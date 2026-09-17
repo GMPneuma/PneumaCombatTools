@@ -15,6 +15,10 @@ This project is currently in roadmap and design discussion. Do not implement fea
 - Use native controls, compact menus, and minimal custom styling. Visual polish should not require a large custom UI layer.
 - Add complexity only for a concrete requirement or demonstrated problem. Review scope and code growth before expanding a feature.
 
+## Build layout
+
+Write runtime module files directly into `dist/`; do not nest them under a module-named subfolder. Package the contents of `dist/` at the ZIP root. The installed module folder remains `pneuma-combattools`.
+
 ## Communication
 
 Be factual and concise. Never imply personal firsthand experience or anthropomorphize yourself. Do not add color commentary.

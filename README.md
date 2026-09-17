@@ -16,7 +16,7 @@ npm run check
 npm run build
 ```
 
-The build creates `dist/pneuma-combattools/`. Copy that folder into your Foundry user data `Data/modules/` directory, restart Foundry, and enable **Pneuma's Combat Tools** in a Cyberpunk RED world.
+The build writes module files directly into `dist/`. For manual installation, copy the contents of `dist/` into your Foundry user data `Data/modules/pneuma-combattools/` directory, restart Foundry, and enable **Pneuma's Combat Tools** in a Cyberpunk RED world.
 
 ## Structure
 

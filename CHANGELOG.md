@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1 - 2026-09-17
+
+- Write module files directly into dist and remove the extra module subfolder.
+- Update manual installation instructions. Combat HUD behavior is unchanged.
+
 ## 0.1.0 - 2026-09-17
 
 - Initialize the Foundry VTT v12 / Cyberpunk RED module scaffold.
