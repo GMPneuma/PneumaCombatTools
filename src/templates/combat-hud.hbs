@@ -15,6 +15,18 @@
   <section class="combat-menu" hidden>
     <strong></strong>
     <div class="combat-attacker">{{localize 'PNEUMA_COMBAT_TOOLS.ActingAs'}} {{attacker}}</div>
-    <p></p>
+    <div class="combat-weapons" hidden>
+      <ul>
+        {{#each weapons}}
+        <li data-weapon-id="{{id}}">
+          {{#if img}}<img src="{{img}}" alt="" width="24" height="24">{{/if}}
+          <span>{{name}}</span>
+        </li>
+        {{else}}
+        <li>{{weaponEmpty}}</li>
+        {{/each}}
+      </ul>
+    </div>
+    <p class="combat-description"></p>
   </section>
 </div>

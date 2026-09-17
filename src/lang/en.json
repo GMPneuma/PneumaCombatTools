@@ -7,7 +7,8 @@
   "PNEUMA_COMBAT_TOOLS.Close": "Close",
   "PNEUMA_COMBAT_TOOLS.ActingAs": "Acting as:",
   "PNEUMA_COMBAT_TOOLS.SelectAttacker": "Select one owned token",
-  "PNEUMA_COMBAT_TOOLS.AttackPlaceholder": "Coming next: equipped weapons, Martial Arts, and Brawling. No roll is made yet.",
+  "PNEUMA_COMBAT_TOOLS.AttackPlaceholder": "Weapon list preview only. Attacks, Martial Arts, and Brawling are not connected yet.",
   "PNEUMA_COMBAT_TOOLS.ThrownPlaceholder": "Coming next: throwable inventory items, including knives and grenades, without requiring them to be equipped. Area effects apply only to appropriate items. No roll is made yet.",
-  "PNEUMA_COMBAT_TOOLS.QuickhacksPlaceholder": "Coming next: available quickhacks for eligible attackers. Eligibility and effects are not connected yet."
+  "PNEUMA_COMBAT_TOOLS.QuickhacksPlaceholder": "Coming next: available quickhacks for eligible attackers. Eligibility and effects are not connected yet.",
+  "PNEUMA_COMBAT_TOOLS.NoEquippedWeapons": "No equipped weapons."
 }

@@ -14,10 +14,11 @@ export async function check(base = root) {
   assert.equal(manifest.compatibility.maximum, "12");
   assert.ok(manifest.relationships.systems.some(system => system.id === "cyberpunk-red-core"));
   for (const asset of [...manifest.esmodules, "templates/combat-hud.hbs", ...manifest.styles, ...manifest.languages.map(lang => lang.path)]) {
-    const path = resolve(base, asset);
+    const sourceAsset = asset.endsWith(".js") ? asset.replace(/\.js$/, ".ts") : asset;
+    const path = base === root ? resolve(root, "src", sourceAsset) : resolve(base, asset);
     assert.ok(path.startsWith(resolve(base) + sep), `Asset outside module: ${asset}`);
     assert.ok((await stat(path)).isFile(), `Missing asset: ${asset}`);
-    if (asset.endsWith(".js")) execFileSync(process.execPath, ["--check", path], { stdio: "inherit" });
+    if (base !== root && asset.endsWith(".js")) execFileSync(process.execPath, ["--check", path], { stdio: "inherit" });
     if (asset.endsWith(".json")) JSON.parse(await readFile(path, "utf8"));
   }
   console.log(`Validated ${manifest.id} v${manifest.version}`);

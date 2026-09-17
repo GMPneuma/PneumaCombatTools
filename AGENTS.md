@@ -15,6 +15,10 @@ This project is currently in roadmap and design discussion. Do not implement fea
 - Use native controls, compact menus, and minimal custom styling. Visual polish should not require a large custom UI layer.
 - Add complexity only for a concrete requirement or demonstrated problem. Review scope and code growth before expanding a feature.
 
+## Language and tooling
+
+Use strict TypeScript for module source under `src/`, matching the other Pneuma modules. Use the Foundry v12 type definitions, pnpm, and the compiler-based build. Do not revert runtime source to JavaScript or edit generated files in `dist/`. JavaScript build scripts may remain in `scripts/`.
+
 ## Build layout
 
 Write runtime module files directly into `dist/`; do not nest them under a module-named subfolder. Package the contents of `dist/` at the ZIP root. The installed module folder remains `pneuma-combattools`.

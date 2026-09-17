@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.2 - 2026-09-17
+
+- Migrate runtime source to strict TypeScript with Foundry v12 types, a pnpm lockfile, and dependency-aware CI. Keep output directly in dist.
+
+- Show the currently selected actor's equipped weapon names and icons in the Attack panel for evaluation; no attack rolls yet.
+
+- Open the player Combat HUD through canvas pointer input on visible, unowned tokens; ignore drags and retain native owned-token controls.
+
+- Anchor the Combat Tools controls to the clicked token in Foundry's canvas HUD container instead of the screen edge.
+
 ## 0.1.1 - 2026-09-17
 
 - Write module files directly into dist and remove the extra module subfolder.
