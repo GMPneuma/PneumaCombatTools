@@ -1,0 +1,20 @@
+<div id="pneuma-combat-hud" class="placeable-hud pneuma-combattools">
+  <div class="col right">
+    {{#each controls}}
+    <button type="button" class="control-icon {{#if active}}active{{/if}}"
+      data-combat-action="{{action}}" title="{{title}}" aria-label="{{title}}"
+      {{#if (eq action "target")}}aria-pressed="{{active}}"{{else}}aria-expanded="false"{{/if}}>
+      <i class="fas {{icon}}" aria-hidden="true"></i>
+    </button>
+    {{/each}}
+    <button type="button" class="control-icon" data-combat-action="close"
+      title="{{localize 'PNEUMA_COMBAT_TOOLS.Close'}}" aria-label="{{localize 'PNEUMA_COMBAT_TOOLS.Close'}}">
+      <i class="fas fa-times" aria-hidden="true"></i>
+    </button>
+  </div>
+  <section class="combat-menu" hidden>
+    <strong></strong>
+    <div class="combat-attacker">{{localize 'PNEUMA_COMBAT_TOOLS.ActingAs'}} {{attacker}}</div>
+    <p></p>
+  </section>
+</div>

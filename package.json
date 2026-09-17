@@ -1,0 +1,9 @@
+{
+  "name": "pneuma-combattools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Combat utilities for Cyberpunk RED in Foundry VTT.",
+  "engines": { "node": ">=22" },
+  "scripts": { "check": "node scripts/check.mjs", "build": "node scripts/build.mjs" }
+}

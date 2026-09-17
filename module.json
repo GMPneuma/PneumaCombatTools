@@ -1,0 +1,39 @@
+{
+  "id": "pneuma-combattools",
+  "title": "Pneuma's Combat Tools",
+  "description": "Combat utilities for Cyberpunk RED in Foundry Virtual Tabletop.",
+  "version": "0.1.0",
+  "authors": [
+    {
+      "name": "GMPneuma"
+    }
+  ],
+  "compatibility": {
+    "minimum": "12",
+    "maximum": "12"
+  },
+  "relationships": {
+    "systems": [
+      {
+        "id": "cyberpunk-red-core",
+        "type": "system"
+      }
+    ]
+  },
+  "esmodules": [
+    "scripts/main.js"
+  ],
+  "styles": [
+    "styles/pneuma-combattools.css"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "url": "https://github.com/GMPneuma/PneumaCombatTools",
+  "manifest": "https://github.com/GMPneuma/PneumaCombatTools/releases/latest/download/module.json",
+  "download": "https://github.com/GMPneuma/PneumaCombatTools/releases/download/v0.1.0/pneuma-combattools.zip"
+}
