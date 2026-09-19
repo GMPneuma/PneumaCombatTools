@@ -18,9 +18,9 @@ if (existing) {
   await rm(output, { recursive: true });
 }
 await mkdir(resolve(output, "scripts"), { recursive: true });
-for (const file of ["module.json", "styles", "lang", "templates", "README.md", "CHANGELOG.md"]) {
+for (const file of ["module.json", "styles", "lang", "templates", "README.md", "CHANGELOG.md", "IMPLEMENTED_FEATURES.md", "BACKLOG.md", "docs"]) {
   const source = ["styles", "lang", "templates"].includes(file) ? resolve(root, "src", file) : resolve(root, file);
-  await cp(source, resolve(output, file), { recursive: true });
+  await cp(source, resolve(output, file), { recursive: true, filter: (path) => !path.endsWith("-preview.png") });
 }
 execFileSync(process.execPath, [tsc], { cwd: root, stdio: "inherit" });
 await check(output);

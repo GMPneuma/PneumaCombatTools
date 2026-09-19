@@ -1,32 +1,49 @@
-<div id="pneuma-combat-hud" class="placeable-hud pneuma-combattools">
-  <div class="col right">
-    {{#each controls}}
-    <button type="button" class="control-icon {{#if active}}active{{/if}}"
-      data-combat-action="{{action}}" title="{{title}}" aria-label="{{title}}"
-      {{#if (eq action "target")}}aria-pressed="{{active}}"{{else}}aria-expanded="false"{{/if}}>
-      <i class="fas {{icon}}" aria-hidden="true"></i>
-    </button>
-    {{/each}}
-    <button type="button" class="control-icon" data-combat-action="close"
-      title="{{localize 'PNEUMA_COMBAT_TOOLS.Close'}}" aria-label="{{localize 'PNEUMA_COMBAT_TOOLS.Close'}}">
-      <i class="fas fa-times" aria-hidden="true"></i>
-    </button>
-  </div>
-  <section class="combat-menu" hidden>
-    <strong></strong>
-    <div class="combat-attacker">{{localize 'PNEUMA_COMBAT_TOOLS.ActingAs'}} {{attacker}}</div>
-    <div class="combat-weapons" hidden>
-      <ul>
-        {{#each weapons}}
-        <li data-weapon-id="{{id}}">
-          {{#if img}}<img src="{{img}}" alt="" width="24" height="24">{{/if}}
-          <span>{{name}}</span>
-        </li>
-        {{else}}
-        <li>{{weaponEmpty}}</li>
-        {{/each}}
-      </ul>
-    </div>
-    <p class="combat-description"></p>
-  </section>
+{{#if standalone}}
+<div id="{{id}}" class="{{classes}}">
+{{/if}}
+<div class="col right pneuma-combat-column">
+{{#each controls}}
+<div class="control-icon {{#if active}}active{{/if}}" role="button" tabindex="0"
+  data-combat-action="{{action}}" data-combat-control title="{{title}}" aria-label="{{title}}"
+  {{#if (eq action "target")}}aria-pressed="{{active}}"{{else}}aria-expanded="false"{{/if}}>
+  {{#if (eq action "melee")}}
+  <i class="fas" aria-hidden="true"><svg class="pneuma-combat-knife" viewBox="0 0 32 32" focusable="false"><path fill="currentColor" d="M29 1 28 9 17 20 11 14 23 3Z M9 14 18 23 16 25 7 16Z M7 19 12 24 6 30Q4 32 1 29L1 27Z"/></svg></i>
+  {{else}}<i class="fas {{icon}}" aria-hidden="true"></i>{{/if}}
 </div>
+{{/each}}
+<section class="status-effects pneuma-combat-menu pneuma-panel">
+  <strong class="combat-heading"></strong>
+  <div class="combat-weapons" hidden>
+    <ul>
+      {{#each weapons}}
+      <li data-attack-category="{{category}}">
+        <button type="button" {{#if deferred}}disabled{{/if}} class="combat-weapon-name" data-item-id="{{id}}" data-roll-type="attack" data-attack-mode="attack" title="{{localize 'PNEUMA_COMBAT_TOOLS.AttackAction'}}: {{name}}">
+          {{#if img}}<img src="{{img}}" alt="" width="24" height="24">{{/if}}<span>{{name}}</span>
+        </button>
+        {{#unless thrown}}<button type="button" {{#if deferred}}disabled{{/if}} class="combat-weapon-mode" data-item-id="{{id}}" data-roll-type="attack" data-attack-mode="aimed" title="{{localize 'PNEUMA_COMBAT_TOOLS.Aimed'}}: {{name}}" aria-label="{{localize 'PNEUMA_COMBAT_TOOLS.Aimed'}}: {{name}}"><i class="fas fa-crosshairs" aria-hidden="true"></i></button>
+        {{#if autofire}}
+        <button type="button" class="combat-weapon-mode" data-item-id="{{id}}" data-roll-type="attack" data-attack-mode="autofire" title="{{localize 'PNEUMA_COMBAT_TOOLS.Autofire'}}: {{name}}" aria-label="{{localize 'PNEUMA_COMBAT_TOOLS.Autofire'}}: {{name}}"><svg viewBox="0 4 32 20" aria-hidden="true"><path fill="currentColor" d="M1 7h5V5h3v2h14v2h8v3h-8v3h-7l2 8h-5l-2-8H8v5H4V11H1zm8 4v2h4v-2z"/></svg></button>
+        {{/if}}
+        {{/unless}}
+      </li>
+      {{/each}}
+      <li data-attack-category="brawling" hidden>
+        <button type="button" class="combat-weapon-name" disabled title="{{localize 'PNEUMA_COMBAT_TOOLS.GrapplePending'}}"><i class="fas fa-hand-back-fist" aria-hidden="true"></i><span>{{localize 'PNEUMA_COMBAT_TOOLS.Grapple'}}</span></button>
+      </li>
+      <li data-attack-category="thrown" hidden>
+        <details><summary>{{localize 'PNEUMA_COMBAT_TOOLS.Grenades'}}</summary>
+          <ul>{{#each grenades}}<li><button type="button" disabled title="Grenade resolution is planned">{{name}}</button></li>{{else}}<li>No grenades in inventory.</li>{{/each}}</ul>
+        </details>
+      </li>
+      <li data-attack-category="thrown" hidden>
+        <button type="button" class="combat-weapon-name" data-item-id="__improvised" data-attack-mode="attack"><img src="systems/cyberpunk-red-core/icons/compendium/weapons/thrown_weapon.svg" alt="" width="24" height="24"><span>Improvised</span></button>
+      </li>
+      <li class="combat-empty">{{weaponEmpty}}</li>
+    </ul>
+  </div>
+  <p class="combat-description"></p>
+</section>
+</div>
+{{#if standalone}}
+</div>
+{{/if}}

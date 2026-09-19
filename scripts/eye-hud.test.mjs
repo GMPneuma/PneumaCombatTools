@@ -1,0 +1,260 @@
+import assert from "node:assert/strict";
+import {readFile} from "node:fs/promises";
+const {chromium}=await import(process.env.PNEUMA_PLAYWRIGHT_MODULE);
+const browser=await chromium.launch({channel:"msedge",headless:true});
+try{
+ const page=await browser.newPage({viewport:{width:1100,height:800}});
+ await page.emulateMedia({reducedMotion:"no-preference"});
+ await page.setContent('<style>body{background:#17222c}</style><div id="chat-log"><div data-message-id="attack">Chat resolution</div></div>');
+ await page.addStyleTag({content:await readFile("dist/styles/pneuma-combattools.css","utf8")});
+ await page.evaluate(()=>{
+  window.FormApplication=class {};
+  window.Dialog=class {constructor(data){window.messageDialog=data;}render(){return this;}};
+  window.hooks={};window.Hooks={on:(k,f)=>(hooks[k]??=[]).push(f),once:(k,f)=>(hooks[k]??=[]).push(f)};
+  window.values={};window.settings={};
+  window.actor={uuid:"Actor.test",name:"Smitty",isOwner:true,system:{derivedStats:{hp:{value:40,max:40}}},items:[{type:"criticalInjury",name:"Crushed Windpipe"}],
+    allApplicableEffects:()=>[{name:"Crushed Windpipe",statuses:new Set(["windpipe"])},{name:"Prone",statuses:new Set(["prone"])},{name:"Disabled",disabled:true,statuses:new Set(["disabled"])}],
+    sheet:{render:()=>{window.openedSheet=true;}}};
+  window.moduleEntry={api:{existing:true}};window.socketListeners=[];window.sentPackets=[];
+  window.game={modules:{get:()=>moduleEntry},socket:{on:(_channel,fn)=>socketListeners.push(fn),emit:(_channel,wire)=>sentPackets.push(wire)},user:{id:"player",isGM:false,character:actor},users:{[Symbol.iterator]:function*(){yield {id:"player",name:"Player",active:true,isGM:false};},filter:fn=>[{id:"player",active:true,isGM:false}].filter(fn),get:id=>id==="player"?{id,active:true}:undefined},i18n:{localize:s=>s},messages:[],settings:{
+    registerMenu:()=>{},register:(_m,k,c)=>{settings[k]=c;values[k]=c.default;},get:(_m,k)=>values[k],
+    set:async(_m,k,v)=>{values[k]=v;settings[k].onChange?.(v);}
+  }};
+  window.canvas={tokens:{controlled:[]}};
+  window.foundry={utils:{randomID:()=>String(window.testMessageId=(window.testMessageId??0)+1),getProperty:(o,p)=>p.split(".").reduce((v,k)=>v?.[k],o)}};
+  window.ui={sidebar:{activateTab:()=>{window.openedChat=true;}},notifications:{info:()=>{}}};
+ });
+ await page.addScriptTag({type:"module",content:(await readFile("dist/scripts/hud-messages.js","utf8"))+"\n"+(await readFile("dist/scripts/item-markers.js","utf8")).replace('const MODULE = "pneuma-combattools";', "")+"\n"+(await readFile("dist/scripts/biomonitor.js","utf8"))+"\n"+(await readFile("dist/scripts/eye-hud.js","utf8")).replace(/^import .*;\s*/gm,"")+"\nObject.assign(window,{sendHUDMessage,hasBiomonitor});registerEyeHUD();"});
+ await page.waitForFunction(()=>hooks.ready?.length);
+ await page.evaluate(()=>{values.biomonitorWithoutImplant=true;hooks.ready.forEach(f=>f());});
+ await page.waitForSelector("#pneuma-eye-hud");
+ assert.equal(await page.locator(".pneuma-eye-conditions .pneuma-eye-condition").count(),2);
+ assert.match(await page.locator("#pneuma-eye-hud").innerText(),/You cannot speak/);
+ await page.locator(".pneuma-eye-ekg").focus();
+ await page.evaluate(()=>{window.stableHUD=document.getElementById("pneuma-eye-hud");window.stableMedical=document.querySelector(".pneuma-eye-medical");window.stableEKG=document.querySelector(".pneuma-eye-ekg");});
+ await page.evaluate(()=>{
+  for(const name of ["createChatMessage","updateChatMessage","deleteChatMessage"]) hooks[name].forEach(fn=>fn({id:"ordinary",flags:{}}));
+  hooks.updateActor.forEach(fn=>fn({uuid:"Actor.unrelated"}));
+  hooks.updateActor.forEach(fn=>fn(actor)); // Same actor, no displayed data changed.
+ });
+ await page.waitForTimeout(50);
+ assert.equal(await page.evaluate(()=>stableHUD===document.getElementById("pneuma-eye-hud")&&stableMedical===document.querySelector(".pneuma-eye-medical")&&document.activeElement===stableEKG),true);
+ await page.evaluate(()=>moduleEntry.api.hud.send({source:"performance",id:"notice",text:"Message only",duration:0}));
+ await page.waitForSelector(".pneuma-eye-alert");
+ assert.equal(await page.evaluate(()=>stableMedical===document.querySelector(".pneuma-eye-medical")&&stableEKG===document.querySelector(".pneuma-eye-ekg")),true);
+ await page.evaluate(()=>moduleEntry.api.hud.dismiss("performance","notice"));
+ await page.waitForSelector(".pneuma-eye-idle");
+ await page.evaluate(()=>{actor.system.derivedStats.hp.value=30;hooks.updateActor.forEach(fn=>fn(actor));});
+ await page.waitForFunction(()=>document.querySelector(".pneuma-eye-hp strong")?.textContent==="30");
+ assert.equal(await page.evaluate(()=>stableHUD===document.getElementById("pneuma-eye-hud")),true);
+ await page.evaluate(()=>{actor.system.derivedStats.hp.value=40;hooks.updateActor.forEach(fn=>fn(actor));});
+ await page.waitForFunction(()=>document.querySelector(".pneuma-eye-hp strong")?.textContent==="40");
+
+ await page.evaluate(()=>game.settings.set("pneuma-combattools","biomonitorShowHP",false));
+ await page.waitForSelector(".conceal-hp");
+ assert.equal(await page.locator(".pneuma-eye-hp").isVisible(),false);
+ await page.locator(".pneuma-eye-ekg").hover();
+ assert.equal(await page.locator(".pneuma-eye-hp").isVisible(),true);
+ await page.mouse.move(0,0);
+ await page.evaluate(()=>game.settings.set("pneuma-combattools","biomonitorShowHP",true));
+ await page.waitForFunction(()=>!document.querySelector(".conceal-hp"));
+ await page.evaluate(()=>{actor.items.push({type:"cyberware",name:"Test Cyberarm",flags:{"pneuma-combattools":{itemMarkers:{disabled:{label:"Disabled"}}}}});hooks.updateActor.forEach(f=>f(actor));});
+ await page.waitForSelector(".pneuma-eye-cyber-disabled");
+ assert.match(await page.locator(".pneuma-eye-cyber").innerText(),/Test Cyberarm/);
+ await page.evaluate(()=>{actor.items.pop();hooks.updateActor.forEach(f=>f(actor));});
+ await page.waitForFunction(()=>document.querySelector(".pneuma-eye-cyber")?.textContent.includes("All Systems Normal"));
+ await page.evaluate(()=>{
+  window.message={id:"attack",visible:true,isContentVisible:true,flags:{"pneuma-combattools":{exchange:{state:"waiting",defenderActor:actor.uuid,total:99,title:"SECRET"}}}};
+  hooks.createChatMessage.forEach(f=>f(message));
+ });
+ await page.waitForSelector(".pneuma-eye-alert");
+ assert.doesNotMatch(await page.locator("#pneuma-eye-hud").innerText(),/SECRET|99/);
+ await page.getByRole("button",{name:"Incoming attack: open chat card",exact:true}).click();
+ assert.equal(await page.evaluate(()=>openedChat),true);
+ await page.getByRole("button",{name:"Clear current HUD message",exact:true}).click();
+
+ await page.evaluate(()=>hooks.updateActor.forEach(f=>f(actor)));
+ await page.waitForTimeout(40);
+ assert.equal(await page.locator(".pneuma-eye-alert").count(),0);
+ assert.equal(await page.evaluate(()=>message.flags["pneuma-combattools"].exchange.state),"waiting");
+ await page.evaluate(()=>game.settings.set("pneuma-combattools","eyeHUDPreview",true));
+ await page.waitForSelector(".pneuma-eye-alert");
+ assert.equal(await page.locator(".pneuma-eye-conditions .pneuma-eye-condition").count(),4);
+ await page.getByRole("button",{name:"Test incoming attack alert",exact:true}).click();
+ assert.match(await page.locator(".pneuma-eye-alert").innerText(),/ALERT: Incoming Attack/);
+ assert.equal(await page.locator(".pneuma-eye-glyph").count(),4);
+ assert.equal(await page.getByRole("button",{name:"Collapse",exact:true}).count(),0);
+ assert.equal(await page.locator(".pneuma-eye-alert").count(),1);
+ assert.equal(await page.locator(".pneuma-eye-condition-text").first().evaluate(n=>getComputedStyle(n).whiteSpace),"nowrap");
+ for (const [hp,state] of [["40","normal"],["30","wounded"],["18","serious"],["9","critical"],["0","flatline"]]) {
+  await page.getByLabel("Test HP state").selectOption(hp);
+  assert.equal(await page.locator(".pneuma-eye-vitals").getAttribute("data-state"),state);
+const dot=page.locator(".pneuma-eye-trace-dot");
+const before=await dot.evaluate(n=>getComputedStyle(n).strokeDashoffset);
+await page.waitForTimeout(120);
+assert.notEqual(await dot.evaluate(n=>getComputedStyle(n).strokeDashoffset),before,"EKG must move in "+state);
+ }
+ await page.getByLabel("Test HP state").selectOption("9");
+ await page.locator(".pneuma-eye-ekg").click();
+ await page.waitForTimeout(50);
+ const pausedOffset=await page.locator(".pneuma-eye-trace-dot").evaluate(n=>getComputedStyle(n).strokeDashoffset);
+ await page.waitForTimeout(150);
+ assert.equal(await page.locator(".pneuma-eye-trace-dot").evaluate(n=>getComputedStyle(n).strokeDashoffset),pausedOffset);
+ await page.locator(".pneuma-eye-ekg").click();
+ await page.waitForTimeout(150);
+ assert.notEqual(await page.locator(".pneuma-eye-trace-dot").evaluate(n=>getComputedStyle(n).strokeDashoffset),pausedOffset);
+ await page.evaluate(()=>values.biomonitorFlashSeconds=1);
+ await page.getByRole("button",{name:"Test lights",exact:true}).click();
+ assert.equal(await page.locator(".pneuma-eye-lamp.is-flashing").count(),4);
+ await page.waitForFunction(()=>!document.querySelector(".pneuma-eye-lamp.is-flashing"));
+ await page.screenshot({path:process.env.TEMP+"/pneuma-eye-hud-preview.png"});
+ await page.getByRole("button",{name:"End test",exact:true}).click();
+ await page.waitForFunction(()=>!document.body.textContent.includes("End test"));
+ assert.equal(await page.locator(".pneuma-eye-conditions .pneuma-eye-condition").count(),2);
+ await page.evaluate(()=>{actor.items=[];actor.allApplicableEffects=()=>[];hooks.updateActor.forEach(f=>f(actor));});
+ await page.waitForSelector("#pneuma-eye-hud");
+ await page.evaluate(()=>game.settings.set("pneuma-combattools","eyeHUD",false));
+ await page.waitForFunction(()=>!document.getElementById("pneuma-eye-hud"));
+
+ await page.evaluate(()=>game.settings.set("pneuma-combattools","eyeHUD",true));
+ await page.evaluate(()=>{actor.items=[{type:"criticalInjury",name:"Broken Arm"}];values.biomonitorWithoutImplant=false;hooks.updateActor.forEach(f=>f(actor));});
+ await page.waitForTimeout(40);
+ assert.equal(await page.locator(".pneuma-eye-medical").count(),0);
+ await page.evaluate(()=>{actor.items.push({type:"cyberware",name:"Biomonitor",system:{isInstalledInActor:true}});hooks.updateActor.forEach(f=>f(actor));});
+ await page.waitForSelector(".pneuma-eye-medical");
+ assert.equal(await page.locator(".pneuma-eye-brand").count(),0);
+ await page.evaluate(()=>{game.user.isGM=true;canvas.tokens.controlled=[{name:"Token Smitty",actor}];hooks.controlToken.forEach(f=>f());});
+ await page.waitForFunction(()=>document.querySelector(".pneuma-eye-brand")?.textContent==="Token Smitty");
+ await page.getByRole("button",{name:"Send HUD Message",exact:true}).click();
+ assert.deepEqual(await page.evaluate(()=>{
+  const doc=new DOMParser().parseFromString(messageDialog.content,"text/html");
+  return [...doc.querySelectorAll('[name="duration"] option')].map(o=>[o.value,o.textContent]);
+ }),[["60","60 Seconds"],["300","5 Minutes"],["900","15 Minutes"],["3600","1 Hour"],["21600","6 Hours"],["0","Until Cleared"]]);
+ await page.evaluate(async()=>{
+  for(const seconds of [60,300,900,3600,21600,0]) {
+   await sendHUDMessage("Duration test","player",seconds);
+   const entry=moduleEntry.api.hud.list().find(m=>m.text==="Duration test");
+   if(seconds===0 && entry.expires!==0)throw new Error("Until Cleared expires");
+   if(seconds>0 && Math.abs(entry.expires-Date.now()-seconds*1000)>1000)throw new Error("Wrong duration");
+   moduleEntry.api.hud.dismiss(entry.source,entry.id);
+  }
+ });
+ await page.evaluate(async()=>{await sendHUDMessage("<b>Take cover</b>","player",60);game.user.isGM=false;actor.items=[];canvas.tokens.controlled=[];hooks.controlToken.forEach(f=>f());});
+ await page.waitForSelector(".pneuma-eye-alert");
+ assert.match(await page.locator(".pneuma-eye-alert").innerText(),/<b>Take cover<\/b>/);
+ assert.equal(await page.locator(".pneuma-eye-alert b").count(),0);
+ assert.equal(await page.locator(".pneuma-eye-medical").count(),0);
+ assert.equal(await page.getByRole("button",{name:"Send HUD Message",exact:true}).count(),0);
+ assert.equal(await page.evaluate(async()=>{try{await sendHUDMessage("no","player",60);return false;}catch{return true;}}),true);
+ await page.getByRole("button",{name:"Clear current HUD message",exact:true}).click();
+ await page.waitForSelector(".pneuma-eye-idle");
+ await page.evaluate(()=>{values.eyeHUDMessage=null;settings.eyeHUDMessage.onChange();});
+
+ await page.waitForSelector(".pneuma-eye-idle");
+
+ await page.evaluate(()=> {
+  const hud=moduleEntry.api.hud;
+  if(!moduleEntry.api.existing) throw new Error("Lost existing API");
+  hud.send({source:"test",id:"one",text:"First",duration:0});
+  hud.send({source:"test",id:"two",text:"Second",duration:0});
+ });
+ await page.waitForFunction(()=>document.querySelector(".pneuma-eye-message-index")?.textContent==="1 / 2");
+ await page.getByRole("button",{name:"Next HUD message",exact:true}).click();
+ assert.match(await page.locator(".pneuma-eye-alert").innerText(),/Second/);
+ await page.evaluate(()=>moduleEntry.api.hud.send({source:"test",id:"two",text:"Updated",duration:0}));
+ await page.waitForFunction(()=>document.querySelector(".pneuma-eye-alert")?.textContent.includes("Updated"));
+ assert.equal(await page.evaluate(()=>moduleEntry.api.hud.list().length),2);
+ await page.getByRole("button",{name:"Clear current HUD message",exact:true}).click();
+ await page.waitForFunction(()=>document.querySelector(".pneuma-eye-message-index")?.textContent==="1 / 1");
+ assert.match(await page.locator(".pneuma-eye-alert").innerText(),/First/);
+ await page.evaluate(()=>moduleEntry.api.hud.remove("test","one"));
+ await page.waitForSelector(".pneuma-eye-idle");
+ await page.evaluate(()=>moduleEntry.api.hud.send({source:"test",id:"expiry",text:"Expires",duration:.1}));
+ await page.waitForFunction(()=>moduleEntry.api.hud.list().length===0);
+ await page.evaluate(()=>{
+  let rejected=false;try{moduleEntry.api.hud.send({source:"test",text:"No",recipients:["remote"]});}catch{rejected=true;}
+  if(!rejected)throw new Error("Player remote send allowed");
+  const originalGet=game.users.get;
+  game.users.get=id=>id==="remote"?{id,active:true}:originalGet(id);
+  game.user.isGM=true;
+  moduleEntry.api.hud.send({source:"test",id:"remote-test",text:"Delivered",recipients:["remote"],duration:30});
+  moduleEntry.api.hud.remove("test","remote-test",["remote"]);
+  game.user.isGM=false;game.users.get=originalGet;
+  if(sentPackets.length!==2 || sentPackets[0].action!=="send" || sentPackets[1].action!=="remove")throw new Error("Remote dispatch failed");
+  socketListeners.forEach(fn=>fn({kind:"hud-message",action:"send",recipients:["someone-else"],notice:{source:"remote",id:"r",text:"Wrong user",expires:0}}));
+  if(moduleEntry.api.hud.list().length)throw new Error("Wrong recipient received notice");
+  socketListeners.forEach(fn=>fn({kind:"hud-message",action:"send",recipients:["player"],notice:{source:"remote",id:"r",text:"Remote notice",expires:0}}));
+ });
+ await page.waitForFunction(()=>document.querySelector(".pneuma-eye-alert")?.textContent.includes("Remote notice"));
+ await page.evaluate(()=>socketListeners.forEach(fn=>fn({kind:"hud-message",action:"remove",recipients:["player"],notice:{source:"remote",id:"r",text:"",expires:0}})));
+ await page.waitForSelector(".pneuma-eye-idle");
+ await page.evaluate(()=>{window.positionWrites=0;const originalSet=game.settings.set;game.settings.set=(module,key,value)=>{if(key==="eyeHUDPosition")positionWrites++;return originalSet(module,key,value);};});
+ const expanded = await page.locator("#pneuma-eye-hud").boundingBox();
+ await page.getByRole("button",{name:"Minimize status HUD",exact:true}).click();
+ await page.waitForSelector("#pneuma-eye-hud.is-minimized");
+ const minimized = await page.locator("#pneuma-eye-hud").boundingBox();
+ assert.equal(minimized.x+minimized.width,expanded.x+expanded.width);
+ assert.equal(minimized.y,expanded.y);
+ assert.equal(await page.locator(".pneuma-eye-body").count(),0);
+ await page.getByRole("button",{name:"Expand status HUD",exact:true}).click();
+ await page.waitForSelector(".pneuma-eye-idle");
+ const restored = await page.locator("#pneuma-eye-hud").boundingBox();
+ assert.equal(restored.x+restored.width,expanded.x+expanded.width);
+ assert.equal(restored.y,expanded.y);
+ assert.equal(await page.evaluate(()=>positionWrites),0,"Collapse/expand must not save position");
+ const handle=await page.locator(".pneuma-eye-header").boundingBox();
+ await page.mouse.move(handle.x+15,handle.y+10);await page.mouse.down();
+ await page.mouse.move(handle.x+160,handle.y+80,{steps:5});await page.mouse.up();
+ assert.equal(await page.evaluate(()=>positionWrites),1);
+ const preferred=await page.locator("#pneuma-eye-hud").boundingBox();
+ const saved=await page.evaluate(()=>({...values.eyeHUDPosition}));
+ await page.setViewportSize({width:400,height:180});
+ await page.waitForTimeout(80);
+ const fitted=await page.locator("#pneuma-eye-hud").boundingBox();
+ assert.ok(fitted.x+fitted.width<=392);
+ assert.deepEqual(await page.evaluate(()=>values.eyeHUDPosition),saved);
+ await page.getByRole("button",{name:"Minimize status HUD",exact:true}).click();
+ await page.waitForSelector("#pneuma-eye-hud.is-minimized");
+ await page.getByRole("button",{name:"Expand status HUD",exact:true}).click();
+ await page.waitForSelector(".pneuma-eye-body");
+ await page.setViewportSize({width:1100,height:800});
+ await page.waitForTimeout(80);
+ const returned=await page.locator("#pneuma-eye-hud").boundingBox();
+ assert.equal(returned.x,preferred.x);assert.equal(returned.y,preferred.y);
+ assert.equal(await page.evaluate(()=>positionWrites),1,"Resize and toggles must not save");
+ await page.evaluate(()=>moduleEntry.api.hud.send({source:"animation",id:"one",text:"Three passes",duration:0}));
+ await page.waitForSelector(".pneuma-eye-ticker");
+ assert.equal(await page.locator(".pneuma-eye-ticker").evaluate(n=>getComputedStyle(n).animationIterationCount),"3");
+ await page.locator(".pneuma-eye-ticker").evaluate(n=>n.getAnimations().forEach(a=>a.finish()));
+ assert.equal(await page.locator(".pneuma-eye-ticker").evaluate(n=>getComputedStyle(n).transform),"none");
+ assert.equal(await page.locator(".pneuma-eye-alert").evaluate(n=>getComputedStyle(n).textAlign),"center");
+ await page.getByRole("button",{name:"Minimize status HUD",exact:true}).click();
+ await page.waitForSelector("#pneuma-eye-hud.is-minimized");
+ await page.getByRole("button",{name:"Expand status HUD",exact:true}).click();
+ await page.waitForSelector(".pneuma-eye-ticker");
+ assert.equal(await page.locator(".pneuma-eye-ticker").evaluate(n=>n.getAnimations().some(a=>a.playState==="running")),true);
+ await page.locator(".pneuma-eye-ticker").evaluate(n=>n.getAnimations().forEach(a=>a.finish()));
+ await page.evaluate(()=>moduleEntry.api.hud.send({source:"animation",id:"two",text:"New message",duration:0}));
+ await page.waitForFunction(()=>document.querySelector(".pneuma-eye-message-index")?.textContent==="1 / 2");
+ assert.equal(await page.locator(".pneuma-eye-ticker").evaluate(n=>n.getAnimations().some(a=>a.playState==="running")),true);
+ await page.evaluate(()=>game.settings.set("pneuma-combattools","biomonitorWithoutImplant",true));
+ await page.waitForSelector(".pneuma-eye-medical");
+ const fullRight=await page.locator("#pneuma-eye-hud").evaluate(n=>n.getBoundingClientRect().right);
+ await page.getByRole("button",{name:"Minimize status HUD",exact:true}).click();
+ await page.waitForSelector(".pneuma-eye-mini-vitals .pneuma-eye-ekg");
+ const miniBox=await page.locator(".pneuma-eye-mini-vitals").boundingBox();
+ const bellBox=await page.getByRole("button",{name:"Expand status HUD",exact:true}).boundingBox();
+ assert.ok(miniBox.x+miniBox.width<=bellBox.x);
+ assert.ok(Math.abs(miniBox.y+miniBox.height/2-bellBox.y-bellBox.height/2)<3);
+ assert.equal(await page.locator("#pneuma-eye-hud").evaluate(n=>n.getBoundingClientRect().right),fullRight);
+ assert.equal(await page.locator(".pneuma-eye-body").count(),0);
+ const miniDot=page.locator(".pneuma-eye-mini-vitals .pneuma-eye-trace-dot");
+ const miniBefore=await miniDot.evaluate(n=>getComputedStyle(n).strokeDashoffset);
+ await page.waitForTimeout(120);
+ assert.notEqual(await miniDot.evaluate(n=>getComputedStyle(n).strokeDashoffset),miniBefore);
+ await page.evaluate(()=>{actor.system.derivedStats.hp.value=0;hooks.updateActor.forEach(fn=>fn(actor));});
+ await page.waitForSelector('.pneuma-eye-mini-vitals[data-state="flatline"]');
+ await page.evaluate(()=>game.settings.set("pneuma-combattools","biomonitorWithoutImplant",false));
+ await page.waitForFunction(()=>!document.querySelector(".pneuma-eye-mini-vitals"));
+ console.log("Eye HUD browser checks passed: native conditions, deduplication, attack privacy/link/dismiss, safe preview, collapse, disable.");
+}finally{await browser.close();}

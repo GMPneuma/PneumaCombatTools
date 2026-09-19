@@ -1,0 +1,80 @@
+import { improvisedSource, thrownRollItem } from "./thrown-weapons.js";
+import { availableWeapons, type EquipmentItem } from "./weapon-data.js";
+
+/** HUD eligibility only; all attack mechanics stay in the CPR sheet handler. */
+export type AttackMode = "attack" | "aimed" | "autofire";
+export interface MenuWeapon extends EquipmentItem {
+  id: string | null; name: string | null; img?: string | null; type: string;
+  flags?: { [key: string]: unknown };
+}
+/** Match Pneuma Quickhack's role and launcher identification. */
+export function canShowQuickhack(items: MenuWeapon[]) {
+  return items.some(item => item.type === "role" && item.name?.trim().toLowerCase() === "netrunner")
+    && items.some(item => item.type === "weapon" && item.system.equipped === "equipped"
+      && (item.flags?.["pneuma-quickhack"] as { action?: string } | undefined)?.action === "quickhack");
+}
+export function attackEntries(items: MenuWeapon[]) {
+  return availableWeapons(items).filter(item => (item.flags?.["pneuma-quickhack"] as { action?: string } | undefined)?.action !== "quickhack"
+    && item.name?.trim().toLowerCase() !== "quickhack")
+    .filter(item => item.system.weaponType !== "thrownWeapon")
+    .map(item => ({ id: item.id, name: item.name, img: item.img,
+      category: ["unarmed", "martialArts"].includes(item.system.weaponType ?? "") ? "brawling"
+        : (item.system.weaponType ?? "").toLowerCase().includes("melee") ? "melee" : "attack",
+      deferred: ["grenadeLauncher", "rocketLauncher"].includes(item.system.weaponType ?? ""),
+      brawling: ["unarmed", "martialArts"].includes(item.system.weaponType ?? ""),
+      autofire: !!item.system.isRanged && (!!item.system.fireModes?.suppressiveFire
+        || ["smg", "heavySmg", "assaultRifle"].includes(item.system.weaponType ?? "")),
+    })).sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+}
+
+export function thrownEntries(items: MenuWeapon[]) {
+  return items.filter(item => item.type === "weapon" && item.system.weaponType === "thrownWeapon")
+    .map(item => ({ id: item.id, name: item.name, img: item.img, category: "thrown", thrown: true }));
+}
+export function grenadeEntries(items: MenuWeapon[]) {
+  return items.filter(item => item.type === "ammo" && (item.system as { type?: string }).type === "grenade")
+    .map(item => ({ id: item.id, name: item.name, img: item.img }));
+}
+
+interface CPRSheet extends ActorSheet {
+  _onRoll(event: JQuery.ClickEvent): Promise<void>;
+  _getFireCheckbox(event: JQuery.ClickEvent): string;
+}
+const rolling = new Set<string>();
+export async function attackFromHUD(attacker: Token, target: Token, itemId: string, mode: AttackMode,
+  event: JQuery.ClickEvent) {
+  const actor = attacker.actor;
+  if (!actor?.isOwner || !target.isVisible || !target.actor
+    || canvas.tokens?.get(attacker.id) !== attacker || canvas.tokens.get(target.id) !== target
+    || !attacker.can(game.user!, "control")) return;
+  const items = Array.from(actor.items) as unknown as MenuWeapon[];
+  const item = [...attackEntries(items), ...thrownEntries(items).map(row => ({...row, autofire:false, deferred:false})),
+    {id:"__improvised",category:"thrown",autofire:false,deferred:false}].find(row => row.id === itemId);
+  if (!item || (mode === "autofire" && !item.autofire)) return;
+  if (item.deferred) { ui.notifications!.info("Grenade and rocket resolution is not implemented yet."); return; }
+  const sheet = actor.sheet as CPRSheet | null;
+  if (!sheet || typeof sheet._onRoll !== "function") throw new Error("CPR attack handler unavailable.");
+  if (rolling.has(actor.uuid)) return;
+  rolling.add(actor.uuid);
+  try {
+    // Restore the captured attacker/defender before entering the native workflow.
+    if (!attacker.control({ releaseOthers: true })) return;
+    target.setTarget(true, { releaseOthers: true });
+    if (item.category === "thrown" || game.settings?.get("pneuma-combattools", "combatResolution")) {
+      const { startCombatExchange } = await import("./combat-resolution.js");
+      if (item.category === "thrown") {
+        const source = itemId === "__improvised" ? await improvisedSource() : actor.items.get(itemId)!.toObject();
+        await startCombatExchange(attacker, target, itemId, "attack", event,
+          { item: thrownRollItem(source, actor), source, improvised: itemId === "__improvised" });
+      } else await startCombatExchange(attacker, target, itemId, mode, event);
+      return;
+    }
+    // Per-call sheet context: choose this button's mode without changing saved sheet fire-mode flags.
+    const context = Object.create(sheet) as CPRSheet;
+    Object.defineProperties(context, {
+      _getFireCheckbox: { value: () => mode },
+      token: { value: attacker.document },
+    });
+    await sheet._onRoll.call(context, event);
+  } finally { rolling.delete(actor.uuid); }
+}

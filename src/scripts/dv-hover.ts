@@ -1,0 +1,135 @@
+import { distanceWithElevation, equippedRanges, parseDV, dvTone, type RangeItem } from "./dv-data.js";
+
+declare global {
+  interface SettingConfig {
+    "cyberpunk-red-core.dvRollTableCompendium": string;
+    "pneuma-combattools.hoverDV": boolean;
+    "pneuma-combattools.hoverAutofire": boolean;
+  }
+}
+
+const MODULE_ID = "pneuma-combattools";
+let hovered: Token | undefined;
+let panel: HTMLDivElement | undefined;
+let revision = 0;
+
+function clear() {
+  revision++;
+  panel?.remove();
+  panel = undefined;
+}
+
+function attacker() {
+  const controlled = canvas.tokens?.controlled ?? [];
+  return controlled.length === 1 && controlled[0]?.actor?.isOwner ? controlled[0] : undefined;
+}
+
+export async function getTable(name: string): Promise<RollTable | undefined> {
+  const world = game.tables?.getName(name);
+  if (world) return world;
+  const configured = game.settings!.get("cyberpunk-red-core", "dvRollTableCompendium") as unknown;
+  const pack = (typeof configured === "string" ? game.packs!.get(configured) : undefined)
+    ?? game.packs!.get("cyberpunk-red-core.internal_dv-tables");
+  if (!pack || pack.documentName !== "RollTable") return;
+  const index = await pack.getIndex();
+  const entry = index.find(entry => entry.name === name);
+  if (!entry) return;
+  return await pack.getDocument(entry._id) as RollTable | undefined;
+}
+
+function position() {
+  if (!panel || !hovered || !canvas.stage || !canvas.app) return;
+  // Convert canvas coordinates to CSS pixels; the panel remains readable while zooming.
+  const view = canvas.app.view as HTMLCanvasElement;
+  const bounds = view.getBoundingClientRect();
+  const point = canvas.stage.toGlobal(new PIXI.Point(hovered.x + hovered.w, hovered.y));
+  const x = bounds.left + point.x * bounds.width / canvas.app.screen.width;
+  const y = bounds.top + point.y * bounds.height / canvas.app.screen.height;
+  const width = panel.offsetWidth;
+  const height = panel.offsetHeight;
+  panel.style.left = `${Math.max(8, Math.min(x + 12, window.innerWidth - width - 8))}px`;
+  panel.style.top = `${Math.max(8, Math.min(y, window.innerHeight - height - 8))}px`;
+}
+
+async function refresh() {
+  clear();
+  const target = hovered;
+  const source = attacker();
+  if (!game.settings!.get(MODULE_ID, "hoverDV") || !target?.isVisible || target.isPreview ||
+    !source || source === target || canvas.activeLayer !== canvas.tokens) return;
+  const current = revision;
+  const distance = distanceWithElevation(canvas.grid!.measurePath([source.center, target.center], {}).distance,
+    source.document.elevation, target.document.elevation);
+  const weapons = equippedRanges(Array.from(source.actor!.items) as unknown as RangeItem[],
+    game.settings!.get(MODULE_ID, "hoverAutofire"));
+  const tables = new Map<string, Promise<RollTable | undefined>>();
+  const lines = await Promise.all(weapons.map(async weapon => {
+    try {
+      if (!tables.has(weapon.table)) tables.set(weapon.table, getTable(weapon.table));
+      const table = await tables.get(weapon.table);
+      const dv = parseDV(table?.getResultsForRoll(distance)[0]?.text);
+      if (dv === undefined) return;
+      const suffix = weapon.autofire ? ` (${game.i18n!.localize("CPR.global.itemType.skill.autofire")})` : "";
+      return { dv, name: `${weapon.name}${suffix}` };
+    } catch (error) {
+      console.warn(`${MODULE_ID} | Could not read DV table ${weapon.table}`, error);
+      return;
+    }
+  }));
+  // Async compendium reads must not resurrect a tooltip after hover/selection changes.
+  if (revision !== current || hovered !== target || attacker() !== source || !target.isVisible) return;
+  const visible = lines.filter((line): line is { dv: number; name: string } => !!line);
+  if (!visible.length) return;
+  panel = document.createElement("div");
+  panel.className = "pneuma-panel pneuma-dv-hover";
+  panel.setAttribute("role", "tooltip");
+  for (const line of visible) {
+    const row = document.createElement("div");
+    const value = document.createElement("span");
+    value.className = `pneuma-dv-value pneuma-dv-${dvTone(line.dv)}`;
+    value.textContent = `DV${line.dv}`;
+    row.append(value, document.createTextNode(` ${line.name}`));
+    panel.append(row);
+  }
+  document.body.append(panel);
+  position();
+}
+
+export function registerHoverDV() {
+  for (const [key, defaultValue] of [["hoverDV", true], ["hoverAutofire", false]] as const) {
+    game.settings!.register(MODULE_ID, key, {
+      name: `PNEUMA_COMBAT_TOOLS.${key}Name`, hint: `PNEUMA_COMBAT_TOOLS.${key}Hint`,
+      scope: "client", config: true, type: Boolean, default: defaultValue,
+      onChange: () => { void refresh(); },
+    });
+  }
+  Hooks.on("hoverToken", (token: Token, entered: boolean) => {
+    if (entered) hovered = token;
+    else if (hovered === token) hovered = undefined;
+    else return;
+    void refresh();
+  });
+  Hooks.on("controlToken", () => { void refresh(); });
+  Hooks.on("canvasPan", position);
+  Hooks.on("refreshToken", (token: Token) => {
+    if (token === hovered) {
+      if (!token.isVisible) { hovered = undefined; clear(); }
+      else position();
+    }
+  });
+  Hooks.on("updateToken", (document: TokenDocument) => {
+    if (document === hovered?.document || document === attacker()?.document) void refresh();
+  });
+  for (const hook of ["createItem", "updateItem", "deleteItem"]) {
+    Hooks.on(hook, (item: Item) => { if (item.parent === attacker()?.actor) void refresh(); });
+  }
+  for (const hook of ["updateRollTable", "createRollTable", "deleteRollTable", "updateTableResult", "createTableResult", "deleteTableResult"]) {
+    Hooks.on(hook, () => { if (hovered) void refresh(); });
+  }
+  Hooks.on("deleteToken", (document: TokenDocument) => {
+    if (document === hovered?.document || document === attacker()?.document) { hovered = undefined; clear(); }
+  });
+  Hooks.on("canvasTearDown", () => { hovered = undefined; clear(); });
+  window.addEventListener("resize", position);
+  window.addEventListener("blur", () => { hovered = undefined; clear(); });
+}
