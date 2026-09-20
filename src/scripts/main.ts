@@ -160,7 +160,7 @@ Hooks.once("init", () => {
     override getData(options = {}) {
       const attacker = selection && selection.target === this.object ? selection.attacker : selectedAttacker();
       const selfCTH = isSelfCTH(this.object ?? undefined, attacker);
-      if (selfCTH) return {...super.getData(options), standalone: false, selfCTH: true, selfInitiative: selfInitiativeControl(this.object!)};
+      if (selfCTH) return {...super.getData(options), standalone: false, selfCTH: true, selfAlertHUD: game.settings!.get(MODULE_ID,"eyeHUD"), selfInitiative: selfInitiativeControl(this.object!)};
       const connection = attacker?.actor && this.object?.actor ? connectionFor(attacker.actor, this.object.actor.uuid) : undefined;
       const sight = !!attacker && !!this.object && quickhackEnabled() && hasQuickhackSight(attacker, this.object);
       const ejectNetrunners = forceOutEntries(this.object?.actor ?? undefined);
@@ -208,6 +208,15 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
     html.find(".col.right").first().append(controls);
   }
   if (data.selfCTH) {
+    html.find<HTMLElement>("[data-self-alert-hud]").on("click keydown",async event=>{
+      if(event.type==="keydown"&&!["Enter"," "].includes(event.key??""))return;
+      event.preventDefault();event.stopPropagation();const button=event.currentTarget;
+      if(button.getAttribute("aria-disabled")==="true")return;
+      button.setAttribute("aria-disabled","true");
+      try{await game.settings!.set(MODULE_ID,"eyeHUD",!game.settings!.get(MODULE_ID,"eyeHUD"));}
+      catch(error){ui.notifications!.error(error instanceof Error?error.message:String(error));}
+      finally{if(hud.object===token)hud.render(true);}
+    });
     html.find<HTMLElement>("[data-self-initiative]").on("click keydown",async event=>{
       if(event.type==="keydown"&&!["Enter"," "].includes(event.key??""))return;
       event.preventDefault();event.stopPropagation();const button=event.currentTarget;

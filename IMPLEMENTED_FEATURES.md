@@ -333,7 +333,7 @@ Hovering a visible token shows the existing Biomonitor EKG below it for Medtech 
 
 ## Self CTH and speedware initiative
 
-Own-token HUDs show self controls instead of standard combat actions while retaining native token controls. GM target actions remain available when acting as a different selected token. Default-off **Pneuma HomeBrew** adds a D10 for installed functional Sandevistan/Kerenzikov. Started combat and existing initiative are required. Native CPR rerolls preserve the acting combatant; duplicate pending clicks are ignored. The Action cost is table-managed. Automated unit/browser checks pass; live Foundry verification remains outstanding. See [Self CTH](docs/self-cth.md).
+Own-token HUDs show self controls instead of standard combat actions while retaining native token controls. GM target actions remain available when acting as a different selected token. Default-off **Speedware allows Rerolling Initiative** adds a D10 for installed functional Sandevistan/Kerenzikov. Started combat and existing initiative are required. Native CPR rerolls preserve the acting combatant; duplicate pending clicks are ignored. The Action cost is table-managed. Automated unit/browser checks pass; live Foundry verification remains outstanding. See [Self CTH](docs/self-cth.md).
 
 ### Refresh performance
 
@@ -352,3 +352,31 @@ Own-token HUDs show self controls instead of standard combat actions while retai
 - Validation: typecheck/build, 66 focused unit/regression checks, and movement, QuickHack and self CTH browser fixtures pass. Live multiplayer FPS/CPU measurements remain outstanding.
 
 Combat Tools requires **libWrapper**. EMP uses WRAPPER/MIXED registrations; damage capture uses a persistent, operation-filtered MIXED registration. Missing registration support blocks the affected operation before mutation. See [v13 migration checklist](FOUNDRY_V13_MIGRATION.dm). Live companion-module compatibility remains unverified.
+
+Thrown-weapon HUD layout: item icon/name remain together on the first row, with Used and other markers underneath. Inventory grenades appear directly in the main thrown list without a collapsible category.
+
+Movement Reset now hides that token's counter, controls and start marker after successfully restoring its position. The hidden state is synchronized on the token and clears on its next movement. Failed resets retain the display.
+
+Thrown names now use the full list width: removed a later shared grid override that reserved three empty action columns on thrown rows.
+
+AoE damage controls match ordinary damage: blood drop rolls shared damage; lightning bolt applies it to a recipient. Native attack-card rollDamage controls are removed inside AoE cards, including older rendered cards, to keep damage within the shared workflow.
+
+Attack-area visibility controls are now GM-only, superseding earlier all-viewer access. Player controls are hidden and the GM request handler rejects player show/hide requests. Automatic completion hiding remains unchanged.
+
+AoE cards use roll-only shared damage rendering: the bottom retains `data-pneuma-section="damage-roll"` and native dice/breakdown, but omits the shared `damage-apply` section and empty recovery slot. Per-target lightning controls remain inline; applied results appear below the shared damage roll. Ordinary single-target cards retain their application section. Older AoE cards lose the redundant bottom section when rendered.
+
+Speedware initiative eligibility accepts installed cyberware with Sandevistan or Kerenzikov anywhere in its name, case-insensitively. Native source identity and existing EMP, world-setting and combat checks remain supported.
+
+Self CTH uses the normal CTH button column beside the native token HUD, with no separate panel, heading or explanatory text. Installed speedware marked Disabled, or disabled by EMP, cannot qualify. The generic EMP token-HUD button has been removed; EMP state and its existing programmatic workflow remain.
+
+Self CTH always includes a bell icon labelled Toggle Alert HUD, which toggles the current client Status HUD setting even when disabled in Settings. Re-roll Initiative uses a D10 icon; it remains a native initiative reroll. The speedware world setting carries the Pneuma Homebrew badge and retains its existing stored key/preferences.
+
+Self controls are direct `.control-icon` children of `.pneuma-combat-column`, sharing native button styling, HUD sizing/spacing and the configured CTH icon color. The bell is always present; the D10 appears only when eligible. This supersedes the separate Self panel.
+
+AoE applied-damage summaries now collect in `.pneuma-damage-applications.pneuma-aoe-applications` directly after `.pneuma-damage-result`. They retain the normal damage result markup, expandable breakdown and undo controls. No empty application box is added; lightning buttons remain beside each target. This supersedes placing summaries between target rows.
+
+
+AoE attack dice animation: new area attacks retain their native attack dice and release them through CPR Dice So Nice handling after scatter placement and every waiting/rolling response resolves. The saved roll mode is retained. A persisted reveal flag prevents later damage, movement, visibility updates or chat rerenders from repeating the animation; legacy cards do not replay. Card attack visibility uses the same response condition. Automated fixture verification only.
+
+
+AoE configuration layout: collapsible attack profiles show their current shape/dimensions in the heading; shotgun shells open initially. Shape-dependent fields use two columns. Evasion and Cover Up remain a separate collapsed section, with a fixed Save footer. All settings and stored values are retained. Supersedes the always-expanded profile layout.

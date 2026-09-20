@@ -21,3 +21,5 @@ The two boxes use native `.placeable-hud`, `.attribute`, and `.control-icon` mar
 Visibility: players see movement counters and start markers for all visible player-owned actors, including other players. NPC actors without a player owner show movement only to GMs. This uses native actor player ownership rather than token disposition or sheet type. Reset remains owner/GM-only; seeing another counter grants no token control. Ownership/user changes refresh the display, and invisible tokens remain hidden.
 
 Movement display updates are batched once per token per animation frame. Unrelated combat flags do not redraw the scene; turn identity changes and initiative reordering update affected tokens. Reset still restores the saved position and updates the counter on the scheduled frame.
+
+Movement Reset now hides that token's counter, controls and start marker after successfully restoring its position. The hidden state is synchronized on the token and clears on its next movement. Failed resets retain the display.

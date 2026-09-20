@@ -53,7 +53,7 @@ export async function createEmp(actor:Actor,options:Pick<EmpRequest,"count"|"cho
   if(message)await combat.update({[`flags.${MODULE}.empRequests.${request.id}.message`]:message.id});
   if(request.chooser!=="player")await chooseEmp(combat,request);
 }
-function configureEmp(actor:Actor) {
+export function configureEmp(actor:Actor) {
   new Dialog({title:`EMP — ${actor.name}`,content:`<form><div class="form-group"><label>Items to disable</label><input name="count" type="number" min="1" max="50" value="2"></div><div class="form-group"><label>Selection</label><select name="chooser"><option value="gm">GM chooses</option><option value="player">Player chooses</option><option value="random">Random</option></select></div><div class="form-group"><label>Random method</label><select name="mode"><option value="equal">True random (equal odds)</option><option value="foundation-more">Foundational more likely (2×)</option><option value="foundation-less">Foundational less likely (½×)</option><option value="system">System first</option></select></div><div class="form-group"><label>Allow foundational cyberware</label><input name="foundational" type="checkbox" checked></div><div class="form-group"><label>Disable installed options with their host</label><input name="cascade" type="checkbox" checked></div><div class="form-group"><label>Include carried electronics</label><input name="electronics" type="checkbox" checked></div><p>Use after resolving the source's resistance check. The GM immunity list applies to direct selection. Lasts until this combat ends.</p></form>`,buttons:{create:{label:"Create EMP selection",callback:html=>{
     const root=(html as JQuery)[0]!;
     const value=(name:string)=>(root.querySelector(`[name="${name}"]`) as HTMLInputElement).value;
@@ -87,14 +87,6 @@ export function registerEmp() {
       for(const actor of actors.values())if(actor.items.some(item=>foundry.utils.getProperty(item,`flags.${MODULE}.empCombats`)))actor.prepareData();
       if(empGM()?.id===game.user?.id)await empWork(reconcileEmp);
     }).catch(report);
-  });
-  Hooks.on("renderTokenHUD",(hud:TokenHUD,html:JQuery,data?:{selfCTH?:boolean})=>{
-    if(data?.selfCTH||!game.user?.isGM||!game.combat?.started||!hud.object?.actor)return;
-    const button=document.createElement("div");button.className="control-icon";button.title="EMP: disable cyberware";button.tabIndex=0;button.setAttribute("role","button");button.innerHTML='<i class="fas fa-bolt" aria-hidden="true"></i>';
-    button.addEventListener("click",event=>{event.stopPropagation();configureEmp(hud.object!.actor!);});
-    button.addEventListener("keydown",event=>{if(["Enter"," "].includes(event.key)){event.preventDefault();button.click();}});
-    const column=html.find(".col.left").first();
-    (column.length?column:html.find(".col.right").first()).append(button);
   });
   Hooks.on("renderChatMessage",(message:ChatMessage,html:JQuery)=>{
     const ref=foundry.utils.getProperty(message,`flags.${MODULE}.emp`) as {combat:string;request:string}|undefined;

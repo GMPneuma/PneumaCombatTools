@@ -1,9 +1,10 @@
 <form class="pneuma-area-editor" autocomplete="off">
   <div class="pneuma-area-editor-body">
-    <p class="notes">Configure each attack separately. Distances use m/yd and the scene scale; ray widths use scene squares. Changes from the rules are homebrew.</p>
+    <p class="notes">Choose an attack type to edit. Distances are in m/yd; widths are in scene squares.</p>
     {{#each profiles}}
-    <fieldset data-area-profile="{{prefix}}">
-      <legend>{{label}}</legend>
+    <details class="pneuma-area-profile" data-area-profile="{{prefix}}" {{#if @first}}open{{/if}}>
+      <summary><span>{{label}}</span><output data-area-summary="{{prefix}}" aria-live="polite"></output></summary>
+      <div class="pneuma-area-profile-body">
       <p class="notes">{{hint}}</p>
       <div class="pneuma-area-fields">
         <div class="form-group"><label for="pct-{{prefix}}-shape">Shape</label><select id="pct-{{prefix}}-shape" name="{{prefix}}Shape">{{selectOptions shapes selected=shape}}</select></div>
@@ -15,16 +16,16 @@
         {{/if}}
         {{#if suppression}}<div class="form-group"><label for="pct-corridor-max">Ray range (m/yd)</label><input id="pct-corridor-max" type="number" name="corridorMax" value="{{rayRange}}" min="0" max="1000" step="any"><small>0 = to the scene boundary</small></div>{{/if}}
       </div>
-      <output data-area-summary="{{prefix}}" aria-live="polite"></output>
-    </fieldset>
+      </div>
+    </details>
     {{/each}}
-    <p class="notes">All shapes respect walls. Cones and rays rotate toward the chosen point. Explosives use a square or circle centered on impact. Range here controls the area, not weapon range.</p>
-    <details class="pneuma-area-rules"><summary>Attack &amp; evasion rules</summary>
-      <p class="notes">RAW: a successful AoE evasion requires moving outside the affected area.</p>
-      <div class="form-group"><label for="pct-evade-move">Homebrew: evasion movement uses MOVE</label><input id="pct-evade-move" type="checkbox" name="evadeMove" {{checked evadeMove}}></div>
-      <div class="form-group"><label for="pct-evade-borrow">Homebrew: deduct insufficient MOVE from next turn</label><input id="pct-evade-borrow" type="checkbox" name="evadeBorrow" {{checked evadeBorrow}}></div>
+    <p class="notes">Areas respect walls. These distances set the affected area, not weapon range.</p>
+    <details class="pneuma-area-rules"><summary>Evasion &amp; Cover Up</summary>
+      <p class="notes">Successful evaders must leave the area. MOVE costs and borrowing are optional homebrew.</p>
+      <div class="form-group"><label for="pct-evade-move">Charge evasion movement to MOVE</label><input id="pct-evade-move" type="checkbox" name="evadeMove" {{checked evadeMove}}></div>
+      <div class="form-group"><label for="pct-evade-borrow">Borrow remaining cost from next turn</label><input id="pct-evade-borrow" type="checkbox" name="evadeBorrow" {{checked evadeBorrow}}></div>
       <div class="form-group"><label for="pct-evade">Evasion eligibility</label><select id="pct-evade" name="evade">{{selectOptions evadeChoices selected=evade}}</select></div>
-      <div class="form-group"><label for="pct-evade-penalty">Evasion modifier (RAW: 0)</label><input id="pct-evade-penalty" type="number" name="evadePenalty" value="{{evadePenalty}}" min="-20" max="20"></div>
+      <div class="form-group"><label for="pct-evade-penalty">Evasion modifier</label><input id="pct-evade-penalty" type="number" name="evadePenalty" value="{{evadePenalty}}" min="-20" max="20"></div>
       <div class="form-group"><label for="pct-cover-up" data-cover-up-label>Cover Up</label><input id="pct-cover-up" type="checkbox" name="coverUp" {{checked coverUp}}></div>
       <p class="notes">Cover Up: stay in place, become Prone, double armor SP for this damage application, and double armor ablation even if no damage penetrates. RAW explosive evasion must exceed the attack. Shell defense ties avoid the attack.</p>
     </details>

@@ -43,7 +43,8 @@ test('accepted updates atomically persist movement, signed AoE deltas, reset and
  const f=fixture();assert.equal(f.commit({x:100}).pneumaMoveDelta,2);assert.equal(currentMovement(f.doc).spent,1);
  assert.equal(f.commit({y:100}).pneumaMoveDelta,0);assert.equal(currentMovement(f.doc).spent,1);
  let resetOptions;const original=f.doc.update;f.doc.update=async(data,options)=>{resetOptions=options;return original(data,options);};
- await resetMovement(f.token);assert.equal(f.doc.x,0);assert.equal(f.doc.y,0);assert.equal(f.doc.elevation,5);assert.equal(currentMovement(f.doc).spent,0);assert.equal(resetOptions.pneumaMoveDelta,-2);
+ await resetMovement(f.token);assert.equal(f.doc.x,0);assert.equal(f.doc.y,0);assert.equal(f.doc.elevation,5);assert.equal(currentMovement(f.doc).spent,0);assert.equal(resetOptions.pneumaMoveDelta,-2);assert.equal(currentMovement(f.doc).hidden,true);
+ f.commit({x:100});assert.equal(currentMovement(f.doc).hidden,false);
  f.commit({x:200});f.combat.round=2;assert.equal(currentMovement(f.doc),undefined);f.commit({x:300});assert.equal(currentMovement(f.doc).spent,1);assert.equal(currentMovement(f.doc).start.x,200);
  f.combat.started=false;assert.equal(currentMovement(f.doc),undefined);
 });

@@ -385,3 +385,16 @@ AoE Cover Up now resolves to row data-state="hit" with a Cover Up / Prone / SP Ã
 Native `Dialog`, `.form-group`, checkbox/select controls and Token HUD `.control-icon` markup remain in use. `.pneuma-emp-selection` scopes the selection form and `.pneuma-emp-choice` scopes each item row; random rows show first-draw odds. No existing card selectors are removed. Example: `.pneuma-emp-card [data-emp-select]:disabled { opacity: 0.6; }`.
 
 The applied EMP card adds `.pneuma-emp-result` with the affected item names while its Combat record exists. Names use text content, not HTML. Example: `.pneuma-emp-card .pneuma-emp-result { font-weight: bold; }`.
+
+### AoE shared damage controls
+
+Within `.pneuma-aoe-card`, `[data-aoe-action="damage"]` uses `fas fa-droplet` and `[data-aoe-action="apply"]` uses `fas fa-bolt`. Existing titles, aria-labels, owner/state checks and Shift-click options remain. `.pneuma-aoe-attack [data-action="rollDamage"]` is removed so native attack controls cannot bypass shared damage. Other native roll nodes and expansion controls are retained. Example selector: `.pneuma-aoe-card [data-aoe-action="apply"] .fa-bolt`. Rendering also updates older saved AoE cards without rebuilding their dice nodes.
+
+AoE `[data-aoe-action="show"]` is visible only to GMs. Both show and hide requests require GM authority.
+
+AoE cards use roll-only shared damage rendering: the bottom retains `data-pneuma-section="damage-roll"` and native dice/breakdown, but omits the shared `damage-apply` section and empty recovery slot. Per-target lightning controls remain inline; applied results appear below the shared damage roll. Ordinary single-target cards retain their application section. Older AoE cards lose the redundant bottom section when rendered.
+
+AoE applied-damage summaries now collect in `.pneuma-damage-applications.pneuma-aoe-applications` directly after `.pneuma-damage-result`. They retain the normal damage result markup, expandable breakdown and undo controls. No empty application box is added; lightning buttons remain beside each target. This supersedes placing summaries between target rows.
+
+
+AoE attack dice animation: new area attacks retain their native attack dice and release them through CPR Dice So Nice handling after scatter placement and every waiting/rolling response resolves. The saved roll mode is retained. A persisted reveal flag prevents later damage, movement, visibility updates or chat rerenders from repeating the animation; legacy cards do not replay. Card attack visibility uses the same response condition. Automated fixture verification only.

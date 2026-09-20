@@ -28,7 +28,7 @@ export const areaSettings = () => normalizeArea(game.settings!.get(MODULE,"areaS
 class AreaSettingsForm extends FormApplication {
   constructor(){super({});}
   static override get defaultOptions() { return foundry.utils.mergeObject(super.defaultOptions, {
-    title:"Area Attacks & Suppressive Fire", id:"pneuma-area-settings", width:600, height:700, resizable:true, scrollY:[".pneuma-area-editor-body"],
+    title:"Area Attacks & Suppressive Fire", id:"pneuma-area-settings", width:560, height:620, resizable:true, scrollY:[".pneuma-area-editor-body"],
     template:`modules/${MODULE}/templates/area-settings.hbs`, closeOnSubmit:true }); }
   override getData() {
     const settings=areaSettings();

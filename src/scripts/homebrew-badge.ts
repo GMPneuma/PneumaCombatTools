@@ -28,6 +28,7 @@ export function markHomebrew(label: HTMLElement): HTMLElement {
 function decorateSettings(root: HTMLElement) {
   for (const [key, homebrewValues] of [
     ["maNoAblation", null],
+    ["pneumaHomebrew", null],
     ["quickhackMode", ["owned", "loaded"]],
   ] as const) {
     const input = root.querySelector<HTMLInputElement | HTMLSelectElement>(`[name="pneuma-combattools.${key}"]`);

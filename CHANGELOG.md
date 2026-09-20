@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.3.5 - 2026-09-20
+
+- Streamline AoE configuration into collapsible profiles with current shape summaries and separate evasion controls.
+- Reveal the stored AoE attack Dice So Nice roll after all evasion responses finish, without rerolling or replaying on later updates.
+- Restrict attack-area show/hide controls to GMs.
+- Exclude installed speedware marked Disabled or disabled by EMP from initiative rerolls; remove the generic EMP HUD button.
+
+- Collect AoE applied-damage results below the shared damage roll, keeping apply buttons beside targets.
+
+- Place self controls in the standard CTH button column with shared icon color/sizing; remove the separate Self panel.
+
+- Add an always-available Toggle Alert HUD bell to self CTH. Rename the speedware world setting to Speedware allows Rerolling Initiative and apply the Pneuma Homebrew badge; the initiative action retains its D10 icon.
+
+- Recognize Sandevistan/Kerenzikov anywhere in installed cyberware names for initiative rerolls.
+
+- Remove the redundant bottom Apply Damage section from AoE cards; keep shared dice below and per-target application inline.
+
+- Match AoE roll/apply damage icons to normal damage and remove the native damage shortcut that bypasses shared resolution.
+
+- Remove empty action-column spacing from thrown-weapon rows so names use the full list width.
+
+- Hide a token's movement UI and start marker after Reset until it moves again.
+
+- Keep HUD item icons/names on one row with markers below; flatten grenades into the thrown-weapon list.
+
 Jack-In and QuickHack combine the native Interface dice and outcome into one chat card with scoped QuickHack header, roll, result, effect and action containers. Result visibility governs the combined card. Private NPC dice remain a separate GM-only message when the result is shared with players. No existing chat messages are migrated.
 
 Jack-In and QuickHack require wall-based line of sight from the attacker center to at least one of nine inset target points. QuickHack requires an active tracked connection. Losing sight blocks actions but never ejects the connection; restored sight permits actions again. Outside combat, Jack-In remains roll/chat-only and QuickHack is blocked because no connection is tracked. No migrations are added.

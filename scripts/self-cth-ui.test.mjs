@@ -9,7 +9,7 @@ try{
   Handlebars.registerHelper('eq',(a,b)=>a===b);Handlebars.registerHelper('localize',s=>s);window.renderTemplate=async()=>Handlebars.compile(template)(window.renderData);
   window.hooks={};window.Hooks={on:(n,f)=>(hooks[n]??=[]).push(f),once:(n,f)=>(hooks[n]??=[]).push(f)};
   window.foundry={utils:{getProperty:(o,p)=>p.split('.').reduce((v,k)=>v?.[k],o)},data:{fields:{ColorField:class{}}}};
-  window.settings={};window.game={system:{id:'cyberpunk-red-core'},user:{isGM:false},settings:{register:(_m,k,c)=>settings[k]=c.default,get:(_m,k)=>settings[k]},i18n:{localize:s=>s,format:s=>s}};
+  window.settings={};window.game={system:{id:'cyberpunk-red-core'},user:{isGM:false},settings:{register:(_m,k,c)=>settings[k]=c.default,get:(_m,k)=>settings[k],set:async(_m,k,v)=>{settings[k]=v;}},i18n:{localize:s=>s,format:s=>s}};
   class NativeToken{_canHUD(){return true;}_onClickRight(){canvas.tokens.controlled=[this];}_onUnclickRight(){}_onClickRight2(){}}
   class NativeHUD{get template(){return 'native';}getData(){return{id:'token-hud',classes:'placeable-hud'};}activateListeners(){}render(){window.renders=(window.renders??0)+1;}}
   window.CONFIG={Token:{objectClass:NativeToken,hudClass:NativeHUD}};window.BasePlaceableHUD=class{};window.Ruler={STATES:{MEASURING:1}};
@@ -30,7 +30,16 @@ try{
  });
  await page.evaluate(template=>window.sourceTemplate=template,await readFile('src/templates/combat-hud.hbs','utf8'));
  await page.evaluate(()=>show(own));assert.equal(await page.locator('[data-self-cth]').count(),1);assert.equal(await page.locator('[data-combat-action]').count(),0);assert.equal(await page.locator('[data-self-initiative]').count(),0);assert.equal(await page.locator('[data-native]').count(),1);
- await page.evaluate(()=>{settings.pneumaHomebrew=true;return show(own,true);});assert.equal(await page.locator('[data-self-initiative] .fa-dice-d10').count(),1);assert.equal(await page.locator('[data-combat-action]').count(),0);
+ await page.addStyleTag({content:await readFile('dist/styles/pneuma-combattools.css','utf8')});
+ await page.evaluate(()=>document.querySelector('#token-hud').style.setProperty('--pneuma-cth-icon-color','#12ab34'));
+ assert.equal(await page.locator('[data-self-cth] > [data-self-alert-hud] .fa-bell').count(),1);
+ assert.equal(await page.locator('[data-self-cth] > section, [data-self-cth] > strong, [data-self-cth] .notes').count(),0);
+ assert.equal(await page.locator('[data-self-alert-hud] > i').evaluate(n=>getComputedStyle(n).color),'rgb(18, 171, 52)');
+ await page.evaluate(()=>settings.eyeHUD=false);
+ await page.locator('[data-self-alert-hud]').dispatchEvent('click');await page.waitForFunction(()=>settings.eyeHUD===true);
+ await page.evaluate(()=>show(own));
+ await page.locator('[data-self-alert-hud]').dispatchEvent('keydown',{key:'Enter'});await page.waitForFunction(()=>settings.eyeHUD===false);
+ await page.evaluate(()=>{settings.pneumaHomebrew=true;return show(own,true);});assert.equal(await page.locator('[data-self-cth] > [data-self-initiative] .fa-dice-d10').count(),1);assert.equal(await page.locator('[data-self-initiative] > i').evaluate(n=>getComputedStyle(n).color),'rgb(18, 171, 52)');assert.equal(await page.locator('[data-combat-action]').count(),0);
  await page.locator('[data-self-initiative]').dispatchEvent('click');assert.deepEqual(await page.evaluate(()=>rolls),[[['c'],{updateTurn:true}]]);
  await page.evaluate(()=>{settings.pneumaHomebrew=false;});await page.locator('[data-self-initiative]').dispatchEvent('click');assert.equal(await page.evaluate(()=>rolls.length),1);
  await page.evaluate(()=>{canvas.tokens.controlled=[own];return show(enemy);});assert.equal(await page.locator('[data-combat-action]').count(),3);assert.equal(await page.locator('[data-self-initiative]').count(),0);

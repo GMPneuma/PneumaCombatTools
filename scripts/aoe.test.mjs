@@ -4,7 +4,7 @@ import {registerHooks} from "node:module";
 globalThis.FormApplication=class {}; globalThis.Hooks={once(){},on(){}};
 registerHooks({resolve(specifier,context,next){
  if(specifier==="./placement.js"&&context.parentURL?.endsWith("/aoe/workflow.js"))return {shortCircuit:true,url:"data:text/javascript,"+encodeURIComponent('export const templateData=area=>({t:area.shape,x:area.origin.x,y:area.origin.y}); export const areaCoverage=area=>box=>globalThis.testCoverage(area,box) && !globalThis.CONFIG.Canvas.polygonBackends.move.testCollision(area.origin,{x:box.x+1,y:box.y+1},{type:"move",mode:"any"}); export const clippedPoints=()=>[]; export const placeArea=async(make,p)=>globalThis.previewCancel?null:make(p);')};
- if(specifier==="/systems/cyberpunk-red-core/modules/extern/cpr-dice-handler.js")return {shortCircuit:true,url:"data:text/javascript,export default {handle3dDice:async()=>{}}"};
+ if(specifier==="/systems/cyberpunk-red-core/modules/extern/cpr-dice-handler.js")return {shortCircuit:true,url:"data:text/javascript,export default {handle3dDice:async(roll,mode)=>{globalThis.diceShown.push({roll,mode})}}"};
  if(specifier==="./damage-application.js"&&context.parentURL?.endsWith("/damage-flow.js"))return {shortCircuit:true,url:"data:text/javascript,"+encodeURIComponent('export async function captureDamageApplication(actor,n,l,id,apply){await apply(actor);return ["<div>applied</div>"]}')};
  return next(specifier,context);
 }});
@@ -17,7 +17,7 @@ const M="pneuma-combattools",get=(o,p)=>p.split(".").reduce((v,k)=>v?.[k],o);
 const collection=rows=>Object.assign(rows,{get(id){return this.find(r=>r.id===id)},has(id){return !!this.get(id)}});
 function fixture(kind="explosive",total=20){
  let serial=0;const messages=[],docs=new Map(),calls=[];
- globalThis.previewCancel=false;
+ globalThis.previewCancel=false;globalThis.diceShown=[];globalThis.Roll={fromJSON:JSON.parse};
  globalThis.foundry={utils:{getProperty:get,deepClone:structuredClone,randomID:()=>String(++serial)}};
  globalThis.ui={notifications:{info(){},warn(){},error(){}}};
  const users=collection([{id:"gm",isGM:true,active:true},{id:"att",isGM:false,active:true},{id:"def",isGM:false,active:true},{id:"stranger",isGM:false,active:true}]);
@@ -38,7 +38,7 @@ function fixture(kind="explosive",total=20){
  globalThis.DOMParser=class{parseFromString(html){return {querySelectorAll:()=>[],querySelector:()=>null,body:{innerHTML:html}}}};
  const weapon={id:"w",type:"weapon",name:"Weapon",system:{isRanged:true,weaponType:kind==="shell"?"shotgun":kind==="suppression"?"assaultRifle":"rocketLauncher",magazine:{value:20},dvTable:"DV Rocket Launcher",fireModes:{suppressiveFire:true}},
  _getLoadedAmmoProp:p=>p==="variety"?(kind==="shell"?"shotgunShell":"rocket"):p==="type"?"basic":undefined,
- createRoll(mode){calls.push(mode);return {luck:0,resultTotal:total,rollCard:"native",wasCritical:()=>false,handleRollDialog:async()=>true,roll:async()=>{calls.push("roll")}};},
+ createRoll(mode){calls.push(mode);return {luck:0,resultTotal:total,rollCard:"native",wasCritical:()=>false,handleRollDialog:async()=>true,async roll(){calls.push("roll");this._roll={toJSON:()=>({total:7})};this._critRoll={toJSON:()=>({total:3})}}};},
  hasAmmo(roll){return this.system.magazine.value>=(kind==="suppression"?10:1)},
  async confirmRoll(roll){this.system.magazine.value-=kind==="suppression"?10:1;calls.push("consume");return roll}};
  a.items.push(weapon);
@@ -169,25 +169,26 @@ test("RAW suppressive mode delegates a circle to area coverage",async()=>{
  assert.ok(f.data().rows.some(r=>r.uuid===f.third.document.uuid));
 });
 
-test("everyone can hide and reveal the shared area without owning a token",async()=>{
+test("only the GM can hide and reveal the shared area, without owning a token",async()=>{
  const f=fixture();await startAreaAttack(f.source,f.target,"w","attack");
  f.docs.delete(f.source.document.uuid);
- await f.request("show",{user:"stranger",hidden:true});
+ await assert.rejects(f.request("show",{user:"stranger",hidden:true}),/Only the GM/);
+ await f.request("show",{user:"gm",hidden:true});
  assert.equal(f.scene.templates[0].hidden,true);assert.match(f.messages[0].content,/Show attack area/);
- await f.request("show",{user:"stranger",hidden:false});
+ await f.request("show",{user:"gm",hidden:false});
  assert.equal(f.scene.templates[0].hidden,false);assert.match(f.messages[0].content,/Hide attack area/);
 });
 test("auto-hide waits for damage and manual reveal persists after completion",async()=>{
  const f=fixture();await startAreaAttack(f.source,f.target,"w","attack");
- await f.request("show",{hidden:false});await f.request("decline");
+ await f.request("show",{user:"gm",hidden:false});await f.request("decline");
  await f.request("exclude",{user:"gm",target:f.third.document.uuid});
  assert.equal(f.scene.templates[0].hidden,false);
  f.data().rows[0].damage={status:"review",recordedApplied:false};
- await f.request("show",{hidden:false});assert.equal(f.data().resolutionComplete,false);
+ await f.request("show",{user:"gm",hidden:false});assert.equal(f.data().resolutionComplete,false);
  await f.request("damage",{user:"gm",damageRequest:{action:"damageResolved"}});
  assert.equal(f.data().resolutionComplete,true);assert.equal(f.scene.templates[0].hidden,true);
- await f.request("show",{user:"stranger",hidden:false});assert.equal(f.scene.templates[0].hidden,false);
- await f.request("show",{user:"stranger",hidden:false});assert.equal(f.scene.templates[0].hidden,false);
+ await f.request("show",{user:"gm",hidden:false});assert.equal(f.scene.templates[0].hidden,false);
+ await f.request("show",{user:"gm",hidden:false});assert.equal(f.scene.templates[0].hidden,false);
  await f.request("add",{user:"gm",target:f.outside.document.uuid});assert.equal(f.data().resolutionComplete,false);
  await f.request("exclude",{user:"gm",target:f.outside.document.uuid});assert.equal(f.scene.templates[0].hidden,true);
 });
@@ -234,4 +235,33 @@ test("shell evasion also waits for relocation",async()=>{
  await startAreaAttack(f.source,f.target,"w","attack");await f.request("claim",{nonce:"shell"});await f.request("commit",{nonce:"shell",total:30,html:"evasion"});
  assert.equal(f.data().resolutionComplete,false);assert.match(f.messages[0].content,/Move outside AoE/);
  await f.request("move",{point:{x:1050,y:50}});assert.equal(f.data().resolutionComplete,true);
+});
+
+ test("area attack dice reveal only after the last response and never repeat",async()=>{
+  const f=fixture();await startAreaAttack(f.source,f.target,"w","attack");
+  assert.deepEqual(f.data().exchange.dice,[JSON.stringify({total:7}),JSON.stringify({total:3})]);
+  f.data().exchange.rollMode="gmroll";
+  await f.request("decline");assert.equal(diceShown.length,0);
+  await f.request("claim",{target:f.third.document.uuid,nonce:"last"});assert.equal(diceShown.length,0);
+  await f.request("commit",{target:f.third.document.uuid,nonce:"last",total:25,html:"defense"});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(diceShown,[{roll:{total:7},mode:"gmroll"},{roll:{total:3},mode:"gmroll"}]);
+  assert.equal(f.data().attackDiceRevealed,true);
+  await f.request("show",{user:"gm",hidden:false});
+  await new Promise(resolve=>setImmediate(resolve));assert.equal(diceShown.length,2);
+ });
+ test("legacy area cards do not replay dice on later saves",async()=>{
+  const f=fixture();await startAreaAttack(f.source,f.target,"w","attack");
+  delete f.data().attackDiceRevealed;f.data().exchange.dice=[JSON.stringify({total:7})];
+  for(const row of f.data().rows)row.state="hit";
+  await f.request("show",{user:"gm",hidden:false});
+  await new Promise(resolve=>setImmediate(resolve));assert.equal(diceShown.length,0);
+ });
+
+test("scatter placement stays silent until all responses resolve",async()=>{
+ const f=fixture("explosive",10);await startAreaAttack(f.source,f.target,"w","attack");
+ await f.request("show",{user:"gm",hidden:false});assert.equal(diceShown.length,0);
+ await f.request("scatter",{user:"gm",area:f.data().area});assert.equal(diceShown.length,0);
+ for(const row of [...f.data().rows])await f.request("decline",{target:row.uuid});
+ await new Promise(resolve=>setImmediate(resolve));assert.equal(diceShown.length,2);
 });

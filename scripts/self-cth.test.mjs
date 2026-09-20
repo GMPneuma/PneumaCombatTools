@@ -15,7 +15,7 @@ test('player-owned tokens are always self; GM can target another token while act
  game.user.isGM=true;assert(isSelfCTH(f.token,f.token));assert(isSelfCTH(f.token,undefined));assert(!isSelfCTH(other,f.token));
 });
 test('speedware requires installed, non-EMP cyberware; native source supports renamed items',()=>{
- const f=fixture();assert(hasSpeedware(f.token.actor));f.item.system.isInstalledInActor=false;assert(!hasSpeedware(f.token.actor));
+ const f=fixture();assert(hasSpeedware(f.token.actor));f.item.flags={'pneuma-combattools':{itemMarkers:{disabled:{label:'Disabled'}}}};assert(!hasSpeedware(f.token.actor));f.item.flags={};f.item.system.isInstalledInActor=false;assert(!hasSpeedware(f.token.actor));
  f.item.system.isInstalledInActor=true;f.item.name='Translated';assert(!hasSpeedware(f.token.actor));f.item._stats={compendiumSource:'Compendium.cpr.Item.nSdoCKRscSOeaZUH'};assert(hasSpeedware(f.token.actor));
  f.item.flags={'pneuma-combattools':{empCombats:['c']}};assert(!hasSpeedware(f.token.actor));
 });
@@ -32,5 +32,5 @@ test('native reroll targets just this combatant, preserves turn and prevents dup
  f.combat.rollInitiative=async(...args)=>f.calls.push(args);await rerollSelfInitiative(f.token);assert.equal(f.calls.length,2);
 });
 test('Pneuma HomeBrew is a default-off world setting',()=>{
- fixture();globalThis.Hooks={on(){}};let settings;game.settings.register=(_module,key,value)=>{settings={key,...value};};registerSelfCTH();assert.equal(settings.key,'pneumaHomebrew');assert.equal(settings.name,'Pneuma HomeBrew');assert.equal(settings.scope,'world');assert.equal(settings.default,false);
+ fixture();globalThis.Hooks={on(){}};let settings;game.settings.register=(_module,key,value)=>{settings={key,...value};};registerSelfCTH();assert.equal(settings.key,'pneumaHomebrew');assert.equal(settings.name,'Speedware allows Rerolling Initiative');assert.equal(settings.scope,'world');assert.equal(settings.default,false);
 });

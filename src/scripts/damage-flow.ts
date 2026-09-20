@@ -53,7 +53,7 @@ export function damageValues(html: string): DamageValues {
     ablation: number("ablation"), ammo: get("ammo-variety"), ignorePercent: number("ignore-armor-percent", false),
     ignoreBelow: number("ignore-below-sp"), lethal: /true/i.test(get("damage-lethal")) };
 }
-export function damageContent(data: Exchange): string {
+export function damageContent(data: Exchange, mode: "full" | "roll" = "full"): string {
   const damage = data.damage;
   if (!damage) return "";
   const labels = { rolling: "Damage roll in progress", rolled: "Damage rolled — awaiting application", applying: "Damage application in progress — do not apply again",
@@ -76,11 +76,11 @@ export function damageContent(data: Exchange): string {
   }
   const status = ["rolled", "applied"].includes(damage.status) ? ""
     : '<p class="pneuma-damage-status">' + labels[damage.status] + '</p>';
-  const actions = damage.result ? resolutionSection("damage-apply",
+  const actions = mode === "full" && damage.result ? resolutionSection("damage-apply",
     '<div class="rollcard-bottom pneuma-damage-application"><div class="cpr-block pneuma-damage-application-box"></div></div>'
       + '<div class="pneuma-damage-applications">' + (damage.applications ?? []).join("") + '</div>') : "";
   return '<div class="pneuma-damage-result">' + resolutionSection("damage-roll", html + status)
-    + actions + '<div class="pneuma-resolution-recovery-slot"></div></div>';
+    + actions + (mode === "full" ? '<div class="pneuma-resolution-recovery-slot"></div>' : "") + "</div>";
 }
 export function recordedDamageApplied(data: Exchange): boolean {
   const damage = data.damage;

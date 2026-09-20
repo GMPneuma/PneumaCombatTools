@@ -58,12 +58,13 @@ try {
   if(isRun){assert.match(await counter.getAttribute('title'),/uses your Action/);const runBox=await run.boundingBox(),countBox=await counter.boundingBox(),resetBox=await reset.boundingBox();assert(runBox.y>=countBox.y+countBox.height);assert.equal(runBox.y,resetBox.y);assert(runBox.x>=resetBox.x+resetBox.width);assert.equal(runBox.height,20);assert.equal(resetBox.height,20);}
  }
  const inputBox=await counter.boundingBox(),resetBox=await reset.boundingBox();assert(resetBox.y>=inputBox.y+inputBox.height);
- await reset.click();await page.waitForFunction(()=>doc.x===100&&doc.y===200&&doc.flags['pneuma-combattools'].movement.spent===0&&document.querySelector('.pneuma-movement-hud input').value==='0 / 6');
- assert.equal(await counter.inputValue(),'0 / 6');assert.equal(await run.isVisible(),false);assert.equal(await counter.evaluate(n=>getComputedStyle(n).color),'rgb(111, 220, 122)');assert.equal(await page.evaluate(()=>writes.length),1);
+ await reset.click();await page.waitForFunction(()=>doc.x===100&&doc.y===200&&doc.flags['pneuma-combattools'].movement.spent===0&&!document.querySelector('.pneuma-movement-hud'));
+ assert.equal(await counter.count(),0);assert.equal(await page.evaluate(()=>token.children.some(c=>c.name==='pneuma-movement')),false);assert.equal(await page.evaluate(()=>writes.length),1);
  assert.equal(await page.evaluate(()=>writes[0].options.pneumaMoveDelta),-6);
  // The native #hud transform moves/scales both boxes; mouse clicks still hit the Reset control.
- await page.evaluate(()=>{doc.x=400;token.x=400;doc.flags['pneuma-combattools'].movement.spent=2;document.getElementById('hud').style.transform='translate(30px,20px) scale(1.2)';hooks.refreshToken.forEach(fn=>fn(token));});
- await reset.click();await page.waitForFunction(()=>doc.x===100&&document.querySelector('.pneuma-movement-hud input').value==='0 / 6');assert.equal(await counter.inputValue(),'0 / 6');
+ await page.evaluate(()=>{doc.x=400;token.x=400;doc.flags['pneuma-combattools'].movement.spent=2;doc.flags['pneuma-combattools'].movement.hidden=false;document.getElementById('hud').style.transform='translate(30px,20px) scale(1.2)';hooks.refreshToken.forEach(fn=>fn(token));});
+ await reset.click();await page.waitForFunction(()=>doc.x===100&&!document.querySelector('.pneuma-movement-hud'));assert.equal(await counter.count(),0);
+ await page.evaluate(async()=>{await doc.update({x:200},{});});assert.equal(await counter.inputValue(),'1 / 6');
  await page.evaluate(()=>{rejectNext=true;});await reset.click();await page.waitForFunction(()=>window.error?.includes('Update rejected'));assert.equal(await reset.isEnabled(),true);
  await page.evaluate(()=>{token.isOwner=false;hooks.refreshToken.forEach(fn=>fn(token));});assert.equal(await reset.isVisible(),false);
  await page.evaluate(()=>{game.user={id:'viewer',isGM:false};token.actor.uuid='Actor.pc';token.actor.hasPlayerOwner=true;hooks.refreshToken.forEach(fn=>fn(token));});

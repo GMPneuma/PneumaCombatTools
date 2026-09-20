@@ -5,7 +5,7 @@ import { areaKind, confirmAreaRoll, type AreaKind, type AreaWeapon } from "./wea
 import { evadeAllowed, winsAreaDefense, type Area, type Point } from "./geometry.js";
 import { placeArea, clippedPoints, templateData, areaCoverage } from "./placement.js";
 import { requireCombatSocket } from "../socket-health.js";
-import { nativeCard, rollHidden, spendBonusLuck, type RollItem } from "../native-combat.js";
+import { diceJSON, nativeAPI, nativeCard, rollHidden, spendBonusLuck, type RollItem } from "../native-combat.js";
 import { thrownRollItem, improvisedSource } from "../thrown-weapons.js";
 import { getTable } from "../dv-hover.js";
 import { parseDV } from "../dv-data.js";
@@ -22,7 +22,7 @@ interface TargetRow {
 }
 export interface AreaAttack {
   scene:string; kind:AreaKind; area:Area; intended:Point; settings:AreaSettings; templateId?:string;
-  phase:"scatter"|"responses"; exchange:Exchange; rows:TargetRow[]; special:boolean; areaHidden?:boolean; resolutionComplete?:boolean; effectsResolved?:boolean;
+  phase:"scatter"|"responses"; exchange:Exchange; rows:TargetRow[]; special:boolean; areaHidden?:boolean; resolutionComplete?:boolean; effectsResolved?:boolean; attackDiceRevealed?:boolean;
 }
 interface Request {
   aoeType:"request"; id:string; user:string; message:string; action:string; target?:string;
@@ -74,9 +74,16 @@ function targets(data:AreaAttack):TargetRow[] {
     }));
 }
 const btn=(action:string,icon:string,title:string,target="")=>`<button type="button" data-aoe-action="${action}" data-aoe-target="${esc(target)}" title="${esc(title)}" aria-label="${esc(title)}"><i class="fas ${icon}" aria-hidden="true"></i></button>`;
+const awaitingResponses=(data:AreaAttack)=>data.phase==="scatter"||data.rows.some(r=>["waiting","rolling"].includes(r.state));
 export function areaContent(data:AreaAttack):string {
-  const waiting=data.phase==="scatter"||data.rows.some(r=>["waiting","rolling"].includes(r.state));
-  const attack=waiting?"<p>Attack rolled — awaiting responses.</p>":`<div class="pneuma-aoe-attack">${data.exchange.html}</div>`;
+  const waiting=awaitingResponses(data);
+  let attackHTML="";
+  if(!waiting){
+    const native=new DOMParser().parseFromString(data.exchange.html,"text/html");
+    native.querySelectorAll('[data-action="rollDamage"]').forEach(button=>button.remove());
+    attackHTML=native.body.innerHTML;
+  }
+  const attack=waiting?"<p>Attack rolled — awaiting responses.</p>":`<div class="pneuma-aoe-attack">${attackHTML}</div>`;
   const rows=data.rows.map(r=>`<div role="listitem" class="pneuma-aoe-target" data-aoe-row="${esc(r.uuid)}" data-state="${r.state}">
     <img src="${esc(r.img)}" alt="" width="24" height="24"><span class="pneuma-aoe-name">${esc(r.name)}</span><span class="pneuma-aoe-response">
     ${r.state==="waiting" ? (data.kind==="suppression"?btn("roll","fa-brain","Concentration",r.uuid):btn("roll","fa-person-running","Evade",r.uuid))
@@ -87,20 +94,22 @@ export function areaContent(data:AreaAttack):string {
     ${r.state==="other"?btn("hit","fa-check","GM: affected",r.uuid)+btn("miss","fa-xmark","GM: unaffected",r.uuid):""}
     ${r.state==="rolling"?btn("reset","fa-unlock","GM: release unfinished response",r.uuid):""}
     ${r.state==="miss"&&data.kind!=="suppression"&&r.total!==undefined&&!r.moved?btn("move","fa-person-walking","Move outside AoE",r.uuid):""}
-    ${r.state==="hit"&&data.exchange.damage?.result ? btn("apply","fa-heart-crack",r.damage?.recordedApplied?"Damage applied":"Apply shared damage (Shift: options)",r.uuid):""}
+    ${r.state==="hit"&&data.exchange.damage?.result ? btn("apply","fa-bolt",r.damage?.recordedApplied?"Damage applied":"Apply shared damage (Shift: options)",r.uuid):""}
     ${r.damage&&["review","applying"].includes(r.damage.status)?btn("damageResolved","fa-check-double","GM: mark resolved after checking damage",r.uuid):""}
     ${r.moved&&r.moveCost?`<span>Move: ${r.moveCost.toFixed(1)}m</span>`:""}</span></div>${r.html?`<div class="pneuma-aoe-defense ${rollOutcomeClass(r.state==="miss")}">${r.html}</div>`:""}
-    ${r.damage?.applications?.join("")??""}`).join("");
+    `).join("");
+  const applications=data.rows.flatMap(r=>r.damage?.applications??[]).join("");
   return `<section class="rollcard pneuma-aoe-card" data-state="${data.phase==="scatter"?"scatter":waiting?"waiting":"resolved"}"><div class="rollcard-top"><div class="cpr-block"><h3>${esc(data.exchange.title)}</h3></div></div>
     ${resolutionSection("attack",attack)}
     ${resolutionSection("result",data.phase==="scatter"?"<p>Missed intended point. GM: choose where it landed within the intended blast square.</p>"+btn("scatter","fa-crosshairs","GM: place actual blast"): `<div role="list" class="pneuma-aoe-targets">${rows||"<p>No tokens in the area.</p>"}</div>`)}
     <div class="pneuma-aoe-actions">${btn("show",data.areaHidden?"fa-eye":"fa-eye-slash",data.areaHidden?"Show attack area":"Hide attack area")}${data.phase==="responses"?btn("add","fa-user-plus","GM: add selected token (manual coverage override)"):""}
-    ${data.kind!=="suppression"&&data.phase!=="scatter"&&!data.special&&!data.exchange.damage?btn("damage","fa-dice","Roll shared damage"):""}
+    ${data.kind!=="suppression"&&data.phase!=="scatter"&&!data.special&&!data.exchange.damage?btn("damage","fa-droplet","Roll shared damage"):""}
     ${data.exchange.damage?.status==="rolling"?btn("damageReset","fa-unlock","GM: release unfinished damage roll"):""}</div>
     ${data.special&&!data.effectsResolved?btn("effectsResolved","fa-check-double","GM: mark manual effects resolved"):""}
     ${data.special?"<p>Special ammunition: resolve its effects manually. Grenade-specific effects are not automated yet.</p>":""}
     ${data.kind==="explosive"?"<p>Cover and terrain: GM resolves durability. GM: exclude targets protected by cover that survives the damage.</p>":""}
-    ${data.exchange.damage?damageContent(data.exchange):""}</section>`;
+    ${data.exchange.damage?damageContent(data.exchange,"roll"):""}
+    ${applications?`<div class="pneuma-damage-applications pneuma-aoe-applications">${applications}</div>`:""}</section>`;
 }
 function rowExchange(data:AreaAttack,row:TargetRow):Exchange {
   return {...data.exchange,coverUp:!!row.coverUp,defender:row.uuid,defenderActor:row.actor,defenderName:row.name,hit:row.state==="hit",
@@ -114,10 +123,20 @@ function complete(data:AreaAttack):boolean {
     : data.kind==="suppression"||(data.special?!!data.effectsResolved:r.damage?.status==="applied"&&!!r.damage.recordedApplied));
 }
 async function save(message:ChatMessage,data:AreaAttack) {
+  const reveal=data.attackDiceRevealed===false&&!awaitingResponses(data);
+  if(reveal)data.attackDiceRevealed=true;
   const resolved=complete(data);
   if(resolved&&!data.resolutionComplete){data.areaHidden=true;await syncTemplate(message,data);}
   data.resolutionComplete=resolved;
-  await message.update({content:areaContent(data),[`flags.${MODULE}.aoe`]:data} as Parameters<ChatMessage["update"]>[0]);}
+  await message.update({content:areaContent(data),[`flags.${MODULE}.aoe`]:data} as Parameters<ChatMessage["update"]>[0]);
+  // Persist first: later saves and chat rerenders must never repeat the animation.
+  if(reveal)void revealAttackDice(data).catch(error=>console.warn(MODULE,"Area attack dice display failed",error));
+}
+async function revealAttackDice(data:AreaAttack):Promise<void> {
+  if(!data.exchange.dice.length)return;
+  const {Dice}=await nativeAPI();
+  for(const json of data.exchange.dice)await Dice.handle3dDice(Roll.fromJSON(json) as Roll,data.exchange.rollMode);
+}
 const pending=new Map<string,{resolve:()=>void;reject:(e:Error)=>void;timer:ReturnType<typeof setTimeout>}>();
 let queue:Promise<unknown>=Promise.resolve();
 export async function handleAreaRequest(req:Request) {
@@ -128,6 +147,7 @@ export async function handleAreaRequest(req:Request) {
   const data=foundry.utils.deepClone(saved);
   const row=data.rows.find(r=>r.uuid===req.target);
   if(req.action==="show") {
+    if(!user.isGM)throw Error("Only the GM can show or hide the attack area.");
     if(typeof req.hidden!=="boolean")throw Error("Choose whether to show or hide the area.");
     data.areaHidden=req.hidden;
     // A deliberate reveal of a completed card must survive later saves.
@@ -259,12 +279,12 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
     const title=(game.settings!.get(MODULE,"hideAttackWeapon")?"Area attack":original.name??"Area attack")+(kind==="suppression"?" — Suppressive Fire":kind==="shell"?" — Shells":" — Blast");
     roll.rollTitle=title;
     const exchange:Exchange={attacker:source.document.uuid,attackerName:source.name??"",defender:source.document.uuid,defenderActor:actor.uuid,defenderName:source.name??"",
-      ranged:true,category:"Ranged",title,total:roll.resultTotal,html:await nativeCard(roll),dice:[],dv,
+      ranged:true,category:"Ranged",title,total:roll.resultTotal,html:await nativeCard(roll),dice:diceJSON(roll),dv,
       state:"resolved",hit:true,weaponId:itemId,attackMode:"attack",weaponType:String(foundry.utils.getProperty(original,"system.weaponType")),
       criticalMethod:kind==="explosive"?(String(original.type)!=="ammo"&&foundry.utils.getProperty(original,"system.weaponType")==="rocketLauncher"?"Rocket":"Grenade"): "Ranged",
       location:"body",...(kind==="shell"?{damageFormula:"3d6"}:{}),rollMode:game.settings!.get("core","rollMode")??"roll",...(thrownSource?{thrownSource}: {})};
     const ammoType=String(original.type)==="ammo"?foundry.utils.getProperty(original,"system.type"):original._getLoadedAmmoProp?.("type");
-    const data:AreaAttack={scene,kind,area,intended:area.origin,settings:s,exchange,rows:[],
+    const data:AreaAttack={scene,kind,area,intended:area.origin,settings:s,exchange,rows:[],attackDiceRevealed:false,
       phase:kind==="explosive"&&roll.resultTotal<=dv!?"scatter":"responses",
       special:kind==="explosive"&&!!ammoType&&!["basic","armorPiercing"].includes(String(ammoType))};
     if(data.phase==="responses")data.rows=targets(data);
@@ -347,9 +367,15 @@ export function registerAreaAttacks() {
   }));
   Hooks.on("renderChatMessage",async(message:ChatMessage,html:JQuery)=>{
     const data=flag(message);if(!data||!canRenderCombatCard(message))return;
+    // Shared roll only: controls stay by targets; application results follow the roll.
+    html.find<HTMLElement>('.pneuma-aoe-card > .pneuma-damage-result > [data-pneuma-section="damage-apply"], .pneuma-aoe-card > .pneuma-damage-result > .pneuma-resolution-recovery-slot').toArray().forEach(node=>node.remove());
+    // Also update previously saved AoE cards without replacing their native dice nodes.
+    html.find<HTMLElement>('.pneuma-aoe-attack [data-action="rollDamage"]').toArray().forEach(button=>button.remove());
     for(const button of html.find<HTMLButtonElement>("[data-aoe-action]").toArray()){
       const action=button.dataset.aoeAction!,row=data.rows.find(r=>r.uuid===button.dataset.aoeTarget);
+      if(action==="damage"||action==="apply")button.innerHTML='<i class="fas '+(action==="damage"?"fa-droplet":"fa-bolt")+'" aria-hidden="true"></i>';
       if(action==="show") {
+        if(!game.user!.isGM){button.remove();continue;}
         const label=data.areaHidden?"Show attack area":"Hide attack area";
         button.title=label;button.setAttribute("aria-label",label);
         button.innerHTML='<i class="fas '+(data.areaHidden?"fa-eye":"fa-eye-slash")+'" aria-hidden="true"></i>';

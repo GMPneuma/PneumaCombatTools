@@ -7,10 +7,10 @@ export function isSelfCTH(token:Token|undefined,attacker:Token|undefined):boolea
 }
 export function hasSpeedware(actor:Actor|undefined):boolean {
   return !!actor?.items.some(item=>{
-    if(String(item.type)!=="cyberware"||!foundry.utils.getProperty(item,"system.isInstalledInActor")||empDisabled(item))return false;
+    if(String(item.type)!=="cyberware"||!foundry.utils.getProperty(item,"system.isInstalledInActor")||empDisabled(item)||foundry.utils.getProperty(item,"flags.pneuma-combattools.itemMarkers.disabled"))return false;
     const source=String(foundry.utils.getProperty(item,"_stats.compendiumSource")??foundry.utils.getProperty(item,"flags.core.sourceId")??"");
     return ["UX79WfUt7Yungbx7","nSdoCKRscSOeaZUH"].some(id=>source.endsWith("."+id))
-      ||["sandevistan","kerenzikov"].includes(item.name?.trim().toLowerCase()??"");
+      ||["sandevistan","kerenzikov"].some(name=>(item.name??"").toLowerCase().includes(name));
   });
 }
 function participant(token:Token){
@@ -22,7 +22,7 @@ function participant(token:Token){
 export function selfInitiativeControl(token:Token){
   const enabled=game.settings!.get(MODULE,"pneumaHomebrew")&&token.isOwner&&hasSpeedware(token.actor??undefined);
   const available=enabled&&!!participant(token);
-  return {show:enabled,disabled:!available,title:available?"Re-roll initiative — uses your Action (Pneuma HomeBrew)":"Re-roll initiative — requires an existing initiative in started combat; uses your Action"};
+  return {show:enabled,disabled:!available,title:available?"Re-roll Initiative — uses your Action (Pneuma HomeBrew)":"Re-roll Initiative — requires an existing initiative in started combat; uses your Action"};
 }
 const pending=new Set<string>();
 export async function rerollSelfInitiative(token:Token){
@@ -38,7 +38,7 @@ export async function rerollSelfInitiative(token:Token){
 }
 export function registerSelfCTH(){
   const refresh=()=>{const hud=canvas.tokens?.hud;if(hud?.object&&hud.rendered)hud.render(true);};
-  game.settings!.register(MODULE,"pneumaHomebrew",{name:"Pneuma HomeBrew",hint:"Installed functional speedware allows an Action to re-roll initiative from the self CTH. Other homebrew settings remain independent.",scope:"world",config:true,type:Boolean,default:false,onChange:refresh});
+  game.settings!.register(MODULE,"pneumaHomebrew",{name:"Speedware allows Rerolling Initiative",hint:"Installed functional speedware allows an Action to re-roll initiative from the self CTH. Other homebrew settings remain independent.",scope:"world",config:true,type:Boolean,default:false,onChange:refresh});
   for(const hook of ["createItem","updateItem","deleteItem"])Hooks.on(hook,(item:Item)=>{if(item.parent?.uuid===canvas.tokens?.hud?.object?.actor?.uuid)refresh();});
   for(const hook of ["updateCombat","deleteCombat","createCombatant","updateCombatant","deleteCombatant"])Hooks.on(hook,refresh);
 }

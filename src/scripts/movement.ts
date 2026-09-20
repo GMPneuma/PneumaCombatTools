@@ -34,7 +34,7 @@ export async function resetMovement(token:Token) {
   if(!record||!token.isOwner||!active())return;
   const grapple=grappleFor(token.document);
   if(grapple?.target.token===token.document.uuid)return ui.notifications!.warn("A held token moves with its grappler.");
-  await token.document.update({x:record.start.x,y:record.start.y,elevation:record.start.elevation,[flag]:{...record,spent:0,last:null}} as never,{pneumaMovementReset:true,pneumaMoveDelta:-record.spent*metersPerSpace()} as never);
+  await token.document.update({x:record.start.x,y:record.start.y,elevation:record.start.elevation,[flag]:{...record,spent:0,last:null,hidden:true}} as never,{pneumaMovementReset:true,pneumaMoveDelta:-record.spent*metersPerSpace()} as never);
 }
 function metersPerSpace(){const units=String(canvas.scene?.grid.units??"").toLowerCase();return Number(canvas.scene?.grid.distance??2)*(["ft","feet","foot"].includes(units)?0.3048:1);}
 interface Display {container:PIXI.Container;marker:PIXI.Graphics;hud:HTMLDivElement;label:HTMLInputElement;run:HTMLSpanElement;reset:HTMLButtonElement;markerKey?:string;stateKey?:string}
@@ -47,7 +47,7 @@ function draw(token:Token,previewRecord?:MoveRecord){
   const context=movementTurn(doc);
   if(!token.visible||!token.actor||(!game.user?.isGM&&!token.actor.hasPlayerOwner)||!context){clear(token);return;}
   const record=previewRecord??(token.isPreview?nextRecord(token,doc,{x:token.document.x,y:token.document.y}):currentMovement(doc,context));
-  if(!record){clear(token);return;}
+  if(!record||record.hidden){clear(token);return;}
   // Native HUD HTML lives outside Token's restricted PIXI hit area and follows canvas pan/zoom.
   const host=canvas.hud?.element[0]??document.getElementById("hud");
   if(!host)return;

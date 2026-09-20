@@ -34,14 +34,35 @@ try {
  assert.equal(await page.locator("#card").textContent().then(s=>s.includes("ATTACK")),false);
  assert.equal(await page.locator("#card unsafe").count(),0);
  assert.equal(await page.evaluate(()=>document.querySelector("#card").scrollWidth<=380),true);
- assert.equal(await page.locator('[data-aoe-action="show"][aria-label="Hide attack area"]').count(),1);
+ assert.equal(await page.locator('[data-aoe-action="show"]').count(),0);
  await page.evaluate(async()=>{
   fromUuid=async()=>null;
-  const {areaContent}=await import("/scripts/aoe/workflow.js");data.areaHidden=true;
+  const {areaContent}=await import("/scripts/aoe/workflow.js");data.areaHidden=true;game.user.isGM=true;
   const root=document.querySelector("#card");root.innerHTML=areaContent(data);
   for(const f of hooks.renderChatMessage)await f(message,{find:s=>({toArray:()=>[...root.querySelectorAll(s)]})});
  });
  assert.equal(await page.locator('[data-aoe-action="show"][aria-label="Show attack area"]').count(),1);
+ await page.evaluate(async()=>{
+  const {areaContent}=await import("/scripts/aoe/workflow.js");
+  data.rows.forEach(r=>r.state="hit");
+  data.exchange.html='<div class="rollcard"><span data-native-dice>20</span><a data-action="rollDamage"><i class="fas fa-droplet"></i></a></div>';
+  document.querySelector('#card').innerHTML=areaContent(data);
+ });
+ assert.equal(await page.locator('.pneuma-aoe-attack [data-action="rollDamage"]').count(),0);
+ assert.equal(await page.locator('[data-native-dice]').textContent(),'20');
+ assert.equal(await page.locator('[data-aoe-action="damage"] .fa-droplet').count(),1);
+ await page.evaluate(async()=>{
+  const {areaContent}=await import("/scripts/aoe/workflow.js");
+  data.exchange.damage={status:"rolled",result:{html:"DAMAGE"}};
+  data.rows[0].damage={applications:['<div class="pneuma-damage-applied">Target damage result</div>']};
+  document.querySelector('#card').innerHTML=areaContent(data);
+ });
+ assert.equal(await page.locator('[data-aoe-action="apply"] .fa-bolt').count(),2);
+ assert.equal(await page.locator('[data-pneuma-section="damage-apply"]').count(),0);
+ assert.equal(await page.locator('[data-pneuma-section="damage-roll"]').count(),1);
+ assert.match(await page.locator('[data-pneuma-section="damage-roll"]').textContent(),/DAMAGE/);
+ assert.equal(await page.locator('.pneuma-damage-result + .pneuma-aoe-applications .pneuma-damage-applied').count(),1);
+ assert.equal(await page.locator('.pneuma-aoe-targets .pneuma-damage-applied').count(),0);
  await page.evaluate(async()=>{
   window.draws=0;window.destroyed=0;window.clipCalls=0;
   class Graphics {clear(){return this}lineStyle(){return this}beginFill(){return this}drawPolygon(){draws++;return this}endFill(){return this}destroy(){destroyed++}}
@@ -119,6 +140,16 @@ try {
   },template);
   await page.locator("#open-editor").click();
   assert.equal(await page.locator('[data-area-profile]').count(),3);
+  assert.equal(await page.locator('[data-area-profile][open]').count(),1);
+  assert.equal(await page.locator('[name="blastShape"]').isVisible(),false);
+  await page.locator('[data-area-profile="blast"] > summary').click();
+  assert.equal(await page.locator('[name="blastShape"]').isVisible(),true);
+  await page.locator('[name="blastShape"]').selectOption("square");
+  assert.equal(await page.locator('[name="blastRadius"]').isVisible(),false);
+  assert.equal(await page.locator('[name="blastSize"]').isVisible(),true);
+  await page.locator('[data-area-profile="blast"] > summary').click();
+  assert.match(await page.locator('[data-area-summary="blast"]').textContent(),/square/);
+
   assert.equal(await page.locator('[name="evade"] option').count(),3);
   assert.deepEqual(await page.locator('[name="blastShape"] option').allTextContents(),["Square","Circle"]);
   assert.equal(await page.locator('[name="shellDV"], [name="evadeTies"]').count(),0);
