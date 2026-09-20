@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0 - 2026-09-20
+
+- Known issue: residual smoke was reported missing in a live Foundry scene despite the server serving the current smoke implementation. Cause and live fix remain under investigation.
+
+- Add reusable Instant Effects, core grenade/rocket ammunition resolution, ammunition colors and persistent animated smoke.
+- Reuse native resistance rolls, injury items and damage application; retain combat-end EMP duration. Add exact timing investigation to the backlog.
+- Include instant effects in Add effects; smoke attack penalties remain deferred.
+
+
 ## 0.3.5 - 2026-09-20
 
 - Streamline AoE configuration into collapsible profiles with current shape summaries and separate evasion controls.

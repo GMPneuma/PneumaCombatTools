@@ -2,9 +2,9 @@
 
 ## Area attacks and suppressive fire
 
-Main flow implemented: native ammo detection/consumption, scene-scaled placement, wall clipping, individual responses, GM scatter, shared native damage and per-target manual application. Cover Up is a disabled placeholder with the Pneuma Homebrew badge. Special grenade effects, cover HP and automatic movement enforcement remain manual/deferred. See [Area attacks](docs/area-attacks.md).
+Main flow implemented: native ammo detection/consumption, scene-scaled placement, wall clipping, individual responses, GM scatter, shared native damage and per-target manual application. Cover Up is a disabled placeholder with the Pneuma Homebrew badge. Core grenade/rocket effects and persistent animated smoke are implemented; cover HP remains manual. See [Instant effects](docs/instant-effects.md). See [Area attacks](docs/area-attacks.md).
 
-- **CTH menu presentation and Jack In/Out:** grenade and QuickHack rows display item artwork and align left. Grenade rows require positive inventory quantity; depleted stacks are hidden. QuickHacks prefer actor item artwork, then world item artwork, then the bundled icon. Menu headers inherit the corresponding CTH control's current colors. The QuickHack header reads **Jacked-In**, **Not Jacked-In**, or **Ejected**. **Jack In/Out** voluntarily disconnects an active link without a roll, even after losing line of sight. The existing GM coordinator validates ownership and connection identity. Voluntary disconnection permits fresh Jack-In; forced ejection still blocks reconnection for that encounter. Old awareness cards cannot operate on a disconnected or replacement connection. Grenade placement/responses/shared basic damage now use the AoE flow; grenade-specific effects remain deferred.
+- **CTH menu presentation and Jack In/Out:** grenade and QuickHack rows display item artwork and align left. Grenade rows require positive inventory quantity; depleted stacks are hidden. QuickHacks prefer actor item artwork, then world item artwork, then the bundled icon. Menu headers inherit the corresponding CTH control's current colors. The QuickHack header reads **Jacked-In**, **Not Jacked-In**, or **Ejected**. **Jack In/Out** voluntarily disconnects an active link without a roll, even after losing line of sight. The existing GM coordinator validates ownership and connection identity. Voluntary disconnection permits fresh Jack-In; forced ejection still blocks reconnection for that encounter. Old awareness cards cannot operate on a disconnected or replacement connection. Grenade placement/responses/shared basic damage now use the AoE flow; core grenade-specific effects and persistent smoke are now implemented (see docs/instant-effects.md).
 
 - **Detected Netrunner ejection from CTH:** an owned token with detected active incoming connections shows the QuickHack icon, with one **Eject NetRunner** row per connection. Uses the existing native Concentration versus Interface Force Out workflow; ties retain the connection. Ejection resolves in one card containing the native Concentration roll, player Netrunner Interface roll, totals and outcome, with shared winner/loser styling. NPC resistance retains its automatic Interface total. The card uses the awareness message's audience. Both the CTH row (including a single connection) and ejection card show the Netrunner name when the current identity setting for a detected Jack-In or later QuickHack permits it; otherwise they show Unknown Netrunner. Existing chat cards are not rewritten. No Netrunner role or launcher is required for ejection. Awareness uses retained Jack-In/QuickHack result cards for the current encounter; deleting those cards removes the associated shortcut. Undetected, ejected, other-encounter and untracked connections are excluded.
 
@@ -178,7 +178,7 @@ Moved to PneumaVisualTools. Combat Tools no longer registers portrait, compact-c
 - Thrown lists all inventory weapons with type thrownWeapon. Native Athletics/DV rolls use normal ranged evasion, including homebrew. A successful attack-card creation appends (used) once to the inventory name; the item remains usable.
 - Improvised loads the native compendium Thrown Weapon without creating an inventory item. The attacker chooses the GM-agreed 1d6–6d6 in the initial attack dialog.
 - Thrown attacks use resolution cards even when the general combat-resolution toggle is off, because their inventory marker and GM damage choice belong to that flow.
-- Main grenade/rocket/shell AoE and suppressive-fire resolution are implemented; grenade-specific effects remain deferred. QuickHack is integrated; some effects retain guided manual handling. Automated checks do not establish live Foundry verification.
+- Main grenade/rocket/shell AoE and suppressive-fire resolution are implemented; core grenade-specific effects and persistent smoke are now implemented (see docs/instant-effects.md). QuickHack is integrated; some effects retain guided manual handling. Automated checks do not establish live Foundry verification.
 
 ## Visual item markers
 
@@ -296,7 +296,7 @@ Release, Choke and Throw on an established grapple require no new Brawling roll 
 
 Foundry must load the module with socket support enabled. Copying newer module files over an installation does not refresh the package metadata held by the running server. After such an update, restart the Foundry server and reconnect every client; a browser refresh alone may still use stale server metadata. Combat Tools now checks the loaded socket flag at startup and before combat, grapple, QuickHack/Force Out and remote HUD requests, reporting the restart requirement before starting an affected action. An active GM must remain connected for shared actor/Combat writes; no GM clicks are required for ordinary player-versus-player resolution.
 
-- Grenade inventory listing corrected against CPR v0.92.4: ammo items are selected by system.variety = grenade, including smoke, EMP and other ammunition types. Superseded by the main AoE implementation; grenade-specific effects remain deferred.
+- Grenade inventory listing corrected against CPR v0.92.4: ammo items are selected by system.variety = grenade, including smoke, EMP and other ammunition types. Superseded by the main AoE implementation; core grenade-specific effects and persistent smoke are now implemented (see docs/instant-effects.md).
 
 AoE visibility: all card viewers can show/hide the shared area, including hiding it from GMs. Automatic hiding waits for responses, blast escape movement and applied damage (or GM-confirmed manual special effects). Completed areas can be revealed again. Uses the existing active-GM coordinator. Verified with automated fixtures; live multi-client verification remains outstanding.
 
@@ -380,3 +380,14 @@ AoE attack dice animation: new area attacks retain their native attack dice and 
 
 
 AoE configuration layout: collapsible attack profiles show their current shape/dimensions in the heading; shotgun shells open initially. Shape-dependent fields use two columns. Evasion and Cover Up remain a separate collapsed section, with a fixed Save footer. All settings and stored values are retained. Supersedes the always-expanded profile layout.
+
+
+## Reusable instant effects — implemented, live verification pending
+
+- Core grenade/rocket eligibility, ammunition-colored placement/target rows, per-target native resistance checks, direct HP poison/biotoxin, temporary native Flashbang/Teargas injuries, Sleep and nonstacking Incendiary fire.
+- Grenade EMP reuses existing GM item selection and combat-end suppression. Smart rockets require Targeting Scope and use the special second-chance roll before scatter. Native damage application remains authoritative for armor and shields.
+- Add effects includes reusable Instant Effects alongside normal statuses. Persistent smoke saves affected cells, animates semi-transparent clouds and expires after one minute of game time; attack penalties remain deferred.
+- Build, focused state tests and browser/PIXI fixtures validate the implementation. Live Foundry multiplayer, scene vision/fog and native item execution are not yet verified. See docs/instant-effects.md.
+
+
+**0.4.0 known issue:** residual smoke is reported missing in a live Foundry scene. The server serves the current smoke implementation; passing browser fixtures do not establish live smoke visibility. Investigation remains open.

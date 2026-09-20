@@ -3,9 +3,10 @@ import {test} from "node:test";
 import {registerHooks} from "node:module";
 globalThis.FormApplication=class {}; globalThis.Hooks={once(){},on(){}};
 registerHooks({resolve(specifier,context,next){
+ if(specifier==="/systems/cyberpunk-red-core/modules/rolls/cpr-rolls.js")return {shortCircuit:true,url:'data:text/javascript,export const CPRRoll=globalThis.SmartRoll'};
  if(specifier==="./placement.js"&&context.parentURL?.endsWith("/aoe/workflow.js"))return {shortCircuit:true,url:"data:text/javascript,"+encodeURIComponent('export const templateData=area=>({t:area.shape,x:area.origin.x,y:area.origin.y}); export const areaCoverage=area=>box=>globalThis.testCoverage(area,box) && !globalThis.CONFIG.Canvas.polygonBackends.move.testCollision(area.origin,{x:box.x+1,y:box.y+1},{type:"move",mode:"any"}); export const clippedPoints=()=>[]; export const placeArea=async(make,p)=>globalThis.previewCancel?null:make(p);')};
  if(specifier==="/systems/cyberpunk-red-core/modules/extern/cpr-dice-handler.js")return {shortCircuit:true,url:"data:text/javascript,export default {handle3dDice:async(roll,mode)=>{globalThis.diceShown.push({roll,mode})}}"};
- if(specifier==="./damage-application.js"&&context.parentURL?.endsWith("/damage-flow.js"))return {shortCircuit:true,url:"data:text/javascript,"+encodeURIComponent('export async function captureDamageApplication(actor,n,l,id,apply){await apply(actor);return ["<div>applied</div>"]}')};
+ if(specifier==="./damage-application.js"&&context.parentURL?.endsWith("/damage-flow.js"))return {shortCircuit:true,url:"data:text/javascript,"+encodeURIComponent('export async function captureDamageApplication(actor,n,l,id,apply){await apply(actor);arguments[6]?.({rawDamageDealt:globalThis.testPenetrated?5:0,hpReduction:globalThis.testPenetrated?5:0});return ["<div>applied</div>"]}')};
  return next(specifier,context);
 }});
 const {overlaps,evadeAllowed,winsAreaDefense}=await import("../dist/scripts/aoe/geometry.js");
@@ -23,7 +24,7 @@ function fixture(kind="explosive",total=20){
  const users=collection([{id:"gm",isGM:true,active:true},{id:"att",isGM:false,active:true},{id:"def",isGM:false,active:true},{id:"stranger",isGM:false,active:true}]);
  globalThis.game={user:users[0],users,messages:collection(messages),modules:new Map(),settings:{get:(_m,k)=>k==="areaSettings"?defaults:k==="rollMode"?"roll":false},tables:{getName:()=>({getResultsForRoll:()=>[{text:"13"}]})}};
  const mkActor=(id,owner)=>({id,uuid:"Actor."+id,type:"character",items:collection([]),effects:[],async createEmbeddedDocuments(_type,rows){this.effects.push(...rows.map(r=>({...r,statuses:new Set(r.statuses)})));},system:{stats:{ref:{value:8},luck:{value:5}}},testUserPermission:u=>u.id===owner,update:async()=>{},_applyDamage:async()=>{calls.push("apply:"+id)}});
- const a=mkActor("a","att"),b=mkActor("b","def"),c=mkActor("c","def");
+ const a=mkActor("a","att"),b=mkActor("b","def"),c=mkActor("c","def");for(const actor of [a,b,c])docs.set(actor.uuid,actor);
  const token=(id,actor,x)=>{const document={id,uuid:"Scene.s.Token."+id,actor,name:id,texture:{src:"icon.png"},parent:{id:"s"}};docs.set(document.uuid,document);const token={id,document,actor,name:id,x,y:0,w:100,h:100,center:{x:x+50,y:50},checkCollision:()=>false};document.object=token;document.update=async change=>{token.x=change.x;token.y=change.y;token.center={x:change.x+50,y:change.y+50};Object.assign(document,change);};return token;};
  const source=token("a",a,0),target=token("b",b,400),third=token("c",c,500),outside=token("o",c,1000);
  const templates=collection([]);
@@ -38,7 +39,7 @@ function fixture(kind="explosive",total=20){
  globalThis.DOMParser=class{parseFromString(html){return {querySelectorAll:()=>[],querySelector:()=>null,body:{innerHTML:html}}}};
  const weapon={id:"w",type:"weapon",name:"Weapon",system:{isRanged:true,weaponType:kind==="shell"?"shotgun":kind==="suppression"?"assaultRifle":"rocketLauncher",magazine:{value:20},dvTable:"DV Rocket Launcher",fireModes:{suppressiveFire:true}},
  _getLoadedAmmoProp:p=>p==="variety"?(kind==="shell"?"shotgunShell":"rocket"):p==="type"?"basic":undefined,
- createRoll(mode){calls.push(mode);return {luck:0,resultTotal:total,rollCard:"native",wasCritical:()=>false,handleRollDialog:async()=>true,async roll(){calls.push("roll");this._roll={toJSON:()=>({total:7})};this._critRoll={toJSON:()=>({total:3})}}};},
+ createRoll(mode){calls.push(mode);return {formula:mode==="damage"?"8d6":"1d10",luck:0,resultTotal:total,rollCard:"native",wasCritical:()=>false,handleRollDialog:async()=>true,async roll(){calls.push("roll");this._roll={toJSON:()=>({total:7})};this._critRoll={toJSON:()=>({total:3})}}};},
  hasAmmo(roll){return this.system.magazine.value>=(kind==="suppression"?10:1)},
  async confirmRoll(roll){this.system.magazine.value-=kind==="suppression"?10:1;calls.push("consume");return roll}};
  a.items.push(weapon);
@@ -264,4 +265,32 @@ test("scatter placement stays silent until all responses resolve",async()=>{
  await f.request("scatter",{user:"gm",area:f.data().area});assert.equal(diceShown.length,0);
  for(const row of [...f.data().rows])await f.request("decline",{target:row.uuid});
  await new Promise(resolve=>setImmediate(resolve));assert.equal(diceShown.length,2);
+});
+
+test("poison grenades use per-target resistance instead of normal damage",async()=>{
+ const f=fixture();f.weapon.system.weaponType="grenadeLauncher";f.weapon._getLoadedAmmoProp=p=>p==="type"?"poison":"grenade";
+ await startAreaAttack(f.source,f.target,"w","attack");assert.equal(f.data().ammoType,"poison");assert.ok(f.data().special);assert.equal(f.data().rows[0].instant.id,"poison");
+ await f.request("decline");await f.request("instant",{instantRequest:{action:"claim",nonce:"resist"}});await f.request("instant",{instantRequest:{action:"commit",nonce:"resist",total:14,html:"native resistance"}});
+ assert.equal(f.data().rows[0].instant.state,"resisted");assert.match(f.messages[0].content,/native resistance/);assert.doesNotMatch(f.messages[0].content,/resolve its effects manually/);await assert.rejects(f.request("damage",{damageRequest:{action:"damageClaim",nonce:"x"}}),/unavailable/);
+});
+test("armor-piercing rocket records its ammunition and damage formula before reload",async()=>{
+ const f=fixture();f.weapon._getLoadedAmmoProp=p=>p==="type"?"armorPiercing":"rocket";
+ await startAreaAttack(f.source,f.target,"w","attack");f.weapon._getLoadedAmmoProp=()=>"poison";
+ assert.deepEqual(f.data().exchange.areaAmmo,{type:"armorPiercing",variety:"rocket"});assert.equal(f.data().exchange.damageFormula,"8d6");assert.equal(f.data().special,false);
+});
+test("incendiary ignition is offered only after penetrating damage",async()=>{
+ for(const penetrates of [true,false]){
+  const f=fixture();globalThis.testPenetrated=penetrates;f.weapon.system.weaponType="grenadeLauncher";f.weapon._getLoadedAmmoProp=p=>p==="type"?"incendiary":"grenade";
+  await startAreaAttack(f.source,f.target,"w","attack");await f.request("decline");
+  f.data().exchange.damage={status:"rolled",user:"att",nonce:"damage",result:{html:"native",values:{total:20,bonus:0,location:"body",ablation:1,ammo:"grenade",ignorePercent:0,ignoreBelow:0,lethal:true}}};
+  await f.request("damage",{damageRequest:{action:"damageApply",options:{useShield:false,damageReductionRole:false,damageReductionAE:false,brainDamageReduction:false}}});
+  assert.equal(f.data().rows[0].instant.state,penetrates?"failed":"skipped");
+ }
+});
+test("smart rockets cannot fire without installed Targeting Scope",async()=>{const f=fixture();f.weapon._getLoadedAmmoProp=p=>p==="type"?"smart":"rocket";await assert.rejects(startAreaAttack(f.source,f.target,"w","attack"),/Targeting Scope/);assert.equal(f.weapon.system.magazine.value,20)});
+
+test("smart second chance uses only base 10 and Luck, before scatter, with one rocket consumed",async()=>{
+ const f=fixture("explosive",10);f.weapon._getLoadedAmmoProp=p=>p==="type"?"smart":"rocket";f.a.items.push({id:"scope",type:"cyberware",name:"Targeting Scope",system:{isInstalledInActor:true}});
+ globalThis.SmartRoll=class {constructor(){this.luck=0;this.mods=[];this.additionalMods=[];this.resultTotal=18;this.rollCard="native"}addMod(m){this.mods.push(...m)}async handleRollDialog(){this.mods.push({value:100,source:"unrelated"});this.additionalMods.push({value:100});return true}wasCritical(){return false}async roll(){assert.deepEqual(this.mods,[{value:10,source:"Smart ammunition"}]);assert.deepEqual(this.additionalMods,[]);this._roll={toJSON:()=>({total:8})}}};
+ await startAreaAttack(f.source,f.target,"w","attack");assert.equal(f.data().phase,"responses");assert.equal(f.data().exchange.total,18);assert.equal(f.weapon.system.magazine.value,19);assert.equal(f.data().exchange.dice.length,3);assert.match(f.data().exchange.html,/pneuma-smart-first/);
 });

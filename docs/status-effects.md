@@ -21,7 +21,7 @@ Disable Condition Lab & Triggler after switching: both modules can write the glo
 - Adding an injury status creates the corresponding native injury item only if absent. Removing/disabling its status removes the linked injury item(s), including their native death-save consequences. It does not undo HP damage.
 - Injury presence controls its icon. Disabling an injury's embedded modifier alone does not delete the injury or hide its icon.
 - Supported native drug effects (Black Lace, Boost, Smash, Synthcoke and their addiction effects, plus Stim) produce markers when active. Status toggles activate/deactivate existing native embedded effects. If the native drug item is missing, it is imported with zero doses; marking a condition does not consume or grant doses.
-- Other status labels are markers, not newly implemented rules. Blue Glass, fire, poison, treatments, wounds and the remaining conditions do not gain new automation in this step.
+- General status labels remain markers unless a workflow owns their mechanics. The Instant Effects resolver now owns temporary Flashbang/Teargas injuries, Sleep and Incendiary fire. See [Instant effects](instant-effects.md). Other status labels are markers, not newly implemented rules. Blue Glass, treatments, wounds and the remaining general conditions do not gain automation merely by toggling their marker. Poison/Biotoxin are direct HP resolutions, not persistent damage-over-time statuses.
 - Damage-card selections use the same status IDs and await native injury/effect application before completion.
 - Existing actors and the current scene's synthetic token actors are reconciled once at startup/scene load. Later changes process only the affected actor.
 - One elected active GM handles hook-driven writes, falling back to an active owner when no GM is online. Per-actor queues and internal mutation flags prevent loops and duplicate imports.
@@ -45,6 +45,6 @@ Example: #token-hud .pneuma-status-group > summary { font-weight: bold; }
 
 Automated state tests cover injury addition/removal, concurrency, import/removal failure, native drug toggling, custom names/IDs, legacy custom settings, and authority selection. Browser checks cover complete grouping, default collapsed sections, and preserved native control nodes/listeners. Live multiplayer Foundry validation remains outstanding.
 
-This is the list/synchronization foundation. Timed fire damage, resistance checks, treatment actions, dose durations, addiction transitions, immunities, and HP-derived wound icons remain separate work.
+This is the list/synchronization foundation. Instant-effect resistance checks, module-owned timed injuries/Sleep and Incendiary turn-end damage are now implemented. Treatment actions, dose durations, addiction transitions, inferred immunities and HP-derived wound icons remain separate work.
 
 - Implemented: opening the native status picker temporarily hides the Combat Tools controls and their menu. Closing the picker restores them; native HUD controls remain available.

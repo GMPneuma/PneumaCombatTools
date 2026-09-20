@@ -87,6 +87,7 @@ Recovered from the original task **Locate PneumaCombatTools**, user message begi
 - Disable cyberware effects for Microwaver, EMP and Quickhacks.
 - Provide various selection-formula options or manual selection.
 - EMP now implements GM/player selection, four random modes, foundational/dependent-option policies, carried electronics and a GM immunity list. Combat-owned records last until combat ends (supersedes printed one-minute timing for this feature). Native item effects are suppressed, item rolls blocked, cyberweapon eligibility filtered, and Reflex Co-Processor evasion qualification respects EMP.
+- **Grenade EMP timing decision (2026-09-20):** reuse the existing EMP behavior until combat ends. A round is 3 seconds, so one minute is 20 rounds; the user reports combats very rarely last that long. Separate one-minute expiry is not required for the initial grenade integration. **Backlog investigation:** revisit exact one-minute timing, including unusually long combats and use outside combat, without changing the current combat-end behavior in this step.
 - Implant Integrity shows Disabled — EMP. Cyberlimbs use temporary broken-limb icons without injury damage or synthesized limb penalties. Existing disabled effects/injuries survive restoration. Source-specific Microwaver/QuickHack dispatch, custom weighting and random shortlists remain deferred. See [EMP](docs/emp.md).
 
 ## Later additions — current status
@@ -459,3 +460,15 @@ AoE attack dice animation: new area attacks retain their native attack dice and 
 
 
 AoE configuration layout: collapsible attack profiles show their current shape/dimensions in the heading; shotgun shells open initially. Shape-dependent fields use two columns. Evasion and Cover Up remain a separate collapsed section, with a fixed Save footer. All settings and stored values are retained. Supersedes the always-expanded profile layout.
+
+
+### Core ammunition and reusable Instant Effects — implemented 2026-09-20; live verification pending
+
+Supersedes earlier grenade-specific-effects and persistent-smoke deferrals; original entries above are retained as history. Grenades support Armor-Piercing, Biotoxin, EMP, Flashbang, Incendiary, Poison, Sleep, Smoke and Teargas. Rockets support Armor-Piercing and Smart. Shared instant resolutions are also available through Add effects. Target rows and placement areas use ammunition colors. Persistent smoke saves the actual affected cells and renders semi-transparent animated clouds.
+
+EMP retains the approved until-combat-ends behavior. The exact-one-minute/long-combat/out-of-combat timing investigation above remains open. Also pending: smoke-based attack penalties and conditional visibility/cyberware interactions, automated biological immunity inference, terrain/cover durability, action-cost enforcement and live multiplayer/vision verification. Normal weapon ammunition automation is not intercepted. See [Instant effects](docs/instant-effects.md).
+
+
+### Residual smoke visibility — reported live issue, open
+
+User reports no residual smoke after a smoke grenade. The server-served smoke.js matches the current build. Automated PIXI rendering passes but does not reproduce the live Foundry failure. Investigate effect creation, saved footprint, native scene render lifecycle, and visibility before marking this fixed. Included as a known issue in 0.4.0.

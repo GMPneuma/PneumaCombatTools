@@ -62,13 +62,13 @@ TypeScript/build and targeted automated tests cover policy combinations, modifie
 ## In-card application and attached statuses
 
 The damage card has recipient bolts and three status slots. Normal click
-uses native defaults; Shift-click opens the native shield/reduction dialog. The popup lists CONFIG.statusEffects, matching the
+uses native defaults; Shift-click opens the native shield/reduction dialog. The popup groups reusable Instant Effects and CONFIG.statusEffects, matching the
 world's native token HUD. Select up to three unique effects; reopening lets you remove
 or replace them. Canceling makes no changes. Effects are saved with the damage roll
 and are shared across its recipient options.
 
 Clicking a recipient's lightning bolt applies damage immediately using defaults or the Shift-click dialog choices, then activates the selected statuses on that same token actor. Statuses are
-applied even if armor/shields absorb the damage; conditional effects are deferred.
+applied even if armor/shields absorb the damage. Selected Instant Effects create their own resolution cards; this is an explicit ad-hoc application, independent of penetration. Automatic Incendiary grenade ignition checks native penetration separately. See [Instant effects](instant-effects.md).
 Already-active statuses remain active. Repeated selected-token applications remain
 available. If the selection changed on another client, the application stops before
 changing HP and asks for a review of the current card.

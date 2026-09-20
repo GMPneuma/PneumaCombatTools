@@ -1,3 +1,5 @@
+import {instantId} from "./instant-catalog.js";
+import {createInstantCard} from "./instant-effects.js";
 import { applyCombatStatus } from "./status-sync.js";
 import { thrownRollItem } from "./thrown-weapons.js";
 import { captureDamageApplication } from "./damage-application.js";
@@ -14,7 +16,7 @@ export interface DamageValues {
 export interface DamageResult { html: string; values: DamageValues; sixes?: number }
 export interface DamageState {
   status: "rolling" | "rolled" | "applying" | "applied" | "review";
-  user: string; nonce: string; statusEffects?: string[]; applications?: string[]; result?: DamageResult; appliedTo?: string; recordedApplied?: boolean; application?: "recorded" | "selected"; applicationId?: string;
+  user: string; nonce: string; penetrated?: boolean; statusEffects?: string[]; applications?: string[]; result?: DamageResult; appliedTo?: string; recordedApplied?: boolean; application?: "recorded" | "selected"; applicationId?: string;
 }
 export interface DamageOptions { useShield: boolean; damageReductionRole: boolean; damageReductionAE: boolean; brainDamageReduction: boolean }
 export interface DamageRequest {
@@ -26,8 +28,15 @@ export async function damageActor(uuid: string): Promise<Actor> {
   if (!token?.actor) throw new Error("The combat token or actor no longer exists.");
   return token.actor;
 }
+function configureAreaAmmo(roll:NativeRoll,data:Exchange):void {
+  if (data.areaAmmo) {
+    const native=roll as NativeRoll & {rollCardExtraArgs:Record<string,unknown>};
+    native.rollCardExtraArgs={...native.rollCardExtraArgs,ammoType:data.areaAmmo.type,ammoVariety:data.areaAmmo.variety,ablationValue:data.areaAmmo.type==="armorPiercing"?2:1};
+  }
+}
 export function configureDamage(roll: NativeRoll, data: Exchange): void {
   if (data.damageFormula) roll.formula = data.damageFormula;
+  configureAreaAmmo(roll,data);
   roll.location = data.location ?? "body";
   roll.isAimed = data.attackMode === "aimed";
   if (data.attackMode === "autofire") {
@@ -165,9 +174,15 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
     const token = await fromUuid(destination) as TokenDocument | null;
     const summaries = await captureDamageApplication(actor, token?.name ?? actor.name ?? "", v.location, damage.applicationId!,
       view => target._applyDamage.call(view, v.total, v.bonus, v.location, (data.coverUp || data.weaponType === "martialArts" && game.settings!.get("pneuma-combattools", "maNoAblation")) ? 0 : v.ablation, v.ammo, data.coverUp?2*v.ignorePercent-100:v.ignorePercent, data.coverUp?v.ignoreBelow/2:v.ignoreBelow, v.lethal, request.options),
-      data.coverUp?{ablation:2*v.ablation,ignorePercent:v.ignorePercent,ignoreBelow:v.ignoreBelow}:undefined);
+      data.coverUp?{ablation:2*v.ablation,ignorePercent:v.ignorePercent,ignoreBelow:v.ignoreBelow}:undefined, native=>{damage.penetrated=Number(native.rawDamageDealt)>0&&native.hpReduction>0;});
     damage.applications = [...(damage.applications ?? []), ...summaries];
-    for (const id of effects) await applyCombatStatus(actor, id);
+    for (const id of effects) {
+      const instant=id.startsWith("instant:")?id.slice(8):"";
+      if(instantId(instant)) {
+        const visibility={blind:data.rollMode==="blindroll",whisper:["gmroll","blindroll"].includes(data.rollMode??"")?game.users!.filter(u=>u.isGM).map(u=>u.id!):data.rollMode==="selfroll"?[user.id!]:[]} as ChatMessage;
+        await createInstantCard(actor,instant,visibility);
+      } else await applyCombatStatus(actor, id);
+    }
   } catch (error) {
     damage.status = "review"; await save();
     throw new Error("Damage or status application was interrupted. Check HP, armor, shield and effects before continuing: " + (error as Error).message);
@@ -192,6 +207,7 @@ export async function rollDamage(id: string, data: Exchange, send: Send, showDia
     configureDamage(roll, data);
     if (!await roll.handleRollDialog({ type: "pneuma-damage", ctrlKey: !showDialog, metaKey: false }, actor, item)) return;
     roll = await item.confirmRoll(roll);
+    if(data.areaAmmo)configureAreaAmmo(roll,data);
     await rollHidden(roll);
     roll.rollTitle = data.title;
     // The native global application button is replaced with our original-defender control.
@@ -312,7 +328,7 @@ export async function renderDamage(message: ChatMessage, data: Exchange, html: J
       const effect = choices.find(effect => effect.id === selected[slot]);
       const edit = document.createElement("button"); edit.type = "button"; edit.className = "pneuma-damage-status-slot";
       edit.dataset.pneumaStatusSlot = String(slot);
-      edit.title = selected[slot] ? "Change or remove " + (effect?.name ?? selected[slot]) : "Add status effect";
+      edit.title = selected[slot] ? "Change or remove " + (effect?.name ?? selected[slot]) : "Add effects";
       edit.setAttribute("aria-label", edit.title);
       if (selected[slot]) {
         edit.dataset.statusId = selected[slot]!;

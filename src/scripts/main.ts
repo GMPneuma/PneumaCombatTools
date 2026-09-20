@@ -1,3 +1,4 @@
+import {registerInstantEffects} from "./instant-effects.js";
 import { registerSelfCTH, isSelfCTH, selfInitiativeControl, rerollSelfInitiative } from "./self-cth.js";
 import { registerHoverEKG } from "./ekg-hover.js";
 import { registerMovement } from "./movement.js";
@@ -62,6 +63,7 @@ Hooks.once("init", () => {
   registerCombatResolution();
   registerMovement();
   registerEmp();
+  registerInstantEffects();
   registerAreaAttacks();
   registerCriticalSettings();
   registerSettingsLayout();

@@ -41,24 +41,27 @@ function touches(points:number[],box:{x:number;y:number;width:number;height:numb
   return Math.abs(poly.reduce((sum,p,i)=>{const q=poly[(i+1)%poly.length]!;return sum+p.x*q.y-q.x*p.y;},0))>0.002;
 }
 /** Use the same native highlighted cells for targeting as for drawing. */
-export function areaCoverage(area:Area) {
+export function areaCells(area:Area):number[][] {
   const shape=new PIXI.Polygon(clippedPoints(area));
-  if(canvas.grid!.type===CONST.GRID_TYPES.GRIDLESS)return (box:{x:number;y:number;width:number;height:number})=>touches(shape.points,box);
+  if(canvas.grid!.type===CONST.GRID_TYPES.GRIDLESS)return [shape.points];
   // v12 has no public cell-list API; this native method only reads document origin and shape.
   const native=CONFIG.MeasuredTemplate.objectClass.prototype as unknown as {_getGridHighlightPositions(this:unknown):Point[]};
   const d=templateData(area);
   const positions=native._getGridHighlightPositions.call({document:d,
     shape:new PIXI.Polygon(shape.points.map((n,i)=>n-(i%2?d.y:d.x)))});
-  const cells=positions.map(p=>canvas.grid!.getVertices(p).flatMap(v=>[v.x,v.y]));
+  return positions.map(p=>canvas.grid!.getVertices(p).flatMap(v=>[v.x,v.y]));
+}
+export function areaCoverage(area:Area) {
+  const cells=areaCells(area);
   return (box:{x:number;y:number;width:number;height:number})=>cells.some(p=>touches(p,box));
 }
 
 /** Local preview only: players do not need permission to create scene templates. */
-export async function placeArea(make:(point:Point)=>Area, initial:Point, prompt:string):Promise<Area|null> {
+export async function placeArea(make:(point:Point)=>Area, initial:Point, prompt:string,color="#d44a40"):Promise<Area|null> {
   if(!canvas.stage || !canvas.app) throw new Error("Open the attack scene first.");
   const stage=canvas.stage, view=canvas.app.view as HTMLCanvasElement;
   let area=make(initial);
-  const document=new CONFIG.MeasuredTemplate.documentClass({...templateData(area),flags:{"pneuma-combattools":{areaShape:area}}} as never,{parent:canvas.scene!} as never);
+  const document=new CONFIG.MeasuredTemplate.documentClass({...templateData(area),fillColor:color,borderColor:color,flags:{"pneuma-combattools":{areaShape:area}}} as never,{parent:canvas.scene!} as never);
   const preview=new CONFIG.MeasuredTemplate.objectClass(document);
   canvas.templates!.preview!.addChild(preview);
   const draw=()=>{document.updateSource({...templateData(area),flags:{"pneuma-combattools":{areaShape:area}}} as never);preview.renderFlags.set({refresh:true});};

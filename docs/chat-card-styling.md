@@ -398,3 +398,16 @@ AoE applied-damage summaries now collect in `.pneuma-damage-applications.pneuma-
 
 
 AoE attack dice animation: new area attacks retain their native attack dice and release them through CPR Dice So Nice handling after scatter placement and every waiting/rolling response resolves. The saved roll mode is retained. A persisted reveal flag prevents later damage, movement, visibility updates or chat rerenders from repeating the animation; legacy cards do not replay. Card attack visibility uses the same response condition. Automated fixture verification only.
+
+
+## Instant effects and ammunition colors
+
+Area targets retain .pneuma-aoe-target[data-aoe-row] and their original response controls. Their inline --pneuma-ammo-color supplies the left border; ammunition names remain in the card title. Matching colors also apply to native placement previews and persisted attack templates. Supported effect rows add .pneuma-instant-effect[data-effect][data-state] below the affected target. States: pending, rolling, failed, resisted, applying, applied, skipped, review. Standalone ad-hoc cards use .rollcard.pneuma-instant-card.
+
+Controls use [data-instant-action] and [data-instant-scope]: roll, apply, skip (GM), reset (GM), review (GM), wake and extinguish. Native resistance HTML remains in .pneuma-instant-roll, and direct-HP dice in .pneuma-instant-damage; native rollcard/dice/detail hooks are retained. Owners/GMs receive controls, and the GM independently validates actions. Message visibility and roll mode are inherited. Add effects retains .pneuma-damage-status-picker and its radio controls, with Instant Effects and Status Effects headings.
+
+[data-aoe-action="removeSmoke"] is GM-only. Existing [data-aoe-action="effectsResolved"] remains for legacy/unknown special ammunition. .pneuma-smart-first wraps the initial Smart miss; the second native roll follows it. No existing selectors are renamed or removed.
+
+Example: .pneuma-aoe-card .pneuma-instant-effect[data-effect="poison"] { border-color: var(--pneuma-ammo-color); }
+
+Browser fixtures verify compact card width, effect controls and animation. Live multi-client card visibility remains to be checked.

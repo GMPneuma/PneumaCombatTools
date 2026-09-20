@@ -36,8 +36,10 @@ try {
  const structure = await readFile(new URL('../dist/scripts/card-structure.js', import.meta.url), 'utf8');
  await page.addScriptTag({type:'module',content:structure+'\nObject.assign(window,{resolutionSection,rollOutcomeClass,combatCardKind,canRenderCombatCard,decorateSharedCard});'});
  await page.waitForFunction(()=>!!window.resolutionSection);
+ const catalog=await readFile(new URL('../dist/scripts/instant-catalog.js',import.meta.url),'utf8');
+ await page.addScriptTag({type:'module',content:catalog+'\nObject.assign(window,{instantEffects,instantId});'});
  const statusSource = await readFile(new URL('../dist/scripts/damage-status.js', import.meta.url), 'utf8');
- await page.addScriptTag({type:'module',content:statusSource+'\nObject.assign(window,{chooseDamageStatuses,damageStatusChoices,validateDamageStatuses});'});
+ await page.addScriptTag({type:'module',content:statusSource.replace(/^import .*$/gm,'')+'\nObject.assign(window,{chooseDamageStatuses,damageStatusChoices,validateDamageStatuses});'});
  await page.waitForFunction(()=>!!window.chooseDamageStatuses);
  const criticalSource = await readFile(new URL('../dist/scripts/critical-injury.js', import.meta.url), 'utf8');
  await page.addScriptTag({type:'module',content:criticalSource.replace('import(utilsPath)', 'Promise.resolve({default:window.criticalUtils})')+'\nObject.assign(window,{hasCriticalInjury,criticalLocation,damageSixes,applyCriticalInjury});'});

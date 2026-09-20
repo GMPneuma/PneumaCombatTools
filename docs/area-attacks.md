@@ -33,7 +33,7 @@ The optional Cover Up button is available on damaging AoE cards, including shotg
 - Armor SP counts double for this attack's damage application.
 - Armor ablation doubles, even if no HP damage penetrates armor.
 
-The original armor SP is never edited to grant protection. Native damage calculation handles shields, reductions, critical bonus damage and armor interactions. The shared damage roll is unchanged for other targets. Armor ablation and its undo value are included in the captured native application result. The Prone condition remains until removed normally. Special grenade effects still require manual handling.
+The original armor SP is never edited to grant protection. Native damage calculation handles shields, reductions, critical bonus damage and armor interactions. The shared damage roll is unchanged for other targets. Armor ablation and its undo value are included in the captured native application result. The Prone condition remains until removed normally. Special grenade effects now use the reusable Instant Effects resolver; see [Instant effects](instant-effects.md).
 
 ## Damage, suppression and visibility
 
@@ -41,11 +41,11 @@ One attack roll is followed by individual responses. Attack results stay visuall
 
 Suppressive fire uses native REF + Autofire and ten bullets. Each affected target rolls WILL + Concentration; ties resist. Failures record the next Move-to-cover and Run-if-needed obligation. The GM excludes mounted targets or cover not represented by walls.
 
-Everyone viewing a card can Show/Hide its shared area. It auto-hides after responses, required evasion relocation and damage applications finish. Special ammunition has a GM manual-effects completion button. Completed areas can be revealed again. Deleting a card removes its linked template. Templates and recipient lists are snapshots.
+The GM can Show/Hide the shared attack area. It auto-hides after responses, required evasion relocation and damage applications finish. Supported special ammunition uses per-target effect resolution; unknown/legacy special ammunition retains the GM manual-effects completion button. Completed areas can be revealed again. Deleting a card removes its attack template; a separate smoke area remains until expiry or GM removal. Templates and recipient lists are snapshots.
 
 An active GM coordinates responses, movement, templates and damage. Players need no template creation permission. Automated/native-method/browser fixtures provide validation; live multiplayer and map testing remain necessary.
 
-Deferred: grenade-specific effects, persistent smoke and conditional visibility/cyberware interactions, automatic terrain/cover destruction, and general Run/action enforcement.
+Implemented: core grenade/rocket ammunition resolution and persistent animated smoke. Deferred: automatic smoke attack penalties, conditional visibility/cyberware interactions, automatic terrain/cover destruction, and general Run/action enforcement. See [Instant effects](instant-effects.md).
 
 Attack-area visibility controls are now GM-only, superseding earlier all-viewer access. Player controls are hidden and the GM request handler rejects player show/hide requests. Automatic completion hiding remains unchanged.
 

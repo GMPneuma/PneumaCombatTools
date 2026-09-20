@@ -41,13 +41,13 @@ export function compactDamageApplication(html: string, name: string, location: s
 
 /** Capture only this call's native summary, using a distinct actor view as its identity. */
 export async function captureDamageApplication(actor: Actor, name: string, location: string, id: string,
-  apply: (actorView: Actor) => Promise<void>, coverUp?:CoverUpDamage): Promise<string[]> {
+  apply: (actorView: Actor) => Promise<void>, coverUp?:CoverUpDamage, inspect?: (data:NativeDamageData)=>void): Promise<string[]> {
   const path = "/systems/cyberpunk-red-core/modules/chat/cpr-chat.js";
   const chat = (await import(path)).default as NativeDamageChat;
-  return captureWithChat(chat, actor, name, location, id, apply,coverUp);
+  return captureWithChat(chat, actor, name, location, id, apply,coverUp,inspect);
 }
 export async function captureWithChat(chat: NativeDamageChat, actor: Actor, name: string, location: string, id: string,
-  apply: (actorView: Actor) => Promise<void>, coverUp?:CoverUpDamage): Promise<string[]> {
+  apply: (actorView: Actor) => Promise<void>, coverUp?:CoverUpDamage, inspect?: (data:NativeDamageData)=>void): Promise<string[]> {
   installDamageCapture(chat);
   // Native getters and mutations still execute on the real document. Only the
   // actor reference passed to its summary renderer is distinct for this call.
@@ -65,6 +65,7 @@ export async function captureWithChat(chat: NativeDamageChat, actor: Actor, name
       if(amount)await native._ablateArmor(location,amount);
       for(const data of captured){data.ablation=amount;data.ignoreArmorPercent=coverUp.ignorePercent;data.ignoreBelowSP=coverUp.ignoreBelow;}
     }
+    for (const data of captured) inspect?.(data);
     if (!captured.length) throw new Error("Native damage applied without a captured result. Check the recipient before continuing.");
     return await Promise.all(captured.map(async (data, index) => compactDamageApplication(
       await renderTemplate("systems/cyberpunk-red-core/templates/chat/cpr-damage-application-card.hbs", data),

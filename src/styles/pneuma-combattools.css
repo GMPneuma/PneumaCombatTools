@@ -509,3 +509,9 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 .pneuma-hover-ekg .pneuma-eye-ekg { display:block; }
 
 #token-hud [data-self-initiative][aria-disabled="true"] { opacity:0.45; cursor:default; }
+
+/* Ammunition identity and reusable instant-effect controls. */
+.pneuma-aoe-target[style] { border-left: 3px solid var(--pneuma-ammo-color); padding-left: 4px; }
+.pneuma-instant-effect { border-left: 3px solid var(--pneuma-ammo-color); padding: 4px 6px; margin: 3px 0; min-width: 0; overflow-wrap: anywhere; }
+.pneuma-instant-effect button { width: auto; font-size: 11px; line-height: 20px; padding: 0 5px; }
+.pneuma-instant-effect .pneuma-instant-roll, .pneuma-instant-effect .pneuma-instant-damage { min-width: 0; }

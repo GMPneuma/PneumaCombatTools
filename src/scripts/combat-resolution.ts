@@ -25,6 +25,7 @@ declare global {
 interface Usage { round: string; used: number; lastPayment?: string }
 interface Defense { total: number; html: string; dice: string[]; bonus: number; fee: number; penalty: number }
 export interface Exchange {
+  areaAmmo?: {type:string;variety:string};
   attacker: string; defender: string; defenderActor: string; attackerName: string; defenderName: string;
   ranged: boolean; category: string; title: string; dv?: number; total: number; html: string; dice: string[];
   rollMode: string; state: "waiting" | "applying" | "resolved" | "cancelled"; defense?: Defense;

@@ -1,3 +1,7 @@
+import {ammoProfile,instantId} from "../instant-catalog.js";
+import {newInstant,instantContent,instantDone,handleInstant,bindInstantControls,type InstantState,type InstantRequest} from "../instant-effects.js";
+import {createSmoke,registerSmoke} from "./smoke.js";
+import {empDisabled} from "../emp-state.js";
 import {masterStatuses} from "../status-catalog.js";
 import {moveEvader,registerAreaMovement} from "./movement.js";
 import { MODULE, areaSettings, registerAreaSettings, type AreaSettings } from "./settings.js";
@@ -16,17 +20,17 @@ import { grappleWeaponBlocked } from "../grapple/state.js";
 import { checkedLuck } from "../evasion-rules.js";
 
 interface TargetRow {
-  uuid:string; actor:string; name:string; img:string; eligible:boolean;
+  instant?:InstantState; uuid:string; actor:string; name:string; img:string; eligible:boolean;
   state:"waiting"|"rolling"|"hit"|"miss"|"other"; total?:number; html?:string;
   claim?:{nonce:string;user:string;expires:number}; damage?:DamageState; moved?:boolean; coverUp?:boolean; moveCost?:number;
 }
 export interface AreaAttack {
-  scene:string; kind:AreaKind; area:Area; intended:Point; settings:AreaSettings; templateId?:string;
+  ammoType?:string; smokeId?:string; scene:string; kind:AreaKind; area:Area; intended:Point; settings:AreaSettings; templateId?:string;
   phase:"scatter"|"responses"; exchange:Exchange; rows:TargetRow[]; special:boolean; areaHidden?:boolean; resolutionComplete?:boolean; effectsResolved?:boolean; attackDiceRevealed?:boolean;
 }
 interface Request {
   aoeType:"request"; id:string; user:string; message:string; action:string; target?:string;
-  nonce?:string; total?:number; html?:string; area?:Area; damageRequest?:DamageRequest; hidden?:boolean; point?:Point;
+  instantRequest?:InstantRequest; nonce?:string; total?:number; html?:string; area?:Area; damageRequest?:DamageRequest; hidden?:boolean; point?:Point;
 }
 interface Reply {aoeType:"reply";id:string;user:string;gm:string;error?:string}
 const flag=(message:ChatMessage)=>foundry.utils.getProperty(message,`flags.${MODULE}.aoe`) as AreaAttack|undefined;
@@ -63,11 +67,13 @@ export function makeArea(kind:AreaKind, source:Token, point:Point, s:AreaSetting
 }
 function targets(data:AreaAttack):TargetRow[] {
   if(canvas.scene?.id!==data.scene)throw Error("Open the original scene to collect area targets.");
+  if(data.ammoType==="smoke")return [];
   const covered=areaCoverage(data.area);
   return (canvas.tokens?.placeables??[]).filter(t=>t.actor && !["container","blackIce","demon"].includes(String(t.actor.type))
     && (data.kind==="explosive"||t.document.uuid!==data.exchange.attacker)
     && covered({x:t.x,y:t.y,width:t.w,height:t.h})
     ).map(t=>({
+      ...(instantId(data.ammoType)&&data.ammoType!=="incendiary"?{instant:newInstant(data.ammoType,t.actor!.uuid,t.name??"")} : {}),
       uuid:t.document.uuid,actor:t.actor!.uuid,name:t.name??"",img:t.document.texture.src??"",
       eligible:evadeAllowed(Number(foundry.utils.getProperty(t.actor!,"system.stats.ref.value")),data.settings.evade),
       state:data.kind==="shell" && data.exchange.total<=13?"miss":"waiting",
@@ -76,7 +82,7 @@ function targets(data:AreaAttack):TargetRow[] {
 const btn=(action:string,icon:string,title:string,target="")=>`<button type="button" data-aoe-action="${action}" data-aoe-target="${esc(target)}" title="${esc(title)}" aria-label="${esc(title)}"><i class="fas ${icon}" aria-hidden="true"></i></button>`;
 const awaitingResponses=(data:AreaAttack)=>data.phase==="scatter"||data.rows.some(r=>["waiting","rolling"].includes(r.state));
 export function areaContent(data:AreaAttack):string {
-  const waiting=awaitingResponses(data);
+  const waiting=awaitingResponses(data),profile=ammoProfile(data.ammoType);
   let attackHTML="";
   if(!waiting){
     const native=new DOMParser().parseFromString(data.exchange.html,"text/html");
@@ -84,7 +90,7 @@ export function areaContent(data:AreaAttack):string {
     attackHTML=native.body.innerHTML;
   }
   const attack=waiting?"<p>Attack rolled — awaiting responses.</p>":`<div class="pneuma-aoe-attack">${attackHTML}</div>`;
-  const rows=data.rows.map(r=>`<div role="listitem" class="pneuma-aoe-target" data-aoe-row="${esc(r.uuid)}" data-state="${r.state}">
+  const rows=data.rows.map(r=>`<div role="listitem" class="pneuma-aoe-target" data-aoe-row="${esc(r.uuid)}" data-state="${r.state}" style="--pneuma-ammo-color:${profile?.color??"#d44a40"}">
     <img src="${esc(r.img)}" alt="" width="24" height="24"><span class="pneuma-aoe-name">${esc(r.name)}</span><span class="pneuma-aoe-response">
     ${r.state==="waiting" ? (data.kind==="suppression"?btn("roll","fa-brain","Concentration",r.uuid):btn("roll","fa-person-running","Evade",r.uuid))
       +(data.settings.coverUp&&data.kind!=="suppression"?btn("other","fa-shield","Cover Up: Prone, double SP and ablation",r.uuid):"")+(data.kind==="suppression"?"":btn("decline","fa-xmark","Not evade",r.uuid))
@@ -97,16 +103,18 @@ export function areaContent(data:AreaAttack):string {
     ${r.state==="hit"&&data.exchange.damage?.result ? btn("apply","fa-bolt",r.damage?.recordedApplied?"Damage applied":"Apply shared damage (Shift: options)",r.uuid):""}
     ${r.damage&&["review","applying"].includes(r.damage.status)?btn("damageResolved","fa-check-double","GM: mark resolved after checking damage",r.uuid):""}
     ${r.moved&&r.moveCost?`<span>Move: ${r.moveCost.toFixed(1)}m</span>`:""}</span></div>${r.html?`<div class="pneuma-aoe-defense ${rollOutcomeClass(r.state==="miss")}">${r.html}</div>`:""}
+    ${r.state==="hit"&&r.instant?instantContent(r.instant,r.uuid):""}
     `).join("");
   const applications=data.rows.flatMap(r=>r.damage?.applications??[]).join("");
-  return `<section class="rollcard pneuma-aoe-card" data-state="${data.phase==="scatter"?"scatter":waiting?"waiting":"resolved"}"><div class="rollcard-top"><div class="cpr-block"><h3>${esc(data.exchange.title)}</h3></div></div>
+  return `<section class="rollcard pneuma-aoe-card" data-state="${data.phase==="scatter"?"scatter":waiting?"waiting":"resolved"}"><div class="rollcard-top"><div class="cpr-block"><h3>${esc(data.exchange.title)}${profile?" · "+esc(profile.name):""}</h3></div></div>
     ${resolutionSection("attack",attack)}
     ${resolutionSection("result",data.phase==="scatter"?"<p>Missed intended point. GM: choose where it landed within the intended blast square.</p>"+btn("scatter","fa-crosshairs","GM: place actual blast"): `<div role="list" class="pneuma-aoe-targets">${rows||"<p>No tokens in the area.</p>"}</div>`)}
     <div class="pneuma-aoe-actions">${btn("show",data.areaHidden?"fa-eye":"fa-eye-slash",data.areaHidden?"Show attack area":"Hide attack area")}${data.phase==="responses"?btn("add","fa-user-plus","GM: add selected token (manual coverage override)"):""}
     ${data.kind!=="suppression"&&data.phase!=="scatter"&&!data.special&&!data.exchange.damage?btn("damage","fa-droplet","Roll shared damage"):""}
     ${data.exchange.damage?.status==="rolling"?btn("damageReset","fa-unlock","GM: release unfinished damage roll"):""}</div>
-    ${data.special&&!data.effectsResolved?btn("effectsResolved","fa-check-double","GM: mark manual effects resolved"):""}
-    ${data.special?"<p>Special ammunition: resolve its effects manually. Grenade-specific effects are not automated yet.</p>":""}
+    ${data.special&&!profile&&!data.effectsResolved?btn("effectsResolved","fa-check-double","GM: mark manual effects resolved"):""}
+    ${data.special&&!profile?"<p>Special ammunition: resolve its effects manually. Grenade-specific effects are not automated yet.</p>":""}
+    ${data.ammoType==="smoke"?"<p>Smoke: 1 minute.</p>"+(data.smokeId?btn("removeSmoke","fa-cloud","GM: remove smoke"):""):""}
     ${data.kind==="explosive"?"<p>Cover and terrain: GM resolves durability. GM: exclude targets protected by cover that survives the damage.</p>":""}
     ${data.exchange.damage?damageContent(data.exchange,"roll"):""}
     ${applications?`<div class="pneuma-damage-applications pneuma-aoe-applications">${applications}</div>`:""}</section>`;
@@ -120,9 +128,13 @@ function complete(data:AreaAttack):boolean {
   if(data.exchange.damage?.status==="rolling")return false;
   return data.rows.every(r=>r.state==="miss"
     ? data.kind==="suppression"||r.total===undefined||!!r.moved
-    : data.kind==="suppression"||(data.special?!!data.effectsResolved:r.damage?.status==="applied"&&!!r.damage.recordedApplied));
+    : data.kind==="suppression"||(data.ammoType==="smoke"?!!data.smokeId:r.instant?(instantDone(r.instant)&& (data.ammoType!=="incendiary"||!!r.damage?.recordedApplied)):data.special?!!data.effectsResolved:r.damage?.status==="applied"&&!!r.damage.recordedApplied));
 }
 async function save(message:ChatMessage,data:AreaAttack) {
+  if(data.ammoType==="smoke"&&data.phase==="responses"&&!data.smokeId) {
+    const scene=game.scenes!.get(data.scene) as Scene|undefined;if(!scene)throw Error("Smoke scene unavailable.");
+    data.smokeId=await createSmoke(scene,data.area,message.id!);
+  }
   const reveal=data.attackDiceRevealed===false&&!awaitingResponses(data);
   if(reveal)data.attackDiceRevealed=true;
   const resolved=complete(data);
@@ -146,6 +158,15 @@ export async function handleAreaRequest(req:Request) {
   if(!message||!saved||!user)throw Error("Area attack is unavailable.");
   const data=foundry.utils.deepClone(saved);
   const row=data.rows.find(r=>r.uuid===req.target);
+  if(req.action==="instant") {
+    if(!row?.instant||row.state!=="hit"||!req.instantRequest||data.phase!=="responses")throw Error("Instant effect unavailable.");
+    await handleInstant(row.instant,req.instantRequest,user,()=>save(message,data),data.exchange.rollMode);return;
+  }
+  if(req.action==="removeSmoke") {
+    if(!user.isGM||data.ammoType!=="smoke")throw Error("GM only.");
+    const scene=game.scenes!.get(data.scene) as Scene|undefined;
+    if(data.smokeId&&scene?.templates.has(data.smokeId))await scene.deleteEmbeddedDocuments("MeasuredTemplate",[data.smokeId]);return;
+  }
   if(req.action==="show") {
     if(!user.isGM)throw Error("Only the GM can show or hide the attack area.");
     if(typeof req.hidden!=="boolean")throw Error("Choose whether to show or hide the area.");
@@ -164,7 +185,7 @@ export async function handleAreaRequest(req:Request) {
     if(!token?.actor||token.parent?.id!==data.scene)throw Error("Select a token in the attack scene.");
     if(row)return;
     data.effectsResolved=false;
-    data.rows.push({uuid:token.uuid,actor:token.actor.uuid,name:token.name??"",img:token.texture.src??"",eligible:evadeAllowed(Number(foundry.utils.getProperty(token.actor,"system.stats.ref.value")),data.settings.evade),state:"waiting"});
+    data.rows.push({...(instantId(data.ammoType)&&data.ammoType!=="incendiary"?{instant:newInstant(data.ammoType,token.actor.uuid,token.name??"")} : {}),uuid:token.uuid,actor:token.actor.uuid,name:token.name??"",img:token.texture.src??"",eligible:evadeAllowed(Number(foundry.utils.getProperty(token.actor,"system.stats.ref.value")),data.settings.evade),state:"waiting"});
     await save(message,data);return;
   }
   if(req.action==="scatter"){
@@ -179,9 +200,14 @@ export async function handleAreaRequest(req:Request) {
       if(!row||row.state!=="hit"||!["damageApply","damageResolved"].includes(req.damageRequest.action))throw Error("Select an affected target.");
       if(req.damageRequest.targetUuid && req.damageRequest.targetUuid!==row.uuid)throw Error("Damage target changed.");
       const exchange=rowExchange(data,row);
-      await handleDamage(req.damageRequest,user,exchange,async()=>{row.damage=exchange.damage;await save(message,data);});
+      await handleDamage(req.damageRequest,user,exchange,async()=>{row.damage=exchange.damage;
+        if(data.ammoType==="incendiary"&&row.damage?.recordedApplied&&!row.instant) {
+          row.instant=newInstant("incendiary",row.actor,row.name);
+          if(!row.damage.penetrated){row.instant.state="skipped";row.instant.summary="No penetrating damage";}
+        }
+        await save(message,data);});
     } else {
-      if(!["damageClaim","damageRelease","damageCommit","damageReset"].includes(req.damageRequest.action))throw Error("Invalid shared damage action.");
+      if(!["damageClaim","damageRelease","damageCommit","damageReset","damageStatuses"].includes(req.damageRequest.action))throw Error("Invalid shared damage action.");
       await handleDamage(req.damageRequest,user,data.exchange,()=>save(message,data));
     }
     return;
@@ -198,8 +224,8 @@ export async function handleAreaRequest(req:Request) {
     row.moveCost=await moveEvader(token,point,!!data.settings.evadeMove,!!data.settings.evadeBorrow,message.id!+":"+row.uuid);
     row.moved=true;await save(message,data);return;
   }
-  if(req.action==="forcehit"){if(!user.isGM||row.state!=="miss"||row.damage)throw Error("GM only.");row.state="hit";data.effectsResolved=false;
-  } else if(req.action==="exclude") { if(!user.isGM||!["waiting","hit"].includes(row.state)||row.damage)throw Error("GM only; damage already started.");row.state="miss";
+  if(req.action==="forcehit"){if(!user.isGM||row.state!=="miss"||row.damage||row.instant&&row.instant.state!=="pending")throw Error("GM only.");row.state="hit";data.effectsResolved=false;
+  } else if(req.action==="exclude") { if(!user.isGM||!["waiting","hit"].includes(row.state)||row.damage||row.instant&&!["pending","failed"].includes(row.instant.state))throw Error("GM only; damage or effect already started.");row.state="miss";
   } else if(req.action==="reset"){
     if(!user.isGM)throw Error("GM only.");row.state="waiting";delete row.claim;
   } else if(["hit","miss"].includes(req.action)){
@@ -245,12 +271,16 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
   const kind=areaKind(original,mode);if(!kind)return;
   requireCombatSocket();if(!gm())throw Error("An active GM is required for area attacks.");
   if(String(original.type)!=="ammo"&&grappleWeaponBlocked(actor,original))throw Error("Grappled characters cannot use weapons requiring two hands.");
+  const ammoType=String(String(original.type)==="ammo"?foundry.utils.getProperty(original,"system.type")??"":original._getLoadedAmmoProp?.("type")??"");
+  const variety=String(original.type)==="ammo"?"grenade":String(original._getLoadedAmmoProp?.("variety")??(foundry.utils.getProperty(original,"system.weaponType")==="rocketLauncher"?"rocket":"grenade"));
+  const profile=kind==="explosive"?ammoProfile(ammoType,variety):undefined;
+  if(ammoType==="smart"&&profile&&!actor.items.some(i=>String(i.type)==="cyberware"&&i.name?.toLowerCase().includes("targeting scope")&&!!(foundry.utils.getProperty(i,"system.isInstalledInActor")??foundry.utils.getProperty(i,"system.isInstalled"))&&!empDisabled(i)))throw Error("Smart rockets require installed, operational Targeting Scope cyberware.");
   starting.add(actor.uuid);
   try {
     const scene=canvas.scene!.id!,s=areaSettings();
     const sourcePosition={x:source.x,y:source.y};
-    const area=await placeArea(p=>makeArea(kind,source,p,s),target.center,
-      kind==="shell"?"Aim the shell area in front of the attacker.":kind==="suppression"?"Aim suppressive fire.":"Place the blast center.");
+    const area=await placeArea(p=>makeArea(kind,source,p,ammoType==="smoke"?{...s,blastShape:"square",blastSize:10}:s),target.center,
+      kind==="shell"?"Aim the shell area in front of the attacker.":kind==="suppression"?"Aim suppressive fire.":"Place the blast center.",profile?.color);
     if(!area||canvas.scene?.id!==scene)return;
     let item:RollItem=original, thrownSource:object|undefined;
     if(String(original.type)==="ammo"){
@@ -273,20 +303,36 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
     if(canvas.scene?.id!==scene||source.x!==sourcePosition.x||source.y!==sourcePosition.y||!owns(actor)||actor.items.get(itemId)!==original||areaKind(original,mode)!==kind||!ammoOK())throw Error("The weapon, scene, ownership or ammunition changed.");
     if(String(original.type)!=="ammo"&&grappleWeaponBlocked(actor,original))throw Error("Grappled characters cannot use weapons requiring two hands.");
     checkedLuck(Number(foundry.utils.getProperty(actor,"system.stats.luck.value")),0,roll.luck);
+    const currentAmmo=String(String(original.type)==="ammo"?foundry.utils.getProperty(original,"system.type")??"":original._getLoadedAmmoProp?.("type")??"");
+    if(currentAmmo!==ammoType)throw Error("Ammunition changed during targeting. Start the attack again.");
+    const blastFormula=kind==="explosive"?item.createRoll("damage",actor,{damageType:"attack"}).formula:undefined;
     roll=await confirmAreaRoll(item,roll);await spendBonusLuck(actor,roll.luck);
     if(String(original.type)==="ammo")await original.update({"system.amount":Number(foundry.utils.getProperty(original,"system.amount"))-1} as Parameters<Item["update"]>[0]);
     await rollHidden(roll);roll.entityData={actor:actor.id!,token:source.id!,item:itemId,tokens:[]};
+    let firstAttackHTML="",firstAttackDice:string[]=[];
+    if(profile&&ammoType==="smart"&&dv!==undefined&&roll.resultTotal<=dv&&dv-roll.resultTotal<=4) {
+      firstAttackHTML=await nativeCard(roll);firstAttackDice=diceJSON(roll);
+      const path="/systems/cyberpunk-red-core/modules/rolls/cpr-rolls.js";
+      const native=await import(path) as {CPRRoll:new(title:string,formula:string)=>import("../native-combat.js").NativeRoll & {additionalMods:unknown[]}};
+      const retry=new native.CPRRoll("Smart rocket — second chance","1d10");retry.addMod([{value:10,source:"Smart ammunition"}]);
+      if(await retry.handleRollDialog({type:"pneuma-smart",ctrlKey:false,metaKey:false},actor,item)) {
+        retry.formula="1d10";retry.mods=[{value:10,source:"Smart ammunition"}];retry.additionalMods=[];
+        checkedLuck(Number(foundry.utils.getProperty(actor,"system.stats.luck.value")),0,retry.luck);
+        await spendBonusLuck(actor,retry.luck);await rollHidden(retry);roll=retry;
+      } else {firstAttackHTML="";firstAttackDice=[];}
+    }
     const title=(game.settings!.get(MODULE,"hideAttackWeapon")?"Area attack":original.name??"Area attack")+(kind==="suppression"?" — Suppressive Fire":kind==="shell"?" — Shells":" — Blast");
     roll.rollTitle=title;
     const exchange:Exchange={attacker:source.document.uuid,attackerName:source.name??"",defender:source.document.uuid,defenderActor:actor.uuid,defenderName:source.name??"",
-      ranged:true,category:"Ranged",title,total:roll.resultTotal,html:await nativeCard(roll),dice:diceJSON(roll),dv,
+      ranged:true,category:"Ranged",title,total:roll.resultTotal,html:(firstAttackHTML?"<div class=\"pneuma-smart-first\">"+firstAttackHTML+"</div>":"")+await nativeCard(roll),dice:[...firstAttackDice,...diceJSON(roll)],dv,
       state:"resolved",hit:true,weaponId:itemId,attackMode:"attack",weaponType:String(foundry.utils.getProperty(original,"system.weaponType")),
       criticalMethod:kind==="explosive"?(String(original.type)!=="ammo"&&foundry.utils.getProperty(original,"system.weaponType")==="rocketLauncher"?"Rocket":"Grenade"): "Ranged",
       location:"body",...(kind==="shell"?{damageFormula:"3d6"}:{}),rollMode:game.settings!.get("core","rollMode")??"roll",...(thrownSource?{thrownSource}: {})};
-    const ammoType=String(original.type)==="ammo"?foundry.utils.getProperty(original,"system.type"):original._getLoadedAmmoProp?.("type");
-    const data:AreaAttack={scene,kind,area,intended:area.origin,settings:s,exchange,rows:[],attackDiceRevealed:false,
+
+    const data:AreaAttack={scene,kind,area,...(profile?{ammoType}:{}),intended:area.origin,settings:s,exchange,rows:[],attackDiceRevealed:false,
       phase:kind==="explosive"&&roll.resultTotal<=dv!?"scatter":"responses",
-      special:kind==="explosive"&&!!ammoType&&!["basic","armorPiercing"].includes(String(ammoType))};
+      special:kind==="explosive"&&(profile?!profile.damaging:!!ammoType&&!["basic","armorPiercing"].includes(ammoType))};
+    if(kind==="explosive"){exchange.areaAmmo={type:ammoType,variety};exchange.damageFormula=blastFormula;}
     if(data.phase==="responses")data.rows=targets(data);
     const messageData={content:areaContent(data),speaker:ChatMessage.getSpeaker({actor,token:source.document}),flags:{[MODULE]:{aoe:data}}} as Parameters<typeof ChatMessage.applyRollMode>[0];
     ChatMessage.applyRollMode(messageData,exchange.rollMode as "roll");await ChatMessage.create(messageData);
@@ -321,7 +367,7 @@ async function moveOutside(message:ChatMessage,data:AreaAttack,row:TargetRow) {
 
 async function syncTemplate(message:ChatMessage,data:AreaAttack) {
   const scene=game.scenes!.get(data.scene) as Scene|undefined;if(!scene)return;
-  const values={...templateData(data.area,scene),hidden:!!data.areaHidden,user:message.author?.id??game.user!.id,
+  const values={...templateData(data.area,scene),fillColor:ammoProfile(data.ammoType)?.color??"#d44a40",borderColor:ammoProfile(data.ammoType)?.color??"#ffffff",hidden:!!data.areaHidden,user:message.author?.id??game.user!.id,
     flags:{[MODULE]:{areaMessage:message.id,areaShape:data.area}}};
   const old=data.templateId?scene.templates.get(data.templateId):undefined;
   if(old)await old.update(values as Parameters<MeasuredTemplateDocument["update"]>[0]);
@@ -332,7 +378,7 @@ async function syncTemplate(message:ChatMessage,data:AreaAttack) {
 }
 
 export function registerAreaAttacks() {
-  registerAreaSettings();registerAreaMovement();
+  registerAreaSettings();registerAreaMovement();registerSmoke();
   Hooks.on("refreshMeasuredTemplate",(template:MeasuredTemplate)=>{
     const area=foundry.utils.getProperty(template.document,`flags.${MODULE}.areaShape`) as Area|undefined;
     if(!area||!template.template)return;
@@ -343,7 +389,7 @@ export function registerAreaAttacks() {
     if(!template.visible)return;
     const points=clippedPoints(area).map((n,i)=>n-(i%2?template.document.y:template.document.x));
     template.shape=new PIXI.Polygon(points);
-    template.template.clear().lineStyle(2,0xffffff,0.8).beginFill(0xd44a40,0).drawPolygon(points).endFill();
+    template.template.clear().lineStyle(2,Number(template.document.borderColor),0.8).beginFill(Number(template.document.fillColor),0).drawPolygon(points).endFill();
     template.highlightGrid();
   });
   Hooks.on("createChatMessage",(message:ChatMessage)=>{
@@ -367,6 +413,7 @@ export function registerAreaAttacks() {
   }));
   Hooks.on("renderChatMessage",async(message:ChatMessage,html:JQuery)=>{
     const data=flag(message);if(!data||!canRenderCombatCard(message))return;
+    if(html[0])await bindInstantControls(html[0],scope=>data.rows.find(r=>r.uuid===scope)?.instant,(scope,instantRequest)=>send(message.id!,"instant",{target:scope,instantRequest}),data.exchange.rollMode);
     // Shared roll only: controls stay by targets; application results follow the roll.
     html.find<HTMLElement>('.pneuma-aoe-card > .pneuma-damage-result > [data-pneuma-section="damage-apply"], .pneuma-aoe-card > .pneuma-damage-result > .pneuma-resolution-recovery-slot').toArray().forEach(node=>node.remove());
     // Also update previously saved AoE cards without replacing their native dice nodes.
@@ -382,7 +429,7 @@ export function registerAreaAttacks() {
       }
       if(action==="other"&&!areaSettings().coverUp){button.remove();continue;}
       const actor=await actorAt(row?.uuid??data.exchange.attacker).catch(()=>null);
-      const gmOnly=["scatter","hit","miss","exclude","forcehit","add","reset","damageReset","damageResolved","effectsResolved"].includes(action);
+      const gmOnly=["removeSmoke","scatter","hit","miss","exclude","forcehit","add","reset","damageReset","damageResolved","effectsResolved"].includes(action);
       if(action!=="show"&&(!actor||!owns(actor)||gmOnly&&!game.user!.isGM)){button.remove();continue;}
       if(action==="roll"&&data.kind!=="suppression"&&!row?.eligible){button.disabled=true;button.title="RAW evasion requires REF 8+.";}
       if(action==="apply"&&(row?.damage?.recordedApplied||["review","applying"].includes(row?.damage?.status??"")))button.disabled=true;
@@ -392,7 +439,7 @@ export function registerAreaAttacks() {
           if(action==="show")await send(message.id!,"show",{hidden:!data.areaHidden});
           else if(action==="scatter"){
             if(canvas.scene?.id!==data.scene)throw Error("Open the attack scene first.");
-            const area=await placeArea(p=>({...data.area,origin:canvas.grid!.getCenterPoint(p)}),data.intended,"Place actual blast center within the intended square.");
+            const area=await placeArea(p=>({...data.area,origin:canvas.grid!.getCenterPoint(p)}),data.intended,"Place actual blast center within the intended square.",ammoProfile(data.ammoType)?.color);
             if(area)await send(message.id!,"scatter",{area});
           } else if(action==="add") {const selected=canvas.tokens?.controlled??[];if(selected.length!==1)throw Error("Select exactly one token to add.");await send(message.id!,"add",{target:selected[0]!.document.uuid});}
           else if(action==="roll"&&row)await respond(message,data,row);
