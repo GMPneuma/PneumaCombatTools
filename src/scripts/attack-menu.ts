@@ -1,26 +1,27 @@
+import { areaKind } from "./aoe/weapon.js";
+import { grappleWeaponBlocked } from "./grapple/state.js";
 import { improvisedSource, thrownRollItem } from "./thrown-weapons.js";
+import { isQuickhackLauncher } from "./quickhack/availability.js";
 import { availableWeapons, type EquipmentItem } from "./weapon-data.js";
 
 /** HUD eligibility only; all attack mechanics stay in the CPR sheet handler. */
-export type AttackMode = "attack" | "aimed" | "autofire";
+export type AttackMode = "attack" | "aimed" | "autofire" | "suppressive";
 export interface MenuWeapon extends EquipmentItem {
   id: string | null; name: string | null; img?: string | null; type: string;
   flags?: { [key: string]: unknown };
 }
-/** Match Pneuma Quickhack's role and launcher identification. */
+/** Launcher ownership is not a RAW requirement. */
 export function canShowQuickhack(items: MenuWeapon[]) {
-  return items.some(item => item.type === "role" && item.name?.trim().toLowerCase() === "netrunner")
-    && items.some(item => item.type === "weapon" && item.system.equipped === "equipped"
-      && (item.flags?.["pneuma-quickhack"] as { action?: string } | undefined)?.action === "quickhack");
+  return items.some(item => item.type === "role" && item.name?.trim().toLowerCase() === "netrunner");
 }
 export function attackEntries(items: MenuWeapon[]) {
-  return availableWeapons(items).filter(item => (item.flags?.["pneuma-quickhack"] as { action?: string } | undefined)?.action !== "quickhack"
+  return availableWeapons(items).filter(item => !isQuickhackLauncher(item)
     && item.name?.trim().toLowerCase() !== "quickhack")
     .filter(item => item.system.weaponType !== "thrownWeapon")
     .map(item => ({ id: item.id, name: item.name, img: item.img,
       category: ["unarmed", "martialArts"].includes(item.system.weaponType ?? "") ? "brawling"
         : (item.system.weaponType ?? "").toLowerCase().includes("melee") ? "melee" : "attack",
-      deferred: ["grenadeLauncher", "rocketLauncher"].includes(item.system.weaponType ?? ""),
+      deferred: false, area: !!areaKind(item,"attack"),
       brawling: ["unarmed", "martialArts"].includes(item.system.weaponType ?? ""),
       autofire: !!item.system.isRanged && (!!item.system.fireModes?.suppressiveFire
         || ["smg", "heavySmg", "assaultRifle"].includes(item.system.weaponType ?? "")),
@@ -32,7 +33,7 @@ export function thrownEntries(items: MenuWeapon[]) {
     .map(item => ({ id: item.id, name: item.name, img: item.img, category: "thrown", thrown: true }));
 }
 export function grenadeEntries(items: MenuWeapon[]) {
-  return items.filter(item => item.type === "ammo" && (item.system as { type?: string }).type === "grenade")
+  return items.filter(item => item.type === "ammo" && item.system.variety === "grenade" && Number(item.system.amount) > 0)
     .map(item => ({ id: item.id, name: item.name, img: item.img }));
 }
 
@@ -50,8 +51,20 @@ export async function attackFromHUD(attacker: Token, target: Token, itemId: stri
   const items = Array.from(actor.items) as unknown as MenuWeapon[];
   const item = [...attackEntries(items), ...thrownEntries(items).map(row => ({...row, autofire:false, deferred:false})),
     {id:"__improvised",category:"thrown",autofire:false,deferred:false}].find(row => row.id === itemId);
-  if (!item || (mode === "autofire" && !item.autofire)) return;
-  if (item.deferred) { ui.notifications!.info("Grenade and rocket resolution is not implemented yet."); return; }
+  if ((!item && !grenadeEntries(items).some(row=>row.id===itemId)) || (["autofire","suppressive"].includes(mode) && !item?.autofire)) return;
+  const originalItem = items.find(entry => entry.id === itemId);
+  if (originalItem && item?.category !== "thrown" && grappleWeaponBlocked(actor, originalItem))
+    throw new Error("Grappled characters cannot use weapons requiring two hands.");
+  const nativeItem = originalItem;
+  if (nativeItem) {
+    const kind=areaKind(nativeItem, mode);
+    if (kind) {
+      const { startAreaAttack } = await import("./aoe/workflow.js");
+      await startAreaAttack(attacker,target,itemId,mode);return;
+    }
+    if(mode==="aimed"&&areaKind(nativeItem,"attack"))throw Error("Area attacks cannot make aimed shots.");
+  }
+  if(!item)return;
   const sheet = actor.sheet as CPRSheet | null;
   if (!sheet || typeof sheet._onRoll !== "function") throw new Error("CPR attack handler unavailable.");
   if (rolling.has(actor.uuid)) return;

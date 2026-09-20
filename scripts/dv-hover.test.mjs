@@ -40,10 +40,10 @@ test('hover lifecycle, table precedence, range boundaries, updates and stale asy
   globalThis.window = { innerWidth: 1000, innerHeight: 800, addEventListener() {} };
   const children = [];
   globalThis.document = {
-    body: { append: node => children.push(node) },
+    body: { append: node => {node.parentElement = true;children.push(node);} },
     createTextNode: textContent => ({ textContent }),
     createElement: () => ({ style: {}, children: [], offsetWidth: 150, offsetHeight: 35,
-      setAttribute() {}, append(...nodes) { this.children.push(...nodes); },
+      replaceChildren(...nodes) {this.children = nodes;}, setAttribute() {}, append(...nodes) { this.children.push(...nodes); },
       get textContent() { return this.children.map(node => node.textContent).join(''); },
       set textContent(value) { this.children = [{ textContent: value }]; },
       remove() { const index = children.indexOf(this); if (index >= 0) children.splice(index, 1); } }),
@@ -73,6 +73,9 @@ test('hover lifecycle, table precedence, range boundaries, updates and stale asy
   assert.equal(children[0].children[0].textContent, 'DV13 <pistol>');
   assert.equal(children[0].children[0].children[0].className, 'pneuma-dv-value pneuma-dv-green');
   assert.equal(packReads, 0, 'world table takes precedence');
+  const retained = children[0]; const row = retained.children[0];
+  fire("updateToken", target.document);await settle();
+  assert.equal(children[0],retained);assert.equal(retained.children[0],row,"unchanged DV retains row nodes");
   distance = 7;
   fire('updateToken', target.document);
   await settle();
@@ -100,6 +103,8 @@ test('hover lifecycle, table precedence, range boundaries, updates and stale asy
   release(world);
   await settle();
   assert.equal(children.length, 0, 'late lookup cannot revive dismissed panel');
+  fire("hoverToken", target, true);await settle();assert.equal(packReads,1,"cached table reused after hover ends");
+  fire("updateTableResult");await settle();assert.equal(packReads,2,"edited table invalidates cache");release(world);await settle();
   worldTable = world;
   fire('hoverToken', target, true);
   await settle();

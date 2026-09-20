@@ -1,13 +1,21 @@
 {{#if standalone}}
 <div id="{{id}}" class="{{classes}}">
 {{/if}}
-<div class="col right pneuma-combat-column">
+<div class="col right pneuma-combat-column" {{#if selfCTH}}data-self-cth{{/if}}>
+{{#if selfCTH}}
+  {{#if selfInitiative.show}}
+  <div class="control-icon" role="button" tabindex="0" data-self-initiative
+    title="{{selfInitiative.title}}" aria-label="{{selfInitiative.title}}" aria-disabled="{{selfInitiative.disabled}}">
+    <i class="fas fa-dice-d10" aria-hidden="true"></i>
+  </div>
+  {{/if}}
+{{else}}
 {{#each controls}}
 <div class="control-icon {{#if active}}active{{/if}}" role="button" tabindex="0"
   data-combat-action="{{action}}" data-combat-control title="{{title}}" aria-label="{{title}}"
-  {{#if (eq action "target")}}aria-pressed="{{active}}"{{else}}aria-expanded="false"{{/if}}>
+  aria-expanded="false">
   {{#if (eq action "melee")}}
-  <i class="fas" aria-hidden="true"><svg class="pneuma-combat-knife" viewBox="0 0 32 32" focusable="false"><path fill="currentColor" d="M29 1 28 9 17 20 11 14 23 3Z M9 14 18 23 16 25 7 16Z M7 19 12 24 6 30Q4 32 1 29L1 27Z"/></svg></i>
+  <i class="fas" aria-hidden="true"><svg class="pneuma-close-combat-icon" focusable="false" viewBox="0 0 64 64" fill="currentColor"><circle cx="16" cy="10" r="5.5"/><circle cx="48" cy="10" r="5.5"/><path d="M11 19Q15 16 20 19L26 25 30 20Q32 17 35 20Q37 22 34 25L28 32Q25 35 22 32L20 30 21 40 27 51 27 58Q26 62 22 61Q19 61 19 57V53L14 45 10 58Q9 62 5 61Q2 60 3 56L9 39 8 26 5 33Q3 36 0 34L1 28 7 20Z"/><path d="M53 19Q49 16 44 19L39 25 37 30 33 27Q30 25 28 28Q26 31 30 33L37 37Q41 39 43 34L45 30 43 40 37 51 37 58Q38 62 42 61Q45 61 45 57V53L50 45 54 58Q55 62 59 61Q62 60 61 56L55 39 56 27 59 33Q61 36 64 34L63 28 57 20Z"/></svg></i>
   {{else}}<i class="fas {{icon}}" aria-hidden="true"></i>{{/if}}
 </div>
 {{/each}}
@@ -20,19 +28,22 @@
         <button type="button" {{#if deferred}}disabled{{/if}} class="combat-weapon-name" data-item-id="{{id}}" data-roll-type="attack" data-attack-mode="attack" title="{{localize 'PNEUMA_COMBAT_TOOLS.AttackAction'}}: {{name}}">
           {{#if img}}<img src="{{img}}" alt="" width="24" height="24">{{/if}}<span>{{name}}</span>
         </button>
-        {{#unless thrown}}<button type="button" {{#if deferred}}disabled{{/if}} class="combat-weapon-mode" data-item-id="{{id}}" data-roll-type="attack" data-attack-mode="aimed" title="{{localize 'PNEUMA_COMBAT_TOOLS.Aimed'}}: {{name}}" aria-label="{{localize 'PNEUMA_COMBAT_TOOLS.Aimed'}}: {{name}}"><i class="fas fa-crosshairs" aria-hidden="true"></i></button>
+        {{#unless thrown}}<button type="button" {{#if deferred}}disabled{{/if}} {{#if area}}disabled{{/if}} class="combat-weapon-mode" data-item-id="{{id}}" data-roll-type="attack" data-attack-mode="aimed" title="{{localize 'PNEUMA_COMBAT_TOOLS.Aimed'}}: {{name}}" aria-label="{{localize 'PNEUMA_COMBAT_TOOLS.Aimed'}}: {{name}}"><i class="fas fa-crosshairs" aria-hidden="true"></i></button>
         {{#if autofire}}
         <button type="button" class="combat-weapon-mode" data-item-id="{{id}}" data-roll-type="attack" data-attack-mode="autofire" title="{{localize 'PNEUMA_COMBAT_TOOLS.Autofire'}}: {{name}}" aria-label="{{localize 'PNEUMA_COMBAT_TOOLS.Autofire'}}: {{name}}"><svg viewBox="0 4 32 20" aria-hidden="true"><path fill="currentColor" d="M1 7h5V5h3v2h14v2h8v3h-8v3h-7l2 8h-5l-2-8H8v5H4V11H1zm8 4v2h4v-2z"/></svg></button>
+        <button type="button" class="combat-weapon-mode pneuma-suppressive" data-item-id="{{id}}" data-attack-mode="suppressive" title="Suppressive Fire: {{name}}" aria-label="Suppressive Fire: {{name}}"><i class="fas fa-bars-staggered" aria-hidden="true"></i></button>
         {{/if}}
         {{/unless}}
       </li>
       {{/each}}
+      {{#each grappleActions}}
       <li data-attack-category="brawling" hidden>
-        <button type="button" class="combat-weapon-name" disabled title="{{localize 'PNEUMA_COMBAT_TOOLS.GrapplePending'}}"><i class="fas fa-hand-back-fist" aria-hidden="true"></i><span>{{localize 'PNEUMA_COMBAT_TOOLS.Grapple'}}</span></button>
+        <button type="button" class="combat-weapon-name" data-grapple-action="{{action}}"><i class="fas fa-hand-back-fist" aria-hidden="true"></i><span>{{label}}</span></button>
       </li>
+      {{/each}}
       <li data-attack-category="thrown" hidden>
         <details><summary>{{localize 'PNEUMA_COMBAT_TOOLS.Grenades'}}</summary>
-          <ul>{{#each grenades}}<li><button type="button" disabled title="Grenade resolution is planned">{{name}}</button></li>{{else}}<li>No grenades in inventory.</li>{{/each}}</ul>
+          <ul>{{#each grenades}}<li><button type="button" class="combat-weapon-name" data-item-id="{{id}}" data-attack-mode="attack" title="Throw grenade">{{#if img}}<img src="{{img}}" alt="" width="24" height="24">{{/if}}<span>{{name}}</span></button></li>{{else}}<li>No grenades in inventory.</li>{{/each}}</ul>
         </details>
       </li>
       <li data-attack-category="thrown" hidden>
@@ -41,8 +52,25 @@
       <li class="combat-empty">{{weaponEmpty}}</li>
     </ul>
   </div>
-  <p class="combat-description"></p>
+  <div class="combat-quickhacks" hidden>
+    <ul>
+      {{#each ejectNetrunners}}
+      <li><button type="button" class="combat-weapon-name" data-eject-message="{{messageId}}"><span>{{label}}</span></button></li>
+      {{/each}}
+    </ul>
+    {{#if offensiveQuickhacks}}
+    <p class="notes">{{quickhackNote}}</p>
+    <ul>
+      <li><button type="button" class="combat-weapon-name" data-quickhack-id="{{quickhackJackAction}}" {{#if quickhackJackInDisabled}}disabled{{/if}}><i class="fas fa-network-wired" aria-hidden="true"></i><span>Jack In/Out</span></button></li>
+      {{#each quickhacks}}
+      <li><button type="button" class="combat-weapon-name" data-quickhack-id="{{id}}" {{#unless ../quickhackConnected}}disabled{{/unless}}><img src="{{img}}" alt="" width="24" height="24"><span>{{name}}</span><small>DV{{dv}}</small></button></li>
+      {{else}}<li>No QuickHacks available under the current rules mode.</li>{{/each}}
+    </ul>
+    {{/if}}
+  </div>
+  <p class="combat-description" hidden></p>
 </section>
+{{/if}}
 </div>
 {{#if standalone}}
 </div>

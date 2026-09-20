@@ -1,6 +1,6 @@
 import { checkedLuck } from "./evasion-rules.js";
 export interface NativeRoll {
-  rollTitle: string; rollCard: string; resultTotal: number; luck: number;
+  rollTitle: string; rollCard: string; resultTotal: number; luck: number; formula?: string;
   mods: { id?: string; value: number; source: string }[];
   entityData?: { actor: string; token: string; item: string; tokens: string[] };
   criticalCard?: boolean; location?: string; isAimed?: boolean; isAutofire?: boolean; autofireMultiplier?: number; autofireMultiplierMax?: number; _roll?: Roll; _critRoll?: Roll;

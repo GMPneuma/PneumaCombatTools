@@ -1,0 +1,52 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {resolve,sep} from 'node:path';
+const {chromium}=await import(process.env.PNEUMA_PLAYWRIGHT_MODULE);
+const browser=await chromium.launch({channel:'msedge',headless:true});
+try {
+ const page=await browser.newPage();
+ const root=resolve('dist');
+ await page.route('http://pneuma.test/**',async route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(path==='/')return route.fulfill({contentType:'text/html',body:'<style>.control-icon{width:32px;height:32px;border:1px solid}</style><body><div id="hud"><div class="col right"></div></div></body>'});
+  const file=resolve(root,'.'+path);assert(file.startsWith(root+sep));
+  await route.fulfill({contentType:'text/javascript',body:await readFile(file,'utf8')});
+ });
+ await page.goto('http://pneuma.test/');
+ await page.evaluate(()=>{
+  const get=(o,p)=>p.split('.').reduce((v,k)=>v?.[k],o);
+  window.hooks={};window.Hooks={once:(n,f)=>(hooks[n]??=[]).push(f),on:(n,f)=>(hooks[n]??=[]).push(f)};
+  let serial=0;window.foundry={utils:{getProperty:get,randomID:()=>String(++serial)}};
+  window.gm={id:'gm',isGM:true,active:true};window.owner={id:'owner',isGM:false,active:true};
+  window.actor={uuid:'Actor.a',name:'Actor <test>',isOwner:true,items:[{id:'a',name:'Cyberarm <img src=x onerror=alert(1)>',type:'cyberware',system:{isInstalledInActor:true,isFoundational:true}},{id:'b',name:'Option',type:'cyberware',system:{isInstalledInActor:true,installedIn:['a']}}],testUserPermission:u=>u.id==='owner'};
+  window.combat={id:'c',started:true,flags:{},async update(changes){for(const [p,v]of Object.entries(changes)){const parts=p.split('.');let node=this;for(const part of parts.slice(0,-1))node=node[part]??={};node[parts.at(-1)]=structuredClone(v);}}};
+  const users=Object.assign([gm,owner],{get:id=>[gm,owner].find(u=>u.id===id)});
+  window.game={user:gm,users,combat,combats:new Map([['c',combat]]),settings:{register(){},get:()=>''},messages:new Map()};
+  window.fromUuid=async()=>actor;window.messages=[];
+  window.ChatMessage={create:async data=>{const message={...data,id:'m'+messages.length};messages.push(message);game.messages.set(message.id,message);return message;}};
+  window.ui={notifications:{warn:text=>{window.warning=text;},error:text=>{window.failure=text;}}};
+  window.Dialog=class{constructor(data){this.data=data;}render(){document.querySelector('.dialog')?.remove();const root=document.createElement('section');root.className='dialog';root.innerHTML=this.data.content;for(const [id,config]of Object.entries(this.data.buttons)){const button=document.createElement('button');button.dataset.button=id;button.textContent=config.label;button.onclick=()=>config.callback?.([root]);root.append(button);}document.body.append(root);return this;}};
+  window.wrap=element=>({0:element,length:element?1:0,find:selector=>wrap(element?.querySelector(selector)),first(){return this;},append(node){element?.append(node);}});
+ });
+ await page.addScriptTag({type:'module',content:'import {registerEmp,chooseEmp} from "/scripts/emp.js"; Object.assign(window,{chooseEmp});registerEmp();window.loaded=true;'});
+ await page.waitForFunction(()=>window.loaded);
+ await page.evaluate(()=>hooks.renderTokenHUD.forEach(f=>f({object:{actor}},wrap(document.getElementById('hud')))));
+ await page.locator('[title="EMP: disable cyberware"]').click();
+ assert.equal(await page.locator('select[name="mode"] option').count(),4);
+ await page.selectOption('select[name="chooser"]','player');await page.locator('[data-button="create"]').click();
+ await page.waitForFunction(()=>messages.length===1);
+ assert.deepEqual(await page.evaluate(()=>messages[0].whisper),['gm','owner']);
+ assert(!await page.evaluate(()=>messages[0].content.includes('<test>')));
+ await page.evaluate(async()=>{game.user=owner;window.request=Object.values(combat.flags['pneuma-combattools'].empRequests)[0];await chooseEmp(combat,request);});
+ assert.equal(await page.locator('.pneuma-emp-choice').count(),2);assert.equal(await page.locator('.pneuma-emp-choice img').count(),0);
+ assert.match(await page.locator('.pneuma-emp-selection').innerText(),/in Cyberarm/);
+ await page.locator('[data-button="apply"]').click();assert.match(await page.evaluate(()=>warning),/exactly 2/);
+ await page.evaluate(async()=>{game.user=gm;await chooseEmp(combat,{...request,chooser:'random',mode:'system'});});
+ assert.equal(await page.locator('.pneuma-emp-choice input:disabled').count(),2);
+ assert.match(await page.locator('.pneuma-emp-selection').innerText(),/first draw 50.0%/);
+ await page.evaluate(()=>{document.querySelector('.dialog').remove();game.user={id:'stranger',isGM:false};actor.isOwner=false;return chooseEmp(combat,request);});
+ assert.equal(await page.locator('.dialog').count(),0);
+ await page.evaluate(()=>{document.body.insertAdjacentHTML('beforeend',messages[0].content);combat.started=false;hooks.renderChatMessage.forEach(f=>f(messages[0],wrap(document.body)));});
+ assert.equal(await page.locator('[data-emp-select]').isDisabled(),true);assert.equal(await page.locator('[data-emp-select]').innerText(),'Combat ended');
+ console.log('EMP browser checks passed: standalone HUD, configuration, owner prompt, escaped nested names, random odds, permissions, ended card.');
+} finally {await browser.close();}

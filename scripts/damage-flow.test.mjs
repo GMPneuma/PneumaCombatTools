@@ -1,9 +1,11 @@
+import {installMockLibWrapper} from "./lib-wrapper-fixture.mjs";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 const {chromium}=await import(process.env.PNEUMA_PLAYWRIGHT_MODULE || "playwright");
 const browser=await chromium.launch({channel:"msedge",headless:true});
 try {
  const page=await browser.newPage();
+ await page.evaluate(installMockLibWrapper);
  await page.setContent('<main><ol><li class="total-mods">Total Mods</li></ol></main>');
  await page.evaluate(()=>{
   window.CONFIG={statusEffects:[{id:"prone",name:"Prone"},{id:"stunned",name:"Stunned"},{id:"blind",name:"Blind"},{id:"dead",name:"Dead"}]};
@@ -32,7 +34,7 @@ try {
  });
  assert.deepEqual(aware,[{confirmed:true,unaware:true},{confirmed:true,unaware:false}]);
  const structure = await readFile(new URL('../dist/scripts/card-structure.js', import.meta.url), 'utf8');
- await page.addScriptTag({type:'module',content:structure+'\nwindow.resolutionSection=resolutionSection;'});
+ await page.addScriptTag({type:'module',content:structure+'\nObject.assign(window,{resolutionSection,rollOutcomeClass,combatCardKind,canRenderCombatCard,decorateSharedCard});'});
  await page.waitForFunction(()=>!!window.resolutionSection);
  const statusSource = await readFile(new URL('../dist/scripts/damage-status.js', import.meta.url), 'utf8');
  await page.addScriptTag({type:'module',content:statusSource+'\nObject.assign(window,{chooseDamageStatuses,damageStatusChoices,validateDamageStatuses});'});
@@ -40,7 +42,7 @@ try {
  const criticalSource = await readFile(new URL('../dist/scripts/critical-injury.js', import.meta.url), 'utf8');
  await page.addScriptTag({type:'module',content:criticalSource.replace('import(utilsPath)', 'Promise.resolve({default:window.criticalUtils})')+'\nObject.assign(window,{hasCriticalInjury,criticalLocation,damageSixes,applyCriticalInjury});'});
  await page.waitForFunction(()=>!!window.hasCriticalInjury);
- const applicationSource = await readFile(new URL('../dist/scripts/damage-application.js', import.meta.url), 'utf8');
+ const applicationSource = (await readFile(new URL('../dist/scripts/native-wrappers.js', import.meta.url), 'utf8'))+'\n'+(await readFile(new URL('../dist/scripts/damage-application.js', import.meta.url), 'utf8')).replace(/^import .*$/gm,'');
  await page.addScriptTag({type:'module',content:applicationSource+'\nObject.assign(window,{compactDamageApplication,captureWithChat,captureDamageApplication});'});
  await page.waitForFunction(()=>!!window.compactDamageApplication);
  const damage=(await readFile(new URL('../dist/scripts/damage-flow.js',import.meta.url),'utf8')).replace(/^import .*$/gm,'');
@@ -287,6 +289,24 @@ try {
    ["tables","Critical Injuries (Head)"],["Token.selected","Critical Injuries (Head)","injuries",0]]);
 
 
+ if(process.env.PNEUMA_CPR_ACTOR_SOURCE){
+  const source=await readFile(process.env.PNEUMA_CPR_ACTOR_SOURCE,"utf8");const start=source.indexOf("  async _applyDamage(");const method=source.slice(start,source.indexOf("\n  }",start)+4);
+  const result=await page.evaluate(async method=>{
+   const chat={RenderDamageApplicationCard(){}};let summary;
+   window.renderTemplate=async(_path,data)=>{summary=data;return '<div><span data-action="toggleVisibility" data-visible-element="d6-data-details">'+data.hpReduction+'</span><div class="d6-data-details">damage</div></div>'};
+   const apply=Function("CPRChat","CPRActorUtils","return ({"+method+"})._applyDamage")(chat,{calculateArmorSP:async a=>a.system.bodyLocation.sp-a.system.bodyLocation.ablation});
+   const cases=[];
+   for(const [damage,ignorePercent,ablation]of [[12,0,1],[30,0,1],[15,50,2]]){
+    const armor={system:{bodyLocation:{sp:11,ablation:0}}};
+    const actor={name:"Target",system:{derivedStats:{hp:{value:50}}},itemTypes:{role:[]},bonuses:{universalDamageReduction:0},getEquippedArmors:where=>where==="body"?[armor]:[],
+      async update(data){this.system.derivedStats.hp.value=data['system.derivedStats.hp.value']},async _ablateArmor(_location,n){armor.system.bodyLocation.ablation+=n}};
+    const rows=await captureWithChat(chat,actor,"Target","body","cover",view=>apply.call(view,damage,0,"body",0,"grenade",ignorePercent*2-100,0,true,{useShield:false,damageReductionRole:false,damageReductionAE:false}),{ablation:ablation*2,ignorePercent,ignoreBelow:0});
+    cases.push({hp:actor.system.derivedStats.hp.value,sp:armor.system.bodyLocation.sp,ablation:armor.system.bodyLocation.ablation,summaryAblation:summary.ablation,note:rows[0].includes("Cover Up")});
+   }
+   return cases;
+  },method);
+  assert.deepEqual(result,[{hp:50,sp:11,ablation:2,summaryAblation:2,note:true},{hp:42,sp:11,ablation:2,summaryAblation:2,note:true},{hp:46,sp:11,ablation:4,summaryAblation:4,note:true}]);
+ }
  const applications = await page.evaluate(async () => {
    const native='<div class="rollcard"><div class="rollcard-top"><a data-action="reverseDamage">undo</a></div><div class="d6-number-div"><span class="clickable" data-action="toggleVisibility" data-visible-element="d6-data-details">7</span></div><div class="d6-data-details hide">12 - 5 armor = 7</div></div>';
    const originalCalls=[];const chat={RenderDamageApplicationCard:data=>{originalCalls.push(data.actor);}};
@@ -299,10 +319,11 @@ try {
      chat.RenderDamageApplicationCard({actor,hpReduction:1});
      chat.RenderDamageApplicationCard({actor:view,hpReduction:7,location:"body"});
    });
-   const restored=chat.RenderDamageApplicationCard===original;
+   const installed=chat.RenderDamageApplicationCard;
+   const restored=installed!==original;
    let failed=false;
    try {await captureWithChat(chat,actor,"Actor","body","fail",async()=>{throw Error("damage failed");});} catch{failed=true;}
-   const restoredAfterFailure=chat.RenderDamageApplicationCard===original;
+   const restoredAfterFailure=chat.RenderDamageApplicationCard===installed;
    const second=compactDamageApplication(native,"Another token","head","second");
    const data={...window.damageFixture,damage:{...window.damageFixture.damage,applications:[...rows,second]}};
    document.body.innerHTML='<div class="message-content">'+exchangeContent(data)+'</div>';
@@ -328,10 +349,29 @@ try {
  assert.equal(applications.count,2);assert.equal(applications.firstName,"Token name");
  assert.equal(applications.expanded,true);assert.equal(applications.secondHidden,true);assert.equal(applications.undo,true);
  assert.equal(applications.horizontal,true);assert.equal(applications.larger,true);
+ const concurrent=await page.evaluate(async()=>{
+   const native='<span data-action="toggleVisibility" data-visible-element="d6-data-details">1</span><div class="d6-data-details">detail</div>';
+   window.renderTemplate=async()=>native;
+   let nativeCalls=0,otherCalls=0;const chat={RenderDamageApplicationCard(){nativeCalls++;}};
+   const actor={};let firstView,release;
+   const first=captureWithChat(chat,actor,"First","body","one",async view=>{
+     firstView=view;await new Promise(resolve=>release=resolve);chat.RenderDamageApplicationCard({actor:view,hpReduction:1});
+   });
+   const installed=chat.RenderDamageApplicationCard;
+   // A later cooperating wrapper stays installed after success and failure.
+   chat.RenderDamageApplicationCard=function(data){otherCalls++;return installed.call(this,data);};
+   const other=chat.RenderDamageApplicationCard;
+   const second=await captureWithChat(chat,actor,"Second","body","two",async view=>chat.RenderDamageApplicationCard({actor:view,hpReduction:2}));
+   release();const rows=await first;
+   chat.RenderDamageApplicationCard({actor:firstView,hpReduction:3});
+   return {first:rows[0].includes('First'),second:second[0].includes('Second'),nativeCalls,otherCalls,preserved:chat.RenderDamageApplicationCard===other};
+ });
+ assert.deepEqual(concurrent,{first:true,second:true,nativeCalls:1,otherCalls:3,preserved:true});
+
 
 
  const scrollSource=await readFile(new URL("../dist/scripts/resolution-scroll.js",import.meta.url),"utf8");
- await page.addScriptTag({type:"module",content:scrollSource+"\nObject.assign(window,{registerResolutionScroll});"});
+ await page.addScriptTag({type:"module",content:scrollSource.replace(/^import .*;\s*/gm,"")+"\nObject.assign(window,{registerResolutionScroll});"});
  const scrolling=await page.evaluate(async()=>{
    document.body.className="";document.body.style.width="";
    document.body.innerHTML='<div id="chat-log" style="height:220px;overflow:auto"><div style="height:350px"></div><div class="chat-message pneuma-combat-message" data-message-id="scroll" style="height:100px"></div><div style="height:200px"></div></div>';

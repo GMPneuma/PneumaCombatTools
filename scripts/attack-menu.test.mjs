@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { canShowQuickhack, attackEntries, attackFromHUD } from "../dist/scripts/attack-menu.js";
-const weapon = (id, system = {}, extra = {}) => ({id, name:id, type:"weapon", system:{equipped:"equipped",weaponType:"heavyPistol",isRanged:true,...system},...extra});
+const weapon = (id, system = {}, extra = {}) => ({id, name:id, type:"weapon", system:{amount:1,equipped:"equipped",weaponType:"heavyPistol",isRanged:true,...system},...extra});
 test("separates weapons and hand-to-hand, excludes quickhacks and carried weapons", () => {
   const rows=attackEntries([weapon("Pistol"),weapon("Blade",{weaponType:"lightMelee",isRanged:false}),
     weapon("Carried",{equipped:"carried"}),weapon("Unarmed",{weaponType:"unarmed",equipped:"equipped"}),
@@ -40,15 +40,15 @@ test("rejects stale items and lost ownership, blocks duplicate pending calls and
  f.sheet._onRoll=async()=>{calls++;};await attackFromHUD(f.attacker,f.target,"SMG","attack",{});assert.equal(calls,2);
 });
 
-test("Quickhack visibility requires acting actor's Netrunner role AND equipped flagged weapon", () => {
+test("Quickhack visibility requires acting actor's Netrunner role without a launcher ownership rule", () => {
  const role={id:"role",name:" Netrunner ",type:"role",system:{}};
  const launcher=weapon("Renamed launcher",{}, {flags:{"pneuma-quickhack":{action:"quickhack"}}});
  assert.equal(canShowQuickhack([role,launcher]),true);
  assert.equal(canShowQuickhack([launcher]),false);
- assert.equal(canShowQuickhack([role]),false);
+ assert.equal(canShowQuickhack([role]),true);
  assert.equal(canShowQuickhack([]),false);
- assert.equal(canShowQuickhack([role,{...launcher,system:{equipped:"owned"}}]),false);
- assert.equal(canShowQuickhack([role,weapon("Quickhack")]),false);
+ assert.equal(canShowQuickhack([role,{...launcher,system:{equipped:"owned"}}]),true);
+ assert.equal(canShowQuickhack([role,weapon("Quickhack")]),true);
  assert.equal(canShowQuickhack([{...role,type:"gear"},launcher]),false);
 });
 
@@ -129,9 +129,9 @@ test("menu categories separate ranged/melee and inventory throws and grenades",a
  assert.equal(rows.find(r=>r.name==="Gun").category,"attack");
  assert.equal(rows.find(r=>r.name==="Sword").category,"melee");
  assert.equal(rows.find(r=>r.name==="MA").category,"brawling");
- assert.equal(rows.find(r=>r.name==="Rocket").deferred,true);
+ assert.equal(rows.find(r=>r.name==="Rocket").deferred,false);
  assert.equal(thrownEntries([weapon("Knife",{weaponType:"thrownWeapon",equipped:"owned"})]).length,1);
- assert.deepEqual(grenadeEntries([weapon("Grenade",{type:"grenade"},{type:"ammo"}),weapon("Bullet",{type:"pistol"},{type:"ammo"})]).map(r=>r.name),["Grenade"]);
+ assert.deepEqual(grenadeEntries([weapon("Grenade",{variety:"grenade",type:"armorPiercing"},{type:"ammo"}),weapon("Smoke",{variety:"grenade",type:"smoke"},{type:"ammo"}),weapon("EMP",{variety:"grenade",type:"emp"},{type:"ammo"}),weapon("Bullet",{variety:"heavyPistol",type:"armorPiercing"},{type:"ammo"}),weapon("Rocket",{variety:"rocket",type:"armorPiercing"},{type:"ammo"}),weapon("Misnamed grenade",{type:"grenade",variety:"rifle"},{type:"ammo"})]).map(r=>r.name),["Grenade","Smoke","EMP"]);
 });
 test("thrown roll item preserves source, uses Athletics and chosen dice, and does not discharge inventory",async()=>{
  const {thrownRollItem,usedThrownName}=await import("../dist/scripts/thrown-weapons.js");
@@ -144,4 +144,10 @@ test("thrown roll item preserves source, uses Athletics and chosen dice, and doe
  assert.equal(source.system.magazine.value,0);assert.equal(source.system.damage,"6d6");
  const roll={};assert.equal(await item.confirmRoll(roll),roll);
  assert.equal(usedThrownName("Rock"),"Rock (used)");assert.equal(usedThrownName("Rock (used)"),"Rock (used)");
+});
+
+test("grenade menu excludes depleted inventory",async()=>{
+ const {grenadeEntries}=await import("../dist/scripts/attack-menu.js");
+ const items=[0,1,3,-1].map(amount=>weapon(String(amount),{variety:"grenade",amount},{type:"ammo"}));
+ assert.deepEqual(grenadeEntries(items).map(row=>row.id),["1","3"]);
 });

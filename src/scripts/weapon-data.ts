@@ -1,7 +1,9 @@
+import { empDisabled } from "./emp-rules.js";
 export interface EquipmentItem {
   id: string | null;
   name: string | null;
   type: string;
+  flags?: unknown;
   system: {
     isRanged?: boolean;
     isWeapon?: boolean;
@@ -11,6 +13,8 @@ export interface EquipmentItem {
     isInstalled?: boolean;
     dvTable?: string;
     weaponType?: string;
+    variety?: string;
+    amount?: number;
     fireModes?: { suppressiveFire?: boolean };
     upgrades?: { _id: string }[];
   };
@@ -20,6 +24,7 @@ export interface EquipmentItem {
 export function availableWeapons<T extends EquipmentItem>(items: T[]): T[] {
   const available = new Set<T>();
   const add = (item: T) => {
+    if (empDisabled(item)) return;
     if (item.type === "weapon" || (item.type === "cyberware" && item.system.isWeapon)
       || (item.type === "itemUpgrade" && item.system.modifiers?.secondaryWeapon?.configured)) available.add(item);
   };

@@ -1,3 +1,4 @@
+import { applyCombatStatus } from "./status-sync.js";
 import { thrownRollItem } from "./thrown-weapons.js";
 import { captureDamageApplication } from "./damage-application.js";
 import { applyCriticalInjury, damageSixes, hasCriticalInjury, criticalLocation } from "./critical-injury.js";
@@ -26,6 +27,7 @@ export async function damageActor(uuid: string): Promise<Actor> {
   return token.actor;
 }
 export function configureDamage(roll: NativeRoll, data: Exchange): void {
+  if (data.damageFormula) roll.formula = data.damageFormula;
   roll.location = data.location ?? "body";
   roll.isAimed = data.attackMode === "aimed";
   if (data.attackMode === "autofire") {
@@ -162,9 +164,10 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
   try {
     const token = await fromUuid(destination) as TokenDocument | null;
     const summaries = await captureDamageApplication(actor, token?.name ?? actor.name ?? "", v.location, damage.applicationId!,
-      view => target._applyDamage.call(view, v.total, v.bonus, v.location, data.weaponType === "martialArts" && game.settings!.get("pneuma-combattools", "maNoAblation") ? 0 : v.ablation, v.ammo, v.ignorePercent, v.ignoreBelow, v.lethal, request.options));
+      view => target._applyDamage.call(view, v.total, v.bonus, v.location, (data.coverUp || data.weaponType === "martialArts" && game.settings!.get("pneuma-combattools", "maNoAblation")) ? 0 : v.ablation, v.ammo, data.coverUp?2*v.ignorePercent-100:v.ignorePercent, data.coverUp?v.ignoreBelow/2:v.ignoreBelow, v.lethal, request.options),
+      data.coverUp?{ablation:2*v.ablation,ignorePercent:v.ignorePercent,ignoreBelow:v.ignoreBelow}:undefined);
     damage.applications = [...(damage.applications ?? []), ...summaries];
-    for (const id of effects) await actor.toggleStatusEffect(id, { active: true });
+    for (const id of effects) await applyCombatStatus(actor, id);
   } catch (error) {
     damage.status = "review"; await save();
     throw new Error("Damage or status application was interrupted. Check HP, armor, shield and effects before continuing: " + (error as Error).message);

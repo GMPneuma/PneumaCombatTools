@@ -12,11 +12,14 @@ const MODULE_ID = "pneuma-combattools";
 let hovered: Token | undefined;
 let panel: HTMLDivElement | undefined;
 let revision = 0;
+let shown = "";
+const tableCache = new Map<string, Promise<RollTable | undefined>>();
 
 function clear() {
   revision++;
   panel?.remove();
   panel = undefined;
+  shown = "";
 }
 
 function attacker() {
@@ -31,10 +34,18 @@ export async function getTable(name: string): Promise<RollTable | undefined> {
   const pack = (typeof configured === "string" ? game.packs!.get(configured) : undefined)
     ?? game.packs!.get("cyberpunk-red-core.internal_dv-tables");
   if (!pack || pack.documentName !== "RollTable") return;
-  const index = await pack.getIndex();
-  const entry = index.find(entry => entry.name === name);
-  if (!entry) return;
-  return await pack.getDocument(entry._id) as RollTable | undefined;
+  const key = `${pack.collection}:${String(configured)}:${name}`;
+  let pending = tableCache.get(key);
+  if (!pending) {
+    pending = (async () => {
+      const index = await pack.getIndex();
+      const entry = index.find(entry => entry.name === name);
+      return entry ? await pack.getDocument(entry._id) as RollTable | undefined : undefined;
+    })();
+    tableCache.set(key,pending);
+    void pending.catch(() => {if(tableCache.get(key) === pending)tableCache.delete(key);});
+  }
+  return pending;
 }
 
 function position() {
@@ -52,12 +63,11 @@ function position() {
 }
 
 async function refresh() {
-  clear();
+  const current = ++revision;
   const target = hovered;
   const source = attacker();
   if (!game.settings!.get(MODULE_ID, "hoverDV") || !target?.isVisible || target.isPreview ||
-    !source || source === target || canvas.activeLayer !== canvas.tokens) return;
-  const current = revision;
+    !source || source === target || canvas.activeLayer !== canvas.tokens) {clear();return;}
   const distance = distanceWithElevation(canvas.grid!.measurePath([source.center, target.center], {}).distance,
     source.document.elevation, target.document.elevation);
   const weapons = equippedRanges(Array.from(source.actor!.items) as unknown as RangeItem[],
@@ -79,8 +89,12 @@ async function refresh() {
   // Async compendium reads must not resurrect a tooltip after hover/selection changes.
   if (revision !== current || hovered !== target || attacker() !== source || !target.isVisible) return;
   const visible = lines.filter((line): line is { dv: number; name: string } => !!line);
-  if (!visible.length) return;
-  panel = document.createElement("div");
+  if (!visible.length) {clear();return;}
+  const signature = JSON.stringify(visible);
+  if (panel && shown === signature) {position();return;}
+  shown = signature;
+  if (!panel) panel = document.createElement("div");
+  panel.replaceChildren();
   panel.className = "pneuma-panel pneuma-dv-hover";
   panel.setAttribute("role", "tooltip");
   for (const line of visible) {
@@ -91,7 +105,7 @@ async function refresh() {
     row.append(value, document.createTextNode(` ${line.name}`));
     panel.append(row);
   }
-  document.body.append(panel);
+  if (!panel.parentElement) document.body.append(panel);
   position();
 }
 
@@ -104,7 +118,7 @@ export function registerHoverDV() {
     });
   }
   Hooks.on("hoverToken", (token: Token, entered: boolean) => {
-    if (entered) hovered = token;
+    if (entered) {if(hovered !== token) clear(); hovered = token;}
     else if (hovered === token) hovered = undefined;
     else return;
     void refresh();
@@ -124,8 +138,10 @@ export function registerHoverDV() {
     Hooks.on(hook, (item: Item) => { if (item.parent === attacker()?.actor) void refresh(); });
   }
   for (const hook of ["updateRollTable", "createRollTable", "deleteRollTable", "updateTableResult", "createTableResult", "deleteTableResult"]) {
-    Hooks.on(hook, () => { if (hovered) void refresh(); });
+    Hooks.on(hook, () => { tableCache.clear(); if (hovered) void refresh(); });
   }
+  Hooks.on("updateCompendium", () => {tableCache.clear();if(hovered)void refresh();});
+  Hooks.on("updateSetting", (setting: {key?: string}) => {if(setting.key === "cyberpunk-red-core.dvRollTableCompendium"){tableCache.clear();if(hovered)void refresh();}});
   Hooks.on("deleteToken", (document: TokenDocument) => {
     if (document === hovered?.document || document === attacker()?.document) { hovered = undefined; clear(); }
   });

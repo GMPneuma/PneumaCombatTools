@@ -1,3 +1,4 @@
+import { requireCombatSocket } from "./socket-health.js";
 const HUD_MODULE = "pneuma-combattools";
 const HUD_CHANNEL = "module." + HUD_MODULE;
 export interface HUDMessageOptions {
@@ -51,6 +52,7 @@ function recipientsFor(target: HUDMessageOptions["recipients"]): string[] {
   return [...new Set(ids)];
 }
 function dispatchHUDMessage(wire: HUDWire) {
+  if (wire.recipients.some(id => id !== game.user!.id)) requireCombatSocket();
   receiveHUDMessage(wire);
   if (wire.recipients.some(id => id !== game.user!.id)) game.socket!.emit(HUD_CHANNEL, wire);
 }

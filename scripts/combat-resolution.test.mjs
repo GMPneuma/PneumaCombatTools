@@ -381,7 +381,7 @@ test("repeat selected-target damage activates statuses without toggling them off
 });
 
 test("critical injury counts only active damage d6 sixes and chooses the attack location",async()=>{
- const {damageSixes,criticalLocation,hasCriticalInjury,criticalMethod,registerCriticalSettings}=await import("../dist/scripts/critical-injury.js");
+ const {damageSixes,criticalLocation,hasCriticalInjury,criticalMethod}=await import("../dist/scripts/critical-injury.js");
  const roll={_roll:{dice:[{faces:6,results:[{result:6,active:true},{result:6},{result:6,active:false},{result:6,discarded:true},{result:5}]},
    {faces:10,results:[{result:6}]}]},_critRoll:{dice:[{faces:6,results:[{result:6}]}]}};
  assert.equal(damageSixes(roll),2);
@@ -396,7 +396,8 @@ test("critical injury counts only active damage d6 sixes and chooses the attack 
  for(const method of ["Explosion","Grenade","Rocket","Quickhack"]) assert.equal(criticalMethod({...data,criticalMethod:method}),method);
  game.settings.get=(_module,key)=>key!=="criticalRanged";assert.equal(hasCriticalInjury(data),false);
  const registered=[];game.settings.register=(module,key,options)=>registered.push([key,options.default]);
- registerCriticalSettings();assert.equal(registered.length,8);assert.ok(registered.every(([,value])=>value===true));
+ const {registerCriticalSettings}=await import("../dist/scripts/critical-settings.js");game.settings.registerMenu=()=>{};
+ registerCriticalSettings();assert.equal(registered.length,8);assert.ok(registered.every(([key,value])=>value===(key!=="criticalQuickhack")));
 });
 test("critical injury verifies recipient ownership before native mutation",async()=>{
  const {applyCriticalInjury}=await import("../dist/scripts/critical-injury.js");

@@ -1,0 +1,7 @@
+<form autocomplete="off">
+  <p class="notes">NPC attack rolls and NPC-to-NPC results are GM-blind. Undetected NPC Jack-In results remain GM-only. Player attack rolls are public.</p>
+  {{#each rows}}
+  <div class="form-group"><label>{{title}}</label><div class="form-fields"><select name="{{key}}">{{selectOptions choices selected=value}}</select></div></div>
+  {{/each}}
+  <footer class="sheet-footer flexrow"><button type="submit"><i class="fas fa-save"></i> {{localize 'Save'}}</button></footer>
+</form>

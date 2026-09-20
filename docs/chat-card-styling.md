@@ -4,7 +4,7 @@ This is the styling contract for Combat Tools exchange cards, using native Found
 
 ## Whole-message scope
 
-The outer Foundry `.chat-message` element receives `.pneuma-combat-message` when it represents a visible Combat Tools exchange. This includes its sender, timestamp, content and appended controls. The message itself is not wrapped; newly generated content has an inner .pneuma-resolution-card wrapper.
+The outer Foundry `.chat-message` element receives `.pneuma-combat-message` when it represents a visible Combat Tools attack/Evasion, grapple, QuickHack, or AoE card. This includes its sender, timestamp, content and appended controls. The message itself is not wrapped. Attack/Evasion content retains .pneuma-resolution-card, grappling retains .pneuma-grapple-card, QuickHack retains its own scoped root, and AoE uses .pneuma-aoe-card.
 
 ```css
 .chat-message.pneuma-combat-message { /* the entire exchange message */ }
@@ -299,3 +299,89 @@ Status slots also paint the icon background itself and use a #chat-log scoped ov
 The resolution-card .pneuma-improvised-damage label/select has been removed. The choice now appears only in the native attack dialog as li.dialog-item.flexrow.pneuma-improvised-damage-choice, before .total-mods, containing a label and native select. Players and GMs can select the GM-agreed 1d6–6d6; confirmation is disabled until selected. The value persists across dialog rerenders and is saved on the exchange. Other attacks omit this row. Native roll/card classes and sections remain unchanged. Example: .pneuma-improvised-damage-choice select { max-width: 8em; }.
 
 CTH menu migration: li[data-brawling] was replaced by li[data-attack-category], with values attack, melee, brawling and thrown. Update any external selectors using the old attribute. Thrown rows have a single column; other attack rows retain native button and mode columns.
+
+### Shared Cyberpunk status list
+
+Damage-card status slots and picker now read the native Cyberpunk master list and custom statuses. Their existing CSS classes and three-slot layout remain unchanged. Native injury mechanics are applied through the shared status subsystem. The token HUD adds .pneuma-status-tray, .pneuma-status-grid, and details.pneuma-status-group while retaining .effect-control nodes. See [Status effects](status-effects.md).
+
+
+## QuickHack cards
+
+Root: `.rollcard.pneuma-quickhack-card`. Jack-In, QuickHack and Force Out results reuse `resolutionSection("result", ...)`, emitting `.pneuma-resolution-section`, `[data-pneuma-section="result"]` and `.pneuma-resolution-body`. Native `rollcard-top` and `cpr-block` are retained. Native Interface dice are embedded in Jack-In/QuickHack results. Force Out embeds native Concentration and player Interface templates in its combined result; NPC resistance remains an automatic total. Damage remains a separate CPR template.
+
+Jack-In, QuickHack and Force Out roots use `data-state="success"` or `"failure"`; for Jack-In that means undetected/detected, not denied access. `.pneuma-quickhack-effect` changes from resolving text to a manual/automated effect summary; `.failure` marks a failed automatic effect. Controls are `[data-quickhack-action="force-out"]` and `[data-quickhack-action="damage"]`. Force Out is shown to defender owners/GMs; damage is shown to attacker owners/GMs. Obsolete encounter connections remove both controls. Disabling QuickHack removes controls, including native damage application links, and captures clicks on already-rendered cards.
+
+GM routing determines whole-message visibility and attacker-name disclosure; NPC rolls are GM-blind through the shared native hidden-roll helper. No CSS substitutes for message audience restrictions. Example: `.pneuma-quickhack-card[data-state="failure"] .pneuma-resolution-result-body`. No existing Combat Tools selectors were removed or renamed. The old external module’s `.pneuma-quickhack-result-rollcard` selectors are not copied.
+
+### Combined QuickHack roll and result
+
+Outer reskin scope remains `.rollcard.pneuma-quickhack-card`. Named containers are `.pneuma-quickhack-heading`, `.pneuma-quickhack-participants`, `.pneuma-quickhack-roll` (also `[data-quickhack-section="roll"]`), `.pneuma-quickhack-result`, `.pneuma-quickhack-outcome`, `.pneuma-quickhack-detail`, `.pneuma-quickhack-effect`, and `.pneuma-quickhack-actions`. Result section attributes, state attributes and button selectors above are unchanged.
+
+The roll container retains CPR's native rollcard-bottom, cpr-block, dice images, total, breakdown and toggleVisibility attributes. Only its duplicate native rollcard-top title is hidden by scoped CSS. The outer heading supplies the action name, DV for QuickHacks, and participants. The result supplies the outcome, opposed totals where permitted, effect summary and owner-specific buttons. An empty action container is hidden. Styling inherits theme colors; no global CPR selectors change.
+
+Combined cards inherit result-message visibility. Private NPC rolls are never embedded in player-visible results: their native dice remain in a separate blind GM message. GM-only NPC results and player rolls combine. No CSS or hidden markup carries private dice to other recipients. Force Out now publishes one result after the contest, embedding Concentration and player Interface rolls rather than publishing standalone roll messages. Damage publication is unchanged.
+
+Example: `.pneuma-quickhack-card .pneuma-quickhack-heading { padding: 8px 10px; }`. No existing scope or action selectors are removed. Browser checks cover embedded roll visibility, suppressed duplicate headings, narrow layouts, native controls and master-off behavior; live Foundry appearance still needs verification.
+
+## Grapple cards
+
+- Root: .pneuma-grapple-card; independent of .pneuma-resolution-card and the attack/Evasion state attributes.
+- Native classes retained: rollcard, rollcard-top, cpr-block and rollcard-bottom; opposed results retain native skill-roll markup.
+- Sections: .pneuma-grapple-note (current outcome/restrictions), .pneuma-grapple-rolls (both native roll results after the response), .pneuma-grapple-controls (per-user controls).
+- Root data-state: waiting, choice, active or ended. Incomplete cross-document operations replace ordinary controls with Retry plus the GM End control.
+- Controls: Roll Brawling; Hold Target/Take Held Object; Choke/Throw/Release; Escape; End (GM). Target/actor ownership governs controls and is rechecked by the GM authority.
+- Visibility: native roll mode is retained; hidden/blind content is never decorated for an unauthorized viewer. Waiting cards omit the attack result. Names and notes are escaped. Active state comes from the originating Combat document; out-of-combat records use the scene. Ended records use the stored chat snapshot.
+- Example selector: .pneuma-grapple-card[data-state="active"] .pneuma-grapple-controls button
+- No existing card selectors were removed or renamed.
+
+Grapple render hooks preserve existing card and native roll DOM nodes. Only data-state, the note text and permission-specific controls are refreshed in place. Roll content changes through the normal ChatMessage update/render lifecycle, preserving Chat Dice artwork and other modules' decorations regardless of hook order. Repeated renders rebuild only the controls without duplicating buttons.
+
+Each resolved opposed Brawling result wrapper uses the existing .pneuma-roll-winner / .pneuma-roll-loser classes, including Escape and third-party Break Grapple. The acting character must beat the responder; a tie styles the responder as winner. Pending rolls receive neither class. Saved older wrappers are decorated in place, preserving modified dice and native listeners. Example: .pneuma-grapple-rolls > .pneuma-roll-winner .cpr-block::before.
+
+## Shared presentation and growth behavior
+
+card-structure.ts supplies common message classification, visibility checks, non-destructive message decoration, outcome classes, and opposed-roll decoration. The shared outer .pneuma-combat-message scope now covers all three workflows, with data-pneuma-card-kind equal to exchange, grapple, or quickhack. Attack-specific state attributes remain exclusive to attack/Evasion cards. Existing selectors are retained; the shared scope is intentionally broadened. Example: .pneuma-combat-message[data-pneuma-card-kind="grapple"] .pneuma-roll-winner.
+
+resolution-scroll.ts is registered once from main.ts, independently of individual workflow registration. Updated visible module cards are kept within the chat log using the same ResizeObserver behavior for attack/Evasion, grapple, and QuickHack. Cards taller than the viewport reveal their bottom controls. Late renders and later content growth reattach/scroll as needed; initial history rendering and ordinary or hidden chat do not trigger scrolling. Deleting the watched message disconnects its observer.
+
+All workflows must preserve existing native roll nodes during render hooks. Shared helpers change classes, attributes, and owned control areas only; roll/content replacement occurs through ChatMessage updates before module render hooks. Workflow-specific authorization and rules remain separate.
+
+Grapple active-state notes now state that the held token follows the grappler. Card markup, controls, state selectors and native dice scope are unchanged by token following.
+
+Release, Choke and Throw on an established grapple require no new Brawling roll or opposed response. Their result displays use the action name and omit the original Grab dice; the original roll data remains saved in grapple metadata. Grab, Escape and Break Grapple still use opposed Brawling.
+
+### Combined Force Out / Eject NetRunner card
+
+Root and whole-message scope remain `.rollcard.pneuma-quickhack-card` and `.pneuma-combat-message[data-pneuma-card-kind="quickhack"]`. The heading uses `.pneuma-quickhack-heading` and `.pneuma-quickhack-participants`. Each embedded roll uses `.pneuma-quickhack-roll[data-quickhack-section="roll"]`, a descriptive `h4`, and `.pneuma-roll-winner` or `.pneuma-roll-loser`; nested native CPR dice markup and interactions remain intact, including Chat Dice decoration. Native duplicate roll headings stay hidden by the existing selector. The outcome retains `[data-pneuma-section="result"]` and `.pneuma-quickhack-result`. Root success means ejected; failure includes ties. The final card adds no controls and uses the shared chat presentation/scroll behavior.
+
+Both rolls and outcome are published together to the originating awareness message's audience after resolution. NPC resistance has an automatic total rather than a native role card. If identity is hidden, no native Interface HTML is embedded that could disclose it. Current Jack-In/QuickHack identity settings govern the CTH and newly generated ejection card; either detected event identifying the same connection permits its name. Unaware connections remain unavailable. Prior messages are not rewritten.
+
+Example: `.pneuma-combat-message[data-pneuma-card-kind="quickhack"] .pneuma-quickhack-roll.pneuma-roll-winner`. No selectors were removed or renamed.
+
+## Area attack cards
+
+Root: `.rollcard.pneuma-aoe-card`; whole-message scope: `.pneuma-combat-message[data-pneuma-card-kind="aoe"]`. The shared growth/re-render scroll observer applies. Root `data-state`: scatter, waiting, resolved.
+
+Sections retain `resolutionSection` attack/result/damage-roll/damage-apply markup and native CPR `rollcard`, `rollcard-top`, `cpr-block`, dice markup and data-action hooks. Attack dice are omitted from rendered content until target choices finish; saved flags follow the existing ordinary-display privacy contract. Defense rolls use `.pneuma-aoe-defense.pneuma-roll-winner` / `.pneuma-roll-loser`. Only duplicate defense headers are hidden, preserving custom dice and native interactions.
+
+Targets: `.pneuma-aoe-targets[role="list"]`, `.pneuma-aoe-target[role="listitem"][data-aoe-row]`, and `.pneuma-aoe-response`. Row states: waiting/rolling/hit/miss/other. Accessible icon controls use `data-aoe-action` and `data-aoe-target`: roll, decline, other (Cover Up), move, apply; GM scatter/add/exclude/forcehit/hit/miss/reset/damageReset/damageResolved; shared damage/show.
+
+Only owners/GMs get operative response/application controls; GM requests independently validate ownership and state. Foundry message visibility and roll modes remain authoritative. Cover Up is absent by default and removed on render when disabled. Shared damage retains native dice/details while replacing the global application link with per-target buttons and native application summaries. No new selector replaces existing card selectors.
+
+Example: `.pneuma-combat-message[data-pneuma-card-kind="aoe"] .pneuma-aoe-target[data-state="hit"]`.
+
+AoE visibility: retained control [data-aoe-action="show"] now toggles the shared template. Its icon and accessible label switch between fa-eye / Show attack area and fa-eye-slash / Hide attack area. Every card viewer retains this control regardless of token ownership. The optional GM-only [data-aoe-action="effectsResolved"] marks special ammunition effects complete. Resolution completion is tracked independently of the existing response data-state; automatic hiding waits for responses, blast movement, and damage. Example: .pneuma-aoe-card [data-aoe-action="show"]. No selectors were removed.
+
+Movement HUD: `.pneuma-movement-hud` retains native `.placeable-hud`, `.attribute` and `.control-icon` hooks. The counter comes first; `.pneuma-movement-controls` holds a compact two-column row with the Reset button on the left and `.pneuma-movement-run.control-icon` on the right. Run remains a noninteractive span, shown only for `.is-running` (including `.is-over-budget`). Reset remains owner/GM-only; run stays in column two when Reset is hidden. Example: `#hud .pneuma-movement-hud .pneuma-movement-controls`. No selectors were removed; run moved from above the counter into the lower row.
+
+AoE shape configuration does not change card selectors, sections, response controls, or visibility permissions. The existing Show/Hide control now displays native measured shapes with wall-clipped grid highlights. The card remains .pneuma-aoe-card with its existing data-state values; no selectors were renamed or removed.
+
+AoE Cover Up now resolves to row data-state="hit" with a Cover Up / Prone / SP ×2 / ablation ×2 label. Existing [data-aoe-action="other"] remains the enabled Cover Up control; no selector was renamed. Native applied-damage results append .pneuma-cover-up-damage with the rule explanation. Successful shell and explosive responses retain [data-aoe-action="move"] until relocation; charged distance appears in .pneuma-aoe-response. Legacy other-state rows remain GM-reviewable. Whole-message scope, native dice and shared scrolling are unchanged. Example: .pneuma-aoe-card .pneuma-cover-up-damage.
+
+## EMP selection cards
+
+`.pneuma-emp-card` contains the target heading, selection summary and `[data-emp-select]` native HTML button. `flags.pneuma-combattools.emp` links the message to its Combat request. The button becomes disabled when applied or the combat has ended; it is labeled EMP applied or Combat ended respectively. These whispered cards are visible to GMs, plus affected actor owners for player-choice requests. The selection dialog independently rechecks ownership; the GM rechecks actor ownership, request state and eligible IDs before application.
+
+Native `Dialog`, `.form-group`, checkbox/select controls and Token HUD `.control-icon` markup remain in use. `.pneuma-emp-selection` scopes the selection form and `.pneuma-emp-choice` scopes each item row; random rows show first-draw odds. No existing card selectors are removed. Example: `.pneuma-emp-card [data-emp-select]:disabled { opacity: 0.6; }`.
+
+The applied EMP card adds `.pneuma-emp-result` with the affected item names while its Combat record exists. Names use text content, not HTML. Example: `.pneuma-emp-card .pneuma-emp-result { font-weight: bold; }`.

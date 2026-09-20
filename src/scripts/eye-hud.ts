@@ -1,6 +1,8 @@
+import {movementHUD} from "./aoe/movement.js";
+import { grappleHUD, property as grappleProperty } from "./grapple/state.js";
 import { registerHUDMessages, postHUDMessage, listHUDMessages, dismissHUDMessage, hudMessageKey } from "./hud-messages.js";
 import { getItemMarkers } from "./item-markers.js";
-import { vitalState, indicatorState, signalExposure, lamps, type LampId } from "./biomonitor.js";
+import { createEKGTrace, vitalState, indicatorState, signalExposure, lamps, type LampId } from "./biomonitor.js";
 const MODULE = "pneuma-combattools";
 declare global { interface SettingConfig {
   "pneuma-combattools.biomonitorShowHP": boolean;
@@ -81,6 +83,14 @@ let hudBody: HTMLElement | undefined;
 let medicalSignature = "";
 let messageSignature = "";
 let hudWasMinimized = false;
+let observedNotices: Map<string, string> | undefined;
+let automaticNotice: string | undefined;
+let automaticTimer: ReturnType<typeof setTimeout> | undefined;
+function stopAutomaticNotice() {
+  automaticNotice = undefined;
+  if (automaticTimer) clearTimeout(automaticTimer);
+  automaticTimer = undefined;
+}
 let queued = false;
 const dismissed = new Set<string>();
 const attacks = new Map<string, ChatMessage>();
@@ -99,7 +109,7 @@ export function eyeConditions(actor: Actor): Notice[] {
   for (const effect of actor.allApplicableEffects()) {
     if (effect.disabled || effect.isSuppressed || foundry.utils.getProperty(effect, "system.isSuppressed")) continue;
     // Only conditions and injuries: ordinary equipment bonuses do not belong in this overlay.
-    if (effect.statuses.size) add(effect.name ?? "Condition", effect.img);
+    if (effect.statuses.size && !grappleProperty(effect, "grappleId")) add(effect.name ?? "Condition", effect.img);
   }
   return [...rows.values()];
 }
@@ -176,8 +186,7 @@ let previewHP = 40;
 let ekgPaused = false;
 let lampTimer: ReturnType<typeof setTimeout> | undefined;
 function createEKG(state: ReturnType<typeof vitalState> | "unknown", compact = false) {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 160 44"); svg.setAttribute("class", "pneuma-eye-ekg");
+  const svg = createEKGTrace(state);
   svg.setAttribute("tabindex", "0"); svg.setAttribute("role", "button");
   const syncPlayback = () => {
     svg.classList.toggle("is-paused", ekgPaused);
@@ -190,13 +199,6 @@ function createEKG(state: ReturnType<typeof vitalState> | "unknown", compact = f
     if (event.key === "Enter" || event.key === " ") { event.preventDefault(); togglePlayback(); }
   });
   syncPlayback();
-  const path = state === "flatline" || state === "unknown" ? "M0 22 H160" : state === "critical"
-    ? "M0 22 H18 L23 17 27 28 32 8 36 36 40 22 H65 L70 14 74 30 78 22 H110 L114 18 118 25 122 22 H160"
-    : "M0 22 H30 L35 18 40 22 H49 L53 28 59 3 65 38 71 22 H92 L100 15 108 22 H160";
-  svg.innerHTML = '<path class="pneuma-eye-trace-base" d="' + path + '"/>' +
-    '<g class="pneuma-eye-trace"><path class="pneuma-eye-trace-tail" pathLength="100" d="' + path + '"/>' +
-    '<path class="pneuma-eye-trace-glow" pathLength="100" d="' + path + '"/>' +
-    '<path class="pneuma-eye-trace-dot" pathLength="100" d="' + path + '"/></g>';
   return svg;
 }
 function vitals(actor: Actor | undefined, states: ReturnType<typeof indicatorState>, preview: boolean) {
@@ -234,14 +236,14 @@ function vitals(actor: Actor | undefined, states: ReturnType<typeof indicatorSta
 function render() {
   const preview = game.settings!.get(MODULE, "eyeHUDPreview");
   if (!game.settings!.get(MODULE, "eyeHUD") && !preview) {
+    stopAutomaticNotice(); observedNotices = undefined;
     root?.remove(); root = undefined; hudBody = undefined; medicalSignature = messageSignature = "";
     if (lampTimer) clearTimeout(lampTimer);
     return;
   }
-  const minimized = !preview && game.settings!.get(MODULE, "eyeHUDMinimized");
+  const prefersMinimized = !preview && game.settings!.get(MODULE, "eyeHUDMinimized");
   const actor = actorInFocus();
   const monitor = preview || !!actor && (game.settings!.get(MODULE, "biomonitorWithoutImplant") || hasBiomonitor(actor));
-  const rows = minimized ? [] : preview ? demo : monitor && actor ? eyeConditions(actor) : [];
   const savedMessage = game.settings!.get(MODULE, "eyeHUDMessage");
   const custom = savedMessage && !dismissedLegacyMessages.has(savedMessage.id) && savedMessage.expires > Date.now() && savedMessage.recipients.includes(game.user!.id!) ? savedMessage : undefined;
   const pending = preview || !actor ? [] : [...attacks.values()].filter(message => {
@@ -249,6 +251,28 @@ function render() {
     return message.visible && message.isContentVisible && !dismissed.has(message.id!)
       && data?.defenderActor === actor.uuid;
   });
+  type AlertEntry = { key: string; text: string; open?: () => void; clear: () => void };
+  const messages: AlertEntry[] = preview ? [
+    { key: "preview-attack", text: "Incoming Attack", open: () => { ui.notifications!.info("Biomonitor test: a live alert opens its chat card."); }, clear: () => {} },
+    { key: "preview-message", text: "Check your equipment", clear: () => {} }
+  ] : [
+    ...pending.map(message => ({ key: "attack:" + message.id!, text: "Incoming Attack", open: () => openCard(message.id!), clear: () => { dismissed.add(message.id!); } })),
+    ...(custom ? [{ key: "legacy:" + custom.id, text: custom.text, clear: () => { dismissedLegacyMessages.add(custom.id); } }] : []),
+    ...listHUDMessages().map(message => ({ key: hudMessageKey(message), text: message.text, clear: () => dismissHUDMessage(message.source, message.id) }))
+  ];
+  if (!preview) {
+    const latest = messages.filter(message => observedNotices && observedNotices.get(message.key) !== message.text).at(-1);
+    observedNotices = new Map(messages.map(message => [message.key, message.text]));
+    if (latest && prefersMinimized) {
+      stopAutomaticNotice();
+      automaticNotice = latest.key;
+      selectedNotice = latest.key;
+      messageSignature = "";
+    }
+    if (!prefersMinimized || !messages.some(message => message.key === automaticNotice)) stopAutomaticNotice();
+  } else stopAutomaticNotice();
+  const minimized = prefersMinimized && !automaticNotice;
+  const rows = minimized ? [] : preview ? demo : monitor && actor ? eyeConditions(actor) : [];
   const panel = root ??= element("section", "pneuma-eye-hud");
   panel.id = "pneuma-eye-hud"; panel.setAttribute("aria-label", "Status HUD");
   const header = element("header", "pneuma-eye-header");
@@ -279,7 +303,9 @@ function render() {
   }
   if (!preview) {
     const toggle = control(minimized ? "" : "−", async () => {
+      stopAutomaticNotice();
       await game.settings!.set(MODULE, "eyeHUDMinimized", !minimized);
+      schedule();
     });
     toggle.setAttribute("aria-label", minimized ? "Expand status HUD" : "Minimize status HUD");
     toggle.title = minimized ? (pending.length ? "Incoming attack" : custom?.text ?? "Open status HUD") : "Minimize status HUD";
@@ -296,15 +322,6 @@ function render() {
   }
   const body = hudBody ??= element("div", "pneuma-eye-body");
   const messageArea = element("div", "pneuma-eye-messages");
-  type AlertEntry = { key: string; text: string; open?: () => void; clear: () => void };
-  const messages: AlertEntry[] = preview ? [
-    { key: "preview-attack", text: "Incoming Attack", open: () => { ui.notifications!.info("Biomonitor test: a live alert opens its chat card."); }, clear: () => {} },
-    { key: "preview-message", text: "Check your equipment", clear: () => {} }
-  ] : [
-    ...pending.map(message => ({ key: "attack:" + message.id!, text: "Incoming Attack", open: () => openCard(message.id!), clear: () => { dismissed.add(message.id!); } })),
-    ...(custom ? [{ key: "legacy:" + custom.id, text: custom.text, clear: () => { dismissedLegacyMessages.add(custom.id); } }] : []),
-    ...listHUDMessages().map(message => ({ key: hudMessageKey(message), text: message.text, clear: () => dismissHUDMessage(message.source, message.id) }))
-  ];
   let index = Math.max(0, messages.findIndex(message => message.key === selectedNotice));
   const current = messages[index];
   selectedNotice = current?.key;
@@ -330,25 +347,51 @@ function render() {
     if (minimized) panel.querySelector("header button")?.setAttribute("title", current.text);
   }
   if (!messages.length) messageArea.append(element("div", "pneuma-eye-idle", "STATUS: Standby"));
-  const nextMessages = JSON.stringify([preview, selectedNotice, messages.map(message => [message.key, message.text])]);
+  const nextMessages = JSON.stringify([preview, automaticNotice, selectedNotice, messages.map(message => [message.key, message.text])]);
   if (nextMessages !== messageSignature) {
     const previousMessages = body.querySelector(".pneuma-eye-messages");
     if (previousMessages) previousMessages.replaceWith(messageArea); else body.prepend(messageArea);
     messageSignature = nextMessages;
+    if (automaticTimer) clearTimeout(automaticTimer);
+    if (automaticNotice) {
+      const ticker = messageArea.querySelector<HTMLElement>(".pneuma-eye-ticker");
+      if (ticker) {
+        ticker.style.animationIterationCount = "1";
+        const finish = () => {
+          if (body.querySelector(".pneuma-eye-ticker") !== ticker || !automaticNotice) return;
+          stopAutomaticNotice();
+          schedule();
+        };
+        ticker.addEventListener("animationend", finish, { once: true });
+        // Reduced motion has no animationend; retain the static notice for one normal pass.
+        if (matchMedia("(prefers-reduced-motion: reduce)").matches) automaticTimer = setTimeout(finish, 8000);
+      }
+    }
   }
   if (!minimized) {
     const disabled = preview ? [{ name: "Cyberarm", detail: "Disabled", item: undefined }] : Array.from(actor?.items ?? [])
-      .filter(item => String(item.type) === "cyberware" && !!getItemMarkers(item).disabled)
-      .map(item => ({ name: item.name ?? "Cyberware", detail: getItemMarkers(item).disabled?.description ?? "Disabled", item }));
+      .filter(item => String(item.type) === "cyberware" && (!!getItemMarkers(item).disabled || !!getItemMarkers(item).emp))
+      .map(item => ({ name: item.name ?? "Cyberware", detail: getItemMarkers(item).emp ? "Disabled — EMP" : getItemMarkers(item).disabled?.description ?? "Disabled", item }));
     const lampStates = monitor ? indicatorState(preview ? "preview" : actor!.uuid, rows.map(row => row.title),
       game.settings!.get(MODULE, "biomonitorFlashSeconds")) : [];
-    const nextMedical = JSON.stringify([monitor, preview, actor?.uuid, actor?.isOwner, previewHP,
+    const grappleRows = preview ? [{id:"preview-grapple",text:"Grappling: Booster",detail:"−2 Actions"},{id:"preview-choke",text:"Choking: Booster — 1/3",detail:"Consecutive rounds"}] : actor ? [...grappleHUD(actor),...movementHUD(actor)] : [];
+    const nextMedical = JSON.stringify([monitor, preview, actor?.uuid, actor?.isOwner, previewHP, grappleRows,
       actor && foundry.utils.getProperty(actor, "system.derivedStats.hp"), rows,
       disabled.map(entry => [entry.item?.id, entry.name, entry.detail]), lampStates,
       game.settings!.get(MODULE, "biomonitorShowHP")]);
     if (nextMedical !== medicalSignature) {
       const medical = element("div", "pneuma-eye-medical");
-      if (monitor) medical.append(vitals(actor, lampStates, preview));
+      const vitalColumn = element("div", "pneuma-eye-vitals-column");
+      if (monitor) vitalColumn.append(vitals(actor, lampStates, preview));
+      if (grappleRows.length) {
+        const grappling = element("div", "pneuma-eye-grapple");
+        for (const entry of grappleRows) {
+          const row = element("div", "pneuma-eye-grapple-row", entry.text); row.title = entry.detail;
+          grappling.append(row);
+        }
+        vitalColumn.append(grappling);
+      }
+      medical.append(vitalColumn);
       const conditions = element("div", "pneuma-eye-conditions");
       conditions.append(element("div", "pneuma-eye-medical-label", "Biological Scan"));
       for (const notice of rows) {
@@ -362,19 +405,19 @@ function render() {
         conditions.append(row);
     }
     if (!rows.length) conditions.append(element("div", "pneuma-eye-condition-empty", "No Active Pathology"));
-    medical.append(conditions);
+    if (monitor) medical.append(conditions);
     const cyber = element("div", "pneuma-eye-cyber");
     cyber.append(element("div", "pneuma-eye-medical-label", "Implant Integrity"));
     for (const entry of disabled) {
-      const row = control(entry.name, () => { entry.item?.sheet?.render(true); });
+      const row = control(entry.name + (entry.detail === "Disabled — EMP" ? " — Disabled — EMP" : ""), () => { entry.item?.sheet?.render(true); });
       row.className = "pneuma-eye-condition pneuma-eye-cyber-disabled";
       row.title = entry.name + " — " + (entry.detail || "Disabled");
       cyber.append(row);
   }
     if (!disabled.length) cyber.append(element("div", "pneuma-eye-condition-empty", "All Systems Normal"));
-    medical.append(cyber);
+    if (monitor) medical.append(cyber);
     const previousMedical = body.querySelector(".pneuma-eye-medical");
-    if (monitor) {
+    if (monitor || grappleRows.length) {
       if (previousMedical) previousMedical.replaceWith(medical); else body.append(medical);
     } else previousMedical?.remove();
     medicalSignature = nextMedical;
@@ -389,6 +432,7 @@ function render() {
       ticker.style.animation = "none";
       void ticker.offsetWidth;
       ticker.style.animation = "";
+      if (automaticNotice) ticker.style.animationIterationCount = "1";
     }
   }
   hudWasMinimized = minimized;
@@ -410,6 +454,7 @@ export function registerEyeHUD() {
   Hooks.on("updateUser", (user: User) => { if (user.id === game.user?.id) schedule(); });
   Hooks.on("updateToken", (token: TokenDocument) => { if (canvas.tokens?.controlled.some(controlled => controlled.document === token)) schedule(); });
   Hooks.on("canvasTearDown", schedule);
+  for (const hook of ["updateCombatant", "updateScene", "updateCombat", "deleteCombat", "deleteScene"]) Hooks.on(hook, schedule);
   for (const hook of ["createItem", "updateItem", "deleteItem", "createActiveEffect", "updateActiveEffect", "deleteActiveEffect", "updateActor"]) {
     Hooks.on(hook, (doc: { uuid?: string; parent?: { uuid?: string; parent?: { uuid?: string } } }) => {
       const actor = actorInFocus();

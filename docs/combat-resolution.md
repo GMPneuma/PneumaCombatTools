@@ -91,9 +91,7 @@ It does not apply HP damage again and remains available for deliberate repeat us
 World settings allow injury controls for Ranged, Melee, Unarmed, Autofire, Explosion,
 Grenade, Rocket and Quickhack methods; all default enabled. These switches govern the
 injury action, not the system's native +5 critical bonus calculation. Grenade/rocket
-launchers record their respective method. General explosion and Quickhack exchanges
-must supply their method when those planned workflows are implemented; these settings
-do not add those attack workflows.
+launchers and inventory grenade AoE cards record their respective methods. See [Area attacks](area-attacks.md) for shared damage and target responses. These injury settings do not independently create attack workflows.
 
 The adapter uses the system's configured critical injury table compendium and its
 native Critical Injuries (Head)/(Body) table and matching injury compendium names.

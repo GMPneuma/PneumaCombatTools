@@ -1,6 +1,23 @@
+import { registerSelfCTH, isSelfCTH, selfInitiativeControl, rerollSelfInitiative } from "./self-cth.js";
+import { registerHoverEKG } from "./ekg-hover.js";
+import { registerMovement } from "./movement.js";
+import { registerEmp } from "./emp.js";
+import { registerAreaAttacks } from "./aoe/workflow.js";
+import { registerSocketHealth } from "./socket-health.js";
+import { registerResolutionScroll } from "./resolution-scroll.js";
+import { registerGrapple, useGrapple } from "./grapple/workflow.js";
+import { grappleMenu, grappleWeaponBlocked } from "./grapple/state.js";
+import { registerQuickhack } from "./quickhack/integration.js";
+import { registerSettingsLayout } from "./settings-layout.js";
+import { enabled as quickhackEnabled } from "./quickhack/settings.js";
+import { actorQuickhacks, executeQuickhack } from "./quickhack/workflow.js";
+import { connectionFor, trackingCombat, jackOut } from "./quickhack/connections.js";
+import { beginForceOut, forceOutEntries } from "./quickhack/force-out.js";
+import { hasQuickhackSight } from "./quickhack/sight.js";
+import { registerCyberpunkStatuses } from "./status-settings.js";
 import { registerEyeHUD } from "./eye-hud.js";
 import { registerItemMarkers, decorateItemList } from "./item-markers.js";
-import { registerCriticalSettings } from "./critical-injury.js";
+import { registerCriticalSettings } from "./critical-settings.js";
 import { registerCombatResolution } from "./combat-resolution.js";
 import { registerArmorShortcut } from "./armor-shortcut.js";
 import { canShowQuickhack, attackEntries, thrownEntries, grenadeEntries, attackFromHUD, type MenuWeapon, type AttackMode } from "./attack-menu.js";
@@ -22,7 +39,7 @@ const MODULE_ID = "pneuma-combattools";
 const TEMPLATE = `modules/${MODULE_ID}/templates/combat-hud.hbs`;
 const label = (key: string) => game.i18n!.localize(`PNEUMA_COMBAT_TOOLS.${key}`);
 let selection: { target: Token; attacker: Token | undefined; combatOnly?: boolean; anchor: { x: number; y: number } } | undefined;
-const isStandalone = (token: Token) => !token.isOwner || (selection?.target === token && !!selection.combatOnly);
+const isStandalone = (token: Token) => !isSelfCTH(token, selection?.target === token ? selection.attacker : selectedAttacker()) && (!token.isOwner || (selection?.target === token && !!selection.combatOnly));
 const selectedAttacker = () => {
   const tokens = canvas.tokens!.controlled.filter(token => token.actor?.isOwner);
   return tokens.length === 1 ? tokens[0] : undefined;
@@ -30,13 +47,24 @@ const selectedAttacker = () => {
 
 Hooks.once("init", () => {
   if (game.system!.id !== "cyberpunk-red-core") return;
+  registerSocketHealth();
+  registerSelfCTH();
+  registerQuickhack(() => { const target = canvas.tokens?.hud?.object ?? undefined; const source = selection && selection.target === target ? selection.attacker : selectedAttacker(); return {source, target, self:isSelfCTH(target,source)}; });
+  registerGrapple();
+  registerResolutionScroll();
+  registerCyberpunkStatuses();
   registerEyeHUD();
   registerHoverDV();
+  registerHoverEKG();
   registerArmorShortcut();
   registerItemMarkers();
   registerEvasionSettings();
   registerCombatResolution();
+  registerMovement();
+  registerEmp();
+  registerAreaAttacks();
   registerCriticalSettings();
+  registerSettingsLayout();
   game.settings!.register(MODULE_ID, "maNoAblation", {
     name: "MA does not ablate armor", hint: "Martial Arts retains half SP, but does not ablate armor when applying damage from a resolution card.",
     scope: "world", config: true, type: Boolean, default: false,
@@ -124,30 +152,42 @@ Hooks.once("init", () => {
       this.element.css({
         width: 100, height: 100, left: anchor.x - 50 * scale, top: anchor.y - 50 * scale,
         transform: `scale(${scale})`,
-        "--pneuma-cth-icon-color": game.settings!.get(MODULE_ID, "iconColor") ?? "",
+        "--pneuma-cth-icon-color": game.settings!.get(MODULE_ID, "iconColor") || "#ffffff",
         "--pneuma-status-icon-size": `${36 * game.settings!.get(MODULE_ID, "statusIconScale")}px`,
       }).removeClass("large").addClass("pneuma-readable-hud")
         .toggleClass("pneuma-tight-hud", game.settings!.get(MODULE_ID, "tightHUD"));
     }
     override getData(options = {}) {
       const attacker = selection && selection.target === this.object ? selection.attacker : selectedAttacker();
+      const selfCTH = isSelfCTH(this.object ?? undefined, attacker);
+      if (selfCTH) return {...super.getData(options), standalone: false, selfCTH: true, selfInitiative: selfInitiativeControl(this.object!)};
+      const connection = attacker?.actor && this.object?.actor ? connectionFor(attacker.actor, this.object.actor.uuid) : undefined;
+      const sight = !!attacker && !!this.object && quickhackEnabled() && hasQuickhackSight(attacker, this.object);
+      const ejectNetrunners = forceOutEntries(this.object?.actor ?? undefined);
+      const offensiveQuickhacks = !!attacker?.actor && attacker.actor.uuid !== this.object?.actor?.uuid
+        && quickhackEnabled() && canShowQuickhack(Array.from(attacker.actor.items) as unknown as MenuWeapon[]);
       return {
         ...super.getData(options),
+        ejectNetrunners,
+        offensiveQuickhacks,
         standalone: isStandalone(this.object!),
         attackTitle: game.user!.isGM && attacker ? game.i18n!.format("PNEUMA_COMBAT_TOOLS.AttackAs", { name: attacker.name }) : label("Attack"),
-        weapons: attacker ? [...attackEntries(Array.from(attacker.actor!.items) as unknown as MenuWeapon[]), ...thrownEntries(Array.from(attacker.actor!.items) as unknown as MenuWeapon[])] : [],
+        weapons: attacker ? [...attackEntries(Array.from(attacker.actor!.items) as unknown as MenuWeapon[]), ...thrownEntries(Array.from(attacker.actor!.items) as unknown as MenuWeapon[])].map(row => ({...row, deferred: ("deferred" in row && row.deferred) || grappleWeaponBlocked(attacker.actor!, attacker.actor!.items.get(row.id!)!)})) : [],
+        grappleActions: grappleMenu(attacker, this.object ?? undefined),
         grenades: attacker ? grenadeEntries(Array.from(attacker.actor!.items) as unknown as MenuWeapon[]) : [],
         weaponEmpty: label(attacker ? "NoEquippedWeapons" : "SelectAttacker"),
+        quickhacks: attacker?.actor && quickhackEnabled() ? actorQuickhacks(attacker.actor) : [],
+        quickhackConnected: sight && connection?.state === "active",
+        quickhackJackInDisabled: connection?.state === "ejected" || (connection?.state !== "active" && !sight),
+        quickhackJackAction: connection?.state === "active" ? "jack-out" : "jack-in",
+        quickhackStatus: connection?.state === "active" ? "Jacked-In" : connection?.state === "ejected" ? "Ejected" : "Not Jacked-In",
+        quickhackNote: (!trackingCombat() ? "Outside combat — QuickHack requires a tracked connection" : "") + (sight ? "" : " — No line of sight"),
         controls: [
-          { action: "target", icon: "fa-crosshairs", title: label("Target"), active: this.object!.isTargeted },
           { action: "attack", icon: "fa-gun", title: label("Attack") },
-          { action: "melee", icon: "", title: label("MeleeAttack") },
-          { action: "brawling", icon: "fa-hand-fist", title: label("Brawling") },
+          { action: "melee", icon: "", title: label("CloseCombat") },
           { action: "thrown", icon: "fa-bomb", title: label("Thrown") },
           { action: "quickhacks", icon: "fa-microchip", title: label("Quickhacks") },
-        ].filter(control => (control.action !== "target" || isStandalone(this.object!))
-          && (control.action !== "quickhacks" || !!attacker?.actor
-            && canShowQuickhack(Array.from(attacker.actor.items) as unknown as MenuWeapon[]))),
+        ].filter(control => (control.action !== "quickhacks" || offensiveQuickhacks || ejectNetrunners.length > 0)),
       };
     }
 
@@ -159,7 +199,7 @@ Hooks.once("init", () => {
   };
 });
 
-Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalone: boolean; attackTitle: string }) => {
+Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalone: boolean; selfCTH?: boolean; attackTitle: string; quickhackStatus: string }) => {
   const token = hud.object;
   if (game.system!.id !== "cyberpunk-red-core" || !token?.actor) return;
   if (!data.standalone) {
@@ -167,8 +207,46 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
     if (hud.object !== token || hud.element[0] !== html[0]) return;
     html.find(".col.right").first().append(controls);
   }
+  if (data.selfCTH) {
+    html.find<HTMLElement>("[data-self-initiative]").on("click keydown",async event=>{
+      if(event.type==="keydown"&&!["Enter"," "].includes(event.key??""))return;
+      event.preventDefault();event.stopPropagation();const button=event.currentTarget;
+      if(button.getAttribute("aria-disabled")==="true")return;
+      button.setAttribute("aria-disabled","true");
+      try{await rerollSelfInitiative(token);}
+      catch(error){ui.notifications!.error(error instanceof Error?error.message:String(error));}
+      finally{if(hud.object===token)hud.render(true);}
+    });
+    return;
+  }
   const attacker = selection?.target === token ? selection.attacker : selectedAttacker();
   if (attacker?.actor && html[0]) decorateItemList(html[0], attacker.actor);
+  html.find<HTMLButtonElement>("[data-grapple-action]").on("click", async event => {
+    event.preventDefault(); event.stopPropagation();
+    if (attacker) await useGrapple(attacker, token, event.currentTarget.dataset.grappleAction!);
+  });
+  html.find<HTMLButtonElement>("[data-eject-message]").on("click", async event => {
+    event.preventDefault(); event.stopPropagation();
+    const button = event.currentTarget;
+    if (button.disabled || !forceOutEntries(token.actor ?? undefined).some(row => row.messageId === button.dataset.ejectMessage)) return;
+    const message = game.messages!.get(button.dataset.ejectMessage!) as ChatMessage | undefined;
+    if (!message) return;
+    button.disabled = true;
+    try { await beginForceOut(message); }
+    catch (error) { ui.notifications!.error(error instanceof Error ? error.message : "Eject NetRunner failed."); }
+    finally { button.disabled = false; }
+  });
+  html.find<HTMLButtonElement>("[data-quickhack-id]").on("click", async event => {
+    event.preventDefault(); event.stopPropagation();
+    const button = event.currentTarget;
+    if (!attacker?.actor || !token.actor || !quickhackEnabled() || button.disabled) return;
+    button.disabled = true;
+    try {
+      if (button.dataset.quickhackId === "jack-out") await jackOut(attacker.actor, token.actor.uuid);
+      else await executeQuickhack(attacker, token, button.dataset.quickhackId!);
+    } catch (error) { ui.notifications!.error(error instanceof Error ? error.message : "Jack Out failed."); }
+    finally { if (hud.object === token) hud.render(true); }
+  });
   html.find<HTMLButtonElement>("[data-attack-mode]").on("click", async event => {
     event.preventDefault();
     event.stopPropagation();
@@ -186,31 +264,27 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
     event.preventDefault();
     event.stopPropagation();
     const action = event.currentTarget.dataset.combatAction;
-    if (action === "target") return token.setTarget(!token.isTargeted, { releaseOthers: false });
     const panel = html.find(".pneuma-combat-menu");
-    if (!action || !["attack", "melee", "brawling", "thrown", "quickhacks"].includes(action)) return;
+    if (!action || !["attack", "melee", "thrown", "quickhacks"].includes(action)) return;
     const open = panel.attr("data-open") !== action || !panel.hasClass("active");
     panel.attr("data-open", action).toggleClass("active", open);
-    html.find('[data-combat-control]:not([data-combat-action="target"])')
+    html.find('[data-combat-control]')
       .removeClass("active").attr("aria-expanded", "false");
     $(event.currentTarget).toggleClass("active", open).attr("aria-expanded", String(open));
-    panel.find(".combat-heading").text(action === "attack" ? data.attackTitle : event.currentTarget.title);
+    const colors = getComputedStyle(event.currentTarget);
+    panel.find(".combat-heading").text(action === "quickhacks" ? data.quickhackStatus : action === "attack" ? data.attackTitle : event.currentTarget.title)
+      .css({ backgroundColor: colors.backgroundColor, color: colors.color, borderColor: colors.borderColor });
     const weaponPanel = action !== "quickhacks";
+    panel.find(".combat-quickhacks").prop("hidden", weaponPanel || !quickhackEnabled());
     panel.find(".combat-weapons").prop("hidden", !weaponPanel);
     panel.find("[data-attack-category]").each((_index, row) => {
-      row.hidden = row.dataset.attackCategory !== action;
+      row.hidden = action === "melee" ? !["melee", "brawling"].includes(row.dataset.attackCategory ?? "") : row.dataset.attackCategory !== action;
     });
     panel.find(".combat-empty").prop("hidden", panel.find("[data-attack-category]").toArray().some(row => !row.hidden));
-    panel.find(".combat-description").prop("hidden", weaponPanel).text(weaponPanel ? "" : label("QuickhacksPlaceholder"));
+    panel.find(".combat-description").prop("hidden", true);
   });
 });
 
-Hooks.on("targetToken", (user: User, token: Token) => {
-  const hud = canvas.tokens?.hud;
-  if (user.id !== game.user!.id || hud?.object !== token) return;
-  hud.element.find('[data-combat-action="target"]')
-    .toggleClass("active", token.isTargeted).attr("aria-pressed", String(token.isTargeted));
-});
 Hooks.on("canvasTearDown", () => {
   selection = undefined;
 });

@@ -39,3 +39,17 @@ export function indicatorState(uuid: string, names: string[], seconds: number) {
   return [...lamps].sort((a, b) => (order.indexOf(a.id) < 0 ? 99 : order.indexOf(a.id)) - (order.indexOf(b.id) < 0 ? 99 : order.indexOf(b.id))).map(lamp => ({ ...lamp, on: active.has(lamp.id) || !!events?.has(lamp.id), flashing: !!events?.has(lamp.id), expires: events?.get(lamp.id) }));
 }
 export function resetMonitor() { seen.clear(); flashes.clear(); activationOrder.clear(); }
+
+/** Shared visual only; callers supply their own interaction and visibility. */
+export function createEKGTrace(state: VitalState | "unknown"): SVGSVGElement {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 160 44"); svg.setAttribute("class", "pneuma-eye-ekg");
+  const path = state === "flatline" || state === "unknown" ? "M0 22 H160" : state === "critical"
+    ? "M0 22 H18 L23 17 27 28 32 8 36 36 40 22 H65 L70 14 74 30 78 22 H110 L114 18 118 25 122 22 H160"
+    : "M0 22 H30 L35 18 40 22 H49 L53 28 59 3 65 38 71 22 H92 L100 15 108 22 H160";
+  svg.innerHTML = '<path class="pneuma-eye-trace-base" d="' + path + '"/>' +
+    '<g class="pneuma-eye-trace"><path class="pneuma-eye-trace-tail" pathLength="100" d="' + path + '"/>' +
+    '<path class="pneuma-eye-trace-glow" pathLength="100" d="' + path + '"/>' +
+    '<path class="pneuma-eye-trace-dot" pathLength="100" d="' + path + '"/></g>';
+  return svg;
+}

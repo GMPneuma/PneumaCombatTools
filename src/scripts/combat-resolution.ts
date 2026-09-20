@@ -1,8 +1,10 @@
+import { empDisabled } from "./emp-rules.js";
+import { requireCombatSocket } from "./socket-health.js";
+import { grappleWeaponBlocked } from "./grapple/state.js";
 import { PendingCardRefresh } from "./pending-card-refresh.js";
 import { setItemMarker } from "./item-markers.js";
-import { registerResolutionScroll } from "./resolution-scroll.js";
 import type { CriticalMethod } from "./critical-injury.js";
-import { resolutionSection } from "./card-structure.js";
+import { resolutionSection, rollOutcomeClass } from "./card-structure.js";
 import { damageContent, handleDamage, renderDamage, type DamageState, type DamageRequest } from "./damage-flow.js";
 import { homebrew } from "./evasion-settings.js";
 import { checkedLuck, evasionButtonLabel, evasionOffer, type EvasionOffer } from "./evasion-rules.js";
@@ -27,7 +29,7 @@ export interface Exchange {
   ranged: boolean; category: string; title: string; dv?: number; total: number; html: string; dice: string[];
   rollMode: string; state: "waiting" | "applying" | "resolved" | "cancelled"; defense?: Defense;
   combatId?: string | null; combatEpoch?: string; round?: string; hit?: boolean;
-  weaponType?: string; thrownSource?: object; improvised?: boolean; improvisedDice?: number; criticalMethod?: CriticalMethod; weaponId?: string; attackMode?: AttackMode; location?: string; unaware?: boolean; damage?: DamageState;
+  coverUp?:boolean; weaponType?: string; damageFormula?: string; thrownSource?: object; improvised?: boolean; improvisedDice?: number; criticalMethod?: CriticalMethod; weaponId?: string; attackMode?: AttackMode; location?: string; unaware?: boolean; damage?: DamageState;
 }
 interface Request { id: string; user: string; message: string; action: "claim" | "release" | "decline" | "commit" | "resume" | "cancel" | DamageRequest["action"];
   statusEffects?: string[]; nonce?: string; defense?: Defense; damage?: DamageRequest["damage"]; options?: DamageRequest["options"]; targetUuid?: string; application?: DamageRequest["application"]; applicationId?: string }
@@ -86,7 +88,7 @@ export function offer(actor: Actor, ranged: boolean, combat?: Combat): EvasionOf
   const get = (key: string) => foundry.utils.getProperty(actor, key);
   const items = Array.from(actor.items);
   const coName = game.i18n!.localize("CPR.global.itemType.cyberware.reflexCoProcessor");
-  const coprocessor = items.some(item => String(item.type) === "cyberware"
+  const coprocessor = items.some(item => !empDisabled(item) && String(item.type) === "cyberware"
     && (item.name?.toLowerCase() === "reflex co-processor" || item.name === coName
       || String(foundry.utils.getProperty(item, "flags.core.sourceId") ?? "").endsWith(".0z0v50kDAgHvMquv"))
     && foundry.utils.getProperty(item, "system.isInstalledInActor") === true);
@@ -140,14 +142,14 @@ export function exchangeContent(data: Exchange): string {
       }
     }
     defense = resolutionSection("evade", part.body.innerHTML,
-      "pneuma-defense-result " + (data.hit ? "pneuma-roll-loser" : "pneuma-roll-winner"));
+      "pneuma-defense-result " + rollOutcomeClass(!data.hit));
   }
   const opposed = data.unaware ? "Defender unaware — no evasion" : data.defense ? "Evasion " + data.defense.total : data.ranged ? "DV " + data.dv : "Defense declined";
   const damageControl = data.weaponId
     ? '<button type="button" class="pneuma-result-damage" data-action="pneumaRollDamage" aria-label="Roll damage" title="Roll damage (Shift-click for options; manual override allowed)"><i class="fas fa-droplet" aria-hidden="true"></i></button>'
     : legacyDamage;
   return '<div class="pneuma-resolution-card">'
-    + resolutionSection("attack", doc.body.innerHTML, "pneuma-attack-result " + (data.hit ? "pneuma-roll-winner" : "pneuma-roll-loser"))
+    + resolutionSection("attack", doc.body.innerHTML, "pneuma-attack-result " + rollOutcomeClass(!!data.hit))
     + defense + resolutionSection("result", '<p class="pneuma-combat-outcome" title="' + escape(opposed) + '">' + damageControl + '<strong class="pneuma-result-summary">'
     + escape(data.attackerName) + ' <span class="' + (data.hit ? "pneuma-hit" : "pneuma-miss") + '">'
     + (data.hit ? "hits" : "misses") + '</span> ' + escape(data.defenderName)
@@ -277,6 +279,7 @@ export function serialized(request: Request): Promise<Claim | undefined> {
   return next;
 }
 async function request(message: string, action: Request["action"], extra: Partial<Request> = {}): Promise<Claim | undefined> {
+  requireCombatSocket();
   const gm = authority();
   if (!gm) throw new Error("An active GM is required for combat resolution.");
   const packet: Request = { ...extra, id: foundry.utils.randomID(), user: game.user!.id, message, action };
@@ -330,6 +333,7 @@ async function respond(message: ChatMessage, evade: boolean): Promise<void> {
   }
 }
 export async function startCombatExchange(attacker: Token, target: Token, itemId: string, mode: AttackMode, event: JQuery.ClickEvent, thrown?: { item: RollItem; source: object; improvised: boolean }): Promise<void> {
+  requireCombatSocket();
   if (!authority()) throw new Error("An active GM is required for combat resolution.");
   const combat = combatForAttack(attacker, target);
   const combatId = combat?.id ?? null;
@@ -354,6 +358,7 @@ export async function startCombatExchange(attacker: Token, target: Token, itemId
   }
   const choice = await attackDialog(roll, actor, item, event, !!thrown?.improvised);
   if (!choice.confirmed) return;
+  if (!thrown && grappleWeaponBlocked(actor, item)) throw new Error("Grappled characters cannot use weapons requiring two hands.");
   if (ranged && item.hasAmmo && !item.hasAmmo(roll)) {
     ui.notifications!.warn(game.i18n!.localize("CPR.messages.weaponAttackOutOfBullets"));
     return;
@@ -412,7 +417,6 @@ export function decorateCombatMessage(root: HTMLElement, data: Exchange): void {
   root.dataset.pneumaOutcome = data.state === "resolved" ? (data.hit ? "hit" : "miss") : "none";
 }
 export function registerCombatResolution(): void {
-  registerResolutionScroll();
   for (const [key, name, hint, value] of [
     ["combatResolution", "Combat resolution", "Attack cards from Combat Tools offer Evade / Do not Evade. Requires an active GM.", true],
     ["hideAttackWeapon", "Hide attack weapon names", "Use Ranged, Melee or Unarmed instead of weapon names on Combat Tools attack cards.", false],

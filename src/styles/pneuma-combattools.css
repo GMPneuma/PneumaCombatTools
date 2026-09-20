@@ -1,4 +1,9 @@
 /* Controls inherit Foundry/system/theme styles from the actual #token-hud. */
+/* Native settings controls retain their theme; fieldsets only organize the module's rows. */
+.pneuma-combat-settings > fieldset { margin: 0 0 12px; padding: 8px 12px; min-width: 0; }
+.pneuma-combat-settings > fieldset > legend { font-weight: bold; padding: 0 6px; }
+.pneuma-combat-settings > fieldset:not(:has(> .form-group:not([hidden]):not(.hidden):not([style*="display: none"]))) { display: none; }
+
 #token-hud .combat-weapons[hidden] { display: none; }
 
 #token-hud .col.right > .pneuma-combat-column {
@@ -125,7 +130,7 @@
 #token-hud .pneuma-combat-menu li[data-attack-category][hidden] { display: none; }
 
 /* Only top-level CTH icons receive the optional world color. */
-#token-hud .pneuma-combat-column > .control-icon > i { color: var(--pneuma-cth-icon-color, inherit); }
+#token-hud .pneuma-combat-column > .control-icon > i { color: var(--pneuma-cth-icon-color, #ffffff); }
 
 /* Native homebrew form: align checkbox columns without overriding theme colors. */
 #pneuma-evasion-homebrew td { text-align: center; }
@@ -283,7 +288,7 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 .pneuma-item-markers .pneuma-item-marker { flex: none; font-size: 0.8em; line-height: 1.2; border: 1px solid currentColor; border-radius: 3px; padding: 0.1em 0.3em; }
 #token-hud .combat-weapon-name:has(.pneuma-item-markers) { height: auto; min-height: 28px; flex-wrap: wrap; }
 
-#token-hud .pneuma-combat-knife { width: 1em; height: 1em; vertical-align: -0.125em; }
+#token-hud .pneuma-close-combat-icon { width: 1em; height: 1em; vertical-align: -0.125em; }
 
 /* Compact Biomonitor. Only the alert text animates; no background polling. */
 #pneuma-eye-hud { position:fixed; z-index:70; width:min(370px,calc(100vw - 16px)); max-height:calc(100vh - 16px); overflow:auto; box-sizing:border-box; color:#b8efeb; background:linear-gradient(135deg,rgba(5,22,28,.95),rgba(5,12,21,.87)); border:1px solid #487a82; border-left:3px solid #64f1df; border-radius:2px 12px 2px 2px; box-shadow:0 8px 28px #0008,inset 0 0 20px #2ba8ba12; font:12px/1.45 monospace; text-shadow:none; }
@@ -320,21 +325,21 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 #pneuma-eye-hud .pneuma-eye-brand { margin-right:auto; }
 #pneuma-eye-hud .pneuma-eye-medical { display:grid; grid-template-columns:140px minmax(0,1fr); gap:12px; padding-bottom:9px; }
 #pneuma-eye-hud .pneuma-eye-vitals { color:#65e9bd; border-right:1px solid #35515d; padding-right:10px; }
-#pneuma-eye-hud .pneuma-eye-vitals[data-state=wounded] { color:#ead56c; }
-#pneuma-eye-hud .pneuma-eye-vitals[data-state=serious] { color:#ffa455; }
-#pneuma-eye-hud .pneuma-eye-vitals[data-state=critical],
-#pneuma-eye-hud .pneuma-eye-vitals[data-state=flatline] { color:#ff6262; }
+:is(#pneuma-eye-hud, .pneuma-hover-ekg) .pneuma-eye-vitals[data-state=wounded] { color:#ead56c; }
+:is(#pneuma-eye-hud, .pneuma-hover-ekg) .pneuma-eye-vitals[data-state=serious] { color:#ffa455; }
+:is(#pneuma-eye-hud, .pneuma-hover-ekg) .pneuma-eye-vitals[data-state=critical],
+:is(#pneuma-eye-hud, .pneuma-hover-ekg) .pneuma-eye-vitals[data-state=flatline] { color:#ff6262; }
 #pneuma-eye-hud .pneuma-eye-hp { font-size:18px; }
 #pneuma-eye-hud .pneuma-eye-hp strong { font-size:34px; line-height:1.1; }
-#pneuma-eye-hud .pneuma-eye-ekg { width:100%; height:40px; overflow:hidden; background:repeating-linear-gradient(0deg,transparent 0 9px,#73a19d17 9px 10px),repeating-linear-gradient(90deg,transparent 0 9px,#73a19d17 9px 10px); }
-#pneuma-eye-hud .pneuma-eye-ekg path { fill:none; stroke:currentColor; stroke-width:2; }
-#pneuma-eye-hud .pneuma-eye-trace-base { opacity:.22; }
-#pneuma-eye-hud .pneuma-eye-trace path { stroke-linecap:round; animation:pneuma-ekg 2.4s linear infinite; }
-#pneuma-eye-hud .pneuma-eye-trace .pneuma-eye-trace-tail { animation-name:pneuma-ekg-tail; stroke-dasharray:18 82; opacity:.35; }
-#pneuma-eye-hud .pneuma-eye-trace .pneuma-eye-trace-glow { animation-name:pneuma-ekg-glow; stroke-dasharray:6 94; opacity:.85; filter:drop-shadow(0 0 2px currentColor); }
-#pneuma-eye-hud .pneuma-eye-trace-dot {  stroke-dasharray:.15 99.85; stroke-width:3.5; filter:drop-shadow(0 0 3px currentColor); }
-#pneuma-eye-hud [data-state=critical] .pneuma-eye-trace path { animation-duration:1.5s; }
-#pneuma-eye-hud [data-state=unknown] .pneuma-eye-trace { display:none; }
+:is(#pneuma-eye-hud, .pneuma-hover-ekg) .pneuma-eye-ekg { width:100%; height:40px; overflow:hidden; background:repeating-linear-gradient(0deg,transparent 0 9px,#73a19d17 9px 10px),repeating-linear-gradient(90deg,transparent 0 9px,#73a19d17 9px 10px); }
+:is(#pneuma-eye-hud, .pneuma-hover-ekg) .pneuma-eye-ekg path { fill:none; stroke:currentColor; stroke-width:2; }
+:is(#pneuma-eye-hud, .pneuma-hover-ekg) .pneuma-eye-trace-base { opacity:.22; }
+:is(#pneuma-eye-hud, .pneuma-hover-ekg) .pneuma-eye-trace path { stroke-linecap:round; animation:pneuma-ekg 2.4s linear infinite; }
+:is(#pneuma-eye-hud, .pneuma-hover-ekg) .pneuma-eye-trace .pneuma-eye-trace-tail { animation-name:pneuma-ekg-tail; stroke-dasharray:18 82; opacity:.35; }
+:is(#pneuma-eye-hud, .pneuma-hover-ekg) .pneuma-eye-trace .pneuma-eye-trace-glow { animation-name:pneuma-ekg-glow; stroke-dasharray:6 94; opacity:.85; filter:drop-shadow(0 0 2px currentColor); }
+:is(#pneuma-eye-hud, .pneuma-hover-ekg) .pneuma-eye-trace-dot {  stroke-dasharray:.15 99.85; stroke-width:3.5; filter:drop-shadow(0 0 3px currentColor); }
+:is(#pneuma-eye-hud, .pneuma-hover-ekg) [data-state=critical] .pneuma-eye-trace path { animation-duration:1.5s; }
+:is(#pneuma-eye-hud, .pneuma-hover-ekg) [data-state=unknown] .pneuma-eye-trace { display:none; }
 #pneuma-eye-hud .pneuma-eye-vital-state { font-size:11px; text-transform:uppercase; }
 #pneuma-eye-hud .pneuma-eye-lamps { display:grid; grid-template-columns:repeat(2,1fr); gap:4px; margin-top:9px; }
 #pneuma-eye-hud .pneuma-eye-lamp { display:flex; flex-direction:column; align-items:center; color:#637773; font-size:9px; text-transform:uppercase; }
@@ -381,9 +386,112 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 #pneuma-eye-hud .pneuma-eye-message-controls .pneuma-eye-message-clear { grid-column:1 / -1; width:100%; }
 #pneuma-eye-hud .pneuma-eye-idle { grid-column:1 / -1; }
 
-#pneuma-eye-hud .pneuma-eye-ekg { cursor:pointer; }
+:is(#pneuma-eye-hud, .pneuma-hover-ekg) .pneuma-eye-ekg { cursor:pointer; }
 #pneuma-eye-hud .pneuma-eye-ekg.is-paused .pneuma-eye-trace path { animation-play-state:paused; }
 
 #pneuma-eye-hud.is-minimized.has-mini-vitals { width:164px; }
 #pneuma-eye-hud .pneuma-eye-mini-vitals { width:110px; flex:0 0 110px; padding:0; border:0; }
 #pneuma-eye-hud .pneuma-eye-mini-vitals .pneuma-eye-ekg { display:block; height:32px; }
+
+/* Retain native effect-control nodes; use the native light HUD text token for group headings. */
+#token-hud.pneuma-readable-hud .status-effects.pneuma-status-tray { display: block; max-height: 70vh; overflow-y: auto; }
+#token-hud .pneuma-status-grid { display: grid; grid-template-columns: repeat(4, calc(var(--pneuma-status-icon-size, 36px) + 2px)); }
+#token-hud .pneuma-status-group > summary { color: var(--pneuma-status-heading-color, var(--color-text-light-highlight, #f0f0e0)); cursor: pointer; font-size: 13px; line-height: 1.5; text-align: left; padding: 4px; }
+#pneuma-custom-statuses .pneuma-custom-status-row { display: grid; grid-template-columns: 1fr 2fr 32px 32px; gap: 4px; margin-bottom: 6px; }
+
+/* The native status picker temporarily takes precedence over combat controls. */
+#token-hud:has(.status-effects.active:not(.pneuma-combat-menu)) .pneuma-combat-column { display: none; }
+
+/* QuickHack uses the combat menu and resolution sections. */
+#token-hud .combat-quickhacks ul { list-style: none; margin: 0; padding: 0; }
+#token-hud .combat-quickhacks .combat-weapon-name { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; }
+#token-hud .combat-quickhacks small { margin-left: auto; }
+.pneuma-quickhack-card .pneuma-resolution-label { display: none; }
+.pneuma-quickhack-card h3 { margin: 0; }
+.pneuma-quickhack-card p { margin: 4px 0; }
+.pneuma-quickhack-card { min-width: 0; overflow-wrap: anywhere; }
+.pneuma-quickhack-card .pneuma-quickhack-heading { padding: 8px 10px; text-align: center; }
+.pneuma-quickhack-card .pneuma-quickhack-participants { font-size: 0.9em; }
+.pneuma-quickhack-card .pneuma-quickhack-roll > .rollcard > .rollcard-top { display: none; }
+.pneuma-quickhack-card .pneuma-quickhack-roll .rollcard-bottom { margin-top: 0; }
+.pneuma-quickhack-card .pneuma-quickhack-result { padding: 8px 10px; }
+.pneuma-quickhack-card .pneuma-quickhack-outcome { display: block; font-size: 1.05em; letter-spacing: 0.04em; margin-bottom: 6px; }
+.pneuma-quickhack-card .pneuma-quickhack-effect { border-top: 1px solid currentColor; padding-top: 7px; margin-top: 7px; }
+.pneuma-quickhack-card .pneuma-quickhack-actions:empty { display: none; }
+.pneuma-quickhack-card .pneuma-quickhack-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.pneuma-quickhack-card .pneuma-quickhack-actions button { flex: 1 1 140px; margin: 0; }
+
+/* Grapple controls use native button/card styling; status sits immediately after Vitals. */
+.pneuma-grapple-card .pneuma-grapple-controls { display: flex; flex-wrap: wrap; gap: 4px; }
+.pneuma-grapple-card .pneuma-grapple-controls button { flex: 1 1 auto; width: auto; }
+.pneuma-grapple-card .pneuma-grapple-rolls > div { margin-block: 4px; }
+#pneuma-eye-hud .pneuma-eye-grapple { border-top: 1px solid currentColor; padding-block: 5px; }
+#pneuma-eye-hud .pneuma-eye-grapple-row { overflow-wrap: anywhere; font-size: 12px; line-height: 1.4; }
+
+#token-hud .pneuma-combat-menu .combat-heading { display: block; padding: 4px 6px; border: 1px solid; border-radius: 3px; text-align: left; }
+#token-hud .pneuma-combat-menu .combat-weapon-name { justify-content: flex-start; }
+#token-hud .pneuma-combat-menu details { width: 100%; grid-column: 1 / -1; text-align: left; }
+#token-hud .combat-quickhacks .notes:empty { display: none; }
+
+#token-hud .pneuma-combat-menu li[data-attack-category] { grid-template-columns:minmax(0,1fr) 24px 24px 24px; }
+#token-hud .pneuma-suppressive i { color:#fff; }
+.pneuma-aoe-targets { list-style:none; margin:0; padding:0; }
+.pneuma-aoe-target { display:flex; align-items:center; gap:5px; padding:4px 0; flex-wrap:wrap; }
+.pneuma-aoe-name { flex:1; min-width:60px; overflow-wrap:anywhere; }
+.pneuma-aoe-target img { border:0; object-fit:cover; }
+.pneuma-aoe-response { display:flex; align-items:center; gap:3px; font-size:0.9em; flex-wrap:wrap; }
+.pneuma-aoe-card button[data-aoe-action] { width:26px; height:26px; padding:0; margin:0; line-height:24px; }
+.pneuma-aoe-card .pneuma-aoe-defense .rollcard-top { display:none; }
+.pneuma-aoe-card { min-width:0; overflow-wrap:anywhere; }
+.pneuma-aoe-actions { display:flex; gap:4px; padding:5px; }
+
+/* AoE editor: native controls and theme colors, scoped structural layout. */
+.pneuma-area-editor { display: flex; flex-direction: column; height: 100%; min-height: 0; gap: 8px; }
+.pneuma-area-editor-body { overflow-y: auto; flex: 1; min-height: 0; padding-right: 6px; }
+.pneuma-area-editor fieldset { min-width: 0; margin: 0 0 10px; padding: 8px 10px; }
+.pneuma-area-editor legend { font-weight: bold; padding: 0 4px; }
+.pneuma-area-editor .notes { margin: 4px 0 8px; }
+.pneuma-area-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; align-items: start; }
+.pneuma-area-fields .form-group { display: flex; flex-direction: column; align-items: stretch; gap: 4px; margin: 0; }
+.pneuma-area-fields .form-group[hidden] { display: none; }
+.pneuma-area-fields input, .pneuma-area-fields select { width: 100%; min-width: 0; flex: none; }
+.pneuma-area-presets { display: flex; gap: 4px; }
+.pneuma-area-presets button { width: auto; flex: 1; margin: 0; line-height: 22px; white-space: nowrap; }
+.pneuma-area-editor output { display: block; margin-top: 8px; font-size: 12px; }
+.pneuma-area-rules summary { cursor: pointer; font-weight: bold; margin-bottom: 8px; }
+.pneuma-area-editor .sheet-footer { flex: 0 0 auto; }
+
+/* Native Dialog layout; colors and controls remain theme-owned. */
+.pneuma-emp-selection .pneuma-emp-choice { display:flex; align-items:center; gap:6px; margin:6px 0; }
+.pneuma-emp-selection .pneuma-emp-choice input { flex:0 0 auto; }
+.pneuma-emp-selection .pneuma-emp-choice small { opacity:0.8; }
+
+/* Native HUD attributes/control boxes; only placement and dimensions are specific to movement. */
+#hud .pneuma-movement-hud {
+  position:absolute; display:flex; flex-direction:column; align-items:center; gap:3px;
+  width:110px; height:auto; margin:0; padding:0; opacity:1;
+  transform:translate(-50%,-100%); pointer-events:none;
+}
+#hud .pneuma-movement-hud .attribute { width:100%; height:auto; margin:0; }
+#hud .pneuma-movement-hud input[type="text"] {
+  width:100%; height:42px; padding:2px 5px; text-align:center; font-size:32px; line-height:36px;
+  pointer-events:none;
+}
+#hud .pneuma-movement-hud .pneuma-movement-controls { display:grid; grid-template-columns:1fr 1fr; gap:4px; width:100%; }
+#hud .pneuma-movement-hud .control-icon {
+  box-sizing:border-box; flex:none; width:100%; height:20px; margin:0; padding:0 3px; font-size:11px; line-height:18px; text-align:center;
+  pointer-events:auto; cursor:pointer;
+}
+#hud .pneuma-movement-hud .control-icon[hidden] { display:none; }
+#hud .pneuma-movement-hud { --pneuma-movement-color:#6fdc7a; }
+#hud .pneuma-movement-hud.is-running { --pneuma-movement-color:#ffd45a; }
+#hud .pneuma-movement-hud.is-over-budget { --pneuma-movement-color:#ff6666; }
+#hud .pneuma-movement-hud input[type="text"] { color:var(--pneuma-movement-color); border-color:var(--pneuma-movement-color); }
+#hud .pneuma-movement-hud .pneuma-movement-run { grid-column:2; color:var(--pneuma-movement-color); border-color:var(--pneuma-movement-color); font-weight:bold; pointer-events:none; cursor:default; }
+#hud .pneuma-movement-hud .pneuma-movement-run[hidden] { display:none; }
+
+.pneuma-hover-ekg { position:fixed; width:140px; height:40px; pointer-events:none; z-index:60; }
+.pneuma-hover-ekg .pneuma-eye-vitals { color:#65e9bd; }
+.pneuma-hover-ekg .pneuma-eye-ekg { display:block; }
+
+#token-hud [data-self-initiative][aria-disabled="true"] { opacity:0.45; cursor:default; }

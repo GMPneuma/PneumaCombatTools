@@ -1,6 +1,6 @@
 # Item markers
 
-Visual annotations on native Item documents. No mechanical disabling, renaming, combat expiry, automatic removal, or cleanup runs.
+Visual annotations on native Item documents. The generic marker API performs no mechanical disabling, renaming, combat expiry, automatic removal, or cleanup. The separate [EMP workflow](emp.md) owns those operations for its `emp` marker; unrelated `disabled` markers remain untouched.
 
 Markers persist in flags.pneuma-combattools.itemMarkers, keyed by a stable caller-owned identifier. Reads use the existing in-memory Item document; no combat scans, UUID resolution, or network requests. Foundry synchronizes writes and refreshes actor sheets. The open CTH refreshes on marker updates.
 

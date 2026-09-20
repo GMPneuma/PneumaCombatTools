@@ -36,7 +36,7 @@ The per-client **Status HUD** switch completely disables the live overlay. Test 
 
 Dashboard indicators are now hidden when inactive. Active indicators fill consecutive slots in activation order; clearing an indicator closes its gap, and reactivation appends it after remaining indicators. Existing conditions on initial display use their actor list order.
 
-Three-column Biomonitor: Vitals, Biological Scan (empty: No Active Pathology), Implant Integrity (empty: All Systems Normal). Diagnostics lists cyberware carrying the existing Disabled item marker and opens its native sheet on click. Combat-scoped expiry/restoration remains deferred; this display does not create that lifecycle. Client Show Biomonitor HP numbers defaults on; when off, hovering or keyboard-focusing the EKG reveals HP without resizing the panel.
+Three-column Biomonitor: Vitals, Biological Scan (empty: No Active Pathology), Implant Integrity (empty: All Systems Normal). Diagnostics lists cyberware carrying the existing Disabled item marker and opens its native sheet on click. EMP now supplies combat-scoped suppression/cleanup; generic markers still have no automatic lifecycle. Client Show Biomonitor HP numbers defaults on; when off, hovering or keyboard-focusing the EKG reveals HP without resizing the panel.
 
 Minimize/expand now preserves the upper-right curved corner. Saved positions retain this right anchor, subject to viewport bounds.
 
@@ -57,3 +57,17 @@ HUD position now remembers the last completed mouse drag as its preferred upper-
 Alert text scrolls three times then rests centered. Opening/expanding the HUD or receiving a new message starts the sequence again. Unrelated updates preserve the animation; reduced-motion stays static.
 
 With an installed Biomonitor or its world override, the minimized HUD shows a compact live EKG and notification bell side by side. Without it, only the bell is shown. The miniature uses the same HP states and pause/resume interaction, and retains the upper-right anchor.
+
+- New HUD notices received while minimized temporarily expand the HUD, select the new notice, scroll once, then minimize again. Reduced-motion users see a static notice for eight seconds. Manual minimization cancels the temporary display; the saved position and minimized preference stay unchanged.
+
+## Grappling beneath Vitals
+
+The Vitals column includes **Grappling: [name]** or **Grappled by: [name]**, followed by **Choking: [name] — 1/3** or **Being choked by: [name] — 1/3** when applicable. Hover the grapple row for the -2 Actions, hand and movement restrictions. Names wrap within the existing column without widening the HUD.
+
+These rows read the actor's active Combat grapple metadata (or scene state for grabs begun outside combat), update on document/round changes, and clear when the grapple ends. A missed full round clears the choking row while retaining the grapple row. Outside combat, the row says GM tracks rounds. Combat information remains visible without a Biomonitor; medical data retains its existing implant requirement.
+
+### EMP diagnostics
+
+EMP-disabled cyberware is listed in Implant Integrity as `[item] — Disabled — EMP`. Entries use the independent EMP marker key, preserving unrelated Disabled markers. Clicking opens the native item sheet. Combat-end cleanup removes only the EMP indication; a remaining unrelated disablement continues to display. Native broken-limb icons identify temporarily disabled cyberlimbs in Biological Scan without creating physical injuries. See [EMP](emp.md).
+
+The same waveform renderer and animation styles are now reused by [Hover EKG](hover-ekg.md). The hover panel has separate Medtech/world-setting visibility, shows no HP numbers, and does not change Biomonitor pause or reveal controls.

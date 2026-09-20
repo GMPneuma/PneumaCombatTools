@@ -1,0 +1,138 @@
+import { requireCombatSocket } from "../socket-health.js";
+import { resolutionSection, rollOutcomeClass } from "../card-structure.js";
+import type { RollItem } from "../native-combat.js";
+import { MODULE } from "./availability.js";
+import { primaryGM } from "./content.js";
+import { resultFlag, delivery, escapeHTML, type QuickhackResult } from "./messages.js";
+import { canOperate, roleFor, nativeQuickhackRoll, criticalD10 } from "./rolls.js";
+import { enabled, label, routing } from "./settings.js";
+import { isNetrunnerEjected } from "./rules.js";
+import { resultConnectionValid, ejectConnection } from "./connections.js";
+
+interface Request { quickhackType: string; messageId: string; requesterId: string; total: number; rollContent?: string; connectionId?: string; id?: string; rollerId?: string; gmId?: string }
+interface Pending { request: Request; rollerId: string; timer: ReturnType<typeof setTimeout> }
+const pending = new Map<string, Pending>();
+const busy = new Set<string>();
+const channel = `module.${MODULE}`;
+/** A connection can be identified by either its detected Jack-In or a later noisy hack. */
+function revealConnection(result: QuickhackResult, connectionId: string | undefined, source: Actor, target: Actor): boolean {
+  const config = routing();
+  return [...game.messages ?? []].some(message => {
+    const evidence = resultFlag(message);
+    if (!evidence?.alerted || evidence.sourceActorUuid !== source.uuid || evidence.targetActorUuid !== target.uuid
+      || evidence.combatUuid !== result.combatUuid
+      || (evidence.type === "jackIn" ? message.id : evidence.connectionId) !== connectionId) return false;
+    if (!source.hasPlayerOwner && target.hasPlayerOwner) {
+      return evidence.type === "jackIn" ? config.npcToPlayerJackInRevealAttacker : config.npcToPlayerQuickhackRevealAttacker;
+    }
+    return evidence.revealAttacker;
+  });
+}
+async function contextFor(id: string) {
+  const message = game.messages!.get(id) as ChatMessage | undefined; const result = message && resultFlag(message);
+  if (!message || !result?.alerted) return;
+  const source = await fromUuid(result.sourceActorUuid) as Actor | null;
+  const target = await fromUuid(result.targetActorUuid) as Actor | null;
+  const connectionId = result.type === "jackIn" ? message.id! : result.connectionId;
+  if (source && target && resultConnectionValid(source, { ...result, connectionId })) return { message, result, source, target, connectionId, revealAttacker: revealConnection(result, connectionId, source, target) };
+}
+/** Reuse awareness cards and encounter connections, never infer awareness from ownership. */
+export function forceOutEntries(target: Actor | undefined) {
+  if (!target || !enabled() || !canOperate(target)) return [];
+  const entries = new Map<string, { messageId: string; name: string }>();
+  for (const message of game.messages ?? []) {
+    const result = resultFlag(message);
+    if (!result?.alerted || !result.combatUuid || result.targetActorUuid !== target.uuid) continue;
+    const connectionId = result.type === "jackIn" ? message.id! : result.connectionId;
+    const source = { uuid: result.sourceActorUuid } as Actor;
+    if (!resultConnectionValid(source, { ...result, connectionId })) continue;
+    const namedSource = game.actors?.find(actor => actor.uuid === source.uuid)
+      ?? canvas.tokens?.placeables?.find(token => token.actor?.uuid === source.uuid)?.actor;
+    const name = namedSource && revealConnection(result, connectionId, namedSource, target)
+      ? namedSource.name ?? label("Result.UnknownNetrunner") : label("Result.UnknownNetrunner");
+    entries.set(connectionId!, { messageId: message.id!, name });
+  }
+  const rows = [...entries.values()];
+  return rows.map((row, index) => ({ ...row, label: "Eject NetRunner — " + row.name + (rows.length > 1 ? " (" + (index + 1) + ")" : "") }));
+}
+export async function beginForceOut(message: ChatMessage) {
+  if (!enabled() || busy.has(message.id!)) return;
+  requireCombatSocket();
+  busy.add(message.id!);
+  try {
+    const context = await contextFor(message.id!);
+    if (!context || !canOperate(context.target)) return;
+    if (!game.users!.some(user => user.isGM && user.active)) { ui.notifications!.warn(label("ForceOut.ActiveGmRequired")); return; }
+    const concentration = context.target.items.find(item => String(item.type) === "skill" && item.name?.trim().toLowerCase() === "concentration") as RollItem | undefined;
+    if (!concentration) throw new Error(label("Error.ConcentrationMissing"));
+    const roll = await nativeQuickhackRoll(context.target, concentration, label("ForceOut.ResultTitle"), delivery(context.result.audience, context.source, context.target), () => enabled() && resultConnectionValid(context.source, {...context.result, connectionId:context.connectionId}), undefined, false);
+    if (!roll || !enabled()) return;
+    const request: Request = { quickhackType: "force-out", messageId: message.id!, requesterId: game.user!.id, total: roll.total, rollContent: roll.content, connectionId: context.connectionId };
+    if (primaryGM()) await resolveForceOut(request); else game.socket!.emit(channel, request);
+  } finally { busy.delete(message.id!); }
+}
+async function postForceOut(request: Request, interfaceTotal: number, interfaceContent = "") {
+  const context = await contextFor(request.messageId);
+  if (!enabled() || !context || context.connectionId !== request.connectionId) return;
+  const ejected = isNetrunnerEjected(request.total, interfaceTotal);
+  if (ejected && context.result.combatUuid && (!context.connectionId || !await ejectConnection(context.source, context.target.uuid, context.connectionId))) return;
+  const rollSection = (name: string, html: string, won: boolean) => html
+    ? `<div class="pneuma-quickhack-roll ${rollOutcomeClass(won)}" data-quickhack-section="roll"><h4>${escapeHTML(name)}</h4>${html}</div>` : "";
+  // Hidden Netrunner identity must not leak through the native role-roll heading or breakdown.
+  const visibleInterface = context.revealAttacker || context.result.audience === "gm" ? interfaceContent : "";
+  const content = `<div class="rollcard pneuma-quickhack-card" data-state="${ejected ? "success" : "failure"}"><div class="rollcard-top"><div class="cpr-block pneuma-quickhack-heading"><h3>${label("ForceOut.ResultTitle")}</h3><p class="pneuma-quickhack-participants">${escapeHTML(context.target.name)} → ${escapeHTML(context.revealAttacker ? context.source.name : label("Result.UnknownNetrunner"))}</p></div></div>`
+    + rollSection(label("ForceOut.DefenderTotal"), request.rollContent ?? "", ejected)
+    + rollSection(label("ForceOut.InterfaceTotal"), visibleInterface, !ejected)
+    + resolutionSection("result", `<div class="cpr-block pneuma-quickhack-result"><p>`
+    + label(ejected ? "ForceOut.Success" : "ForceOut.Failure", { defender: escapeHTML(context.target.name), netrunner: context.revealAttacker ? escapeHTML(context.source.name) : label("Result.UnknownNetrunner") })
+    + `</p><p>${label("ForceOut.DefenderTotal")}: ${request.total} · ${label("ForceOut.InterfaceTotal")}: ${interfaceTotal}</p></div>`) + "</div>";
+  await ChatMessage.create({ content, speaker: ChatMessage.getSpeaker({ actor: context.target }),
+    ...delivery(context.result.audience, context.source, context.target), flags: { [String(MODULE)]: { quickhack: { type: "forceOutResult", ejected } } } });
+}
+async function resolveForceOut(request: Request) {
+  if (!enabled() || !primaryGM() || !Number.isFinite(request.total) || [...pending.values()].some(value => value.request.messageId === request.messageId)) return;
+  const context = await contextFor(request.messageId);
+  const requester = game.users!.get(request.requesterId) as User | undefined;
+  if (!context || !requester || !canOperate(context.target, requester)) return;
+  const role = roleFor(context.source);
+  const rank = Number(role && foundry.utils.getProperty(role, "system.rank"));
+  if (!role || !Number.isFinite(rank)) throw new Error(label("ForceOut.InterfaceMissing"));
+  if (!context.source.hasPlayerOwner) { await postForceOut(request, rank + await criticalD10()); return; }
+  const roller = game.users!.filter(user => user.active && !user.isGM && canOperate(context.source, user)).sort((a,b) => a.id.localeCompare(b.id))[0] ?? game.user!;
+  const id = foundry.utils.randomID();
+  const timer = setTimeout(() => { pending.delete(id); if (enabled()) ui.notifications!.warn(label("ForceOut.RollTimedOut", { player: roller.name! })); }, 120000);
+  pending.set(id, { request, rollerId: roller.id, timer });
+  const prompt = { ...request, quickhackType: "force-out-roll", id, rollerId: roller.id, gmId: game.user!.id };
+  if (roller.id === game.user!.id) await performResistance(prompt); else game.socket!.emit(channel, prompt);
+}
+async function performResistance(request: Request) {
+  const gm = game.users!.filter(user => user.active && user.isGM).sort((a,b) => a.id.localeCompare(b.id))[0];
+  if (!enabled() || request.rollerId !== game.user!.id || request.gmId !== gm?.id) return;
+  const context = await contextFor(request.messageId);
+  if (!context || !canOperate(context.source)) return;
+  const role = roleFor(context.source); if (!role) return;
+  const roll = await nativeQuickhackRoll(context.source, role, label("ForceOut.InterfaceDialogTitle", { target: context.target.name! }), delivery(context.result.audience, context.source, context.target), () => enabled() && resultConnectionValid(context.source, {...context.result, connectionId:context.connectionId}), undefined, false);
+  if (!enabled()) return;
+  const reply = { ...request, quickhackType: roll ? "force-out-complete" : "force-out-cancel", total: roll?.total ?? 0, rollContent: roll?.content };
+  if (primaryGM()) await completeResistance(reply); else game.socket!.emit(channel, reply);
+}
+async function completeResistance(reply: Request) {
+  if (!enabled() || !primaryGM() || !reply.id) return;
+  const entry = pending.get(reply.id); if (!entry || entry.rollerId !== reply.rollerId) return;
+  clearTimeout(entry.timer); pending.delete(reply.id);
+  if (reply.quickhackType === "force-out-cancel") { ui.notifications!.warn("QuickHack Interface roll cancelled."); return; }
+  if (Number.isFinite(reply.total)) await postForceOut(entry.request, reply.total, reply.rollContent);
+}
+export function clearForceOut() {
+  for (const entry of pending.values()) clearTimeout(entry.timer);
+  pending.clear();
+}
+export function registerForceOut() {
+  game.socket!.on(channel, (request: Request) => {
+    if (!enabled() || !request || typeof request.messageId !== "string") return;
+    const handler = request.quickhackType === "force-out" ? resolveForceOut
+      : request.quickhackType === "force-out-roll" ? performResistance
+      : ["force-out-complete", "force-out-cancel"].includes(request.quickhackType) ? completeResistance : undefined;
+    if (handler) void handler(request).catch(error => { console.error(MODULE, error); ui.notifications!.error(label("ForceOut.UnexpectedError")); });
+  });
+}

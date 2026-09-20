@@ -1,0 +1,12 @@
+<form autocomplete="off">
+  <p class="notes">Allow the injury dice control when damage rolls two or more sixes. Does not change native bonus damage.</p>
+  <table>
+    <thead><tr><th scope="col">Damage type</th><th scope="col">Allow critical injuries</th></tr></thead>
+    <tbody>
+      {{#each rows}}
+      <tr><th scope="row"><label for="pct-{{key}}">{{label}}</label></th><td style="text-align: center"><input type="checkbox" id="pct-{{key}}" name="{{key}}" {{checked enabled}}></td></tr>
+      {{/each}}
+    </tbody>
+  </table>
+  <footer class="sheet-footer flexrow"><button type="submit"><i class="fas fa-save"></i> {{localize 'Save'}}</button></footer>
+</form>

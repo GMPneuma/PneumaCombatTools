@@ -9,14 +9,6 @@ export type CriticalMethod = keyof typeof criticalMethods;
 type CriticalSettings = Record<`pneuma-combattools.critical${CriticalMethod}`, boolean>;
 declare global { interface SettingConfig extends CriticalSettings {} }
 
-export function registerCriticalSettings(): void {
-  for (const [method, label] of Object.entries(criticalMethods)) {
-    game.settings!.register("pneuma-combattools", `critical${method as CriticalMethod}`, {
-      name: "Critical injuries: " + label, hint: "Allow the injury dice control when damage rolls two or more sixes. Does not change native bonus damage.",
-      scope: "world", config: true, type: Boolean, default: true, requiresReload: true,
-    });
-  }
-}
 export function criticalMethod(data: Exchange): CriticalMethod {
   if (data.criticalMethod) return data.criticalMethod;
   return data.attackMode === "autofire" ? "Autofire" : data.category === "Unarmed" ? "Unarmed" : data.ranged ? "Ranged" : "Melee";

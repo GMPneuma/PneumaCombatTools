@@ -1,5 +1,21 @@
 # Implemented features
 
+## Area attacks and suppressive fire
+
+Main flow implemented: native ammo detection/consumption, scene-scaled placement, wall clipping, individual responses, GM scatter, shared native damage and per-target manual application. Cover Up is a disabled placeholder with the Pneuma Homebrew badge. Special grenade effects, cover HP and automatic movement enforcement remain manual/deferred. See [Area attacks](docs/area-attacks.md).
+
+- **CTH menu presentation and Jack In/Out:** grenade and QuickHack rows display item artwork and align left. Grenade rows require positive inventory quantity; depleted stacks are hidden. QuickHacks prefer actor item artwork, then world item artwork, then the bundled icon. Menu headers inherit the corresponding CTH control's current colors. The QuickHack header reads **Jacked-In**, **Not Jacked-In**, or **Ejected**. **Jack In/Out** voluntarily disconnects an active link without a roll, even after losing line of sight. The existing GM coordinator validates ownership and connection identity. Voluntary disconnection permits fresh Jack-In; forced ejection still blocks reconnection for that encounter. Old awareness cards cannot operate on a disconnected or replacement connection. Grenade placement/responses/shared basic damage now use the AoE flow; grenade-specific effects remain deferred.
+
+- **Detected Netrunner ejection from CTH:** an owned token with detected active incoming connections shows the QuickHack icon, with one **Eject NetRunner** row per connection. Uses the existing native Concentration versus Interface Force Out workflow; ties retain the connection. Ejection resolves in one card containing the native Concentration roll, player Netrunner Interface roll, totals and outcome, with shared winner/loser styling. NPC resistance retains its automatic Interface total. The card uses the awareness message's audience. Both the CTH row (including a single connection) and ejection card show the Netrunner name when the current identity setting for a detected Jack-In or later QuickHack permits it; otherwise they show Unknown Netrunner. Existing chat cards are not rewritten. No Netrunner role or launcher is required for ejection. Awareness uses retained Jack-In/QuickHack result cards for the current encounter; deleting those cards removes the associated shortcut. Undetected, ejected, other-encounter and untracked connections are excluded.
+
+Jack-In and QuickHack combine the native Interface dice and outcome into one chat card with scoped QuickHack header, roll, result, effect and action containers. Result visibility governs the combined card. Private NPC dice remain a separate GM-only message when the result is shared with players. No existing chat messages are migrated.
+
+Jack-In and QuickHack require wall-based line of sight from the attacker center to at least one of nine inset target points. QuickHack requires an active tracked connection. Losing sight blocks actions but never ejects the connection; restored sight permits actions again. Outside combat, Jack-In remains roll/chat-only and QuickHack is blocked because no connection is tracked. No migrations are added.
+
+QuickHack program items use `Quickhack: <name>` in world and actor inventories, when newly created. The Booster class is unchanged.
+
+QuickHack content: eleven native program items live in `CombatTools/Quickhacks`; the QuickHack launcher weapon lives in `CombatTools`. Its native sheet attack and damage controls run Jack In and QuickHack Target. Legacy gear backups and folders remain in place; cleanup is deferred until at least v0.8.0.
+
 Inventory of features present in the working source. This is not a release log or a claim that every feature has been verified in live Foundry. Keep this list current when adding, changing, or removing features, including small convenience options. Deferred designs belong in [BACKLOG.md](BACKLOG.md).
 
 ## HUD access and targeting
@@ -8,14 +24,14 @@ Inventory of features present in the working source. This is not a release log o
 - Shift-right-click opens only Combat Tools on owned or unowned tokens.
 - Optional per-user right-click access on owned, targeted tokens without changing the controlled attacker.
 - Ordinary owned-token right-click retains native HUD controls, with Combat Tools always visible in a separate column to the right.
-- Native target toggle; toggling a target preserves other targets.
+- Targeting uses the normal Foundry token HUD. The duplicate Combat Tools target toggle has been removed.
 - Capture the acting token before right-click changes selection.
 - Preserve native right-drag panning and ordinary owned-token double-right-click behavior.
 
 ## HUD appearance and convenience
 
 - No Combat Tools launcher submenu or X button; both HUD forms use native dismissal.
-- GM-controlled world setting for Combat Tools icon color, using the native color picker. Applies only to main CTH icons. Unset preserves theme colors; submenu and native HUD icons are unaffected.
+- GM-controlled world setting for Combat Tools icon color, using the native color picker. Applies only to main CTH icons. Unset uses white; submenu and native HUD icons are unaffected.
 
 - Reuse the configured Foundry Token HUD and native control styling.
 - Keep HUD screen size consistent through canvas zoom.
@@ -37,7 +53,7 @@ Inventory of features present in the working source. This is not a release log o
 - Reuse native roll dialogs, modifiers, ammo, Luck, dice presentation, and chat cards.
 - Before each attack, restore the captured attacker as the sole controlled token and the HUD token as the sole target. Reject removed tokens or denied control before rolling.
 - Reject unavailable items, lost attacker ownership, and unsupported Autofire; prevent duplicate calls while a roll workflow is pending.
-- Show Quickhacks only when the acting token has a Netrunner role and an equipped flagged Pneuma Quickhack weapon. Visibility is implemented; the menu action is still a placeholder.
+- Show Quickhacks for the acting Netrunner when enabled. Execute Jack-In and available QuickHacks against the captured target; see [QuickHack](docs/quickhack.md).
 
 ## Armor convenience
 
@@ -64,11 +80,23 @@ Inventory of features present in the working source. This is not a release log o
 - Defaults: RAW eligibility, unlimited attempts, and no added penalties or mandatory LUCK spending.
 - Settings feed the first Combat Tools defense workflow, including prompts, round tracking and configured LUCK deductions. Definitions and sources: [evasion rules](docs/evasion-rules.md).
 
+## Settings organization
+
+- Native module settings are grouped into Combat & Evasion, Critical Injuries, QuickHack, Token HUD & Targeting, Status HUD & Biomonitor, and Status Effects.
+- Existing controls, values, permissions, homebrew badges and configuration buttons are retained. Groups with no controls available to the current user are omitted.
+
+## QuickHack
+
+- Functional target HUD with RAW, Must Buy QuickHack and Must Be Loaded in Equipped Cyberdeck modes.
+- Master switch gates controls, rolls, sockets and effect/damage actions. All six prior GM routing options are retained.
+- Native program content creation; existing items and settings are not migrated; the native Cyberdeck installation UI handles capacity and loading.
+- Started Combat documents own attacker/target connections. Ejection blocks QuickHacks and re-Jack-In for that encounter. Outside combat, roll/chat workflows remain untracked.
+- Prior guided/manual effect boundaries are preserved. See [QuickHack setup and compatibility](docs/quickhack.md). Automated and browser checks are not live Foundry validation.
+
 ## Visible placeholders — mechanics not implemented
 
-- Grapple: disabled button in the fist menu, pending behavior design.
-- Grenades: expandable inventory-ammunition list; attack flow deferred. Grenade/rocket launcher attacks are disabled pending their separate flow.
-- Quickhacks: conditionally visible placeholder panel.
+- Grapple: implemented; see the Grappling section below.
+- Grenades: expandable inventory-ammunition list routes to AoE placement. Grenade/rocket launchers and shell-loaded shotguns use the shared AoE flow; slugs remain single-target. See [Area attacks](docs/area-attacks.md).
 
 ## Deferred or unresolved
 
@@ -129,7 +157,7 @@ Moved to PneumaVisualTools. Combat Tools no longer registers portrait, compact-c
 - Recipient bolts use defaults on click and open native shield/reduction options on Shift-click. Native application results append as small horizontal Name / Damage / Location rows with expandable native details.
 - Add/edit up to three native statuses before applying damage; saved statuses activate on the exact damage recipient after HP handling. Reapplication never toggles an existing effect off.
 - Injury dice links appear for two or more active damage d6 sixes. Aimed head attacks use Head; others use Body. The native workflow supplies injury Items/effects and duplicate handling.
-- Eight per-method injury toggles default enabled. Explosion/Quickhack workflows remain planned; their settings are integration points.
+- Eight per-method injury toggles default enabled and now live in a GM-only Critical injuries submenu with a damage-type/checkbox table. Existing values and reload behavior are retained. Explosion workflows remain planned. QuickHack retains the reference module’s no-critical-damage behavior; its injury toggle does not change that behavior.
 - Browser checks and 36 combat-resolution tests pass; actual native injury creation and multi-client operation still need live verification.
 
 - Compact applied-damage rows preserve the native calculation and undo control; number is larger than name/location. Additional recipients append rows without publishing a separate managed damage-application card.
@@ -150,7 +178,7 @@ Moved to PneumaVisualTools. Combat Tools no longer registers portrait, compact-c
 - Thrown lists all inventory weapons with type thrownWeapon. Native Athletics/DV rolls use normal ranged evasion, including homebrew. A successful attack-card creation appends (used) once to the inventory name; the item remains usable.
 - Improvised loads the native compendium Thrown Weapon without creating an inventory item. The attacker chooses the GM-agreed 1d6–6d6 in the initial attack dialog.
 - Thrown attacks use resolution cards even when the general combat-resolution toggle is off, because their inventory marker and GM damage choice belong to that flow.
-- Quickhacking, grenade/rocket resolution and AoE remain deferred. Automated checks do not establish live Foundry verification.
+- Main grenade/rocket/shell AoE and suppressive-fire resolution are implemented; grenade-specific effects remain deferred. QuickHack is integrated; some effects retain guided manual handling. Automated checks do not establish live Foundry verification.
 
 ## Visual item markers
 
@@ -196,7 +224,7 @@ Dashboard indicators are now hidden when inactive. Active indicators fill consec
 
 EKG animation fix: explicit numeric stroke offsets replace the stalled calculated offsets. Browser regression checks verify scan-point movement across all five HP states.
 
-Three-column Biomonitor: Vitals, Biological Scan (empty: No Active Pathology), Implant Integrity (empty: All Systems Normal). Diagnostics lists cyberware carrying the existing Disabled item marker and opens its native sheet on click. Combat-scoped expiry/restoration remains deferred; this display does not create that lifecycle. Client Show Biomonitor HP numbers defaults on; when off, hovering or keyboard-focusing the EKG reveals HP without resizing the panel.
+Three-column Biomonitor: Vitals, Biological Scan (empty: No Active Pathology), Implant Integrity (empty: All Systems Normal). Diagnostics lists cyberware carrying the existing Disabled item marker and opens its native sheet on click. EMP now supplies combat-scoped suppression/cleanup; generic markers still have no automatic lifecycle. Client Show Biomonitor HP numbers defaults on; when off, hovering or keyboard-focusing the EKG reveals HP without resizing the panel.
 
 EKG Critical threshold revised to below 10 HP (supersedes below 15); zero or below remains Flatline.
 
@@ -223,3 +251,104 @@ HUD position now remembers the last completed mouse drag as its preferred upper-
 Alert text scrolls three times then rests centered. Opening/expanding the HUD or receiving a new message starts the sequence again. Unrelated updates preserve the animation; reduced-motion stays static.
 
 With an installed Biomonitor or its world override, the minimized HUD shows a compact live EKG and notification bell side by side. Without it, only the bell is shown. The miniature uses the same HP states and pause/resume interaction, and retains the upper-right anchor.
+
+- New HUD notices received while minimized temporarily expand the HUD, select the new notice, scroll once, then minimize again. Reduced-motion users see a static notice for eight seconds. Manual minimization cancels the temporary display; the saved position and minimized preference stay unchanged.
+
+## Native Cyberpunk status foundation
+
+- Cyberpunk master status list replaces the stock picker. Head/body injury sections start collapsed and retain native controls.
+- Custom-status settings editor with native icon picker, seeded with In Jail; existing Condition Lab custom entries are preserved.
+- Native injuries and supported drug effects synchronize with actor/token status markers without duplicating modifiers. Damage-card status application awaits the native source changes.
+- Condition Lab must not also manage the palette. Timed damage and other condition-specific rules remain deferred.
+- Details and verification limits: [Status effects](docs/status-effects.md).
+
+- Implemented: existing Pharmaceuticals and Drugs (including addiction statuses) have separate collapsed token-HUD sections. Section headings now use light HUD text for dark-background readability; missing drug/pharma statuses are not created.
+
+- Implemented: opening the native status picker temporarily hides the Combat Tools controls and their menu. Closing the picker restores them; native HUD controls remain available.
+
+- Close Combat now combines melee weapons, Unarmed, Martial Arts and grappling actions (superseding the disabled placeholder) under the combat-knife button. Supersedes separate melee and fist buttons; Ranged, Thrown and conditional Quickhack remain separate. Attack mechanics and equipment eligibility are unchanged.
+
+- Close Combat now uses the approved two-sparring-figures icon, replacing the combat knife. It inherits the configured CTH icon color and existing button sizing.
+
+## Grappling
+
+- Close Combat offers Grab, Choke, Throw, Release, Escape and third-party Break Grapple according to the acting token's role.
+- Native DEX/Brawling dialogs and rolls; ties favor the responder. Winning Grab chooses Hold Target or Take Held Object. Inventory transfer remains manual.
+- Native ActiveEffects supply Grappled and the -2 all-Actions modifier to both actors, without duplicating an already active native Grappled penalty. Existing effects are preserved on release.
+- Combat Tools blocks two-handed weapon attacks while grappling. Free hands and universal Action expenditure remain player/GM checks.
+- Choke and Throw apply prepared BODY directly to HP with no armor change. Choke follows the supplied strict greater-than-1/below-0 safeguard and three-successive-round unconsciousness rule. Throw applies Prone and ends the grapple.
+- Encounter Grab/Grapple records are stored under Combat flags: participant actor/token references, roles, state, roll results, pending operation, revision, card reference and choke sequence. Outside-combat records use scene flags with manual round tracking. Completed history remains in chat.
+- Vitals column shows Grappling/Grappled by and Choking/Being choked by, with consecutive-round counters. These combat rows do not require a Biomonitor. The ordinary HUD visibility/minimize settings still apply.
+- One tracked grapple per character. Hold Target sets the defender's token texture scale to 0.8, preserves mirroring and places it on the square the grappler just left (including the previous elevation) through native GM-authorized updates. Multi-square moves use the starting square, without path calculation. Ending the grapple restores the prior scale. Independent defender movement is blocked for players; footprint, movement allowance and pathfinding are unchanged. Native sheet attacks outside Combat Tools are not intercepted.
+- Automated rule, lifecycle, concurrency, failure-injection and browser HUD checks cover this implementation. Live multi-client Foundry verification remains outstanding.
+
+- Grapple cards preserve Chat Dice artwork and other native-roll decorations during chat rendering; repeated renders update status/controls without replacing roll nodes. Browser regression checks cover both hook orders and state transitions.
+
+- Contested Brawling cards reuse the existing winner/loser styling for Grab, Escape and Break Grapple; ties favor the responder. Decoration preserves modified dice and works on older saved cards.
+
+- Shared chat-card presentation now covers attack/Evasion, grappling and QuickHack: common scope/kind metadata, visibility checks, outcome helpers and growth scrolling. Initial history and hidden/ordinary chat do not trigger scrolling. Render hooks preserve native dice nodes.
+
+Status picker critical injury categories are labelled **Crit Head** and **Crit Body**; grouping and native controls are unchanged.
+
+Release, Choke and Throw on an established grapple require no new Brawling roll or opposed response. Their result displays use the action name and omit the original Grab dice; the original roll data remains saved in grapple metadata. Grab, Escape and Break Grapple still use opposed Brawling.
+
+### Cross-client setup
+
+Foundry must load the module with socket support enabled. Copying newer module files over an installation does not refresh the package metadata held by the running server. After such an update, restart the Foundry server and reconnect every client; a browser refresh alone may still use stale server metadata. Combat Tools now checks the loaded socket flag at startup and before combat, grapple, QuickHack/Force Out and remote HUD requests, reporting the restart requirement before starting an affected action. An active GM must remain connected for shared actor/Combat writes; no GM clicks are required for ordinary player-versus-player resolution.
+
+- Grenade inventory listing corrected against CPR v0.92.4: ammo items are selected by system.variety = grenade, including smoke, EMP and other ammunition types. Superseded by the main AoE implementation; grenade-specific effects remain deferred.
+
+AoE visibility: all card viewers can show/hide the shared area, including hiding it from GMs. Automatic hiding waits for responses, blast escape movement and applied damage (or GM-confirmed manual special effects). Completed areas can be revealed again. Uses the existing active-GM coordinator. Verified with automated fixtures; live multi-client verification remains outstanding.
+
+AoE shapes: independently configurable square, cone (including 45/90 degrees) and ray (including 1/3 scene squares) per attack type, with RAW suppressive radius retained. Placement uses local native measured templates without creation permission. Native ray/cone geometry respects world measurement settings; wall-clipped native highlighted cells also determine recipients. Legacy corridor settings retain their dimensions. Automated native-method and browser fixtures verified; live map/multiplayer validation remains pending.
+
+AoE settings UI: compact sections for shotgun shells, grenades/rockets and suppressive fire; shape-specific size/range/angle/width controls, 45°/90° and 1-/3-square quick buttons, live dimension summaries, collapsible attack/evasion rules and a fixed Save footer. Settings remain world-scoped and GM-editable through Combat & Evasion → Area Attacks & Suppressive Fire.
+
+Fixed AoE settings opening: evasion choices now come from form data rather than an unavailable Handlebars hash helper. The real settings template is included in browser rendering regression checks.
+
+AoE evasion revision: grenades/rockets offer Square/Circle; shotgun DV13 is fixed and explosive tie-success settings are removed. All damaging AoE requires successful evaders to relocate. Optional MOVE charging/next-turn borrowing tracks combatant allowance and displays it under vitals. Cover Up is implemented for damaging AoE: remain in place, become Prone, double effective armor SP and double armor ablation even when damage is blocked. Supersedes prior placeholder and shape-option inventory entries.
+
+Critical injury damage types: Quickhacks now default to disabled. Explicitly saved world preferences remain respected; other damage-type defaults are unchanged.
+
+## Movement and EMP
+
+Movement accounting uses committed Token source coordinates for costs, unchanged axes and reset origins. Rapid arrow-key regression fixtures simulate unfinished animations; live Foundry verification remains outstanding.
+
+- Combat movement tracking adds a start outline, native-elevation-style MOVE counter, and return/reset control on square grids. Adjacent clear perpendicular steps count as one diagonal; blocked shortcuts count as two. Native walking allowance and existing AoE movement accounting are retained. See [Movement](docs/movement.md).
+- GM-triggered EMP supports GM/player choice, equal/foundational-weighted/system-first random selection, a GM immunity list, optional foundations, carried electronics, and dependent options. Combat-owned records last until combat ends. Native effects are suppressed without changing their saved enablement; native item rolls, cyberweapon eligibility and Combat Tools Reflex Co-Processor qualification respect disablement.
+- Biomonitor Implant Integrity displays Disabled — EMP. Cyberlimbs receive temporary broken-limb icons, without physical injury damage or automated limb penalties. Existing injuries and unrelated disablements survive cleanup. See [EMP](docs/emp.md).
+- Validation: focused unit/lifecycle fixtures and Biomonitor browser checks. Live Foundry multi-client movement/EMP validation remains outstanding. Native source-specific EMP saves, Microwaver and QuickHack dispatch are not automated by this addition.
+
+Movement reset follow-up: the counter omits MOVE, uses 32px text in a native HUD-style box, and places a smaller Reset box below. Native HUD HTML replaces the unclickable token-child arrow. Pointer-driven browser tests verify return to the saved position and zero spent movement, including pan/zoom and update failures. Live Foundry multiplayer validation remains open.
+
+Movement visibility: all players can see counters for visible player-owned actors. NPC movement counters and start markers are GM-only. Reset remains restricted to token owners/GMs. Native player ownership determines the distinction; ownership changes refresh the display. Browser fixtures cover these visibility rules.
+
+The GM world toggle is named **Enable movement counters** (existing `movementTracking` setting key retained). It defaults on and enables/disables tracking, counters, origin markers and Reset controls for all clients. Visibility remains player-owned counters shared with players and NPC counters GM-only.
+
+Movement Run display: green through the normal allowance, yellow with `run` when exceeding normal movement through double the allowance, and red beyond double. Reset and run use compact 20px boxes below the unchanged counter: Reset on the left and run on the right. The tooltip states that Run uses the Action; this remains a movement aid without automatic Action enforcement. Reset clears the running state. Boundary colors, run placement and reset have browser regression coverage.
+
+### Hover EKG
+
+Hovering a visible token shows the existing Biomonitor EKG below it for Medtech viewers, or for everyone when the GM world setting **Always show EKG** is enabled (default off). Uses the selected owned character, falling back to the assigned character with no selection. Native role rank/source/name determine Medtech status. No numeric HP is shown. Animation/health-state rendering is shared with Biomonitor; existing pause and HP interactions remain intact. See [Hover EKG](docs/hover-ekg.md). Browser fixtures pass; live multiplayer verification remains open.
+
+## Self CTH and speedware initiative
+
+Own-token HUDs show self controls instead of standard combat actions while retaining native token controls. GM target actions remain available when acting as a different selected token. Default-off **Pneuma HomeBrew** adds a D10 for installed functional Sandevistan/Kerenzikov. Started combat and existing initiative are required. Native CPR rerolls preserve the acting combatant; duplicate pending clicks are ignored. The Action cost is table-managed. Automated unit/browser checks pass; live Foundry verification remains outstanding. See [Self CTH](docs/self-cth.md).
+
+### Refresh performance
+
+- QuickHack indexes its own loaded cards and batches eligibility refreshes. Ordinary round changes and disabled QuickHack skip combat refresh work. Connection changes, encounter start/reset/end and settings changes update affected cards without rebuilding the whole chat panel. Disabling refreshes QuickHack cards once to remove controls.
+- QuickHack HUD refreshes are batched and limited to relevant attacker/target fields and walls in the viewed scene. Self CTH is excluded.
+- Movement token refreshes are batched per frame. Unrelated Combat flags are ignored; turn identity changes (including initiative reordering) select affected tokens. Scene lifecycle and visibility/settings changes retain broader refreshes. Unchanged counter/marker displays are retained.
+- Hover DV retains panel/row nodes when output is unchanged and shares cached compendium table promises across refreshes. Table/result edits, compendium updates and DV compendium setting changes invalidate the cache; world tables retain precedence and stale hover requests remain guarded.
+- Verified with typecheck/build, refresh-count regressions, DV cache/lifecycle checks and browser HUD fixtures. Live multiplayer FPS/CPU measurements remain outstanding.
+
+### Refresh performance
+
+- QuickHack batches its own card eligibility updates instead of rebuilding chat. Ordinary round changes and disabled QuickHack skip combat refresh work. Connection changes and encounter lifecycle update affected cards; settings changes refresh QuickHack cards once.
+- QuickHack HUD refreshes are batched and limited to relevant attacker/target fields and walls in the viewed scene. Self CTH is excluded.
+- Movement refreshes are batched per token per frame. Unrelated Combat flags are ignored; turn identity changes, including initiative reordering, select affected tokens. Scene lifecycle and visibility/settings changes retain broader refreshes. Unchanged counter and marker displays are retained.
+- Hover DV retains unchanged panel/row nodes and caches compendium table promises. Table/result edits, compendium updates and DV compendium setting changes invalidate the cache. World tables retain precedence and stale hover requests remain guarded.
+- Validation: typecheck/build, 66 focused unit/regression checks, and movement, QuickHack and self CTH browser fixtures pass. Live multiplayer FPS/CPU measurements remain outstanding.
+
+Combat Tools requires **libWrapper**. EMP uses WRAPPER/MIXED registrations; damage capture uses a persistent, operation-filtered MIXED registration. Missing registration support blocks the affected operation before mutation. See [v13 migration checklist](FOUNDRY_V13_MIGRATION.dm). Live companion-module compatibility remains unverified.

@@ -24,7 +24,7 @@ try{
   window.foundry={utils:{randomID:()=>String(window.testMessageId=(window.testMessageId??0)+1),getProperty:(o,p)=>p.split(".").reduce((v,k)=>v?.[k],o)}};
   window.ui={sidebar:{activateTab:()=>{window.openedChat=true;}},notifications:{info:()=>{}}};
  });
- await page.addScriptTag({type:"module",content:(await readFile("dist/scripts/hud-messages.js","utf8"))+"\n"+(await readFile("dist/scripts/item-markers.js","utf8")).replace('const MODULE = "pneuma-combattools";', "")+"\n"+(await readFile("dist/scripts/biomonitor.js","utf8"))+"\n"+(await readFile("dist/scripts/eye-hud.js","utf8")).replace(/^import .*;\s*/gm,"")+"\nObject.assign(window,{sendHUDMessage,hasBiomonitor});registerEyeHUD();"});
+ await page.addScriptTag({type:"module",content:(await readFile("dist/scripts/socket-health.js","utf8")).replace('const MODULE = "pneuma-combattools";','const SOCKET_MODULE = "pneuma-combattools";').replace("get(MODULE)","get(SOCKET_MODULE)")+"\n"+(await readFile("dist/scripts/hud-messages.js","utf8")).replace(/^import .*;\s*/gm,"")+"\n"+(await readFile("dist/scripts/item-markers.js","utf8")).replace('const MODULE = "pneuma-combattools";', "")+"\n"+(await readFile("dist/scripts/biomonitor.js","utf8"))+"\n"+(await readFile("dist/scripts/grapple/rules.js","utf8"))+"\n"+(await readFile("dist/scripts/grapple/state.js","utf8")).replace(/^import .*;\s*/gm,"").replace('export const MODULE = "pneuma-combattools";', "")+"\nconst movementHUD=()=>[]; const grappleProperty = property;\n"+(await readFile("dist/scripts/eye-hud.js","utf8")).replace(/^import .*;\s*/gm,"")+"\nObject.assign(window,{sendHUDMessage,hasBiomonitor});registerEyeHUD();"});
  await page.waitForFunction(()=>hooks.ready?.length);
  await page.evaluate(()=>{values.biomonitorWithoutImplant=true;hooks.ready.forEach(f=>f());});
  await page.waitForSelector("#pneuma-eye-hud");
@@ -49,6 +49,26 @@ try{
  assert.equal(await page.evaluate(()=>stableHUD===document.getElementById("pneuma-eye-hud")),true);
  await page.evaluate(()=>{actor.system.derivedStats.hp.value=40;hooks.updateActor.forEach(fn=>fn(actor));});
  await page.waitForFunction(()=>document.querySelector(".pneuma-eye-hp strong")?.textContent==="40");
+
+
+ await page.evaluate(()=>{
+  game.scenes=[{flags:{"pneuma-combattools":{grapples:{hold:{id:"hold",state:"active",source:{actor:actor.uuid,name:"Smitty"},target:{actor:"Actor.enemy",name:"Booster"},choke:{combat:"fight",round:1,count:1}}}}}}];
+  game.combats=new Map([["fight",{id:"fight",started:true,round:1}]]);
+  hooks.updateScene.forEach(fn=>fn());
+ });
+ await page.waitForSelector('.pneuma-eye-grapple-row');
+ assert.match(await page.locator('.pneuma-eye-grapple').innerText(),/Grappling: Booster/);
+ assert.match(await page.locator('.pneuma-eye-grapple').innerText(),/Choking: Booster — 1\/3/);
+ const vbox=await page.locator('.pneuma-eye-vitals').boundingBox(),gbox=await page.locator('.pneuma-eye-grapple').boundingBox();
+ assert.ok(gbox.y>=vbox.y+vbox.height-1,'Grapple status must be beneath Vitals');
+ assert.ok(Math.abs(gbox.x-vbox.x)<2,'Grapple status belongs in the Vitals column');
+ await page.evaluate(()=>{const g=game.scenes[0].flags['pneuma-combattools'].grapples.hold;g.target.actor=actor.uuid;g.source.actor='Actor.enemy';g.source.name='Booster';g.choke.count=2;hooks.updateScene.forEach(fn=>fn());});
+ await page.waitForFunction(()=>document.querySelector('.pneuma-eye-grapple')?.textContent.includes('Being choked by: Booster — 2/3'));
+ await page.screenshot({path:process.env.TEMP+'/pneuma-grapple-hud.png'});
+ await page.evaluate(()=>{game.combats.get('fight').round=3;hooks.updateCombat.forEach(fn=>fn());});
+ await page.waitForFunction(()=>document.querySelectorAll('.pneuma-eye-grapple-row').length===1);
+ await page.evaluate(()=>{game.scenes=[];hooks.updateScene.forEach(fn=>fn());});
+ await page.waitForFunction(()=>!document.querySelector('.pneuma-eye-grapple'));
 
  await page.evaluate(()=>game.settings.set("pneuma-combattools","biomonitorShowHP",false));
  await page.waitForSelector(".conceal-hp");
@@ -256,5 +276,37 @@ assert.notEqual(await dot.evaluate(n=>getComputedStyle(n).strokeDashoffset),befo
  await page.waitForSelector('.pneuma-eye-mini-vitals[data-state="flatline"]');
  await page.evaluate(()=>game.settings.set("pneuma-combattools","biomonitorWithoutImplant",false));
  await page.waitForFunction(()=>!document.querySelector(".pneuma-eye-mini-vitals"));
+ await page.evaluate(()=>moduleEntry.api.hud.send({source:"auto",id:"first",text:"Automatic opening",duration:0}));
+ await page.waitForSelector("#pneuma-eye-hud:not(.is-minimized) .pneuma-eye-ticker");
+ assert.match(await page.locator(".pneuma-eye-alert").innerText(),/Automatic opening/);
+ assert.equal(await page.locator(".pneuma-eye-ticker").evaluate(n=>getComputedStyle(n).animationIterationCount),"1");
+ assert.equal(await page.evaluate(()=>values.eyeHUDMinimized),true,"Temporary display must preserve preference");
+ await page.evaluate(()=>{window.oldTicker=document.querySelector('.pneuma-eye-ticker');moduleEntry.api.hud.send({source:"auto",id:"second",text:"Newest notice",duration:0});});
+ await page.waitForFunction(()=>document.querySelector('.pneuma-eye-alert')?.textContent.includes('Newest notice'));
+ await page.evaluate(()=>oldTicker.dispatchEvent(new AnimationEvent('animationend')));
+ assert.equal(await page.locator('#pneuma-eye-hud.is-minimized').count(),0,"Old completion must not close a newer notice");
+ await page.locator('.pneuma-eye-ticker').evaluate(n=>n.getAnimations().forEach(a=>a.finish()));
+ await page.waitForSelector('#pneuma-eye-hud.is-minimized');
+ assert.equal(await page.evaluate(()=>positionWrites),1,"Automatic toggles must not save position");
+ await page.evaluate(()=>moduleEntry.api.hud.send({source:"auto",id:"third",text:"Manual close",duration:0}));
+ await page.waitForSelector('#pneuma-eye-hud:not(.is-minimized)');
+ await page.getByRole('button',{name:'Minimize status HUD',exact:true}).click();
+ await page.waitForSelector('#pneuma-eye-hud.is-minimized');
+ await page.getByRole('button',{name:'Expand status HUD',exact:true}).click();
+ await page.waitForSelector('.pneuma-eye-ticker');
+ assert.equal(await page.locator('.pneuma-eye-ticker').evaluate(n=>getComputedStyle(n).animationIterationCount),'3');
+ await page.locator('.pneuma-eye-ticker').evaluate(n=>n.getAnimations().forEach(a=>a.finish()));
+ assert.equal(await page.locator('#pneuma-eye-hud.is-minimized').count(),0);
+ await page.evaluate(()=>{
+  values.biomonitorWithoutImplant=true;
+  const cyber={id:"emp-arm",name:"Left Cyberarm",type:"cyberware",flags:{"pneuma-combattools":{itemMarkers:{emp:{label:"Disabled — EMP",description:"Disabled until combat ends."}}}},parent:actor,sheet:{render:()=>{window.empSheetOpened=true;}}};
+  actor.items.push(cyber);hooks.updateItem.forEach(fn=>fn(cyber));
+ });
+ await page.waitForSelector('.pneuma-eye-cyber-disabled');
+ assert.match(await page.locator('.pneuma-eye-cyber-disabled').innerText(),/Left Cyberarm — Disabled — EMP/);
+ await page.locator('.pneuma-eye-cyber-disabled').click();assert.equal(await page.evaluate(()=>window.empSheetOpened),true);
+ await page.evaluate(()=>{const cyber=actor.items.find(i=>i.id==='emp-arm');cyber.flags={};hooks.updateItem.forEach(fn=>fn(cyber));});
+ await page.waitForFunction(()=>!document.querySelector('.pneuma-eye-cyber-disabled'));
+ assert.match(await page.locator('.pneuma-eye-cyber').innerText(),/All Systems Normal/);
  console.log("Eye HUD browser checks passed: native conditions, deduplication, attack privacy/link/dismiss, safe preview, collapse, disable.");
 }finally{await browser.close();}

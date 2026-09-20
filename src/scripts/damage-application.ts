@@ -1,6 +1,20 @@
+import {registerNativeWrapper} from "./native-wrappers.js";
+interface CoverUpDamage {ablation:number;ignorePercent:number;ignoreBelow:number}
 
 interface NativeDamageData { actor: Actor; hpReduction: number; location?: string; [key: string]: unknown }
 interface NativeDamageChat { RenderDamageApplicationCard(data: NativeDamageData): unknown }
+
+const damageCaptures = new WeakMap<Actor, NativeDamageData[]>();
+const installedChats = new WeakSet<object>();
+function installDamageCapture(chat: NativeDamageChat) {
+  if (installedChats.has(chat)) return;
+  registerNativeWrapper(chat,"RenderDamageApplicationCard",function(wrapped,data: NativeDamageData) {
+    const captured = damageCaptures.get(data.actor);
+    if (captured) {captured.push(data);return Promise.resolve();}
+    return wrapped(data);
+  },"MIXED");
+  installedChats.add(chat);
+}
 
 /** Repack the native result and breakdown; no damage formula is calculated here. */
 export function compactDamageApplication(html: string, name: string, location: string, id: string): string {
@@ -27,15 +41,14 @@ export function compactDamageApplication(html: string, name: string, location: s
 
 /** Capture only this call's native summary, using a distinct actor view as its identity. */
 export async function captureDamageApplication(actor: Actor, name: string, location: string, id: string,
-  apply: (actorView: Actor) => Promise<void>): Promise<string[]> {
+  apply: (actorView: Actor) => Promise<void>, coverUp?:CoverUpDamage): Promise<string[]> {
   const path = "/systems/cyberpunk-red-core/modules/chat/cpr-chat.js";
   const chat = (await import(path)).default as NativeDamageChat;
-  return captureWithChat(chat, actor, name, location, id, apply);
+  return captureWithChat(chat, actor, name, location, id, apply,coverUp);
 }
 export async function captureWithChat(chat: NativeDamageChat, actor: Actor, name: string, location: string, id: string,
-  apply: (actorView: Actor) => Promise<void>): Promise<string[]> {
-  const original = chat.RenderDamageApplicationCard;
-  if (typeof original !== "function") throw new Error("Native damage summary is unavailable.");
+  apply: (actorView: Actor) => Promise<void>, coverUp?:CoverUpDamage): Promise<string[]> {
+  installDamageCapture(chat);
   // Native getters and mutations still execute on the real document. Only the
   // actor reference passed to its summary renderer is distinct for this call.
   const view = new Proxy(actor, { get(target, key) {
@@ -43,20 +56,20 @@ export async function captureWithChat(chat: NativeDamageChat, actor: Actor, name
     return typeof value === "function" ? value.bind(target) : value;
   } });
   const captured: NativeDamageData[] = [];
-  let active = true;
-  const wrapper: NativeDamageChat["RenderDamageApplicationCard"] = function(this: NativeDamageChat, data) {
-    if (active && data.actor === view) { captured.push(data); return Promise.resolve(); }
-    return original.call(this, data);
-  };
-  chat.RenderDamageApplicationCard = wrapper;
+  damageCaptures.set(view,captured);
   try {
     await apply(view);
+    if(coverUp){
+      const native=actor as Actor & {getEquippedArmors(location:string):Item[];_ablateArmor(location:string,amount:number):Promise<void>};
+      const amount=native.getEquippedArmors(location).length?coverUp.ablation:0;
+      if(amount)await native._ablateArmor(location,amount);
+      for(const data of captured){data.ablation=amount;data.ignoreArmorPercent=coverUp.ignorePercent;data.ignoreBelowSP=coverUp.ignoreBelow;}
+    }
     if (!captured.length) throw new Error("Native damage applied without a captured result. Check the recipient before continuing.");
     return await Promise.all(captured.map(async (data, index) => compactDamageApplication(
       await renderTemplate("systems/cyberpunk-red-core/templates/chat/cpr-damage-application-card.hbs", data),
-      name, data.location ?? location, id + "-" + index)));
+      name, data.location ?? location, id + "-" + index)+(coverUp?'<p class="pneuma-cover-up-damage">Cover Up: armor SP ×2; armor ablation ×2, including blocked damage.</p>':"")));
   } finally {
-    active = false;
-    if (chat.RenderDamageApplicationCard === wrapper) chat.RenderDamageApplicationCard = original;
+    damageCaptures.delete(view);
   }
 }
