@@ -23,3 +23,16 @@ Visibility: players see movement counters and start markers for all visible play
 Movement display updates are batched once per token per animation frame. Unrelated combat flags do not redraw the scene; turn identity changes and initiative reordering update affected tokens. Reset still restores the saved position and updates the counter on the scheduled frame.
 
 Movement Reset now hides that token's counter, controls and start marker after successfully restoring its position. The hidden state is synchronized on the token and clears on its next movement. Failed resets retain the display.
+
+
+## Broken Ribs
+
+With the movement tracker enabled and an active GM connected, a character with the native Broken Ribs injury or active marker receives a chat reminder after moving more than **4m/yd on foot in a turn**. This threshold is distance, not four grid spaces.
+
+The reminder is visible to the actor's owners and GMs. **Apply 5 damage** applies the end-turn damage directly to HP, bypassing armor. It is a manual action; the module never applies this damage automatically. Further movement updates the same turn's card, and repeated clicks cannot charge damage twice.
+
+Reset withdraws an unpaid warning when distance returns to 4m/yd or less. Re-crossing the threshold reuses that warning. Applied damage is not refunded. New turns can issue new reminders; ended or reset encounters reject stale applications. The critical injury itself remains.
+
+Actual blast/shell escape distance counts even when the optional MOVE charge is off. Being carried and next-turn MOVE debt do not count as on-foot movement. Ordinary token drags are treated as walking; the GM decides whether to apply the reminder for vehicles, teleportation or other unusual movement.
+
+The starting-position outline is attached directly to the native token layer at saved scene coordinates. It remains fixed during token animation and drag previews, follows canvas pan/zoom, mirrors token visibility, and is removed on reset, token destruction, or scene teardown. Automated PIXI browser checks cover these transitions; live Foundry verification remains pending.

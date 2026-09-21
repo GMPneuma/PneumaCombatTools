@@ -2,6 +2,7 @@ const MODULE = "pneuma-combattools";
 /** Order existing native rows; settings remain registered under their original keys/scopes. */
 const groups = [
   { id: "combat", title: "Combat & Evasion", keys: ["combatResolution", "hideAttackWeapon", "evasionEligibility", "configureEvasion", "areaSettingsMenu", "maNoAblation", "movementTracking", "empImmunity", "pneumaHomebrew"] },
+  { id: "combat-bar", title: "Combat Bar", keys: ["combatBar", "combatBarSize", "combatBarOrientation", "combatBarNameOnly", "combatBarDefaultMovement"] },
   { id: "injuries", title: "Critical Injuries", keys: ["criticalInjuries"] },
   { id: "quickhack", title: "QuickHack", keys: ["quickhackEnabled", "quickhackMode", "quickhackMessages"] },
   { id: "token-hud", title: "Token HUD & Targeting", keys: ["targetedRightClick", "tightHUD", "hudScale", "iconColor", "hoverDV", "hoverAutofire", "alwaysShowEKG"] },

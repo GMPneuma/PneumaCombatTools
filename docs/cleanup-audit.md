@@ -28,3 +28,7 @@
 All 67 runtime TypeScript modules are reachable from the entrypoint. TypeScript unused-local/unused-parameter checks passed. Reachability does not prove every branch or external integration is used. Dynamically generated localization keys were excluded from blanket removal. This is a source audit, not live Foundry verification.
 
 Automatic approval review rejected the broader cross-subsystem deletion patch before execution. Only the verified HUD cleanup was pursued; additional candidates remain unchanged pending approval.
+
+## Shared native wrapper registration (2026-09-21)
+
+EMP and injury guards both use CPR createRoll; native-effect observation and managed damage capture both use RenderDamageApplicationCard. These now share one libWrapper MIXED registration per owner/method. Internal WRAPPER handlers run before MIXED handlers so observations survive capture/cancellation. Call receivers, arguments, synchronous results and asynchronous failures are preserved. Failed registration remains retryable. The test double now rejects duplicate package/target registrations; the earlier permissive double missed the reported startup error. Automated regression coverage is separate from live Foundry verification.

@@ -24,7 +24,7 @@ Throw applies Prone and ends the grapple. Its damage has no Choke HP safeguard. 
 
 ## HUD and encounter state
 
-Under Vitals: **Grappling: name** / **Grappled by: name**, plus **Choking: name — 1/3** / **Being choked by: name — 1/3**. These combat rows do not require a Biomonitor and respect the Status HUD visibility/minimize settings. The sequence remains visible in the next round while a consecutive Choke is still possible, then clears after a missed round. Grapple status remains until release, escape, throw or GM termination.
+In the HUD's yellow situational indicators: **Grappling: name** / **Grappled by: name**, plus **Choking: name — 1/3** / **Being choked by: name — 1/3**. These combat rows do not require a Biomonitor and respect the Status HUD visibility/minimize settings. The sequence remains visible in the next round while a consecutive Choke is still possible, then clears after a missed round. Grapple status remains until release, escape, throw or GM termination.
 
 For a Grab begun with both tokens participating in a started encounter, the canonical record lives on that **Combat document**, in flags.pneuma-combattools.grapples. It includes token/actor references, attacker/defender roles, pending/choice/active state, native roll results, card reference, revision, incomplete operation, choke rounds, original held-token scale. Changing the selected combat cannot redirect the record. Resetting or deleting its Combat ends the grapple and removes its managed penalties.
 

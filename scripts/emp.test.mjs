@@ -86,7 +86,7 @@ test('native effect suppression and roll guard restore automatically without fli
  const hook=registerHooks({resolve(specifier,context,next){if(specifier==='/systems/cyberpunk-red-core/modules/item/cpr-item.js')return {shortCircuit:true,url:'data:text/javascript,export default globalThis.NativeEmpItem'};return next(specifier,context);}});
  try {
   const {installEmpNativeGuards}=await import('../dist/scripts/emp-state.js');await installEmpNativeGuards();
-  assert.deepEqual(registrations.map(r=>r.type),['WRAPPER','MIXED','MIXED']);
+  assert.deepEqual(registrations.map(r=>r.type),['MIXED','MIXED','MIXED']);
   const effect=new CONFIG.ActiveEffect.documentClass();effect.parent=item;effect.disabled=true;
   assert.equal(item.createRoll(),'native-roll');
   item.flags={[module]:{empCombats:['c']}};effect.determineSuppression();assert.equal(effect.system.isSuppressed,true);assert.equal(effect.disabled,true);

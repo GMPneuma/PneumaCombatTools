@@ -16,6 +16,8 @@ All distances use scene scale and m/yd, with feet conversion where necessary. Ex
 
 ## Evasion and MOVE
 
+Dismembered Leg and disabled installed Cyberlegs block area Evasion. Concentration for suppressive fire and the optional Cover Up response remain available.
+
 All damaging AoE attacks, including shotgun shells, require successful evaders to move completely outside the affected area. RAW mode charges no MOVE for this relocation. Explosive Evasion must exceed the attack; shotgun defense ties succeed. The explosive homebrew tie option and its runtime handling were removed.
 
 Optional homebrew settings:
@@ -23,7 +25,7 @@ Optional homebrew settings:
 - Evasion movement uses MOVE: subtract native measured escape distance from the combatant's remaining movement allowance.
 - Deduct insufficient MOVE from next turn: available only with the first option; an escape can borrow the shortfall from the next turn, up to that turn's allowance. Without it, an escape exceeding remaining MOVE is rejected.
 
-MOVE accounting requires a selected, started combat containing the token. It uses native walking distance, tracks ordinary token movement as spent distance, and keeps spent movement/debt on the combatant rather than altering the actor's MOVE stat. Remaining movement and next-turn debt appear under vitals. The debt reduces the allowance at the combatant's next turn; subsequent turns reset normally. Manual token dragging remains available for GM adjudication and Run; it is accounted for, not blocked by this tracker. Straight-line escape selection checks walls; choose a reachable outside position.
+MOVE accounting requires a selected, started combat containing the token. It uses native walking distance, tracks ordinary token movement as spent distance, and keeps spent movement/debt on the combatant rather than altering the actor's MOVE stat. Remaining movement and next-turn debt appear in the HUD's yellow situational indicators. The debt reduces the allowance at the combatant's next turn; subsequent turns reset normally. Manual token dragging remains available for GM adjudication and Run; it is accounted for, not blocked by this tracker. Straight-line escape selection checks walls; choose a reachable outside position.
 
 ## Cover Up — Pneuma Homebrew
 

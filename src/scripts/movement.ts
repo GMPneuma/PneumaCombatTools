@@ -39,11 +39,11 @@ export async function resetMovement(token:Token) {
 function metersPerSpace(){const units=String(canvas.scene?.grid.units??"").toLowerCase();return Number(canvas.scene?.grid.distance??2)*(["ft","feet","foot"].includes(units)?0.3048:1);}
 interface Display {container:PIXI.Container;marker:PIXI.Graphics;hud:HTMLDivElement;label:HTMLInputElement;run:HTMLSpanElement;reset:HTMLButtonElement;markerKey?:string;stateKey?:string}
 const displays=new Map<Token,Display>();
-function clear(token:Token){const display=displays.get(token);if(display){display.container.destroy({children:true});display.hud.remove();displays.delete(token);}}
+function clear(token:Token){const display=displays.get(token);if(display){if(!display.container.destroyed)display.container.destroy({children:true});display.hud.remove();displays.delete(token);}}
 function draw(token:Token,previewRecord?:MoveRecord){
   const original=(token as Token & {_original?:Token})._original;
   const doc=original?.document??token.document;
-  if(!active()){clear(token);return;}
+  if(token.destroyed||!active()){clear(token);return;}
   const context=movementTurn(doc);
   if(!token.visible||!token.actor||(!game.user?.isGM&&!token.actor.hasPlayerOwner)||!context){clear(token);return;}
   const record=previewRecord??(token.isPreview?nextRecord(token,doc,{x:token.document.x,y:token.document.y}):currentMovement(doc,context));
@@ -54,7 +54,10 @@ function draw(token:Token,previewRecord?:MoveRecord){
   let display=displays.get(token);
   if(!display){
     const container=new PIXI.Container();container.name="pneuma-movement";
-    const marker=new PIXI.Graphics();container.addChild(marker);token.addChild(container);
+    // Scene coordinates keep the origin fixed even between native animation and our queued draw.
+    // Use the layer directly: its objects/preview containers are reserved for native Token instances.
+    container.eventMode="none";
+    const marker=new PIXI.Graphics();container.addChild(marker);canvas.tokens!.addChild(container);
     const hud=document.createElement("div");hud.className="placeable-hud pneuma-movement-hud";
     const run=document.createElement("span");run.className="control-icon pneuma-movement-run";run.textContent="run";run.hidden=true;
     const controls=document.createElement("div");controls.className="pneuma-movement-controls";
@@ -71,6 +74,9 @@ function draw(token:Token,previewRecord?:MoveRecord){
     controls.append(reset,run);hud.append(attribute,controls);host.append(hud);display={container,marker,hud,label,run,reset};displays.set(token,display);
   }
   if(display.hud.parentElement!==host)host.append(display.hud);
+  display.container.visible=token.visible;
+  display.container.alpha=token.alpha;
+  display.container.renderable=token.renderable;
   const perSpace=metersPerSpace(),entry=areaSettings().evadeMove?movementEntry(doc):undefined;
   const nativeWalk=foundry.utils.getProperty(token.actor,"system.derivedStats.walk.value");
   const maxMeters=Math.max(0,Number(nativeWalk??Number(foundry.utils.getProperty(token.actor,"system.stats.move.value"))*2)||0);
@@ -91,8 +97,8 @@ function draw(token:Token,previewRecord?:MoveRecord){
   display.hud.style.left=`${token.x+token.w/2}px`;
   display.hud.style.top=`${token.y+top}px`;
   display.reset.hidden=!token.isOwner||token.isPreview;
-  const markerKey=[record.start.x-token.x,record.start.y-token.y,token.w,token.h].join(":");
-  if(display.markerKey!==markerKey){display.markerKey=markerKey;display.marker.clear().lineStyle(2,0xffffff,0.45).drawRect(record.start.x-token.x,record.start.y-token.y,token.w,token.h);}
+  const markerKey=[record.start.x,record.start.y,token.w,token.h].join(":");
+  if(display.markerKey!==markerKey){display.markerKey=markerKey;display.marker.clear().lineStyle(2,0xffffff,0.45).drawRect(record.start.x,record.start.y,token.w,token.h);}
 }
 export function registerMovement(){
   game.settings!.register(MODULE,"movementTracking",{name:"Enable movement counters",hint:"GM world setting: enable or disable movement tracking, counters, start markers, and Reset controls for everyone. Player-owned counters are shared; NPC counters are GM-only. Does not block excess movement.",scope:"world",config:true,type:Boolean,default:true,onChange:()=>{for(const token of canvas.tokens?.placeables??[])draw(token);}});
@@ -127,7 +133,12 @@ export function registerMovement(){
     for(const token of canvas.tokens?.placeables??[])if(force||turns.get(token.id!)!==next.get(token.id!))enqueue(token);
     turns=next;
   };
-  Hooks.on("refreshToken",(token:Token)=>enqueue(token));
+  Hooks.on("refreshToken",(token:Token)=>{
+    // The detached marker must inherit visibility immediately, before the next rendered frame.
+    const display=displays.get(token);
+    if(display){display.container.visible=token.visible;display.container.alpha=token.alpha;display.container.renderable=token.renderable;}
+    enqueue(token);
+  });
   Hooks.on("updateToken",(doc:TokenDocument)=>{if(doc.object)enqueue(doc.object);});
   Hooks.on("controlToken",(token:Token)=>enqueue(token));
   Hooks.on("updateActor",(actor:Actor)=>{for(const token of canvas.tokens?.placeables??[])if(token.actor?.uuid===actor.uuid)enqueue(token);});

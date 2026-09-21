@@ -1,6 +1,6 @@
-# Combat resolution — first test version
+# Combat resolution
 
-Start an attack through Combat Tools with one owned attacker selected and a target. The GM/world **Combat resolution** switch is on by default. Disabling it restores the native attack routing. This does not intercept sheet or macro attacks.
+Start an attack through Combat Tools with one owned attacker selected and a target. The GM/world **Combat resolution** switch is on by default. Disabling it restores the native attack routing. Paired attack cards are specific to Combat Tools attacks. Native Evasion rolls are nevertheless guarded against Dismembered Leg and disabled installed Cyberlegs.
 
 1. Confirm the native attack dialog. Native weapon/ammo handling runs. The attack roll and its dice stay undisplayed while the card awaits a defense choice.
 2. The defender's owner or a GM chooses **Evade** or **Do not Evade** on the attack card.
@@ -25,7 +25,7 @@ Start an attack through Combat Tools with one owned attacker selected and a targ
 - Homebrew evaluates enabled REF, Co-Processor and Solo/Threat Detection qualifiers; uses free grants first; then applies the selected flat/cumulative penalty, LUCK cost or hard limit. Attempts count whether successful or not. Declines do not count.
 - Homebrew ranged evasion requires an active combat. Allowances reset by round, not turn. Rewinding below a recorded round blocks tracked evasion until the round is restored; it does not refund resources.
 - Melee/unarmed Evasion is unaffected by ranged settings.
-- Current prepared REF, installed cyberware and Threat Detection's allocated rank are read from system data. Renamed/unrecognized items and temporarily disabled cyberware require GM review; no reliable native temporary-functionality field was found. Awareness and weapon-specific exceptions are not automatically detected. The GM attack dialog always opens and includes **Defender is unaware**, unchecked for every new attack. Selecting it immediately reveals the attack and skips Evasion without spending defensive resources; ranged attacks still compare against DV, and melee/unarmed are treated as undefended hits.
+- Current prepared REF, installed cyberware and Threat Detection's allocated rank are read from system data. EMP-disabled Reflex Co-Processors do not qualify. Dismembered Leg or a disabled installed Cyberleg blocks Evasion regardless of melee/ranged eligibility; unrecognized custom item data still requires GM review. Awareness and weapon-specific exceptions are not automatically detected. The GM attack dialog always opens and includes **Defender is unaware**, unchecked for every new attack. Selecting it immediately reveals the attack and skips Evasion without spending defensive resources; ranged attacks still compare against DV, and melee/unarmed are treated as undefended hits.
 - The first active GM coordinates defense responses, preventing two cards from spending the same allowance simultaneously. An active GM is required. A GM can cancel a waiting exchange; spent attack ammo/LUCK is not rolled back.
 - A pending payment is saved on its card. **Finish payment** resumes that exact result after a write failure; a temporary actor payment receipt prevents double charging until the Combat counter and chat record are saved; the receipt is then removed.
 - Native roll privacy is preserved. A privately whispered attack may require the GM to respond if its defender cannot see it.
@@ -89,7 +89,8 @@ injury to the recorded token or the single controlled, owned token at click time
 It does not apply HP damage again and remains available for deliberate repeat use.
 
 World settings allow injury controls for Ranged, Melee, Unarmed, Autofire, Explosion,
-Grenade, Rocket and Quickhack methods; all default enabled. These switches govern the
+Grenade, Rocket and Quickhack methods. Quickhack defaults off for new worlds; the other
+methods default on. Existing saved choices are retained. These switches govern the
 injury action, not the system's native +5 critical bonus calculation. Grenade/rocket
 launchers and inventory grenade AoE cards record their respective methods. See [Area attacks](area-attacks.md) for shared damage and target responses. These injury settings do not independently create attack workflows.
 

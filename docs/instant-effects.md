@@ -1,6 +1,6 @@
 # Instant effects and ammunition
 
-Instant Effects are reusable effect resolutions. Their activation is immediate; injuries, sleep, fire and smoke can persist afterward. The damage card's **Add effects** picker separates Instant Effects from normal token statuses. Its three existing slots are retained. Applying the damage creates a separate resolution card for each selected instant effect on that recipient; ordinary statuses retain their existing application behavior. Existing normal-weapon ammunition handling is not intercepted or repeated automatically.
+Instant Effects are reusable effect resolutions. Their activation is immediate; injuries, sleep, fire and smoke can persist afterward. The damage card's **Add effects** picker separates Instant Effects from normal token statuses. Its three existing slots are retained. Applying the damage creates a separate resolution card for each selected instant effect on that recipient; ordinary statuses retain their existing application behavior. Normal-weapon ammunition damage remains native. Combat Tools observes supported confirmed outcomes for HUD exposure warnings and ignition without repeating the ammunition damage.
 
 Area attacks place the same resolver directly below each affected target. Resolve the native resistance check, then apply a failed effect. A tie fails: the roll must beat the DV. The owner or GM can resolve the target; the GM can mark an immune/ineligible target unaffected. Biological eligibility (meat targets/meat eyes) remains a GM determination, not a guess from installed cyberware. No action-spending enforcement is added.
 
@@ -21,8 +21,8 @@ These are the types in the supplied core ammunition tables. Basic, Expansive and
 
 ## Duration and removal
 
-- Flashbang/Teargas: 60 seconds of game time. Native injury items provide the actual modifiers. Existing permanent injuries are preserved; repeated temporary exposure extends the module-owned injury. Expiry deletes only module-owned temporary injuries and updates their native status markers. HP is unchanged.
-- Sleep: 60 seconds of game time, incoming HP damage, or **Wake (touching Action)**. Waking leaves Prone in place. A pre-existing unrelated Unconscious effect is preserved.
+- Flashbang/Teargas: 20 rounds when applied in combat, otherwise 60 seconds of game time. Native injury items provide the actual modifiers. Existing permanent injuries are preserved; repeated temporary exposure extends the module-owned injury. Expiry deletes only module-owned temporary injuries and updates their native status markers. HP is unchanged.
+- Sleep: 20 rounds when applied in combat (otherwise 60 seconds of game time), incoming HP damage, or **Wake (touching Action)**. Waking leaves Prone in place. A pre-existing unrelated Unconscious effect is preserved.
 - Ignite: one nonstacking instance, 2 direct HP at the end of the affected combatant's turn. **Extinguish (Action)** or removal of its On Fire marker stops it. Turn updates are handled by one GM. There is no automatic out-of-combat fire tick.
 - EMP: the existing two-item selection/suppression workflow, **until combat ends**, as requested. Start combat before applying it. Exact one-minute timing, very long combats and out-of-combat EMP remain on the backlog.
 
@@ -34,7 +34,7 @@ Smoke is created at the final impact location, including scatter, without per-ta
 
 A separate scene MeasuredTemplate stores creation time, expiry and cell polygons. Semi-transparent procedural PIXI clouds animate over those cells in the primary canvas, above floor tiles and below tokens at matching elevation. The scene's vision/fog pipeline remains in use. No animation assets or additional module dependencies are required.
 
-Smoke survives chat deletion, attack-area hiding and scene reload. It expires after 60 seconds of game time. The attack card's GM **Remove smoke** control or native template deletion removes it early. Ad-hoc Smoke centers a 10m/yd area on the recipient's token in the open scene. Smoke has no automated visibility or attack penalties yet; its stored footprint supports that later work.
+Smoke survives chat deletion, attack-area hiding and scene reload. It expires after 20 rounds when created in combat, otherwise after 60 seconds of game time; combat end also clears it. The attack card's GM **Remove smoke** control or native template deletion removes it early. Ad-hoc Smoke centers a 10m/yd area on the recipient's token in the open scene. A reported missing residual smoke effect still needs live confirmation. Smoke has no automated visibility or attack penalties yet; its stored footprint supports that later work.
 
 ## Integration and verification
 

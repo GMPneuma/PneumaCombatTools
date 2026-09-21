@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.5 - 2026-09-21
+
+- Add a compact floating combat bar above Players with square actor artwork, native combatant visibility and active-turn highlighting.
+- Add per-user 32/40/48px portraits, vertical/horizontal layouts, minimize/restore and optional name-only tooltips. Minimized GM bars retain movement controls.
+- Support token selection, permission-checked double-click sheets, hold-to-ping, Shift-click pan and GM Shift-long-click native pull pings. Player navigation uses native visibility checks; GM navigation ignores token visibility on the current scene.
+- Add owner End Turn through the active GM, GM previous/next turns, status-effect hover flyouts and native per-combatant context controls.
+- Add Default, No Movement, Combat Move and Free-Move modes, a configurable combat-start default and throttled movement warnings.
+- Anchor movement-origin outlines to the scene so token animation cannot carry them away from the starting position.
+- Fix duplicate libWrapper registrations when injury, EMP and other integrations share native methods.
+- Set manifest verified compatibility to Foundry VTT 12.343, retaining the v12-only support range.
+- Reorganize feature documentation and add player/GM guides.
+
+Validation: TypeScript/build, automated regressions and browser fixtures. Live Foundry multiplayer verification remains pending; existing limitations remain documented in the feature guides.
+
+
 ## 0.5.0 - 2026-09-21
 
 - Make the compact Eye HUD available to all players; installed Biomonitor sharing exposes hovered vitals while keeping messages private.

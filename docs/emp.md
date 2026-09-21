@@ -1,8 +1,10 @@
 # EMP disablement
 
-EMP lasts **until combat ends**, replacing the ammunition's printed one-minute duration for this workflow. Start combat first. After resolving the source's resistance check, the GM opens the affected token's HUD and clicks the lightning-bolt **EMP: disable cyberware** control. This does not automatically roll Cybertech or resolve a grenade hit.
+EMP lasts **until combat ends**, replacing the ammunition's printed one-minute duration for this workflow. Start combat first. Use the EMP Instant Effect on the grenade card or through **Add effects**: resolve the native Cybertech resistance check, then apply the failed effect to create a GM selection for two cyberware/electronic items. There is no standalone EMP lightning-bolt control on the token HUD. See [Instant effects](instant-effects.md).
 
-Choose the number of items, who selects them, eligibility and random method:
+## Integration selection options
+
+The normal EMP Instant Effect requests two items selected by the GM. The reusable EMP API also supports a configurable item count, chooser, eligibility and random method. These are integration options, not additional controls on the standard grenade card:
 
 | Selection | Behavior |
 |---|---|
@@ -23,11 +25,11 @@ System-first selection prevents extra options inside one group from diluting oth
 
 ## Effects and Biomonitor
 
-Affected items receive **Disabled — EMP** markers. Cyberware appears under the Biomonitor's **Implant Integrity** section with that label; clicking the entry opens its native sheet. The usual Biomonitor visibility settings still apply.
+Affected items receive **Disabled — EMP** markers. Cyberware appears under the Biomonitor's **Implant Integrity** section with that label; clicking the entry opens its native sheet. Your own HUD needs no Biomonitor; sharing another actor's stats follows the installed-Biomonitor rule.
 
 Native CPR Active Effects belonging to affected items are temporarily suppressed. Their original `disabled` settings, installation, Humanity, and inventory are not changed. Native item roll creation/confirmation is blocked while disabled; Combat Tools excludes disabled cyberweapons from attack/DV menus and a disabled Reflex Co-Processor no longer qualifies for Combat Tools evasion. Rules that exist only in item descriptions still require GM adjudication; no general limb movement/hand-use penalty is synthesized.
 
-A disabled foundational cyberarm/leg adds a temporary **EMP: [item] Disabled** actor status using the native broken-arm/leg icon. It does not create a physical injury, apply injury damage, or add broken/dismembered stat penalties. Existing injuries remain intact. This is the requested broken-limb visual indication, not the printed dismembered-limb mechanics.
+A disabled foundational cyberarm/leg adds a temporary **EMP: [item] Disabled** actor status using the native broken-arm/leg icon. It does not create a physical injury, apply injury damage, or add broken/dismembered stat penalties. Existing injuries remain intact. An installed disabled Cyberleg also prevents Evasion in Combat Tools and native skill rolls. Other dismembered-limb penalties are not synthesized.
 
 ## Combat ownership and restoration
 

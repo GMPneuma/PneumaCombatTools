@@ -1,3 +1,4 @@
+import { registerCombatBar } from "./combat-bar.js";
 import {registerInjuryMechanics} from "./injury-mechanics.js";
 import {registerNativeEffectIntegration} from "./native-effect-integration.js";
 import {registerInstantEffects} from "./instant-effects.js";
@@ -63,6 +64,7 @@ Hooks.once("init", () => {
   registerItemMarkers();
   registerEvasionSettings();
   registerCombatResolution();
+  registerCombatBar();
   registerMovement();
   registerInjuryMechanics();
   registerEmp();

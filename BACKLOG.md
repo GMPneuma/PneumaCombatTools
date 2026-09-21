@@ -77,10 +77,14 @@ Recovered from the original task **Locate PneumaCombatTools**, user message begi
 - Support other penalty-producing visual effects.
 - This is a combat-mechanics roadmap item; moving general chat cosmetics to another module does not remove it. Specific effects and rules remain to be defined.
 
-### 9. Combat tracker controls — planned, not implemented
+### 9. Combat tracker controls — combat bar implemented; other features open
 
-- Hide enemies on the combat tracker.
-- Other selected Monk’s-style features. The original list left those additional features unspecified; retain that open scope rather than inventing a feature list.
+- Hide enemies on the combat tracker: retain the native hidden control and mirror it in the new bar. Follow native tracker visibility, including ownership exceptions. The initial additional hidden-token and line-of-sight filters were removed at user request; unseen tokens stay listed but cannot be pinged or panned to.
+- **Combat bar (2026-09-21):** compact 60px floating strip on the left above Players, with a semi-transparent native-color container, 40px square actor artwork, hover names and icon controls; click selects owned tokens, hold pings, Shift-click pans. Outside combat, show connected-player-owned scene tokens to GMs and own visible tokens to players. During active combat, show all permitted combatants in native order, highlight the current turn, provide owner/GM End Turn and GM previous/next controls.
+- **Combat bar follow-up (2026-09-21):** owner End Turn appears to the right and is GM-coordinated without player Combat-update permission. GM hover shows native status icons; right-click reuses the native tracker's per-combatant buttons and handler. Double-click opens actor sheets with native OBSERVER permission; movement warnings have a five-second cooldown per reason without weakening movement restrictions.
+- GM movement modes: Default, No Movement (also outside combat), Combat Move (only the active token can move), Free-Move. A GM setting selects the initial mode for newly started combats. Modes preserve native ownership and existing grapple restrictions. See [combat bar](docs/combat-bar.md) for persistence and scene scope.
+- Automated state/browser verification is separate from live multi-client Foundry verification, which remains pending.
+- Other selected Monk’s-style features were originally unspecified and remain open; no additional feature list is inferred.
 
 ### 10. Mechanical cyberware disabling — EMP implemented; source-specific integrations deferred
 
@@ -552,3 +556,17 @@ Audited all 65 catalog statuses and six additional prepared drug/pharma icons ag
 ### Status audit follow-up: leg evasion and Broken Ribs - implemented
 
 Supersedes the Dismembered Leg dodge and Broken Ribs movement-trigger gaps in the 2026-09-21 audit above. Native injury/marker and disabled installed Cyberleg checks now prohibit Evasion across Combat Tools and native skill rolls. Broken Ribs now uses committed movement over 4m/yd to offer a private owner/GM warning with manual 5 direct-HP damage. User explicitly requested no automatic damage. Other audit findings remain open, including Foreign Object triggers and the minimum MOVE 1 caveat.
+
+- **Combat bar personal layout (2026-09-21, implemented):** client-local 32/40/48 px actor portraits, minimize/restore, vertical/horizontal switch for all users, orientation-aware turn buttons and scrolling. Automated browser coverage; live Foundry validation pending.
+
+- **Combat bar native navigation (2026-09-21):** hold-to-ping and Shift-click pan delegate to native tracker handlers; removed redundant right-click visibility gates. Native combatant list visibility remains independent of token sight.
+
+- **Movement origin outline (2026-09-21, fixed):** anchor to saved scene coordinates on the native token layer rather than the moving token, eliminating animation-frame drift. Preserve visibility, reset and cleanup; automated animation/preview and pan/zoom checks.
+
+- **Minimized GM combat bar (2026-09-21):** retain movement-mode controls in both orientations; hide portraits and turn controls, and preserve the outside-combat Combat Move restriction.
+
+- **Combat bar tooltip preference (2026-09-21):** per-client Show name only setting, default off, hides portrait click instructions.
+
+- **GM navigation exception (2026-09-21):** GM bar gestures and context-menu ping/pan ignore token visibility; players retain native visibility checks.
+
+- **Combat bar GM pull ping (2026-09-21):** Shift-long-click uses native pull ping; ordinary Shift-click remains local, and players cannot pull others.

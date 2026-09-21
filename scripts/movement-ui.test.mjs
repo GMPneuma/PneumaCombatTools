@@ -50,6 +50,32 @@ try {
  await page.evaluate(()=>{movementEnabled=false;movementSetting.onChange();});assert.equal(await page.locator('.pneuma-movement-hud').count(),0);
  await page.evaluate(()=>{movementEnabled=true;movementSetting.onChange();});
  assert.equal(await counter.inputValue(),'3 / 6');assert.equal(await counter.evaluate(n=>getComputedStyle(n).fontSize),'32px');
+ // Inspect rendered bounds before the deferred redraw: animation must never carry the origin along.
+ assert.deepEqual(await page.evaluate(()=>{
+  const marker=canvas.tokens.children.find(c=>c.name==='pneuma-movement');
+  const bounds=()=>{const b=marker.getBounds();return [b.x,b.y,b.width,b.height];};
+  const initial=bounds(),samples=[];
+  for(let x=410;x<=700;x+=10){token.x=x;hooks.refreshToken.forEach(fn=>fn(token));samples.push(JSON.stringify(bounds())===JSON.stringify(initial));}
+  token.position.set(400,300);
+  app.stage.position.set(30,20);app.stage.scale.set(1.2);
+  const zoomed=bounds();app.stage.position.set(0,0);app.stage.scale.set(1);
+  return {fixed:samples.every(Boolean),panZoom:Math.abs(zoomed[0]-(initial[0]*1.2+30))<0.01&&Math.abs(zoomed[1]-(initial[1]*1.2+20))<0.01,interactive:marker.eventMode};
+ }),{fixed:true,panZoom:true,interactive:'none'});
+ // Drag previews get independent scene-space markers and remove them when the preview is destroyed.
+ await page.evaluate(()=>{
+  const preview=new PIXI.Container();
+  Object.assign(preview,{document:{...doc,x:600,y:400},actor:token.actor,w:100,h:100,isOwner:true,isPreview:true,_original:token,tooltip:token.tooltip,getCenterPoint:token.getCenterPoint,checkCollision:()=>false});
+  preview.position.set(600,400);canvas.tokens.addChild(preview);window.preview=preview;
+  hooks.refreshToken.forEach(fn=>fn(preview));
+ });
+ assert.equal(await page.evaluate(()=>canvas.tokens.children.filter(c=>c.name==='pneuma-movement').length),2);
+ assert.equal(await page.evaluate(()=>{
+  const markers=canvas.tokens.children.filter(c=>c.name==='pneuma-movement');const before=markers.map(c=>c.getBounds().x);
+  preview.x+=100;hooks.refreshToken.forEach(fn=>fn(preview));
+  return markers.every((c,i)=>c.getBounds().x===before[i]);
+ }),true);
+ await page.evaluate(()=>{hooks.destroyToken.forEach(fn=>fn(preview));preview.destroy();});
+ assert.equal(await page.evaluate(()=>canvas.tokens.children.filter(c=>c.name==='pneuma-movement').length),1);
  const run=page.locator('.pneuma-movement-run');
  for(const [spent,color,isRun] of [[6,'rgb(111, 220, 122)',false],[7,'rgb(255, 212, 90)',true],[12,'rgb(255, 212, 90)',true],[13,'rgb(255, 102, 102)',true],[3,'rgb(111, 220, 122)',false]]){
   await page.evaluate(spent=>{doc.flags['pneuma-combattools'].movement.spent=spent;hooks.refreshToken.forEach(fn=>fn(token));},spent);
@@ -59,7 +85,7 @@ try {
  }
  const inputBox=await counter.boundingBox(),resetBox=await reset.boundingBox();assert(resetBox.y>=inputBox.y+inputBox.height);
  await reset.click();await page.waitForFunction(()=>doc.x===100&&doc.y===200&&doc.flags['pneuma-combattools'].movement.spent===0&&!document.querySelector('.pneuma-movement-hud'));
- assert.equal(await counter.count(),0);assert.equal(await page.evaluate(()=>token.children.some(c=>c.name==='pneuma-movement')),false);assert.equal(await page.evaluate(()=>writes.length),1);
+ assert.equal(await counter.count(),0);assert.equal(await page.evaluate(()=>canvas.tokens.children.some(c=>c.name==='pneuma-movement')),false);assert.equal(await page.evaluate(()=>writes.length),1);
  assert.equal(await page.evaluate(()=>writes[0].options.pneumaMoveDelta),-6);
  // The native #hud transform moves/scales both boxes; mouse clicks still hit the Reset control.
  await page.evaluate(()=>{doc.x=400;token.x=400;doc.flags['pneuma-combattools'].movement.spent=2;doc.flags['pneuma-combattools'].movement.hidden=false;document.getElementById('hud').style.transform='translate(30px,20px) scale(1.2)';hooks.refreshToken.forEach(fn=>fn(token));});
@@ -72,14 +98,18 @@ try {
  assert.equal(await reset.isVisible(),false,'Only owners can reset');
  await page.evaluate(()=>{token.actor.hasPlayerOwner=false;hooks.updateActor.forEach(fn=>fn(token.actor));});
  assert.equal(await page.locator('.pneuma-movement-hud').count(),0,'NPC counter hidden from players');
- assert.equal(await page.evaluate(()=>token.children.some(c=>c.name==='pneuma-movement')),false,'NPC start marker hidden too');
+ assert.equal(await page.evaluate(()=>canvas.tokens.children.some(c=>c.name==='pneuma-movement')),false,'NPC start marker hidden too');
  await page.evaluate(()=>{game.user.isGM=true;hooks.updateUser.forEach(fn=>fn(game.user));});
  assert.equal(await counter.isVisible(),true,'GM can see NPC counters');
  await page.evaluate(()=>{game.user.isGM=false;token.actor.hasPlayerOwner=true;token.isOwner=true;hooks.updateActor.forEach(fn=>fn(token.actor));});
  assert.equal(await reset.isVisible(),true,'Owner retains reset');
- await page.evaluate(()=>{token.visible=false;hooks.refreshToken.forEach(fn=>fn(token));});
+ assert.equal(await page.evaluate(()=>{const marker=canvas.tokens.children.find(c=>c.name==='pneuma-movement');token.visible=false;hooks.refreshToken.forEach(fn=>fn(token));return marker.visible;}),false,'Visibility updates synchronously before queued drawing');
  assert.equal(await page.locator('.pneuma-movement-hud').count(),0,'Invisible tokens never reveal counters');
  await page.evaluate(()=>{token.visible=true;hooks.refreshToken.forEach(fn=>fn(token));});
  await page.evaluate(()=>hooks.destroyToken.forEach(fn=>fn(token)));assert.equal(await page.locator('.pneuma-movement-hud').count(),0);
+ assert.equal(await page.evaluate(()=>canvas.tokens.children.some(c=>c.name==='pneuma-movement')),false);
+ await page.evaluate(()=>hooks.refreshToken.forEach(fn=>fn(token)));
+ await page.evaluate(()=>hooks.canvasTearDown.forEach(fn=>fn()));
+ assert.equal(await page.evaluate(()=>canvas.tokens.children.some(c=>c.name==='pneuma-movement')),false,'Scene teardown removes detached markers');
  console.log('Movement UI checks passed: reproduced old hit failure, real clicks reset position/counter, larger stacked boxes, pan/zoom, failed-update retry, ownership and cleanup.');
 } finally {await browser.close();}
