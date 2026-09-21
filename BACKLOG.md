@@ -472,3 +472,83 @@ EMP retains the approved until-combat-ends behavior. The exact-one-minute/long-c
 ### Residual smoke visibility — reported live issue, open
 
 User reports no residual smoke after a smoke grenade. The server-served smoke.js matches the current build. Automated PIXI rendering passes but does not reproduce the live Foundry failure. Investigate effect creation, saved footprint, native scene render lifecycle, and visibility before marking this fixed. Included as a known issue in 0.4.0.
+
+
+## HUD layout revision — implemented, pending live verification
+
+Supersedes the earlier implant-gated own HUD, mixed pathology list, top alert ticker, message navigation and temporary auto-expansion. The current compact three-column appearance is retained.
+
+- Everyone can view their own HUD. Hovering a visible token with an installed Biomonitor switches the stats to that actor, marked BIOMONITOR LINK; leaving restores the viewer. No additional actor-sheet permissions are granted.
+- Biological Scan contains injuries and medical conditions. Persistent native drugs/pharma illuminate icon-only indicators beneath EKG (red/green) with tooltips. Instant treatments are excluded. Large exposure indicators retain text below and add Addict, Unconscious and an actual active QuickHack Jack-In connection.
+- Headerless yellow situational rectangles sit INSIDE the HUD at the lower-right, extending left. Grapple/choke and movement information use those same rectangles. Implant Integrity retains disabled cyberware.
+- Up to three private notifications appear outside the HUD, always identified with the viewer. Each clears independently; ordinary messages expire (legacy duration zero becomes 60 seconds). Incoming attack notices remain until resolved or dismissed. New text pulses briefly, without scrolling or expanding a minimized HUD.
+- TypeScript/build and focused browser/state verification are required. User replicates built dist files; no server deployment or release is implied.
+
+
+### HUD active-drug indicator correction — implemented
+
+- Health-state label restored immediately beneath EKG, before drug indicators.
+- Supersedes the always-visible drug dashboard: only active unsuppressed drug/pharma effects appear; icons pack from the left and an empty row disappears. Names remain tooltips, with no letters.
+- Added Berserker, Prime Time, Sixgun, Timewarp, Sedative and Veritas icons and native primary/addicted-primary aliases; Antibiotic singular maps to the existing Antibiotics entry. All nine core/Hornet street drugs and five lasting pharmaceuticals are covered, plus the existing temporary Quick Fix treatment. Instant treatments stay excluded.
+- Native no-status-ID effects are recognized; addiction-only effects activate Addict without falsely showing an active dose. CPR v0.92.4 data and Hornet's Pharmacy are the reference. No additional drug mechanics or automatic expiry system is introduced.
+- Browser tests passed for all 15 prepared indicators, primary-effect aliases, addiction isolation, suppression, empty-row hiding, label order and leftmost packing. User replication/live verification remains separate.
+
+
+### Floating statuses and notification text — implemented
+
+- Yellow statuses now use absolute positioning inside the lower-right HUD corner and do not add width/height. This supersedes the earlier in-flow status dock.
+- Removed the visible notification-owner heading; recipient identity remains accessible and notifications remain private. All message text is now 24px orange, including ordinary GM messages, with individual clear controls.
+- Browser regression verifies identical HUD dimensions with zero versus multiple statuses and the message heading/font/color. Live replication is user-managed.
+
+
+### HUD top-row removal — implemented
+
+- Expanded HUD no longer has a title/header row. Minimize sits inline with Implant Integrity; GM Send HUD Message remains available as the adjacent envelope button.
+- GM character identity appears outside below the HUD, aligned left. Shared-view identity also appears there for players; own player views omit it. Background/label dragging and minimized controls remain available. Preview controls move outside the HUD.
+- Supersedes earlier top identity/header descriptions; no deployment or release performed.
+
+- HUD identity alignment correction: the below-HUD name follows the actual monitor width and left edge through minimize/expand and dragging; notification width remains independent. Browser regression covers collapsed and expanded identity alignment.
+
+
+### Incoming HUD message animation — implemented
+
+New private notification text appears large in orange at screen center, holds briefly, then shrinks into its existing slot below the HUD over 1.6 seconds. Concurrent arrivals are stacked. Existing messages do not replay when HUD contents refresh. The client setting **Animate incoming HUD messages** defaults on; disabling it shows messages immediately and stops active arrivals. Reduced-motion preferences also skip the animation. This supersedes the previous arrival blink; privacy, expiry and clear controls are retained.
+
+
+### HUD pinned to Foundry sidebar — implemented
+
+The HUD sits 8px below the viewport top and 8px left of the native right sidebar, including its collapsed state. Sidebar resize observation follows native width animation; sidebar render/collapse hooks and viewport resize keep the anchor current. HUD and private notification widths fit the available space. Manual drag routines and saved positions remain in source/storage, but are inactive while docking is enabled. This supersedes draggable positioning for now.
+
+
+### Scan-line notification arrival — implemented
+
+Supersedes the smooth zoom/flight: a glowing orange horizontal scan reveals the large centered message, holds it, collapses it to a bright horizontal line, then reveals normal-size text beneath the HUD. The 1.8-second sequence relocates only while invisible. Existing per-client animation toggle, reduced-motion bypass, private recipient filtering and pinned docking remain unchanged.
+
+
+### Effect activation scan — implemented
+
+Newly activated drug/pharma and exposure symbols scan in large at screen center, blink three times, then illuminate their dashboard slot after 2.4 seconds. Colors match the corresponding indicator. Concurrent symbols share the central overlay. Refreshes and switching actors do not replay existing conditions; removal cancels an unfinished announcement. Minimized HUDs still announce newly detected effects. The existing client toggle is now named **Animate HUD messages and effect icons** and retains its saved value. Disabled/reduced-motion mode lights indicators immediately.
+
+
+### Drug labels and round exposure clearing — implemented
+
+Drug/pharma tooltips and accessible labels show only the name, without the Active suffix. During combat, Poison and Biotoxin Vitals reports remain lit after their arrival animation until the round changes, then clear. Existing actor status effects are not deleted; a fresh exposure or reactivation can light the report again. Other indicators and noncombat flash behavior are unchanged.
+
+
+### Native effects, warnings and combat durations — implemented
+
+- Native fire statuses now drive end-turn damage regardless of application source; strongest active level wins, without stacking.
+- Temporary injuries and Sleep use native durations: one minute means 20 rounds at 3 seconds each, with start round/turn and combat recorded. Smoke uses the same clock. Old instantLifetime records are adopted on load where their native source is available.
+- Combat end clears timed effects, including manual effects, on participants or explicitly linked to the combat; critical injuries are preserved. EMP remains until-combat-end.
+- Confirmed instant/native poison and biotoxin applications now emit exposure warnings. Original ammunition context survives native dialogs and Combat Tools damage cards. Native incendiary damage applies the shared fire status only after penetration.
+- See docs/native-effects.md for source metadata, permanent-condition protections, expiry rules and coverage limitations.
+
+
+### Complete status mechanics audit — 2026-09-21
+
+Audited all 65 catalog statuses and six additional prepared drug/pharma icons against official CPR v0.92.4 YAML/runtime source. See docs/status-mechanics-audit.md. Confirmed outstanding work: prose-only drug durations (native duration fields are null), injury movement triggers, Cracked Skull multiplier, Dismembered Leg dodge prohibition, Spinal Injury action loss, limb usability, contextual sense/hand/speech modifiers and drug-specific automation. Previous native-duration integration does not cover drugs whose source declares no numeric duration. No mechanics changed in this audit; these remain open.
+
+
+### Status audit follow-up: leg evasion and Broken Ribs - implemented
+
+Supersedes the Dismembered Leg dodge and Broken Ribs movement-trigger gaps in the 2026-09-21 audit above. Native injury/marker and disabled installed Cyberleg checks now prohibit Evasion across Combat Tools and native skill rolls. Broken Ribs now uses committed movement over 4m/yd to offer a private owner/GM warning with manual 5 direct-HP damage. User explicitly requested no automatic damage. Other audit findings remain open, including Foreign Object triggers and the minimum MOVE 1 caveat.

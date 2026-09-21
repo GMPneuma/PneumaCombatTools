@@ -1,3 +1,5 @@
+import {reportExposure} from "./effect-events.js";
+import {igniteTarget} from "./instant-lifetime.js";
 import {instantId} from "./instant-catalog.js";
 import {createInstantCard} from "./instant-effects.js";
 import { applyCombatStatus } from "./status-sync.js";
@@ -13,7 +15,7 @@ export interface DamageValues {
   total: number; bonus: number; location: string; ablation: number; ammo: string;
   ignorePercent: number; ignoreBelow: number; lethal: boolean;
 }
-export interface DamageResult { html: string; values: DamageValues; sixes?: number }
+export interface DamageResult { ammoType?:string; html: string; values: DamageValues; sixes?: number }
 export interface DamageState {
   status: "rolling" | "rolled" | "applying" | "applied" | "review";
   user: string; nonce: string; penetrated?: boolean; statusEffects?: string[]; applications?: string[]; result?: DamageResult; appliedTo?: string; recordedApplied?: boolean; application?: "recorded" | "selected"; applicationId?: string;
@@ -175,6 +177,11 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
     const summaries = await captureDamageApplication(actor, token?.name ?? actor.name ?? "", v.location, damage.applicationId!,
       view => target._applyDamage.call(view, v.total, v.bonus, v.location, (data.coverUp || data.weaponType === "martialArts" && game.settings!.get("pneuma-combattools", "maNoAblation")) ? 0 : v.ablation, v.ammo, data.coverUp?2*v.ignorePercent-100:v.ignorePercent, data.coverUp?v.ignoreBelow/2:v.ignoreBelow, v.lethal, request.options),
       data.coverUp?{ablation:2*v.ablation,ignorePercent:v.ignorePercent,ignoreBelow:v.ignoreBelow}:undefined, native=>{damage.penetrated=Number(native.rawDamageDealt)>0&&native.hpReduction>0;});
+    if(damage.penetrated) {
+      const ammo=damage.result.ammoType;
+      if(ammo==="incendiary")await igniteTarget(actor);
+      else if(ammo)reportExposure(actor,ammo);
+    }
     damage.applications = [...(damage.applications ?? []), ...summaries];
     for (const id of effects) {
       const instant=id.startsWith("instant:")?id.slice(8):"";
@@ -213,7 +220,7 @@ export async function rollDamage(id: string, data: Exchange, send: Send, showDia
     // The native global application button is replaced with our original-defender control.
     roll.entityData = { actor: actor.id!, token: data.attacker.split(".").at(-1)!, item: item.id!, tokens: [] };
     const html = await nativeCard(roll);
-    const result = { nonce, damage: { html, values: damageValues(html), sixes: damageSixes(roll) } };
+    const result = { nonce, damage: { ammoType:(roll as NativeRoll & {rollCardExtraArgs?:{ammoType?:string}}).rollCardExtraArgs?.ammoType, html, values: damageValues(html), sixes: damageSixes(roll) } };
     retry.set(id, result);
     await send("damageCommit", result); retry.delete(id);
     const { Dice } = await nativeAPI();

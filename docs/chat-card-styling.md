@@ -411,3 +411,12 @@ Controls use [data-instant-action] and [data-instant-scope]: roll, apply, skip (
 Example: .pneuma-aoe-card .pneuma-instant-effect[data-effect="poison"] { border-color: var(--pneuma-ammo-color); }
 
 Browser fixtures verify compact card width, effect controls and animation. Live multi-client card visibility remains to be checked.
+
+
+## Broken Ribs movement warning
+
+Root: `.pneuma-injury-card.rollcard[data-injury="broken-ribs"]`. Retains native `.rollcard-top`, `.cpr-block` and `.rollcard-bottom` for the character/injury heading and movement warning. `[data-state]` is `pending`, `withdrawn` (movement reset to 4m/yd or less), or `applied`. Native ChatMessage speaker, whisper visibility and surrounding chat controls remain. This card contains no roll or armor application; its fixed damage goes directly to HP.
+
+`[data-ribs-apply]` is a standard button labeled **Apply 5 damage**, visible to the affected actor's owners and GMs. The card is whispered to those owners and GMs; NPC reminders are GM-only unless an NPC has an owner. Applied or withdrawn cards omit the button; ended-combat cards disable it. Server-side validation also rejects reset-combat cards. No timeout or automatic damage application. Area Evasion buttons retain their existing selectors and now show the leg restriction as a disabled-button tooltip, refreshing when injury/item state changes.
+
+Example selector: `.pneuma-injury-card[data-state="pending"] [data-ribs-apply] { font-weight: bold; }`.

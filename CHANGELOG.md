@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.0 - 2026-09-21
+
+- Make the compact Eye HUD available to all players; installed Biomonitor sharing exposes hovered vitals while keeping messages private.
+- Pin the HUD beside the Foundry sidebar, retain the compact minimized view and name placement, and move orange notifications outside the HUD.
+- Add active-only drug/pharma indicators, larger exposure lights, floating situational statuses, and optional per-player scanline message/effect animations.
+- Integrate native poison, biotoxin and incendiary damage with HUD warnings; restore native fire status end-turn damage.
+- Use native Active Effect durations where numeric durations are available. One minute becomes 20 combat rounds; timed effects end with combat, including manually applied effects, while critical injuries persist.
+- Block Evasion for Dismembered Leg and disabled installed Cyberlegs across single-target, area and native skill-roll workflows.
+- Warn when Broken Ribs movement exceeds 4m/yd on foot, with a manual Apply 5 damage button, reset handling and duplicate-application protection.
+- Document status/critical-injury automation gaps and remaining cleanup candidates.
+
+Known limitations: live Foundry multiplayer verification is pending. The previously reported missing residual smoke still needs live confirmation. Drug effects whose native data has no numeric duration are not automatically assigned a timer from their description; remaining mechanics are listed in docs/status-mechanics-audit.md.
+
 ## 0.4.0 - 2026-09-20
 
 - Known issue: residual smoke was reported missing in a live Foundry scene despite the server serving the current smoke implementation. Cause and live fix remain under investigation.

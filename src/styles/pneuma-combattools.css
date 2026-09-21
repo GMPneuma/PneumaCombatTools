@@ -296,21 +296,15 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 
 #token-hud .pneuma-close-combat-icon { width: 1em; height: 1em; vertical-align: -0.125em; }
 
-/* Compact Biomonitor. Only the alert text animates; no background polling. */
-#pneuma-eye-hud { position:fixed; z-index:70; width:min(370px,calc(100vw - 16px)); max-height:calc(100vh - 16px); overflow:auto; box-sizing:border-box; color:#b8efeb; background:linear-gradient(135deg,rgba(5,22,28,.95),rgba(5,12,21,.87)); border:1px solid #487a82; border-left:3px solid #64f1df; border-radius:2px 12px 2px 2px; box-shadow:0 8px 28px #0008,inset 0 0 20px #2ba8ba12; font:12px/1.45 monospace; text-shadow:none; }
+/* Compact Biomonitor HUD. */
+#pneuma-eye-hud { position:fixed; z-index:70; width:min(370px,calc(100vw - 16px)); max-height:calc(100vh - 16px); overflow:auto; box-sizing:border-box; color:#b8efeb; background:linear-gradient(135deg,rgba(5,22,28,.80),rgba(5,12,21,.72)); border:1px solid #487a82; border-left:3px solid #64f1df; border-radius:2px 12px 2px 2px; box-shadow:0 8px 28px #0008,inset 0 0 20px #2ba8ba12; font:12px/1.45 monospace; text-shadow:none; }
 #pneuma-eye-hud .pneuma-eye-header { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 10px; cursor:move; touch-action:none; border-bottom:1px solid #457078; }
-#pneuma-eye-hud .pneuma-eye-brand { color:#edfffd; letter-spacing:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 #pneuma-eye-hud .pneuma-eye-body { max-height:55vh; overflow:auto; padding:0 9px; }
 #pneuma-eye-hud button { font:inherit; color:inherit; box-shadow:none; border-radius:0; margin:0; cursor:pointer; }
 #pneuma-eye-hud .pneuma-eye-condition { display:block; width:100%; padding:6px 0; border:0; border-bottom:1px solid #35515d; background:transparent; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.4; }
 #pneuma-eye-hud .pneuma-eye-condition:last-child { border-bottom:0; }
-#pneuma-eye-hud .pneuma-eye-alert { display:block; width:100%; padding:6px 0; margin:5px 0; overflow:hidden; text-align:center; border:1px solid #e18d54; background:#512b204f; color:#ffd5b9; }
-#pneuma-eye-hud .pneuma-eye-ticker { display:inline-block; white-space:nowrap; letter-spacing:1px; animation:pneuma-eye-scroll 8s linear 3; transform:none; }
-@keyframes pneuma-eye-scroll { from { transform:translateX(100%); } to { transform:translateX(-100%); } }
-#pneuma-eye-hud .pneuma-eye-alert:hover .pneuma-eye-ticker, #pneuma-eye-hud .pneuma-eye-alert:focus-visible .pneuma-eye-ticker { animation-play-state:paused; }
 #pneuma-eye-hud .pneuma-eye-button { width:auto; flex-shrink:0; padding:2px 5px; line-height:1.4; font-size:10px; border:1px solid #608a90; background:#122c36; }
 #pneuma-eye-hud button:focus-visible { outline:1px solid #9cfff0; outline-offset:-1px; }
-@media (prefers-reduced-motion:reduce) { #pneuma-eye-hud .pneuma-eye-ticker { animation:none; transform:none; padding-left:6px; } }
 
 #pneuma-eye-hud .pneuma-eye-condition { display:flex; align-items:center; gap:7px; }
 #pneuma-eye-hud .pneuma-eye-condition-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -320,7 +314,6 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 /* Alerts lead; optional Biomonitor sits below them. */
 #pneuma-eye-hud { width:min(480px,calc(100vw - 16px)); }
 #pneuma-eye-hud .pneuma-eye-header { min-height:8px; padding:0 8px; border-bottom:0; }
-#pneuma-eye-hud .pneuma-eye-alert { font-size:24px; line-height:1.4; padding:7px 0; }
 #pneuma-eye-hud .pneuma-eye-condition,
 #pneuma-eye-hud .pneuma-eye-condition-empty { font:16px/1.4 monospace; }
 #pneuma-eye-hud .pneuma-eye-medical-label { font-size:10px; letter-spacing:2px; padding:6px 0 3px; color:#79a8b4; }
@@ -328,7 +321,6 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 /* Biomonitor vitals and dashboard indicators. */
 #pneuma-eye-hud { width:min(600px,calc(100vw - 16px)); }
 #pneuma-eye-hud .pneuma-eye-header { min-height:24px; justify-content:flex-end; }
-#pneuma-eye-hud .pneuma-eye-brand { margin-right:auto; }
 #pneuma-eye-hud .pneuma-eye-medical { display:grid; grid-template-columns:140px minmax(0,1fr); gap:12px; padding-bottom:9px; }
 #pneuma-eye-hud .pneuma-eye-vitals { color:#65e9bd; border-right:1px solid #35515d; padding-right:10px; }
 :is(#pneuma-eye-hud, .pneuma-hover-ekg) .pneuma-eye-vitals[data-state=wounded] { color:#ead56c; }
@@ -356,11 +348,9 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 #pneuma-eye-hud .pneuma-eye-lamp[data-kind=fire] { --lamp:#ff853e; }
 #pneuma-eye-hud .pneuma-eye-lamp.is-on { color:var(--lamp); }
 #pneuma-eye-hud .pneuma-eye-lamp.is-flashing { animation:pneuma-lamp 1.2s steps(2,end) infinite; }
-#pneuma-eye-hud .pneuma-eye-condition-empty,
-#pneuma-eye-hud .pneuma-eye-idle { color:#79a8b4; padding:8px 0; }
+#pneuma-eye-hud .pneuma-eye-condition-empty { color:#79a8b4; padding:8px 0; }
 #pneuma-eye-hud.is-minimized { width:44px; overflow:hidden; }
 #pneuma-eye-hud.is-minimized .pneuma-eye-header { padding:5px; justify-content:center; }
-#pneuma-eye-hud.is-minimized .pneuma-eye-brand { display:none; }
 #pneuma-eye-hud.is-minimized button { font-size:20px; border:0; background:transparent; }
 #pneuma-eye-hud.is-minimized.has-alert { border-color:#ffb45f; color:#ffb45f; box-shadow:0 0 12px #ffb45f66; }
 @keyframes pneuma-ekg { from { stroke-dashoffset:100; } to { stroke-dashoffset:0; } }
@@ -386,11 +376,6 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 #pneuma-eye-hud .conceal-hp:has(.pneuma-eye-ekg:focus) .pneuma-eye-hp { visibility:visible; }
 #pneuma-eye-hud .pneuma-eye-ekg:focus-visible { outline:1px solid currentColor; }
 
-#pneuma-eye-hud .pneuma-eye-messages { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px; }
-#pneuma-eye-hud .pneuma-eye-message-controls { display:grid; grid-template-columns:auto auto auto; align-items:center; gap:3px 5px; }
-#pneuma-eye-hud .pneuma-eye-message-index { text-align:center; white-space:nowrap; }
-#pneuma-eye-hud .pneuma-eye-message-controls .pneuma-eye-message-clear { grid-column:1 / -1; width:100%; }
-#pneuma-eye-hud .pneuma-eye-idle { grid-column:1 / -1; }
 
 :is(#pneuma-eye-hud, .pneuma-hover-ekg) .pneuma-eye-ekg { cursor:pointer; }
 #pneuma-eye-hud .pneuma-eye-ekg.is-paused .pneuma-eye-trace path { animation-play-state:paused; }
@@ -431,8 +416,6 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 .pneuma-grapple-card .pneuma-grapple-controls { display: flex; flex-wrap: wrap; gap: 4px; }
 .pneuma-grapple-card .pneuma-grapple-controls button { flex: 1 1 auto; width: auto; }
 .pneuma-grapple-card .pneuma-grapple-rolls > div { margin-block: 4px; }
-#pneuma-eye-hud .pneuma-eye-grapple { border-top: 1px solid currentColor; padding-block: 5px; }
-#pneuma-eye-hud .pneuma-eye-grapple-row { overflow-wrap: anywhere; font-size: 12px; line-height: 1.4; }
 
 #token-hud .pneuma-combat-menu .combat-heading { display: block; padding: 4px 6px; border: 1px solid; border-radius: 3px; text-align: left; }
 #token-hud .pneuma-combat-menu .combat-weapon-name { justify-content: flex-start; }
@@ -515,3 +498,66 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 .pneuma-instant-effect { border-left: 3px solid var(--pneuma-ammo-color); padding: 4px 6px; margin: 3px 0; min-width: 0; overflow-wrap: anywhere; }
 .pneuma-instant-effect button { width: auto; font-size: 11px; line-height: 20px; padding: 0 5px; }
 .pneuma-instant-effect .pneuma-instant-roll, .pneuma-instant-effect .pneuma-instant-damage { min-width: 0; }
+
+/* Approved compact HUD: preserve the three-column monitor; dock statuses inside and private notices outside. */
+#pneuma-eye-hud .pneuma-eye-drug-lights { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:4px; margin-top:5px; }
+#pneuma-eye-hud .pneuma-eye-drug-light { display:flex; align-items:center; justify-content:center; color:#637773; min-height:22px; font-size:18px; }
+#pneuma-eye-hud .pneuma-eye-drug-light[data-kind=drug].is-on { color:#ff666b; filter:drop-shadow(0 0 3px #ff666b55); }
+#pneuma-eye-hud .pneuma-eye-drug-light[data-kind=pharma].is-on { color:#65e9a0; filter:drop-shadow(0 0 3px #65e9a055); }
+#pneuma-eye-hud .pneuma-eye-lamp i { font-size:28px; line-height:32px; }
+#pneuma-eye-hud .pneuma-eye-lamp { font-size:10px; }
+#pneuma-eye-hud .pneuma-eye-lamp[data-kind=addict] { --lamp:#ff666b; }
+#pneuma-eye-hud .pneuma-eye-lamp[data-kind=jacked] { --lamp:#64f1df; }
+#pneuma-eye-hud .pneuma-eye-lamp[data-kind=unconscious] { --lamp:#ead56c; }
+#pneuma-eye-hud.is-shared { border-left-color:#69bdff; }
+#pneuma-eye-attachments { position:fixed; z-index:70; width:min(600px,calc(100vw - 16px)); font:12px/1.45 monospace; pointer-events:none; color:#b8efeb; }
+#pneuma-eye-hud .pneuma-eye-status-dock { position:absolute; right:9px; bottom:5px; max-width:calc(100% - 22px); display:flex; flex-direction:row-reverse; flex-wrap:wrap; gap:3px; z-index:1; }
+#pneuma-eye-hud.is-minimized .pneuma-eye-status-dock { display:none; }
+#pneuma-eye-hud .pneuma-eye-status-dock:empty { display:none; }
+#pneuma-eye-hud .pneuma-eye-situation { pointer-events:auto; color:#ead56c; background:linear-gradient(135deg,#272717,#171b12); border:1px solid #887d38; border-right:2px solid #ead56c; border-radius:0 0 5px 1px; padding:3px 7px; text-transform:uppercase; overflow-wrap:anywhere; max-width:100%; }
+
+#pneuma-eye-attachments .pneuma-eye-notifications { margin-top:9px; text-align:right; text-shadow:0 1px 3px #000,0 0 4px #000; }
+#pneuma-eye-attachments .pneuma-eye-notification { display:flex; justify-content:flex-end; align-items:baseline; gap:8px; padding:2px 0; font-size:24px; color:#ffb45f; }
+#pneuma-eye-attachments .pneuma-eye-notification.is-attack { color:#ffb45f; }
+#pneuma-eye-attachments .pneuma-eye-notification button { pointer-events:auto; font:inherit; color:inherit; background:transparent; border:0; width:auto; padding:0 3px; margin:0; box-shadow:none; text-shadow:inherit; }
+#pneuma-eye-attachments .pneuma-eye-notification > span { overflow-wrap:anywhere; }
+@media(max-width:480px) {
+ #pneuma-eye-hud .pneuma-eye-medical { grid-template-columns:115px minmax(0,1fr); gap:8px; }
+ #pneuma-eye-hud .pneuma-eye-vitals-column { grid-row:1/3; }
+ #pneuma-eye-hud .pneuma-eye-cyber { grid-column:2; border:0; padding-left:0; }
+}
+
+
+/* Active drugs occupy consecutive slots; no empty dashboard or reserved gaps. */
+#pneuma-eye-hud .pneuma-eye-drug-lights:empty { display:none; }
+#pneuma-eye-hud .pneuma-eye-drug-lights { display:flex; flex-wrap:wrap; justify-content:flex-start; gap:4px; }
+#pneuma-eye-hud .pneuma-eye-drug-light { flex:0 0 20px; }
+
+#pneuma-eye-attachments .pneuma-eye-notification > :first-child { min-width:0; overflow-wrap:anywhere; }
+#pneuma-eye-attachments .pneuma-eye-notification > button:last-child { flex-shrink:0; }
+
+/* No expanded title row: controls share the diagnostic heading. */
+#pneuma-eye-hud .pneuma-eye-cyber-heading { display:flex; align-items:center; justify-content:space-between; gap:4px; }
+#pneuma-eye-hud .pneuma-eye-cyber-heading .pneuma-eye-medical-label { min-width:0; }
+#pneuma-eye-hud .pneuma-eye-inline-controls { display:flex; align-items:center; gap:3px; flex-shrink:0; padding:0; }
+#pneuma-eye-hud .pneuma-eye-inline-controls .pneuma-eye-button { padding:0 4px; line-height:16px; }
+#pneuma-eye-attachments .pneuma-eye-identity { overflow-wrap:anywhere; text-align:left; color:#b8efeb; font:11px/1.4 monospace; margin-top:3px; text-shadow:0 1px 3px #000; }
+#pneuma-eye-attachments .pneuma-eye-preview-controls { display:flex; flex-wrap:wrap; gap:4px; pointer-events:auto; margin-top:6px; }
+#pneuma-eye-attachments .pneuma-eye-preview-controls button, #pneuma-eye-attachments .pneuma-eye-preview-controls select { width:auto; color:#b8efeb; background:#122c36; border:1px solid #608a90; font:11px/1.4 monospace; }
+
+/* Incoming text travels from screen center without changing the notification layout. */
+#pneuma-eye-attachments .pneuma-eye-notification > :first-child { display:block; transform-origin:center; }
+
+/* Manual dragging is retained in source but inactive while docked. */
+#pneuma-eye-hud.is-docked .pneuma-eye-header { cursor:default; touch-action:auto; }
+
+/* Scan beam rides the revealed edge, then becomes the central collapse line. */
+#pneuma-eye-attachments .pneuma-eye-notification > :first-child { position:relative; }
+#pneuma-eye-attachments .pneuma-eye-scanline { position:absolute; left:0; width:100%; height:1px; background:#ffb45f; box-shadow:0 0 4px #ffb45f,0 0 9px #ff8a24; pointer-events:none; transform:translateY(-1px); }
+
+/* Newly detected effects announce once, then illuminate their dashboard slot. */
+#pneuma-eye-hud [data-effect-key].is-arriving { visibility:hidden; }
+.pneuma-eye-effect-arrivals { position:fixed; inset:0; z-index:90; pointer-events:none; display:flex; flex-wrap:wrap; align-content:center; justify-content:center; align-items:center; gap:24px; padding:24px; }
+.pneuma-eye-effect-arrival { position:relative; display:flex; align-items:center; justify-content:center; width:clamp(80px,18vw,220px); height:clamp(80px,25vh,220px); font-size:clamp(72px,16vw,190px); filter:drop-shadow(0 0 9px currentColor); }
+.pneuma-eye-effect-beam { position:absolute; left:0; width:100%; height:2px; background:currentColor; box-shadow:0 0 12px currentColor; animation:pneuma-effect-scan .53s linear forwards; }
+@keyframes pneuma-effect-scan { from { top:0; opacity:1; } 98% { opacity:1; } to { top:100%; opacity:0; } }

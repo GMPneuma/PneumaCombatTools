@@ -72,3 +72,14 @@ test('rapid arrow moves use committed positions while prepared coordinates anima
  assert.equal(f.doc.x,-200);assert.equal(f.doc.y,-100);assert.equal(f.doc.elevation,5);
  assert.equal(currentMovement(f.doc).spent,0);
 });
+
+test('on-foot distance follows counter diagonals, resets, and actual escape rather than MOVE debt',async()=>{
+ const f=fixture();f.commit({x:100});assert.equal(currentMovement(f.doc).onFoot,2);
+ f.commit({y:100});assert.equal(currentMovement(f.doc).onFoot,2);
+ f.commit({x:200});assert.equal(currentMovement(f.doc).onFoot,4);
+ f.commit({x:300});assert.equal(currentMovement(f.doc).onFoot,6);
+ await resetMovement(f.token);assert.equal(currentMovement(f.doc).onFoot,0);
+ f.commit({x:400},{pneumaAreaMove:true,pneumaAreaDistance:8});assert.equal(currentMovement(f.doc).onFoot,8);assert.equal(currentMovement(f.doc).spent,0);
+ f.commit({x:500});assert.equal(currentMovement(f.doc).onFoot,10);await resetMovement(f.token);assert.equal(currentMovement(f.doc).onFoot,8);
+ f.combat.round=2;f.commit({x:500});assert.equal(currentMovement(f.doc).onFoot,2);
+});

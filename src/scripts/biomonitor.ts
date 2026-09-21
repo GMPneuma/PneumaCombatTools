@@ -10,13 +10,32 @@ export const lamps = [
   { id: "radiation", name: "Radiation", icon: "fa-radiation", match: /radiation/i },
   { id: "biotoxin", name: "Biotoxin", icon: "fa-biohazard", match: /biotoxin/i },
   { id: "fire", name: "On fire", icon: "fa-fire", match: /on[ _-]?fire|burning|incendiary/i },
+  { id: "addict", name: "Addict", icon: "fa-pills", match: /addiction|addicted/i },
+  { id: "jacked", name: "Jacked In", icon: "fa-plug", match: /^jacked in$/i },
+  { id: "unconscious", name: "Unconscious", icon: "fa-bed", match: /unconscious/i },
 ] as const;
 export type LampId = typeof lamps[number]["id"];
 const seen = new Map<string, Set<LampId>>();
 const activationOrder = new Map<string, LampId[]>();
 const flashes = new Map<string, Map<LampId, number>>();
-export function signalExposure(uuid: string, kind: LampId, seconds: number) {
+const roundExposures = new Map<string, Set<LampId>>();
+const clearedExposures = new Map<string, Set<LampId>>();
+const roundKinds: LampId[] = ["poison", "biotoxin"];
+/** Clear visual exposure reports, without changing actor effects or damage. */
+export function clearRoundExposures() {
+  for (const uuid of new Set([...seen.keys(), ...roundExposures.keys()])) {
+    clearedExposures.set(uuid, new Set(roundKinds.filter(kind => seen.get(uuid)?.has(kind))));
+    for (const kind of roundKinds) flashes.get(uuid)?.delete(kind);
+  }
+  roundExposures.clear();
+}
+export function signalExposure(uuid: string, kind: LampId, seconds: number, untilRoundEnd = false) {
   if (!lamps.some(lamp => lamp.id === kind)) return;
+  clearedExposures.get(uuid)?.delete(kind);
+  if (untilRoundEnd && roundKinds.includes(kind)) {
+    const held = roundExposures.get(uuid) ?? new Set<LampId>();
+    held.add(kind); roundExposures.set(uuid, held);
+  }
   let events = flashes.get(uuid);
   if (!events) { events = new Map(); flashes.set(uuid, events); }
   const order = activationOrder.get(uuid) ?? [];
@@ -24,11 +43,21 @@ export function signalExposure(uuid: string, kind: LampId, seconds: number) {
   activationOrder.set(uuid, order);
   events.set(kind, Date.now() + Math.max(0, Math.min(seconds, 60)) * 1000);
 }
-export function indicatorState(uuid: string, names: string[], seconds: number) {
+export function indicatorState(uuid: string, names: string[], seconds: number, untilRoundEnd = false) {
   const active = new Set<LampId>(names.flatMap(name => lamps.filter(lamp => lamp.match.test(name)).map(lamp => lamp.id)));
   const previous = seen.get(uuid);
-  if (previous) for (const kind of active) if (!previous.has(kind)) signalExposure(uuid, kind, seconds);
-  seen.set(uuid, active);
+  if (previous) for (const kind of active) if (!previous.has(kind)) signalExposure(uuid, kind, seconds, untilRoundEnd);
+  seen.set(uuid, new Set(active));
+  for (const kind of clearedExposures.get(uuid) ?? []) {
+    if (!active.has(kind)) clearedExposures.get(uuid)!.delete(kind);
+    else active.delete(kind);
+  }
+  if (untilRoundEnd) {
+    const held = roundExposures.get(uuid) ?? new Set<LampId>();
+    for (const kind of roundKinds) if (active.has(kind)) held.add(kind);
+    roundExposures.set(uuid, held);
+    for (const kind of held) active.add(kind);
+  }
   const events = flashes.get(uuid);
   const now = Date.now();
   for (const [kind, expires] of events ?? []) if (expires <= now) events!.delete(kind);
@@ -38,7 +67,7 @@ export function indicatorState(uuid: string, names: string[], seconds: number) {
   activationOrder.set(uuid, order);
   return [...lamps].sort((a, b) => (order.indexOf(a.id) < 0 ? 99 : order.indexOf(a.id)) - (order.indexOf(b.id) < 0 ? 99 : order.indexOf(b.id))).map(lamp => ({ ...lamp, on: active.has(lamp.id) || !!events?.has(lamp.id), flashing: !!events?.has(lamp.id), expires: events?.get(lamp.id) }));
 }
-export function resetMonitor() { seen.clear(); flashes.clear(); activationOrder.clear(); }
+export function resetMonitor() { seen.clear(); flashes.clear(); activationOrder.clear(); roundExposures.clear(); clearedExposures.clear(); }
 
 /** Shared visual only; callers supply their own interaction and visibility. */
 export function createEKGTrace(state: VitalState | "unknown"): SVGSVGElement {

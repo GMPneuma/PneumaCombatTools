@@ -41,3 +41,8 @@ Smoke survives chat deletion, attack-area hiding and scene reload. It expires af
 The module API exposes instantEffects.catalog and instantEffects.create(actor, id, sourceMessage?) for additional workflows. Creating an effect card does not bypass target permissions or the coordinating GM.
 
 Native integration references: cached CPR v0.92.4 roll creation, damage metadata and native application capture; Foundry v12 native measured-template cell selection and primary-canvas sorting. Automated tests exercise resistance boundaries, HP application, temporary/permanent injury separation, sleep/fire removal, permission/state checks, ammunition snapshots, Smart retry, smoke expiry/persistence and browser rendering with PIXI 7. Live Foundry multiplayer, actual scene vision/fog and native item execution remain to be checked in a running world.
+
+
+## Native effect update
+
+See [native-effects.md](native-effects.md). The native status/duration workflow supersedes custom instantLifetime identity and world-time-only expiry. One minute is 20 combat rounds; combat end clears timed non-injury effects regardless of how applied. Critical injuries are preserved.

@@ -100,9 +100,9 @@ Improvised damage is now selected by the attacker (player or GM), after agreeing
 
 ### Cybereye overlay
 
-Select an owned token to display existing injuries/statuses and pending Combat Tools attack alerts. In Configure Settings → Pneuma's Combat Tools, enable **Test status HUD** and save to try a safe sample. Drag the header or use **End test**. See [HUD guide](docs/cybereye-hud.md).
+Select an owned token to display existing injuries/statuses and pending Combat Tools attack alerts. In Configure Settings → Pneuma's Combat Tools, enable **Test status HUD** and save to try a safe sample. The HUD is pinned beside the Foundry sidebar; use **End test** to leave the preview. See [HUD guide](docs/cybereye-hud.md).
 
-The HUD now shows alerts independently of implants. Condition rows require an installed Biomonitor or the world override. GMs can use **Send HUD Message** on the GM HUD. See the [current HUD guide](docs/cybereye-hud.md).
+The full HUD is available without an implant. An installed Biomonitor allows other viewers to see that actor's stats by hovering their visible token. Notifications stay private and outside the HUD. GMs can use **Send HUD Message** on the GM HUD. See the [current HUD guide](docs/cybereye-hud.md).
 
 Developer integration: [HUD messaging API](docs/hud-api.md).
 
@@ -120,7 +120,7 @@ Foundry must load the module with socket support enabled. Copying newer module f
 
 During started combat, square-grid tokens show a movement start outline and spent/maximum counter with a Reset box beneath it. See [Movement](docs/movement.md).
 
-GMs can use the token HUD lightning bolt to apply EMP after resolving the source's resistance check. Choose items manually, ask the player, or draw randomly. Disabled cyberware appears in Biomonitor Implant Integrity and restores when combat ends. See [EMP](docs/emp.md).
+Resolve EMP through its Instant Effect card. Choose items manually, ask the player, or draw randomly. Disabled cyberware appears in Biomonitor Implant Integrity and restores when combat ends. See [EMP](docs/emp.md).
 
 Medtech viewers can see a hovered token EKG below the token. The GM world **Always show EKG** setting enables it for everyone. See [Hover EKG](docs/hover-ekg.md).
 

@@ -1,3 +1,4 @@
+import {effectDuration,durationExpired,hasDuration} from "./effect-duration.js";
 import {masterStatuses} from "./status-catalog.js";
 import {applyCombatStatus, syncActorStatuses} from "./status-sync.js";
 import {empGM} from "./emp-state.js";
@@ -5,47 +6,105 @@ const M="pneuma-combattools", key="flags."+M+".instantLifetime";
 interface Lifetime {kind:"injury"|"sleep"|"fire";expires?:number;lastTurn?:string}
 const life=(doc:object)=>foundry.utils.getProperty(doc,key) as Lifetime|undefined;
 const status=(name:string)=>{const s=masterStatuses.find(s=>s.name===name);if(!s)throw Error("Missing status: "+name);return s;};
-const active=(e:ActiveEffect)=>!e.disabled;
+const active=(e:ActiveEffect)=>!e.disabled&&!e.isSuppressed&&!foundry.utils.getProperty(e,"system.isSuppressed");
+const allEffects=(actor:Actor):ActiveEffect[]=>Array.from(actor.allApplicableEffects?.()??actor.effects);
+const fireLevels=()=>[[status("On Fire (Mild)").id,2],[status("On Fire (Strong)").id,4],[status("On Fire (Deadly)").id,6]] as const;
+const fireDamage=(e:ActiveEffect)=>Math.max(0,...fireLevels().filter(([id])=>e.statuses.has(id)).map(([,damage])=>damage),life(e)?.kind==="fire"?2:0);
+const sleepEffect=(e:ActiveEffect)=>e.statuses.has(status("Unconscious").id)&&(e.name==="Sleep"||life(e)?.kind==="sleep");
+const timedMarker=(actor:Actor,item:Item)=>String(item.type)==="criticalInjury"?actor.effects.find(e=>!!item.uuid&&e.origin===item.uuid&&hasDuration(e.duration)):undefined;
 /** Import the native injury only when absent. Repeated temporary injuries extend their own expiry. */
 export async function temporaryInjury(actor:Actor,name:string) {
   const s=status(name),b=s.binding!;
   const matches=actor.items.filter(i=>String(i.type)==="criticalInjury"&&(i.name===b.itemName||foundry.utils.getProperty(i,"flags."+M+".statusId")===s.id||String(foundry.utils.getProperty(i,"_stats.compendiumSource")??foundry.utils.getProperty(i,"flags.core.sourceId")??"").endsWith("."+b.itemId)));
-  if(matches.some(i=>!life(i)))return;
-  const expires=game.time!.worldTime+60;
-  if(matches.length){for(const i of matches)await i.update({[key]:{kind:"injury",expires}} as never);return;}
+  if(matches.some(i=>!life(i)&&!timedMarker(actor,i)))return;
+  const duration=effectDuration(60);
+  if(matches.length){for(const i of matches){const marker=timedMarker(actor,i);if(marker)await marker.update({duration} as never);else await i.update({[key]:{kind:"injury",expires:game.time!.worldTime+60}} as never);}return;}
   const source=await game.packs!.get(b.pack)?.getDocument(b.itemId) as Item|undefined;
   if(!source)throw Error("Native "+name+" injury is unavailable.");
   const data=source.toObject();delete (data as {_id?:string})._id;
-  foundry.utils.setProperty(data,key,{kind:"injury",expires});
   foundry.utils.setProperty(data,"flags."+M+".statusId",s.id);
-  await actor.createEmbeddedDocuments("Item",[data] as never,{pneumaStatusSync:true} as never);
+  const [item]=(await actor.createEmbeddedDocuments("Item",[data] as never,{pneumaStatusSync:true} as never))??[];
   await syncActorStatuses(actor);
+  const marker=actor.effects.find(e=>e.statuses.has(s.id));
+  if(marker&&item)await marker.update({duration,origin:item.uuid} as never);
+}
+/** Adopt previously saved instant effects without duplicating native conditions. */
+async function migrateInstantActor(actor:Actor) {
+  for(const item of actor.items) {
+    const old=life(item);
+    if(old?.kind!=="injury"||old.expires===undefined)continue;
+    await syncActorStatuses(actor);
+    const id=foundry.utils.getProperty(item,"flags."+M+".statusId");
+    const marker=actor.effects.find(e=>typeof id==="string"&&e.statuses.has(id));
+    if(!marker)continue;
+    await marker.update({origin:item.uuid,duration:effectDuration(Math.max(0,old.expires-game.time!.worldTime))} as never);
+    await item.update({["flags."+M+".-=instantLifetime"]:null} as never);
+  }
+  for(const effect of actor.effects) {
+    const old=life(effect);if(!old||old.kind==="injury")continue;
+    if(old.lastTurn)await actor.update({["flags."+M+".lastBurnTurn"]:old.lastTurn} as never);
+    await effect.update({
+      name:old.kind==="sleep"?"Sleep":status("On Fire (Mild)").name,
+      statuses:old.kind==="fire"?[status("On Fire (Mild)").id]:[...effect.statuses],
+      ...(old.expires!==undefined?{duration:effectDuration(Math.max(0,old.expires-game.time!.worldTime))}:{}),
+      ["flags."+M+".-=instantLifetime"]:null
+    } as never);
+  }
 }
 const hpValues=new Map<string,number>();
 export async function sleepTarget(actor:Actor) {
   hpValues.set(actor.uuid,Number(foundry.utils.getProperty(actor,"system.derivedStats.hp.value")));
   await applyCombatStatus(actor,status("Prone").id);
   const s=status("Unconscious"),matches=actor.effects.filter(e=>active(e)&&e.statuses.has(s.id));
-  if(matches.some(e=>!life(e)))return;
-  const expires=game.time!.worldTime+60;
-  if(matches.length){for(const e of matches)await e.update({[key]:{kind:"sleep",expires}} as never);return;}
-  await actor.createEmbeddedDocuments("ActiveEffect",[{name:"Sleep — Unconscious",img:s.img,statuses:[s.id],changes:[],duration:{seconds:60,startTime:game.time!.worldTime},flags:{[M]:{instantLifetime:{kind:"sleep",expires}}}}] as never);
+  if(matches.some(e=>!sleepEffect(e)))return;
+  const duration=effectDuration(60);
+  if(matches.length){for(const e of matches)await e.update({name:"Sleep",duration,["flags."+M+".-=instantLifetime"]:null} as never);return;}
+  await actor.createEmbeddedDocuments("ActiveEffect",[{name:"Sleep",img:s.img,statuses:[s.id],changes:[],duration}] as never);
 }
 export async function igniteTarget(actor:Actor) {
-  if(actor.effects.some(e=>active(e)&&life(e)?.kind==="fire"))return;
+  if(allEffects(actor).some(e=>active(e)&&fireDamage(e)>0))return;
   const s=status("On Fire (Mild)");
-  await actor.createEmbeddedDocuments("ActiveEffect",[{name:"Incendiary — On Fire (Mild)",img:s.img,statuses:[s.id],changes:[],flags:{[M]:{instantLifetime:{kind:"fire"}}}}] as never);
+  await actor.createEmbeddedDocuments("ActiveEffect",[{name:s.name,img:s.img,statuses:[s.id],changes:[]}] as never);
 }
 export async function clearInstantCondition(actor:Actor,kind:"sleep"|"fire") {
-  const ids=actor.effects.filter(e=>life(e)?.kind===kind).map(e=>e.id!);
-  if(ids.length)await actor.deleteEmbeddedDocuments("ActiveEffect",ids);
+  for(const effect of allEffects(actor).filter(e=>kind==="fire"?fireDamage(e)>0:sleepEffect(e))) {
+    if(effect.parent===actor)await actor.deleteEmbeddedDocuments("ActiveEffect",[effect.id!]);
+    else await effect.update({disabled:true} as never);
+  }
 }
 export async function expireInstantActor(actor:Actor,now=game.time!.worldTime) {
-  const items=actor.items.filter(i=>life(i)?.expires!==undefined&&life(i)!.expires!<=now).map(i=>i.id!);
+  const items=actor.items.filter(i=>{const marker=timedMarker(actor,i);return marker?durationExpired(marker.duration,now):life(i)?.expires!==undefined&&life(i)!.expires!<=now;}).map(i=>i.id!);
   if(items.length){await actor.deleteEmbeddedDocuments("Item",items,{pneumaStatusSync:true} as never);await syncActorStatuses(actor);}
-  const effects=actor.effects.filter(e=>life(e)?.expires!==undefined&&life(e)!.expires!<=now).map(e=>e.id!);
-  if(effects.length)await actor.deleteEmbeddedDocuments("ActiveEffect",effects);
+  let itemEffectsChanged=false;
+  for(const effect of allEffects(actor)) {
+    const expired=hasDuration(effect.duration)?durationExpired(effect.duration,now):life(effect)?.expires!==undefined&&life(effect)!.expires!<=now;
+    if(!expired||effect.disabled)continue;
+    if(effect.parent===actor)await actor.deleteEmbeddedDocuments("ActiveEffect",[effect.id!]);
+    else {await effect.update({disabled:true} as never);itemEffectsChanged=true;}
+  }
+  if(itemEffectsChanged)await syncActorStatuses(actor);
 }
+
+/** Native durations are enough to qualify; manually applied effects are included. */
+export async function finishTimedEffects(combat:Combat) {
+  const participants=new Set(Array.from(combat.combatants??[]).map(c=>c.actor?.uuid));
+  for(const actor of actors()) {
+    let changed=false;
+    for(const effect of allEffects(actor)) {
+      const injury=String((effect.parent as Item)?.type)==="criticalInjury"||masterStatuses.some(s=>s.binding?.kind==="injury"&&effect.statuses.has(s.id));
+      if(injury||!hasDuration(effect.duration))continue;
+      const linked=effect.duration?.combat;
+      const combatId=typeof linked==="string"?linked:linked?.id;
+      if(combatId&&combatId!==combat.id)continue;
+      if(!combatId&&!participants.has(actor.uuid))continue;
+      if(effect.parent===actor)await actor.deleteEmbeddedDocuments("ActiveEffect",[effect.id!]);
+      else await effect.update({disabled:true} as never);
+      changed=true;
+    }
+    if(changed)await syncActorStatuses(actor);
+  }
+}
+
 function actors():Actor[] {
   const all=new Map<string,Actor>();
   for(const a of game.actors??[])all.set(a.uuid,a);
@@ -55,13 +114,13 @@ function actors():Actor[] {
 let work:Promise<unknown>=Promise.resolve();
 const enqueue=(run:()=>Promise<unknown>)=>{if(game.user?.id!==empGM()?.id)return;work=work.catch(()=>{}).then(run);void work.catch(e=>ui.notifications!.error("Instant effects: "+(e as Error).message));};
 export async function burnTurn(actor:Actor,turn:string) {
-  const effects=actor.effects.filter(e=>active(e)&&life(e)?.kind==="fire");
-  if(!effects.length||effects.some(e=>life(e)?.lastTurn===turn))return;
+  const effects=allEffects(actor).filter(e=>active(e)&&fireDamage(e)>0);
+  if(!effects.length||foundry.utils.getProperty(actor,"flags."+M+".lastBurnTurn")===turn||effects.some(e=>life(e)?.lastTurn===turn))return;
   // Persist the turn before HP writes so duplicate combat updates cannot burn twice.
-  for(const e of effects)await e.update({[key+".lastTurn"]:turn} as never);
+
   const hp=Number(foundry.utils.getProperty(actor,"system.derivedStats.hp.value"));
   if(!Number.isFinite(hp))throw Error("Target HP is unavailable.");
-  await actor.update({"system.derivedStats.hp.value":hp-2} as never);
+  await actor.update({"system.derivedStats.hp.value":hp-Math.max(...effects.map(fireDamage)),["flags."+M+".lastBurnTurn"]:turn} as never);
 }
 export function registerInstantLifetimes() {
   type Turn={actor?:Actor;round:number;turn:number;started:boolean};
@@ -71,7 +130,7 @@ export function registerInstantLifetimes() {
   const refresh=()=>{
     for(const a of actors())rememberHP(a);
     for(const c of game.combats??[])rememberCombat(c);
-    enqueue(async()=>{for(const a of actors())await expireInstantActor(a);});
+    enqueue(async()=>{for(const a of actors()){await migrateInstantActor(a);await expireInstantActor(a);}});
   };
   Hooks.once("ready",refresh);Hooks.on("canvasReady",refresh);
   Hooks.on("createActor",rememberHP);Hooks.on("createToken",(t:TokenDocument)=>{if(t.actor)rememberHP(t.actor);});
@@ -81,8 +140,8 @@ export function registerInstantLifetimes() {
   Hooks.on("preUpdateActor",rememberHP);
   Hooks.on("updateActor",(a:Actor)=>{const before=hpValues.get(a.uuid),after=Number(foundry.utils.getProperty(a,"system.derivedStats.hp.value"));hpValues.set(a.uuid,after);if(before!==undefined&&after<before)enqueue(()=>clearInstantCondition(a,"sleep"));});
   Hooks.on("createCombat",rememberCombat);Hooks.on("preUpdateCombat",rememberCombat);
-  Hooks.on("deleteCombat",(c:Combat)=>previous.delete(c.id!));
-  Hooks.on("updateCombat",(c:Combat)=>{const p=previous.get(c.id!);rememberCombat(c);if(!p?.actor||!p.started||!c.started)return;
+  Hooks.on("deleteCombat",(c:Combat)=>{previous.delete(c.id!);enqueue(()=>finishTimedEffects(c));});
+  Hooks.on("updateCombat",(c:Combat)=>{const p=previous.get(c.id!);rememberCombat(c);if(p?.started&&!c.started){enqueue(()=>finishTimedEffects(c));return;}enqueue(async()=>{for(const a of actors())await expireInstantActor(a);});if(!p?.actor||!p.started||!c.started)return;
     if((c.round??0)>p.round||c.round===p.round&&(c.turn??0)>p.turn)enqueue(()=>burnTurn(p.actor!,c.id+":"+p.round+":"+p.turn));
   });
 }

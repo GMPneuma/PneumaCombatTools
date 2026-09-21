@@ -7,7 +7,7 @@ const hud = game.modules.get("pneuma-combattools")?.api?.hud;
 if (!hud) return; // Module absent, inactive, or unsupported game system.
 ```
 
-The HUD shows one message at a time. Previous/next arrows and a position indicator browse current messages. Clear dismisses only the displayed message on this client. Incoming attacks share the selector; clicking an attack opens its chat card, while Clear acknowledges only that notice. Neither action resolves the attack.
+Up to three notifications appear as text outside the HUD. Each has its own Clear control. Incoming attacks take priority, link to their chat card and remain until resolved or dismissed. Clear only dismisses the local notification. Ordinary messages expire; there is no navigation or saved history. Viewing another character never replaces the viewer's messages.
 
 ## Send on this client
 
@@ -27,7 +27,7 @@ const id = hud.send({
 | source | Required module ID or namespace, 1–100 characters. |
 | id | Optional stable ID, 1–100 characters. Omit to generate one. |
 | text | Required plain text, 1–200 characters after trimming. HTML is displayed literally. |
-| duration | Seconds; defaults to 60. Range 0–86400. Zero remains until cleared, removed, or the client reloads. |
+| duration | Seconds; defaults to 60. Range 0–86400. Legacy zero now uses the 60-second default. |
 | recipients | Defaults to `"self"`. GM clients may also use `"players"` (all connected non-GMs), or an array of connected user IDs. |
 
 The pair `source` + `id` identifies a message. Sending that pair again updates its text and resets its expiry without adding a duplicate. If already cleared, sending it again creates a new notice. Other namespaces with the same ID do not collide. Updating recipients only sends to the newly specified audience; remove from an old audience explicitly if needed.
@@ -52,7 +52,7 @@ hud.send({
 });
 ```
 
-Call once from the client responsible for the event. Do not send from every client's event hook. Non-GMs can send locally; cross-client API calls throw on non-GM clients. Delivery uses Foundry's existing module socket and is best-effort to currently connected clients, without acknowledgments or offline replay. Messages are not a private communication channel.
+Call once from the client responsible for the event. Do not send from every client's event hook. Non-GMs can send locally; cross-client API calls throw on non-GM clients. Delivery uses Foundry's existing module socket and is best-effort to currently connected clients, without acknowledgments or offline replay. Messages are shown only to addressed viewers and never shared through Biomonitor hover. Socket delivery does not provide a separate encrypted communication channel.
 
 ## Clear, remove and inspect
 
@@ -73,13 +73,13 @@ const messages = hud.list();
 
 `remove(source, id, recipients = "self"): void` uses the same audience rules as send.
 `dismiss(source, id): void` always acts locally.
-`list(): HUDNotice[]` returns copies; `expires` is a Unix timestamp in milliseconds, or zero. Native attack notices and legacy world-setting messages are not part of this list.
+`list(): HUDNotice[]` returns copies; `expires` is a Unix timestamp in milliseconds, for each message. Native attack notices and legacy world-setting messages are not part of this list.
 `version` is 1.
 
 ## Behavior and limits
 
 - Messages are temporary client-session state; reloading clears them. There is no saved message history.
-- At most 100 API messages are retained per client; inserting another drops the oldest.
+- At most three API messages are retained per client; inserting another drops the oldest. Incoming attacks take priority within the three visible rows.
 - Expiry uses a one-shot timer, not polling.
 - A disabled HUD stays disabled; a minimized HUD remains minimized and highlights its notification icon when messages exist.
 - Implant ownership does not gate messages.
@@ -87,4 +87,4 @@ const messages = hud.list();
 - No arbitrary callbacks, macros, HTML, or actor changes execute through this API.
 - The GM HUD Send HUD Message control adds messages rather than replacing the previous message. The old single-message setting is read only for compatibility with already-sent messages.
 
-Browser fixtures verify message update, expiry, clearing, navigation, recipient filtering and the non-GM cross-client restriction. Live multi-client Foundry verification remains outstanding.
+Browser fixtures verify message update, expiry, clearing, message capacity, recipient filtering and the non-GM cross-client restriction. Live multi-client Foundry verification remains outstanding.

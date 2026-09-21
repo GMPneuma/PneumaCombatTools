@@ -43,7 +43,7 @@ export async function moveEvader(token:Token,point:Point,costs:boolean,borrow:bo
       // Reserve first so an interrupted move cannot grant movement twice.
       await entry.participant.update({[`flags.${MODULE}.${key}`]:entry.current} as never);
     }
-    await token.document.update({x:point.x-token.w/2,y:point.y-token.h/2,[`flags.${MODULE}.aoeEscape`]:{id:receipt,cost}} as never, {pneumaAreaMove:true} as never);
+    await token.document.update({x:point.x-token.w/2,y:point.y-token.h/2,[`flags.${MODULE}.aoeEscape`]:{id:receipt,cost}} as never, {pneumaAreaMove:true,pneumaAreaDistance:distanceMoved(token.center,point)} as never);
     return cost;
   });
 }

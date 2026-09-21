@@ -34,7 +34,7 @@ export async function resetMovement(token:Token) {
   if(!record||!token.isOwner||!active())return;
   const grapple=grappleFor(token.document);
   if(grapple?.target.token===token.document.uuid)return ui.notifications!.warn("A held token moves with its grappler.");
-  await token.document.update({x:record.start.x,y:record.start.y,elevation:record.start.elevation,[flag]:{...record,spent:0,last:null,hidden:true}} as never,{pneumaMovementReset:true,pneumaMoveDelta:-record.spent*metersPerSpace()} as never);
+  await token.document.update({x:record.start.x,y:record.start.y,elevation:record.start.elevation,[flag]:{...record,spent:0,onFoot:Math.max(0,(record.onFoot??record.spent*metersPerSpace())-record.spent*metersPerSpace()),last:null,hidden:true}} as never,{pneumaMovementReset:true,pneumaMoveDelta:-record.spent*metersPerSpace()} as never);
 }
 function metersPerSpace(){const units=String(canvas.scene?.grid.units??"").toLowerCase();return Number(canvas.scene?.grid.distance??2)*(["ft","feet","foot"].includes(units)?0.3048:1);}
 interface Display {container:PIXI.Container;marker:PIXI.Graphics;hud:HTMLDivElement;label:HTMLInputElement;run:HTMLSpanElement;reset:HTMLButtonElement;markerKey?:string;stateKey?:string}
@@ -105,11 +105,12 @@ export function registerMovement(){
     if(options.pneumaAreaMove||grapple?.target.token===doc.uuid){
       // Resolved evasion / held-token placement is a new reset origin; never undo another workflow's movement.
       options.pneumaMoveDelta=0;
-      const fresh=initial(doc);if(fresh)changes[flag]={...fresh,start:{...to,elevation:Number(changes.elevation??from.elevation)}};
+      const previous=currentMovement(doc),fresh=initial(doc);if(fresh)changes[flag]={...fresh,onFoot:(previous?.onFoot??(previous?.spent??0)*metersPerSpace())+(options.pneumaAreaMove?Number(options.pneumaAreaDistance??0):0),start:{...to,elevation:Number(changes.elevation??from.elevation)}};
       return;
     }
     const record=nextRecord(doc.object,doc,to);if(!record)return;
     options.pneumaMoveDelta=(record.spent-(currentMovement(doc)?.spent??0))*metersPerSpace();
+    record.onFoot=(currentMovement(doc)?.onFoot??(currentMovement(doc)?.spent??0)*metersPerSpace())+Number(options.pneumaMoveDelta);
     changes[flag]=record;
   });
   const queued=new Set<Token>();let scheduled=false;

@@ -1,3 +1,4 @@
+import {evasionBlocked} from "./injury-rules.js";
 import { empDisabled } from "./emp-rules.js";
 import { requireCombatSocket } from "./socket-health.js";
 import { grappleWeaponBlocked } from "./grapple/state.js";
@@ -85,6 +86,8 @@ async function tokenActor(uuid: string): Promise<Actor> {
   return token.actor;
 }
 export function offer(actor: Actor, ranged: boolean, combat?: Combat): EvasionOffer {
+  const blocked=evasionBlocked(actor);
+  if(blocked)return {allowed:false,penalty:0,cost:0,free:0,reason:blocked};
   if (!ranged) return { allowed: true, penalty: 0, cost: 0, free: 0, reason: "Free evasion" };
   const get = (key: string) => foundry.utils.getProperty(actor, key);
   const items = Array.from(actor.items);

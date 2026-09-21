@@ -40,8 +40,9 @@ function receiveHUDMessage(wire: HUDWire) {
   if (wire.action !== "send" || typeof message.text !== "string" || !message.text.trim() || message.text.length > 200
     || !Number.isFinite(message.expires) || message.expires < 0 || (message.expires !== 0 && message.expires <= Date.now())) return;
   const key = hudMessageKey(message);
-  if (!notices.has(key) && notices.size >= 100) notices.delete(notices.keys().next().value!);
-  notices.set(key, { source: message.source, id: message.id, text: message.text, expires: message.expires });
+  if (notices.has(key)) notices.delete(key);
+  if (notices.size >= 3) notices.delete(notices.keys().next().value!);
+  notices.set(key, { source: message.source, id: message.id, text: message.text, expires: message.expires || Date.now() + 60000 });
   refreshMessages();
 }
 function recipientsFor(target: HUDMessageOptions["recipients"]): string[] {
@@ -59,7 +60,7 @@ function dispatchHUDMessage(wire: HUDWire) {
 export function postHUDMessage(options: HUDMessageOptions): string {
   if (!options || !validPart(options.source) || (options.id !== undefined && !validPart(options.id))) throw new Error("Provide a source and optional ID of 1–100 characters.");
   if (typeof options.text !== "string" || !options.text.trim() || options.text.trim().length > 200) throw new Error("HUD text must contain 1–200 characters.");
-  const duration = options.duration ?? 60;
+  const duration = options.duration === 0 ? 60 : options.duration ?? 60;
   if (!Number.isFinite(duration) || duration < 0 || duration > 86400) throw new Error("HUD duration must be 0–86400 seconds.");
   const recipients = recipientsFor(options.recipients);
   const id = options.id ?? foundry.utils.randomID();

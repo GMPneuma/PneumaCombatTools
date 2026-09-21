@@ -1,3 +1,4 @@
+import {reportExposure,registerEffectEvents} from "./effect-events.js";
 import {createSmoke} from "./aoe/smoke.js";
 import {instantEffects,instantId,type InstantId,escapeInstant as esc} from "./instant-catalog.js";
 import {temporaryInjury,sleepTarget,igniteTarget,clearInstantCondition,registerInstantLifetimes} from "./instant-lifetime.js";
@@ -65,7 +66,7 @@ async function resolveInstant(s:InstantState,req:InstantRequest,user:User,save:(
   }
   s.state="applying";await save();
   try {
-    if(e.damage){const hp=Number(foundry.utils.getProperty(actor,"system.derivedStats.hp.value"));if(!Number.isFinite(hp))throw Error("Target HP unavailable.");await actor.update({"system.derivedStats.hp.value":hp-s.damage!} as never);s.summary=s.damage+" direct HP damage; armor unchanged";}
+    if(e.damage){const hp=Number(foundry.utils.getProperty(actor,"system.derivedStats.hp.value"));if(!Number.isFinite(hp))throw Error("Target HP unavailable.");await actor.update({"system.derivedStats.hp.value":hp-s.damage!} as never);s.summary=s.damage+" direct HP damage; armor unchanged";reportExposure(actor,s.id);}
     else if(s.id==="emp") {await createEmp(actor,{count:2,chooser:"gm",mode:"equal",policy:{foundational:true,cascade:true,electronics:true,immune:game.settings!.get(M,"empImmunity").split(/[\n,;]/)}});s.summary="EMP selection created — GM chooses two items; until combat ends";}
     else if(s.id==="flashbang"||s.id==="teargas") {await temporaryInjury(actor,"Damaged Eye");if(s.id==="flashbang")await temporaryInjury(actor,"Damaged Ear");s.summary="Temporary native injury effects: 1 minute; no bonus damage";}
     else if(s.id==="smoke") {
@@ -125,6 +126,7 @@ function send(message:string,request:InstantRequest) {
   return new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(w.id);reject(Error("Effect not confirmed by GM."));},30000);pending.set(w.id,{resolve,reject,timer});game.socket!.emit("module."+M,w);});
 }
 export function registerInstantEffects() {
+  registerEffectEvents();
   registerInstantLifetimes();
   Hooks.once("ready",()=>{
     const module=game.modules!.get(M) as unknown as {api?:Record<string,unknown>};module.api={...module.api,instantEffects:{catalog:instantEffects,create:createInstantCard}};

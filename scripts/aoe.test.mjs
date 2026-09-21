@@ -294,3 +294,14 @@ test("smart second chance uses only base 10 and Luck, before scatter, with one r
  globalThis.SmartRoll=class {constructor(){this.luck=0;this.mods=[];this.additionalMods=[];this.resultTotal=18;this.rollCard="native"}addMod(m){this.mods.push(...m)}async handleRollDialog(){this.mods.push({value:100,source:"unrelated"});this.additionalMods.push({value:100});return true}wasCritical(){return false}async roll(){assert.deepEqual(this.mods,[{value:10,source:"Smart ammunition"}]);assert.deepEqual(this.additionalMods,[]);this._roll={toJSON:()=>({total:8})}}};
  await startAreaAttack(f.source,f.target,"w","attack");assert.equal(f.data().phase,"responses");assert.equal(f.data().exchange.total,18);assert.equal(f.weapon.system.magazine.value,19);assert.equal(f.data().exchange.dice.length,3);assert.match(f.data().exchange.html,/pneuma-smart-first/);
 });
+
+test("leg injury blocks shell/blast evasion and late commits, but leaves Concentration available",async()=>{
+ for(const kind of ["shell","explosive","suppression"]){
+  const f=fixture(kind);f.b.items.push({type:"criticalInjury",name:"Dismembered Leg"});await startAreaAttack(f.source,f.target,"w",kind==="suppression"?"suppressive":"attack");
+  if(!f.data().rows.some(r=>r.uuid===f.target.document.uuid))await f.request("add",{user:"gm"});
+  if(kind==="suppression"){await f.request("claim",{nonce:"n"});await f.request("release",{nonce:"n"});continue;}
+  await assert.rejects(f.request("claim",{nonce:"n"}),/Cannot evade/);
+  f.b.items=[];await f.request("claim",{nonce:"n"});f.b.items.push({type:"criticalInjury",name:"Dismembered Leg"});
+  await assert.rejects(f.request("commit",{nonce:"n",total:30,html:"defense"}),/Cannot evade/);await f.request("release",{nonce:"n"});
+ }
+});

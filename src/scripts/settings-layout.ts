@@ -5,7 +5,7 @@ const groups = [
   { id: "injuries", title: "Critical Injuries", keys: ["criticalInjuries"] },
   { id: "quickhack", title: "QuickHack", keys: ["quickhackEnabled", "quickhackMode", "quickhackMessages"] },
   { id: "token-hud", title: "Token HUD & Targeting", keys: ["targetedRightClick", "tightHUD", "hudScale", "iconColor", "hoverDV", "hoverAutofire", "alwaysShowEKG"] },
-  { id: "status-hud", title: "Status HUD & Biomonitor", keys: ["eyeHUD", "biomonitorWithoutImplant", "biomonitorShowHP", "biomonitorFlashSeconds", "eyeHUDPreview"] },
+  { id: "status-hud", title: "Status HUD & Biomonitor", keys: ["eyeHUD", "eyeHUDAnimateMessages", "biomonitorShowHP", "biomonitorFlashSeconds", "eyeHUDPreview"] },
   { id: "statuses", title: "Status Effects", keys: ["statusIconScale", "customStatusesMenu"] },
 ] as const;
 

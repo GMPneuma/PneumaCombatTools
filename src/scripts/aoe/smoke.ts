@@ -1,15 +1,16 @@
+import {effectDuration,durationExpired,type EffectDuration} from "../effect-duration.js";
 import {areaCells,templateData} from "./placement.js";
 import type {Area} from "./geometry.js";
 import {empGM} from "../emp-state.js";
 const M="pneuma-combattools";
-export interface SmokeArea {cells:number[][];expires:number;source:string;created:number}
+export interface SmokeArea {duration?:EffectDuration;cells:number[][];expires:number;source:string;created:number}
 const smoke=(d:object)=>foundry.utils.getProperty(d,"flags."+M+".smoke") as SmokeArea|undefined;
 /** Scene-owned footprint stays independent of the attack card and later wall changes. */
 export async function createSmoke(scene:Scene,area:Area,source:string):Promise<string> {
   const old=scene.templates.find(d=>smoke(d)?.source===source);if(old)return old.id!;
   if(canvas.scene?.id!==scene.id)throw Error("Open the impact scene to create smoke.");
   const cells=areaCells(area),created=game.time!.worldTime;
-  const docs=await scene.createEmbeddedDocuments("MeasuredTemplate",[{...templateData(area,scene),fillColor:"#a7afb7",borderColor:"#a7afb7",flags:{[M]:{smoke:{cells,created,expires:created+60,source}}}} as never]);
+  const docs=await scene.createEmbeddedDocuments("MeasuredTemplate",[{...templateData(area,scene),fillColor:"#a7afb7",borderColor:"#a7afb7",flags:{[M]:{smoke:{cells,created,expires:created+60,source,duration:effectDuration(60)}}}} as never]);
   if(!docs?.[0])throw Error("Could not create smoke area.");return docs[0].id!;
 }
 const drawings=new Map<string,{container:PIXI.Container;tick:(delta:number)=>void}>();
@@ -27,7 +28,7 @@ function smokeTexture():PIXI.Texture {
 }
 function draw(document:MeasuredTemplateDocument) {
   remove(document.id!);const data=smoke(document);
-  if(!data||document.hidden||data.expires<=game.time!.worldTime||!canvas.primary||!canvas.app)return;
+  if(!data||document.hidden||(data.duration?durationExpired(data.duration):data.expires<=game.time!.worldTime)||!canvas.primary||!canvas.app)return;
   const container=new PIXI.Container(),mask=new PIXI.Graphics();mask.beginFill(0xffffff);for(const cell of data.cells)mask.drawPolygon(cell);mask.endFill();
   container.addChild(mask);container.mask=mask;container.eventMode="none";
   // Primary-canvas rendering preserves scene fog/vision; token artwork remains above the smoke.
@@ -44,12 +45,21 @@ function draw(document:MeasuredTemplateDocument) {
   let phase=0;const tick=(delta:number)=>{phase+=Math.min(delta,3)*0.012;for(const p of particles){const a=phase+p.phase;p.g.position.set(p.x+Math.sin(a)*p.radius*.32,p.y+Math.cos(a*.8)*p.radius*.18);p.g.width=p.g.height=p.radius*2.8*(.94+.1*Math.sin(a*.7));p.g.rotation=.08*Math.sin(a*.5);}};
   tick(0);canvas.primary.addChild(container);canvas.app.ticker.add(tick);drawings.set(document.id!,{container,tick});
 }
-export async function expireSmoke(){if(game.user?.id!==empGM()?.id)return;for(const scene of game.scenes??[]){const ids=scene.templates.filter(d=>!!smoke(d)&&smoke(d)!.expires<=game.time!.worldTime).map(d=>d.id!);if(ids.length)await scene.deleteEmbeddedDocuments("MeasuredTemplate",ids);}}
+export async function expireSmoke(){if(game.user?.id!==empGM()?.id)return;for(const scene of game.scenes??[]){const ids=scene.templates.filter(d=>!!smoke(d)&&(smoke(d)!.duration?durationExpired(smoke(d)!.duration):smoke(d)!.expires<=game.time!.worldTime)).map(d=>d.id!);if(ids.length)await scene.deleteEmbeddedDocuments("MeasuredTemplate",ids);}}
+async function finishCombatSmoke(combat:Combat) {
+  if(game.user?.id!==empGM()?.id)return;
+  for(const scene of game.scenes??[]){
+    const ids=scene.templates.filter(d=>{const data=smoke(d);return !!data&&data.duration?.combat===combat.id;}).map(d=>d.id!);
+    if(ids.length)await scene.deleteEmbeddedDocuments("MeasuredTemplate",ids);
+  }
+}
 export function registerSmoke() {
   Hooks.on("canvasTearDown",()=>{for(const id of [...drawings.keys()])remove(id);});
   Hooks.on("canvasReady",()=>{for(const d of canvas.scene?.templates??[])if(smoke(d))draw(d);void expireSmoke();});
+  Hooks.on("updateCombat",(combat:Combat,changes:{round?:number})=>{if(changes.round!==undefined&&!combat.started)void finishCombatSmoke(combat);else void expireSmoke();});
+  Hooks.on("deleteCombat",(combat:Combat)=>{void finishCombatSmoke(combat);});
   Hooks.once("ready",()=>{void expireSmoke();});
-  Hooks.on("updateWorldTime",()=>{for(const d of canvas.scene?.templates??[])if(smoke(d)&&smoke(d)!.expires<=game.time!.worldTime)remove(d.id!);void expireSmoke();});
+  Hooks.on("updateWorldTime",()=>{for(const d of canvas.scene?.templates??[])if(smoke(d)&&(smoke(d)!.duration?durationExpired(smoke(d)!.duration):smoke(d)!.expires<=game.time!.worldTime))remove(d.id!);void expireSmoke();});
   Hooks.on("createMeasuredTemplate",(d:MeasuredTemplateDocument)=>{if((d.parent as Scene|null)?.id===canvas.scene?.id&&smoke(d))draw(d);});
   Hooks.on("updateMeasuredTemplate",(d:MeasuredTemplateDocument)=>{if((d.parent as Scene|null)?.id===canvas.scene?.id&&smoke(d))draw(d);});
   Hooks.on("deleteMeasuredTemplate",(d:MeasuredTemplateDocument)=>remove(d.id!));

@@ -1,3 +1,5 @@
+import {registerInjuryMechanics} from "./injury-mechanics.js";
+import {registerNativeEffectIntegration} from "./native-effect-integration.js";
 import {registerInstantEffects} from "./instant-effects.js";
 import { registerSelfCTH, isSelfCTH, selfInitiativeControl, rerollSelfInitiative } from "./self-cth.js";
 import { registerHoverEKG } from "./ekg-hover.js";
@@ -62,8 +64,10 @@ Hooks.once("init", () => {
   registerEvasionSettings();
   registerCombatResolution();
   registerMovement();
+  registerInjuryMechanics();
   registerEmp();
   registerInstantEffects();
+  registerNativeEffectIntegration();
   registerAreaAttacks();
   registerCriticalSettings();
   registerSettingsLayout();

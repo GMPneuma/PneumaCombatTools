@@ -5,3 +5,10 @@ function setup(){let serial=0;const templates=Object.assign([],{find:Array.proto
 test('smoke stores immutable affected cells and one-minute game-time expiry',async()=>{const scene=setup();const id=await createSmoke(scene,{},'message');cells[0][0]=1000;assert.equal(scene.templates[0].flags[M].smoke.cells[0][0],0);assert.equal(scene.templates[0].flags[M].smoke.expires,110);assert.equal(await createSmoke(scene,{},'message'),id);assert.equal(scene.templates.length,1)});
 test('smoke expiry preserves unrelated templates and has one GM writer',async()=>{const scene=setup();await createSmoke(scene,{},'message');scene.templates.push({id:'unrelated',flags:{}});game.time.worldTime=109;await expireSmoke();assert.equal(scene.templates.length,2);game.user={id:'player'};game.time.worldTime=111;await expireSmoke();assert.equal(scene.templates.length,2);game.user=game.users[0];await expireSmoke();assert.deepEqual(scene.templates.map(t=>t.id),['unrelated'])});
 test('smoke requires its scene and survives independent attack-template removal',async()=>{const scene=setup();canvas.scene={id:'other'};await assert.rejects(createSmoke(scene,{},'message'),/impact scene/);canvas.scene=scene;await createSmoke(scene,{},'message');scene.templates.push({id:'attack'});await scene.deleteEmbeddedDocuments('MeasuredTemplate',['attack']);assert.equal(scene.templates.length,1);assert.ok(scene.templates[0].flags[M].smoke)});
+
+test('combat smoke uses twenty rounds, ignoring world-time drift until its end turn',async()=>{
+ const scene=setup();const c={id:'combat',started:true,round:2,turn:1,turns:[{},{}]};game.combat=c;game.combats=new Map([[c.id,c]]);
+ await createSmoke(scene,{},'timed');assert.equal(scene.templates[0].flags[M].smoke.duration.rounds,20);
+ game.time.worldTime=1000;c.round=22;c.turn=0;await expireSmoke();assert.equal(scene.templates.length,1);
+ c.turn=1;await expireSmoke();assert.equal(scene.templates.length,0);
+});

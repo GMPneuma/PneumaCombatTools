@@ -1,3 +1,4 @@
+import {effectDuration} from "./effect-duration.js";
 import { masterStatuses, type StatusDefinition } from "./status-catalog.js";
 const MODULE = "pneuma-combattools";
 const options = { pneumaStatusSync: true, render: true };
@@ -65,7 +66,8 @@ async function changeSource(actor: Actor, status: Bound, active: boolean): Promi
     const item = items[0]!;
     const effect = sourceEffects(item, status)[0];
     if (!effect) throw new Error("Native " + status.name + " effect is unavailable.");
-    await item.updateEmbeddedDocuments("ActiveEffect", [{ _id: effect.id!, disabled: false }], options);
+    const seconds=effect.duration?.seconds??(effect.duration?.rounds?effect.duration.rounds*3:undefined);
+    await item.updateEmbeddedDocuments("ActiveEffect", [{ _id: effect.id!, disabled: false, ...(typeof seconds==="number"&&seconds>0?{duration:effectDuration(seconds)}:{}) }] as never, options);
   }
 }
 async function refreshMarkers(actor: Actor): Promise<void> {

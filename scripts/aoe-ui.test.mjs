@@ -17,10 +17,11 @@ try {
   window.FormApplication=class {activateListeners(){}};window.hooks={};window.Hooks={on:(k,f)=>{(hooks[k]??=[]).push(f);return 1},once(){},off(){}};
   window.foundry={data:{fields:{ObjectField:class{}}},utils:{getProperty:(o,p)=>p.split(".").reduce((v,k)=>v?.[k],o)}};
   window.game={user:{id:"def",isGM:false},users:[],modules:new Map(),settings:{get:()=>({coverUp:false}),register(){},registerMenu(_m,_k,config){window.SettingsForm=config.type}},i18n:{localize:k=>k}};
-  window.fromUuid=async uuid=>({actor:{testUserPermission:()=>uuid==="owned"}});
+  window.targetActor={items:[],effects:[],system:{stats:{ref:{value:8}}}};
+  window.fromUuid=async uuid=>({actor:{...targetActor,testUserPermission:()=>uuid==="owned"}});
   const {areaContent,registerAreaAttacks}=await import("/scripts/aoe/workflow.js");
   window.data={scene:"s",kind:"explosive",phase:"responses",area:{shape:"square",origin:{x:50,y:50},direction:0,length:500,width:500},
-   settings:{coverUp:true},exchange:{title:"Grenade <unsafe>",html:'<div class="rollcard">ATTACK</div>',total:20},
+   settings:{coverUp:true,evade:"raw"},exchange:{title:"Grenade <unsafe>",html:'<div class="rollcard">ATTACK</div>',total:20},
    rows:[{uuid:"owned",actor:"actor",name:"Target & Ally",img:"",eligible:true,state:"waiting"},{uuid:"unowned",actor:"other",name:"NPC",img:"",eligible:false,state:"waiting"}]};
   window.message={id:"message",visible:true,isContentVisible:true,flags:{"pneuma-combattools":{aoe:data}}};
   document.querySelector("#card").innerHTML=areaContent(data);registerAreaAttacks();
@@ -35,6 +36,20 @@ try {
  assert.equal(await page.locator("#card unsafe").count(),0);
  assert.equal(await page.evaluate(()=>document.querySelector("#card").scrollWidth<=380),true);
  assert.equal(await page.locator('[data-aoe-action="show"]').count(),0);
+ const evade=page.locator('[data-aoe-row="owned"] button[data-aoe-action="roll"]');
+ assert.equal(await evade.isEnabled(),true);
+ await page.evaluate(async()=>{
+  targetActor.items=[{type:"criticalInjury",name:"Dismembered Leg"}];
+  const root=document.querySelector("#card"),{areaContent}=await import("/scripts/aoe/workflow.js");root.innerHTML=areaContent(data);
+  for(const f of hooks.renderChatMessage)await f(message,{0:root,find:s=>({toArray:()=>[...root.querySelectorAll(s)]})});
+ });
+ assert.equal(await evade.isDisabled(),true);assert.match(await evade.getAttribute("title"),/Dismembered Leg/);
+ await page.evaluate(async()=>{
+  targetActor.items=[];const root=document.querySelector("#card"),{areaContent}=await import("/scripts/aoe/workflow.js");root.innerHTML=areaContent(data);
+  for(const f of hooks.renderChatMessage)await f(message,{0:root,find:s=>({toArray:()=>[...root.querySelectorAll(s)]})});
+ });
+ assert.equal(await evade.isEnabled(),true);
+
  await page.evaluate(async()=>{
   fromUuid=async()=>null;
   const {areaContent}=await import("/scripts/aoe/workflow.js");data.areaHidden=true;game.user.isGM=true;

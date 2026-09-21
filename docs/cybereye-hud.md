@@ -1,73 +1,62 @@
-# Status HUD and Biomonitor
+# Status HUD
 
-The optical overlay displays one large scrolling alert, with optional condition rows underneath. It remains visible when enabled, showing STATUS: Standby without an alert. Minimize reduces it to a notification bell; new alerts highlight the bell. Minimized state is saved per client. Players have no name heading; GMs see the selected token's name. Drag the narrow top edge to reposition it.
+The existing compact three-column HUD remains: Vitals, Biological Scan and Implant Integrity. The top alert ticker has been removed.
 
-## Alerts
+## Own and shared views
 
-Pending Combat Tools attacks against the focused actor show **ALERT: Incoming Attack**. Clicking opens that notice’s resolution card in chat without dismissing it; its Clear button acknowledges it locally. Attack results remain hidden. Current messages share previous/next controls. Clear dismisses only the displayed notice locally.
+Everyone can see their own HUD without a Biomonitor. Select one owned token, or use the assigned player character when nothing is selected. GMs select an owned token. The old implant override setting is retained internally for compatibility and is no longer needed.
 
-GMs use **Send HUD Message** on the expanded live HUD. Choose one connected user or all connected players, enter up to 200 characters, and choose **60 Seconds**, **5 Minutes**, **15 Minutes**, **1 Hour**, **6 Hours**, or **Until Cleared**. Send adds a message to the current list. Recipients browse messages with the arrows and use Clear to dismiss each one locally. Messages are plain text, not macros or HTML. This is a display feature, not a private messaging channel.
+Hover a visible token with an installed Biomonitor to view that actor's stats. A blue HUD edge and the character name below the HUD identify the BIOMONITOR LINK; leaving returns to YOUR STATUS. Carrying an uninstalled Biomonitor does not qualify. Shared viewing does not grant actor-sheet permissions. Notifications always remain the viewer's; the owner is identified accessibly, with no visible message heading.
 
-## Biomonitor
+## Indicators and conditions
 
-Vitals and condition rows require an installed native Biomonitor cyberware item. Identification supports the native compendium source ID or the item name Biomonitor, using the system's installed-in-actor state. Merely carrying it does not qualify.
+Vitals keeps current/maximum HP and the animated EKG. The HP-number setting and click/keyboard pause behavior are retained. HP display states remain Normal, Wounded, Seriously wounded, Critical, Flatline or unavailable; these are visual states, not additional rules.
 
-The world setting **Show Biomonitor even if not installed** overrides that requirement; it defaults off. Alerts never require the implant. Rows show existing injuries and active token statuses with condition icons, plus fallbacks, single-line text, and full descriptions on hover. Clicking a row opens the actor sheet. This display does not add condition mechanics or synchronize injury items and statuses.
+The health label (Normal, Wounded, etc.) sits immediately below the EKG. Beneath that, icon-only dashboard lights show ONLY active lasting drugs in red and pharmaceuticals in green. Icons fill consecutive positions from the left; when none are active the row disappears. Hover shows the drug name.
 
-One selected owned actor is used. Players fall back to their assigned character when no token is selected. GMs select a token. Custom messages addressed to a user can appear even without an actor selected.
+Prepared indicators cover nine street drugs: Black Lace, Blue Glass, Boost, Smash, Synthcoke, Berserker, Prime Time, Sixgun and Timewarp. Pharmaceutical/treatment indicators cover Antibiotic (also recognizes Antibiotics), Stim, Surge, Sedative, Veritas and Quick Fix. Native core and Hornet's Pharmacy records were checked against CPR v0.92.4, including primary-effect and addicted-primary aliases. See [Hornet's Pharmacy](https://rtalsoriangames.com/wp-content/uploads/2023/01/RTG-CPR-DLC-HornetsPhramacyv1.11.pdf).
 
-## Preview
+The row reads active unsuppressed effects and status markers, including native effects without status IDs. Native duration fields can be empty even for a timed drug, so the HUD uses the active effect and its verified name instead of requiring a nonzero duration field. Inventory or consumption without an active effect never lights an icon. Addiction-only effects light Addict, not the primary drug indicator; an active addicted-primary effect can light both. Disabling, suppressing, removing or clearing an effect removes the corresponding icon. Instant treatments such as Speed Heal, Rapiddetox and Radaway are excluded.
 
-Enable **Test status HUD** in module settings and save. It shows sample conditions regardless of implant ownership and an interactive test alert. Use Test HP state to cycle through all five states and Test lights to flash all four dashboard indicators. **End test** returns to live data. No actor changes or real messages are sent.
+Larger exposure icons retain small labels below: Poison, Radiation, Biotoxin, On fire, Addict, Jacked In and Unconscious. Any addiction lights Addict. Jacked In requires an active outgoing Combat Tools QuickHack connection in started combat, not the Netrunning marker. NET Architecture connections remain future work. Exposure-only instantaneous damage still requires the existing local exposure hook; this visual update does not add damage mechanics.
 
-**Status HUD** controls client visibility. The test can display even if live visibility is off. Position is saved per client. Reduced-motion users receive static alert text.
+Biological Scan shows native critical injuries and medical conditions, excluding drug/exposure and tactical markers. Implant Integrity shows disabled cyberware and EMP information. Clicking medical/implant rows opens the native sheet only for an owner.
 
-Updates use document hooks and a one-shot custom-message expiry timer, not polling. Build and browser fixtures pass; live multi-client Foundry verification remains outstanding.
+Situational states, grapple/choke details and tracked movement appear as small yellow rectangles INSIDE the HUD, floating at its lower-right without changing its dimensions. The first entry is rightmost; additional entries extend left, wrapping when needed. There is no Situational heading.
 
-## Vitals and effect indicators
+## Private notifications
 
-The left side shows current/maximum HP and an EKG with a moving luminous scan point and fading trail. The right side holds single-line conditions. State priority: HP at or below zero is Flatline; below 10 is Critical; below half maximum is Seriously wounded; any other missing HP is Wounded; full HP is Normal. These are display states only and do not change wound rules. Flatline retains the moving scan point and trail on a straight line. Reduced-motion mode shows a steady trace.
+Up to three large orange text notifications appear below and outside the HUD, without a heading. Each has its own clear control. Incoming attack notices take priority and open the corresponding chat card; clearing a notice does not resolve the attack. Ordinary notifications expire and are not saved in a history or navigable queue. Newly visible text briefly pulses; it never scrolls or automatically expands the HUD.
 
-Dashboard lights: green Poison, yellow Radiation, purple Biotoxin and orange On fire. Existing matching statuses light steadily on first viewing. Newly added matching statuses flash for the client setting **Biomonitor indicator flash duration** (default 8 seconds, range 0–60); ongoing conditions then remain lit. Repeated renders do not restart the timer. Reduced motion makes EKG and lights static. Effect names are matched; this does not implement poison/fire damage mechanics.
+GM Send HUD Message retains recipient selection and timed durations. Legacy API duration zero now becomes 60 seconds. API messages retain only the latest three, with oldest entries dropped; pending attacks can occupy visible slots. See [HUD API](hud-api.md). Notifications remain available when the monitor is minimized, and disappear when the HUD is disabled.
 
-Instant-effect integrations can call the local hook `Hooks.callAll("pneumaCombatToolsExposure", actor.uuid, kind)`, where kind is poison, radiation, biotoxin or fire. This is a local display signal; future mechanics must deliver it to the relevant clients. It is not yet connected to instantaneous ammo damage.
+## Position and preview
 
-The per-client **Status HUD** switch completely disables the live overlay. Test mode is an explicit exception. Without a qualifying actor or implant, the alert area remains available. Scene transitions refresh the display without clearing the saved minimized preference.
+The expanded top row is removed. Minimize and the GM message envelope sit beside Implant Integrity. The GM sees the current character name below the HUD at its left edge, including when minimized; a shared view also identifies its subject there. Drag the HUD background or section labels to move it with a saved right anchor. Existing positions are preserved; new positions default to the top-right. Enable Test status HUD to inspect sample conditions, drug indicators, statuses and messages without changing actors. Test HP state and Test lights exercise the display. End test returns to live data. Reduced motion disables EKG/indicator and notification animations.
 
-Dashboard indicators are now hidden when inactive. Active indicators fill consecutive slots in activation order; clearing an indicator closes its gap, and reactivation appends it after remaining indicators. Existing conditions on initial display use their actor list order.
+Build and browser fixtures verify classification, drug suppression, Jack-In state, hover sharing, private messages, expiry, docking and saved dragging. Live Foundry and multi-client verification remain pending. The user replicates the built module files.
 
-Three-column Biomonitor: Vitals, Biological Scan (empty: No Active Pathology), Implant Integrity (empty: All Systems Normal). Diagnostics lists cyberware carrying the existing Disabled item marker and opens its native sheet on click. EMP now supplies combat-scoped suppression/cleanup; generic markers still have no automatic lifecycle. Client Show Biomonitor HP numbers defaults on; when off, hovering or keyboard-focusing the EKG reveals HP without resizing the panel.
 
-Minimize/expand now preserves the upper-right curved corner. Saved positions retain this right anchor, subject to viewport bounds.
+### Incoming HUD message animation — implemented
 
-Hidden HP now takes no layout space: the EKG moves up under Vitals. Hovering or focusing the EKG reveals HP directly over the animation without shifting the layout.
+New private notification text appears large in orange at screen center, holds briefly, then shrinks into its existing slot below the HUD over 1.6 seconds. Concurrent arrivals are stacked. Existing messages do not replay when HUD contents refresh. The client setting **Animate incoming HUD messages** defaults on; disabling it shows messages immediately and stops active arrivals. Reduced-motion preferences also skip the animation. This supersedes the previous arrival blink; privacy, expiry and clear controls are retained.
 
-Module integration: see [HUD API](hud-api.md) for send/update/remove examples, audience rules and expiry behavior. Messages now use temporary client-session delivery instead of the legacy single world-setting message.
 
-Until Cleared has no timed expiry; like other HUD API messages, it remains session-local and clears on client reload.
+### HUD pinned to Foundry sidebar — implemented
 
-Click the EKG to pause/resume its animation; Enter/Space also toggles it. The local pause preference lasts for the current session and survives HUD refreshes. HP and conditions continue updating.
+The HUD sits 8px below the viewport top and 8px left of the native right sidebar, including its collapsed state. Sidebar resize observation follows native width animation; sidebar render/collapse hooks and viewport resize keep the anchor current. HUD and private notification widths fit the available space. Manual drag routines and saved positions remain in source/storage, but are inactive while docking is enabled. This supersedes draggable positioning for now.
 
-Performance fixes: pending-card refreshes use an unresolved-card index seeded once on ready, filter actor/item/effect updates by defender and combat updates by originating combat, and batch repeated requests once per animation frame. Ordinary chat events no longer refresh the HUD; stable header/message/medical sections retain unchanged DOM, EKG playback and focus. Hidden HUD exits before gathering medical data; minimized HUD skips medical work. Regression checks cover event routing, batching, card cleanup, unchanged DOM and live HP updates.
 
-HUD alert layout: shortened scrolling banner with previous/count/next on one row to its right and Clear directly underneath. Clear dismisses only the displayed alert on this client.
+### Scan-line notification arrival — implemented
 
-HUD position now remembers the last completed mouse drag as its preferred upper-right anchor. Resize and content changes only clamp the displayed position to the viewport; enlarging restores the preferred position. Minimize/expand and stationary header clicks never save position.
+Supersedes the smooth zoom/flight: a glowing orange horizontal scan reveals the large centered message, holds it, collapses it to a bright horizontal line, then reveals normal-size text beneath the HUD. The 1.8-second sequence relocates only while invisible. Existing per-client animation toggle, reduced-motion bypass, private recipient filtering and pinned docking remain unchanged.
 
-Alert text scrolls three times then rests centered. Opening/expanding the HUD or receiving a new message starts the sequence again. Unrelated updates preserve the animation; reduced-motion stays static.
 
-With an installed Biomonitor or its world override, the minimized HUD shows a compact live EKG and notification bell side by side. Without it, only the bell is shown. The miniature uses the same HP states and pause/resume interaction, and retains the upper-right anchor.
+### Effect activation scan — implemented
 
-- New HUD notices received while minimized temporarily expand the HUD, select the new notice, scroll once, then minimize again. Reduced-motion users see a static notice for eight seconds. Manual minimization cancels the temporary display; the saved position and minimized preference stay unchanged.
+Newly activated drug/pharma and exposure symbols scan in large at screen center, blink three times, then illuminate their dashboard slot after 2.4 seconds. Colors match the corresponding indicator. Concurrent symbols share the central overlay. Refreshes and switching actors do not replay existing conditions; removal cancels an unfinished announcement. Minimized HUDs still announce newly detected effects. The existing client toggle is now named **Animate HUD messages and effect icons** and retains its saved value. Disabled/reduced-motion mode lights indicators immediately.
 
-## Grappling beneath Vitals
 
-The Vitals column includes **Grappling: [name]** or **Grappled by: [name]**, followed by **Choking: [name] — 1/3** or **Being choked by: [name] — 1/3** when applicable. Hover the grapple row for the -2 Actions, hand and movement restrictions. Names wrap within the existing column without widening the HUD.
+### Drug labels and round exposure clearing — implemented
 
-These rows read the actor's active Combat grapple metadata (or scene state for grabs begun outside combat), update on document/round changes, and clear when the grapple ends. A missed full round clears the choking row while retaining the grapple row. Outside combat, the row says GM tracks rounds. Combat information remains visible without a Biomonitor; medical data retains its existing implant requirement.
-
-### EMP diagnostics
-
-EMP-disabled cyberware is listed in Implant Integrity as `[item] — Disabled — EMP`. Entries use the independent EMP marker key, preserving unrelated Disabled markers. Clicking opens the native item sheet. Combat-end cleanup removes only the EMP indication; a remaining unrelated disablement continues to display. Native broken-limb icons identify temporarily disabled cyberlimbs in Biological Scan without creating physical injuries. See [EMP](emp.md).
-
-The same waveform renderer and animation styles are now reused by [Hover EKG](hover-ekg.md). The hover panel has separate Medtech/world-setting visibility, shows no HP numbers, and does not change Biomonitor pause or reveal controls.
+Drug/pharma tooltips and accessible labels show only the name, without the Active suffix. During combat, Poison and Biotoxin Vitals reports remain lit after their arrival animation until the round changes, then clear. Existing actor status effects are not deleted; a fresh exposure or reactivation can light the report again. Other indicators and noncombat flash behavior are unchanged.

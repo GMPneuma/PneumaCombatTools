@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {vitalState,indicatorState,signalExposure,resetMonitor} from "../dist/scripts/biomonitor.js";
+import {vitalState,indicatorState,signalExposure,clearRoundExposures,resetMonitor} from "../dist/scripts/biomonitor.js";
 for(const [hp,max,state] of [[40,40,"normal"],[39,40,"wounded"],[20,40,"wounded"],[19,40,"serious"],[10,40,"serious"],[9,40,"critical"],[0,40,"flatline"],[-2,40,"flatline"]]) assert.equal(vitalState(hp,max),state);
 const realNow=Date.now;
 let now=1000;Date.now=()=>now;
@@ -26,3 +26,19 @@ try {
  assert.deepEqual(visible(["On fire","Poison"]),["poison","fire"]);
  console.log("Biomonitor thresholds, transitions, expiration and actor isolation passed.");
 } finally {Date.now=realNow;resetMonitor();}
+
+resetMonitor();
+for (const kind of ['poison','biotoxin']) {
+ signalExposure('round-actor',kind,0,true);
+ assert.equal(indicatorState('round-actor',[],0,true).find(l=>l.id===kind).on,true,'Exposure held even with flashing disabled');
+}
+clearRoundExposures();
+assert.equal(indicatorState('round-actor',[],0,true).some(l=>l.on),false);
+indicatorState('persistent',['Poison','Biotoxin','On fire'],0,true);
+clearRoundExposures();
+const cleared=indicatorState('persistent',['Poison','Biotoxin','On fire'],0,true);
+assert.equal(cleared.find(l=>l.id==='poison').on,false);
+assert.equal(cleared.find(l=>l.id==='biotoxin').on,false);
+assert.equal(cleared.find(l=>l.id==='fire').on,true);
+signalExposure('persistent','poison',0,true);
+assert.equal(indicatorState('persistent',['Poison'],0,true).find(l=>l.id==='poison').on,true,'Fresh hit relights cleared exposure');

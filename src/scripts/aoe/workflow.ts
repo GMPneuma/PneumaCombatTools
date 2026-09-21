@@ -1,3 +1,4 @@
+import {evasionBlocked} from "../injury-rules.js";
 import {ammoProfile,instantId} from "../instant-catalog.js";
 import {newInstant,instantContent,instantDone,handleInstant,bindInstantControls,type InstantState,type InstantRequest} from "../instant-effects.js";
 import {createSmoke,registerSmoke} from "./smoke.js";
@@ -75,7 +76,7 @@ function targets(data:AreaAttack):TargetRow[] {
     ).map(t=>({
       ...(instantId(data.ammoType)&&data.ammoType!=="incendiary"?{instant:newInstant(data.ammoType,t.actor!.uuid,t.name??"")} : {}),
       uuid:t.document.uuid,actor:t.actor!.uuid,name:t.name??"",img:t.document.texture.src??"",
-      eligible:evadeAllowed(Number(foundry.utils.getProperty(t.actor!,"system.stats.ref.value")),data.settings.evade),
+      eligible:!evasionBlocked(t.actor!)&&evadeAllowed(Number(foundry.utils.getProperty(t.actor!,"system.stats.ref.value")),data.settings.evade),
       state:data.kind==="shell" && data.exchange.total<=13?"miss":"waiting",
     }));
 }
@@ -185,7 +186,7 @@ export async function handleAreaRequest(req:Request) {
     if(!token?.actor||token.parent?.id!==data.scene)throw Error("Select a token in the attack scene.");
     if(row)return;
     data.effectsResolved=false;
-    data.rows.push({...(instantId(data.ammoType)&&data.ammoType!=="incendiary"?{instant:newInstant(data.ammoType,token.actor.uuid,token.name??"")} : {}),uuid:token.uuid,actor:token.actor.uuid,name:token.name??"",img:token.texture.src??"",eligible:evadeAllowed(Number(foundry.utils.getProperty(token.actor,"system.stats.ref.value")),data.settings.evade),state:"waiting"});
+    data.rows.push({...(instantId(data.ammoType)&&data.ammoType!=="incendiary"?{instant:newInstant(data.ammoType,token.actor.uuid,token.name??"")} : {}),uuid:token.uuid,actor:token.actor.uuid,name:token.name??"",img:token.texture.src??"",eligible:!evasionBlocked(token.actor)&&evadeAllowed(Number(foundry.utils.getProperty(token.actor,"system.stats.ref.value")),data.settings.evade),state:"waiting"});
     await save(message,data);return;
   }
   if(req.action==="scatter"){
@@ -213,6 +214,10 @@ export async function handleAreaRequest(req:Request) {
     return;
   }
   if(!row||data.phase!=="responses"||!owns(await actorAt(row.uuid),user))throw Error("Only this target's owner or GM can respond.");
+  if(data.kind!=="suppression"&&["claim","commit","move"].includes(req.action)){
+    const blocked=evasionBlocked(await actorAt(row.uuid));if(blocked)throw Error(blocked);
+    row.eligible=evadeAllowed(Number(foundry.utils.getProperty(await actorAt(row.uuid),"system.stats.ref.value")),data.settings.evade);
+  }
   if(req.action==="move") {
     if(row.state!=="miss"||row.total===undefined||data.kind==="suppression")throw Error("Target did not evade.");
     if(row.moved)return;
@@ -349,6 +354,7 @@ async function respond(message:ChatMessage,data:AreaAttack,row:TargetRow) {
     if(data.kind!=="suppression"&&data.settings.evadePenalty)roll.addMod([{value:data.settings.evadePenalty,source:"Area evasion homebrew"}]);
     if(!await roll.handleRollDialog({ctrlKey:false,metaKey:false,type:"pneuma-area"},actor,item))return;
     checkedLuck(Number(foundry.utils.getProperty(actor,"system.stats.luck.value")),0,roll.luck);
+    if(data.kind!=="suppression"){const blocked=evasionBlocked(actor);if(blocked)throw Error(blocked);}
     roll=await item.confirmRoll(roll);await spendBonusLuck(actor,roll.luck);await roll.roll();
     roll.entityData={actor:actor.id!,token:row.uuid.split(".").at(-1)!,item:item.id!,tokens:[]};
     await send(message.id!,"commit",{target:row.uuid,nonce,total:roll.resultTotal,html:await nativeCard(roll)});committed=true;
@@ -379,6 +385,16 @@ async function syncTemplate(message:ChatMessage,data:AreaAttack) {
 
 export function registerAreaAttacks() {
   registerAreaSettings();registerAreaMovement();registerSmoke();
+  const refreshActors=new Set<string>();let refreshQueued=false;
+  for(const hook of ["createItem","updateItem","deleteItem","createActiveEffect","updateActiveEffect","deleteActiveEffect"])Hooks.on(hook,(doc:Item|ActiveEffect)=>{
+    const parent=doc.parent,actor=parent instanceof Actor?parent:parent?.parent instanceof Actor?parent.parent:undefined;
+    if(!actor)return;refreshActors.add(actor.uuid);if(refreshQueued)return;refreshQueued=true;
+    requestAnimationFrame(()=>{
+      refreshQueued=false;
+      for(const message of game.messages??[]){const data=flag(message);if(message.visible&&(!message.blind||game.user?.isGM)&&data?.phase==="responses"&&data.rows.some(r=>refreshActors.has(r.actor)&&["waiting","rolling"].includes(r.state)))ui.chat?.updateMessage(message);}
+      refreshActors.clear();
+    });
+  });
   Hooks.on("refreshMeasuredTemplate",(template:MeasuredTemplate)=>{
     const area=foundry.utils.getProperty(template.document,`flags.${MODULE}.areaShape`) as Area|undefined;
     if(!area||!template.template)return;
@@ -431,7 +447,11 @@ export function registerAreaAttacks() {
       const actor=await actorAt(row?.uuid??data.exchange.attacker).catch(()=>null);
       const gmOnly=["removeSmoke","scatter","hit","miss","exclude","forcehit","add","reset","damageReset","damageResolved","effectsResolved"].includes(action);
       if(action!=="show"&&(!actor||!owns(actor)||gmOnly&&!game.user!.isGM)){button.remove();continue;}
-      if(action==="roll"&&data.kind!=="suppression"&&!row?.eligible){button.disabled=true;button.title="RAW evasion requires REF 8+.";}
+      if(action==="roll"&&data.kind!=="suppression"&&row){
+        const blocked=actor?evasionBlocked(actor):undefined;
+        const eligible=actor?evadeAllowed(Number(foundry.utils.getProperty(actor,"system.stats.ref.value")),data.settings.evade):row.eligible;
+        if(blocked||!eligible){button.disabled=true;button.title=blocked??"RAW evasion requires REF 8+.";}
+      }
       if(action==="apply"&&(row?.damage?.recordedApplied||["review","applying"].includes(row?.damage?.status??"")))button.disabled=true;
       button.addEventListener("click",async event=>{
         event.preventDefault();event.stopPropagation();if(button.disabled)return;button.disabled=true;

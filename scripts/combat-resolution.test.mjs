@@ -468,3 +468,11 @@ test("MA homebrew removes only ablation and retains native armor penetration",as
   assert.equal(args[5],0.5);
  }
 });
+
+test("leg injuries block melee and ranged claims and invalidate an open defense without charging",async()=>{
+ setup();actor.items.push({type:"criticalInjury",name:"Dismembered Leg"});
+ assert.equal(offer(actor,false,game.combat).allowed,false);assert.equal(offer(actor,true,game.combat).allowed,false);
+ message("injury");await assert.rejects(request("injury","claim"),/Cannot evade/);
+ actor.items=[];const claim=await request("injury","claim");actor.items.push({type:"criticalInjury",name:"Dismembered Leg"});
+ await assert.rejects(request("injury","commit",{nonce:claim.nonce,defense:defense()}),/conditions changed/);assert.equal(updates,0);await request("injury","release",{nonce:claim.nonce});
+});

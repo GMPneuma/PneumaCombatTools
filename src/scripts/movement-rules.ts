@@ -1,6 +1,6 @@
 export interface MovePoint {x:number;y:number}
 export interface MoveStep {from:MovePoint;to:MovePoint;cost:number}
-export interface MoveRecord {combat:string;turn:string;start:MovePoint & {elevation:number};spent:number;hidden?:boolean;last?:MoveStep}
+export interface MoveRecord {combat:string;turn:string;start:MovePoint & {elevation:number};spent:number;onFoot?:number;hidden?:boolean;last?:MoveStep}
 /** Cost in grid spaces. Only adjacent, perpendicular one-square steps may be folded. */
 export function recordStep(record:MoveRecord,from:MovePoint,to:MovePoint,size:number,blocked:(from:MovePoint,to:MovePoint)=>boolean):MoveRecord {
   if(!(size>0)||![from.x,from.y,to.x,to.y].every(Number.isFinite))throw Error("Invalid movement coordinates.");

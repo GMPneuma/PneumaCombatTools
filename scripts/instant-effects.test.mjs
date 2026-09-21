@@ -6,13 +6,13 @@ registerHooks({resolve(s,c,next){if(s==="/systems/cyberpunk-red-core/modules/ext
 globalThis.FormApplication=class{};globalThis.foundry={utils:{getProperty:get,setProperty:set,deepClone:structuredClone,randomID:()=>String(++serial)}};
 let serial=0;
 class Collection extends Map {[Symbol.iterator](){return this.values()}filter(fn){return [...this.values()].filter(fn)}find(fn){return [...this.values()].find(fn)}some(fn){return [...this.values()].some(fn)}}
-class Doc {constructor(data,parent){Object.assign(this,data);this.id=data._id??String(++serial);this.parent=parent;this.effects=new Collection();this.statuses=new Set(data.statuses??[])}async update(changes){for(const [k,v] of Object.entries(changes))set(this,k,v);return this}}
+class Doc {constructor(data,parent){Object.assign(this,data);this.id=data._id??String(++serial);this.parent=parent;this.uuid=parent?parent.uuid+"."+(data.type?"Item":"ActiveEffect")+"."+this.id:undefined;this.effects=new Collection();this.statuses=new Set(data.statuses??[])}async update(changes){for(const [k,v] of Object.entries(changes))set(this,k,v);return this}}
 class Actor extends Doc {constructor(){super({name:'Target',type:'character',system:{derivedStats:{hp:{value:40}},stats:{luck:{value:3}}}});this.uuid='Actor.'+this.id;this.items=new Collection();this.effects=new Collection();this.isOwner=true}testUserPermission(u){return u.id==='owner'}async createEmbeddedDocuments(type,rows){if(this.failCreate)throw Error('write failed');return rows.map(r=>{const d=new Doc(r,this);(type==='Item'?this.items:this.effects).set(d.id,d);return d})}async deleteEmbeddedDocuments(type,ids){for(const id of ids)(type==='Item'?this.items:this.effects).delete(id)}async updateEmbeddedDocuments(type,rows){for(const row of rows)await (type==='Item'?this.items:this.effects).get(row._id).update(row)}async toggleStatusEffect(id){if(!this.effects.some(e=>e.statuses.has(id)))await this.createEmbeddedDocuments('ActiveEffect',[{statuses:[id]}])}}
 globalThis.Actor=Actor;globalThis.Item=Doc;
 const {masterStatuses}=await import('../dist/scripts/status-catalog.js');
 const {instantEffects,ammoProfile}=await import('../dist/scripts/instant-catalog.js');
 const {handleInstant,newInstant,instantContent}=await import('../dist/scripts/instant-effects.js');
-const {temporaryInjury,expireInstantActor,sleepTarget,clearInstantCondition,igniteTarget,burnTurn,registerInstantLifetimes}=await import('../dist/scripts/instant-lifetime.js');
+const {temporaryInjury,expireInstantActor,sleepTarget,clearInstantCondition,igniteTarget,burnTurn,registerInstantLifetimes,finishTimedEffects}=await import('../dist/scripts/instant-lifetime.js');
 const {damageStatusChoices,validateDamageStatuses}=await import('../dist/scripts/damage-status.js');
 function setup(){
  const gm={id:'gm',isGM:true,active:true},owner={id:'owner',isGM:false,active:true},actor=new Actor();
@@ -30,7 +30,7 @@ test('resistance must beat DV; tied poison check fails, higher check resists',as
 test('poison and biotoxin bypass armor, roll once, and do not apply twice',async()=>{for(const [id,amount] of [['poison',8],['biotoxin',12]]){const f=setup();f.actor.armor=11;const s=await resist(f,id,0);await handleInstant(s,{action:'apply'},f.owner,f.save,'blindroll');await handleInstant(s,{action:'apply'},f.owner,f.save);assert.equal(f.actor.system.derivedStats.hp.value,40-amount);assert.equal(f.actor.armor,11);assert.deepEqual(diceModes,['blindroll']);assert.equal(s.state,'applied')}});
 test('unowned targets, other users reservations, and non-GM immunity skips are rejected',async()=>{const f=setup(),s=newInstant('poison',f.actor.uuid,'T');await assert.rejects(handleInstant(s,{action:'claim',nonce:'n'},{id:'stranger'},f.save),/owner/);await handleInstant(s,{action:'claim',nonce:'n'},f.owner,f.save);await assert.rejects(handleInstant(s,{action:'commit',nonce:'n',total:30,html:''},f.gm,f.save),/reservation/);await handleInstant(s,{action:'reset'},f.gm,f.save);await assert.rejects(handleInstant(s,{action:'skip'},f.owner,f.save),/GM/);await handleInstant(s,{action:'skip'},f.gm,f.save);assert.equal(s.state,'skipped')});
 test('failed application requires GM review; retry never repeats target writes',async()=>{const f=setup(),s=await resist(f,'flashbang',0);f.actor.failCreate=true;await assert.rejects(handleInstant(s,{action:'apply'},f.owner,f.save),/write failed/);assert.equal(s.state,'review');await assert.rejects(handleInstant(s,{action:'apply'},f.owner,f.save),/resistance/);await handleInstant(s,{action:'review'},f.gm,f.save);assert.equal(s.state,'applied')});
-test('flashbang applies two native injuries with no HP damage; tear gas only eye',async()=>{for(const [id,n] of [['flashbang',2],['teargas',1]]){const f=setup(),s=await resist(f,id,0);await handleInstant(s,{action:'apply'},f.owner,f.save);assert.equal(f.actor.items.size,n);assert.equal(f.actor.system.derivedStats.hp.value,40);assert.ok(f.actor.items.filter(i=>get(i,'flags.pneuma-combattools.instantLifetime.expires')===160).length===n)}});
+test('flashbang applies two native injuries with no HP damage; tear gas only eye',async()=>{for(const [id,n] of [['flashbang',2],['teargas',1]]){const f=setup(),s=await resist(f,id,0);await handleInstant(s,{action:'apply'},f.owner,f.save);assert.equal(f.actor.items.size,n);assert.equal(f.actor.system.derivedStats.hp.value,40);assert.equal(f.actor.effects.filter(e=>e.duration?.seconds===60&&e.duration?.startTime===100&&e.origin).length,n)}});
 test('temporary injury expiry preserves permanent injuries and extends repeated temporary exposure',async()=>{const f=setup();await f.actor.createEmbeddedDocuments('Item',[{name:'Damaged Ear',type:'criticalInjury'}]);await temporaryInjury(f.actor,'Damaged Ear');assert.equal(get([...f.actor.items][0],'flags.pneuma-combattools.instantLifetime'),undefined);await temporaryInjury(f.actor,'Damaged Eye');game.time.worldTime=120;await temporaryInjury(f.actor,'Damaged Eye');await expireInstantActor(f.actor,160);assert.equal(f.actor.items.size,2);await expireInstantActor(f.actor,180);assert.equal(f.actor.items.size,1);assert.equal([...f.actor.items][0].name,'Damaged Ear')});
 test('sleep waking and expiry preserve prone and pre-existing unconsciousness',async()=>{const f=setup();await sleepTarget(f.actor);await clearInstantCondition(f.actor,'sleep');assert.equal(f.actor.effects.size,1);assert.ok([...f.actor.effects][0].statuses.has(masterStatuses.find(s=>s.name==='Prone').id));await f.actor.createEmbeddedDocuments('ActiveEffect',[{statuses:[masterStatuses.find(s=>s.name==='Unconscious').id]}]);await sleepTarget(f.actor);await expireInstantActor(f.actor,1000);assert.equal(f.actor.effects.size,2)});
 test('incendiary cannot stack and applies only once per ended turn; extinguishing stops it',async()=>{const f=setup();await igniteTarget(f.actor);await igniteTarget(f.actor);assert.equal(f.actor.effects.size,1);await burnTurn(f.actor,'c:1:0');await burnTurn(f.actor,'c:1:0');assert.equal(f.actor.system.derivedStats.hp.value,38);await burnTurn(f.actor,'c:2:0');assert.equal(f.actor.system.derivedStats.hp.value,36);await clearInstantCondition(f.actor,'fire');await burnTurn(f.actor,'c:3:0');assert.equal(f.actor.system.derivedStats.hp.value,36)});
@@ -41,3 +41,44 @@ test('effect names and scope attributes are escaped',()=>{setup();const s=newIns
 
 test('remote HP loss wakes Sleep without a local preUpdate hook',async()=>{const f=setup();registerInstantLifetimes();await sleepTarget(f.actor);f.actor.system.derivedStats.hp.value-=3;hooks.updateActor[0](f.actor);await new Promise(r=>setTimeout(r,0));assert.equal(f.actor.effects.size,1);assert.ok([...f.actor.effects][0].statuses.has(masterStatuses.find(s=>s.name==='Prone').id))});
 test('remote combat advance burns the previous actor once without local preUpdate',async()=>{const f=setup();registerInstantLifetimes();await igniteTarget(f.actor);const c={id:'c',started:true,round:1,turn:0,combatant:{actor:f.actor}};hooks.createCombat[0](c);c.turn=1;c.combatant={actor:null};hooks.updateCombat[0](c);await new Promise(r=>setTimeout(r,0));assert.equal(f.actor.system.derivedStats.hp.value,38);hooks.updateCombat[0](c);await new Promise(r=>setTimeout(r,0));assert.equal(f.actor.system.derivedStats.hp.value,38)});
+
+test('native fire status severity, suppression, and nonstacking work without lifetime flags',async()=>{
+ const f=setup();const fire=name=>masterStatuses.find(s=>s.name===name).id;
+ await f.actor.createEmbeddedDocuments('ActiveEffect',[{name:'On Fire (Strong)',statuses:[fire('On Fire (Strong)')]},{name:'On Fire (Mild)',statuses:[fire('On Fire (Mild)')]}]);
+ await igniteTarget(f.actor);assert.equal(f.actor.effects.size,2);
+ await burnTurn(f.actor,'native:1');assert.equal(f.actor.system.derivedStats.hp.value,36);
+ [...f.actor.effects][0].isSuppressed=true;await burnTurn(f.actor,'native:2');assert.equal(f.actor.system.derivedStats.hp.value,34);
+ await clearInstantCondition(f.actor,'fire');await burnTurn(f.actor,'native:3');assert.equal(f.actor.system.derivedStats.hp.value,34);
+});
+test('one minute expires after twenty rounds at the application turn, not world-time drift',async()=>{
+ const f=setup();const c={id:'clock',started:true,round:4,turn:1,turns:[{},{}]};game.combat=c;game.combats.set(c.id,c);
+ await sleepTarget(f.actor);await temporaryInjury(f.actor,'Damaged Eye');
+ const sleep=[...f.actor.effects].find(e=>e.name==='Sleep');assert.equal(sleep.duration.rounds,20);assert.equal(sleep.duration.seconds,null);assert.equal(sleep.duration.combat,'clock');
+ c.round=23;game.time.worldTime=10000;await expireInstantActor(f.actor);assert.equal(f.actor.items.size,1);assert.ok(f.actor.effects.has(sleep.id));
+ c.round=24;c.turn=0;await expireInstantActor(f.actor);assert.equal(f.actor.items.size,1);
+ c.turn=1;await expireInstantActor(f.actor);assert.equal(f.actor.items.size,0);assert.equal(f.actor.effects.has(sleep.id),false);
+ assert.ok([...f.actor.effects].some(e=>e.statuses.has(masterStatuses.find(s=>s.name==='Prone').id)));
+});
+
+test('combat end clears manual timed effects but preserves critical injuries and other combats',async()=>{
+ const f=setup(),c={id:'ending',combatants:[{actor:f.actor}]};
+ const injury=masterStatuses.find(s=>s.name==='Damaged Eye');
+ await f.actor.createEmbeddedDocuments('Item',[{name:'Damaged Eye',type:'criticalInjury'}]);
+ await f.actor.createEmbeddedDocuments('ActiveEffect',[
+  {name:'Manual buff',statuses:['manual'],duration:{seconds:3600,startTime:100}},
+  {name:'Timed unconscious',statuses:[masterStatuses.find(s=>s.name==='Unconscious').id],duration:{rounds:20,startRound:1,combat:'ending'}},
+  {name:'Another encounter',statuses:['other'],duration:{rounds:20,startRound:1,combat:'other'}},
+  {name:'Critical injury',statuses:[injury.id],duration:{rounds:20,startRound:1,combat:'ending'}},
+  {name:'Addiction',statuses:['addiction']}
+ ]);
+ await finishTimedEffects(c);
+ assert.deepEqual([...f.actor.effects].map(e=>e.name),['Another encounter','Critical injury','Addiction']);
+});
+
+test('timed item effects expire without deleting drug inventory',async()=>{
+ const f=setup();const [drug]=await f.actor.createEmbeddedDocuments('Item',[{name:'Manual medication',type:'drug'}]);
+ const effect=new Doc({name:'Medication effect',duration:{seconds:10,startTime:100}},drug);drug.effects.set(effect.id,effect);
+ f.actor.allApplicableEffects=function*(){yield* this.effects;yield* drug.effects;};
+ await f.actor.createEmbeddedDocuments('ActiveEffect',[{name:'Linked marker',origin:drug.uuid,statuses:['manual'],duration:{seconds:10,startTime:100}}]);
+ await expireInstantActor(f.actor,111);assert.equal(f.actor.items.size,1);assert.equal(effect.disabled,true);assert.equal(f.actor.effects.size,0);
+});
