@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.0 - 2026-09-23
+
+- Keep player HUD vitals, incoming attacks and Neural Intrusion active without token selection: use the assigned character's unique scene token, or the single owned scene token when no Character is assigned.
+- Extend queued HUD message animations to six seconds, with a fast initial reveal and a longer center-screen hold.
+- Replace the Jacked In wall-plug icon with a diagonal audio-style neural connector and curved cable.
+- Move optional Neural Intrusion screen glitches into PneumaVisualTools, using a read-only Combat Tools state API and change hook.
+- Keep Neural Intrusion status and ejection controls in Combat Tools; screen-effect preferences now belong to Visual Tools.
+- Add a Manual Rolls menu header and remove automatic first-item highlighting while retaining keyboard navigation.
+- Fix combat bar initiative icon contrast and keep settings buttons compact, single-line and aligned with their labels.
+
+Validation: production build, automated regressions and browser fixtures. Live multiplayer verification remains separate. Jack-In tracking requires a started combat. Screen glitches require the separate Visual Tools module.
+
 ## 0.7.0 - 2026-09-23
 
 - Expand combat bar docking, portrait sizes, scrolling, native initiative controls, and shared settings; add minimized Players-list mode.

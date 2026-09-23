@@ -9,7 +9,7 @@ const groups = [
   { id: "quickhack", title: "QuickHack", keys: ["quickhackEnabled", "quickhackMode", "quickhackMessages"] },
   { id: "combat-bar", title: "Combat Bar", keys: COMBAT_BAR_SETTING_KEYS },
   { id: "token-hud", title: "Token HUD & Targeting", keys: ["targetedRightClick", "tightHUD", "hudScale", "iconColor", "statusIconScale", "hoverDV", "hoverAutofire", "alwaysShowEKG"] },
-  { id: "status-hud", title: "Status HUD & Biomonitor", keys: ["eyeHUD", "eyeHUDDock", "crewHUDIntegration", "biomonitorShowHP", "forcePlayerHUDAnimations", "eyeHUDAnimateMessages", "biomonitorFlashSeconds", "neuralIntrusionGlitches"] },
+  { id: "status-hud", title: "Status HUD & Biomonitor", keys: ["eyeHUD", "eyeHUDDock", "crewHUDIntegration", "biomonitorShowHP", "forcePlayerHUDAnimations", "eyeHUDAnimateMessages", "biomonitorFlashSeconds"] },
 ] as const;
 
 /** Keep native saved fields and submission behavior; present their paired values as one choice. */

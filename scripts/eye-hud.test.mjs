@@ -10,7 +10,7 @@ try{
  await page.evaluate(()=>{
   window.injuryGuidance={};window.FormApplication=class {};
   window.Dialog=class {constructor(data){window.messageDialog=data;}render(){return this;}};
-  window.hooks={};window.Hooks={on:(k,f)=>(hooks[k]??=[]).push(f),once:(k,f)=>(hooks[k]??=[]).push(f)};
+  window.hooks={};window.Hooks={on:(k,f)=>(hooks[k]??=[]).push(f),once:(k,f)=>(hooks[k]??=[]).push(f),callAll:(k,...args)=>(hooks[k]??[]).forEach(f=>f(...args))};
   window.values={};window.settings={};
   window.actor={uuid:"Actor.test",name:"Smitty",isOwner:true,system:{derivedStats:{hp:{value:40,max:40}}},items:[{type:"criticalInjury",name:"Crushed Windpipe"}],
     allApplicableEffects:()=>[{name:"Crushed Windpipe",statuses:new Set(["windpipe"])},{name:"Prone",statuses:new Set(["prone"])},{name:"Disabled",disabled:true,statuses:new Set(["disabled"])}],
@@ -24,7 +24,7 @@ try{
   window.foundry={utils:{randomID:()=>String(window.testMessageId=(window.testMessageId??0)+1),getProperty:(o,p)=>p.split(".").reduce((v,k)=>v?.[k],o)}};
   window.ui={sidebar:{activateTab:()=>{window.openedChat=true;}},notifications:{info:()=>{}}};
  });
- await page.addScriptTag({type:"module",content:(await readFile("dist/scripts/socket-health.js","utf8")).replace('const MODULE = "pneuma-combattools";','const SOCKET_MODULE = "pneuma-combattools";').replace("get(MODULE)","get(SOCKET_MODULE)")+"\n"+(await readFile("dist/scripts/hud-messages.js","utf8")).replace(/^import .*;\s*/gm,"")+"\n"+(await readFile("dist/scripts/update-path.js","utf8"))+"\n"+(await readFile("dist/scripts/item-markers.js","utf8")).replace(/^import .*;\s*/gm,"").replace('const MODULE = "pneuma-combattools";', "")+"\n"+(await readFile("dist/scripts/biomonitor.js","utf8"))+"\n"+(await readFile("dist/scripts/grapple/rules.js","utf8"))+"\n"+(await readFile("dist/scripts/grapple/state.js","utf8")).replace(/^import .*;\s*/gm,"").replace('export const MODULE = "pneuma-combattools";', "")+"\nconst forceOutEntries=()=>window.testIncoming??[]; const bindStatusActions=()=>{}; const closeStatusActions=()=>{}; const createIntrusionGlitches=()=>({sync(){},stop(){}}); const movementHUD=()=>[]; const grappleProperty = property;\n"+(await readFile("dist/scripts/status-catalog.js","utf8"))+"\n"+(await readFile("dist/scripts/hud-conditions.js","utf8")).replace(/^import .*;\s*/gm,"")+"\n"+(await readFile("dist/scripts/eye-hud.js","utf8")).replace(/^import .*;\s*/gm,"")+"\nObject.assign(window,{sendHUDMessage,hasBiomonitor,collectHUDConditions});registerEyeHUD();"});
+ await page.addScriptTag({type:"module",content:(await readFile("dist/scripts/socket-health.js","utf8")).replace('const MODULE = "pneuma-combattools";','const SOCKET_MODULE = "pneuma-combattools";').replace("get(MODULE)","get(SOCKET_MODULE)")+"\n"+(await readFile("dist/scripts/hud-messages.js","utf8")).replace(/^import .*;\s*/gm,"")+"\n"+(await readFile("dist/scripts/update-path.js","utf8"))+"\n"+(await readFile("dist/scripts/item-markers.js","utf8")).replace(/^import .*;\s*/gm,"").replace('const MODULE = "pneuma-combattools";', "")+"\n"+(await readFile("dist/scripts/biomonitor.js","utf8"))+"\n"+(await readFile("dist/scripts/grapple/rules.js","utf8"))+"\n"+(await readFile("dist/scripts/grapple/state.js","utf8")).replace(/^import .*;\s*/gm,"").replace('export const MODULE = "pneuma-combattools";', "")+"\nconst forceOutEntries=()=>window.testIncoming??[]; const bindStatusActions=()=>{}; const closeStatusActions=()=>{}; const movementHUD=()=>[]; const grappleProperty = property;\n"+(await readFile("dist/scripts/status-catalog.js","utf8"))+"\n"+(await readFile("dist/scripts/hud-conditions.js","utf8")).replace(/^import .*;\s*/gm,"")+"\n"+(await readFile("dist/scripts/eye-hud.js","utf8")).replace(/^import .*;\s*/gm,"")+"\nObject.assign(window,{sendHUDMessage,hasBiomonitor,collectHUDConditions,actorInFocus});registerEyeHUD();"});
  const ts = (await import("../node_modules/typescript/lib/typescript.js")).default;
  const crewRoot = process.env.PNEUMA_CREWTOOLS_ROOT ?? "../PneumaCrewTools";
  const shortcutSource = await readFile(crewRoot + "/src/hud-shortcuts.ts", "utf8").catch(()=>null);
@@ -47,7 +47,7 @@ try{
  const arrival=await page.evaluate(()=>{
   const text=document.querySelector('.pneuma-eye-notification').firstElementChild;
   window.arrivalText=text; window.arrivalAnimation=text.getAnimations()[0];
-  arrivalAnimation.pause();arrivalAnimation.currentTime=400;
+  if(arrivalAnimation.effect.getTiming().duration!==6000)throw Error('Expected six-second message animation');arrivalAnimation.pause();arrivalAnimation.currentTime=400;
   const b=text.getBoundingClientRect();
   return {x:b.x+b.width/2,y:b.y+b.height/2,w:b.width,screenX:innerWidth/2,screenY:innerHeight/2,color:getComputedStyle(text).color};
  });
@@ -55,10 +55,10 @@ try{
  assert.equal(arrival.color,'rgb(255, 180, 95)');
  const scan=await page.evaluate(()=>{
   arrivalAnimation.currentTime=100;const reveal=getComputedStyle(arrivalText).clipPath;
-  arrivalAnimation.currentTime=800;const hold=getComputedStyle(arrivalText).clipPath;
-  arrivalAnimation.currentTime=1290;const collapsed=getComputedStyle(arrivalText).clipPath;
+  arrivalAnimation.currentTime=2500;const hold=getComputedStyle(arrivalText).clipPath;
+  arrivalAnimation.currentTime=5000;const collapsed=getComputedStyle(arrivalText).clipPath;
   const center=arrivalText.getBoundingClientRect();
-  arrivalAnimation.currentTime=1380;const blackout=getComputedStyle(arrivalText).opacity;
+  arrivalAnimation.currentTime=5340;const blackout=getComputedStyle(arrivalText).opacity;
   arrivalAnimation.currentTime=400;
   return {reveal,hold,collapsed,blackout,centerX:center.x+center.width/2,line:!!arrivalText.querySelector('.pneuma-eye-scanline')};
  });
@@ -164,6 +164,34 @@ try{
  await page.waitForSelector('.pneuma-eye-lamp[data-kind=jacked].is-on');
  await page.evaluate(()=>{effects[0].disabled=true;effects[1].isSuppressed=true;hooks.updateActor.forEach(f=>f(actor));});
  await page.waitForFunction(()=>!document.querySelector('.pneuma-eye-drug-light.is-on'));
+ // Assigned unlinked token supplies the HUD identity even with no selection.
+ await page.evaluate(()=>{
+  actor.id='test';
+  window.assignedTokenActor={...actor,uuid:'Scene.test.Token.default.Actor.test'};
+  canvas.tokens.placeables=[{actor:assignedTokenActor,document:{actorId:actor.id}}];
+  canvas.tokens.controlled=[];testIncoming=[{messageId:'intrusion',name:'Netrunner'}];
+  hooks.controlToken.forEach(f=>f());
+ });
+ await page.waitForFunction(()=>moduleEntry.api.getNeuralIntrusionActor()==='Scene.test.Token.default.Actor.test');
+ assert.equal(await page.evaluate(()=>actorInFocus().uuid),'Scene.test.Token.default.Actor.test');
+ await page.evaluate(()=>{game.user.character=null;hooks.controlToken.forEach(f=>f());});
+ assert.equal(await page.evaluate(()=>actorInFocus().uuid),'Scene.test.Token.default.Actor.test','Single owned token works without a User Character assignment');
+ await page.waitForFunction(()=>moduleEntry.api.getNeuralIntrusionActor()==='Scene.test.Token.default.Actor.test');
+ await page.evaluate(()=>{game.user.character=actor;});
+
+ await page.evaluate(()=>{
+  window.defaultAttack={id:'default-attack',visible:true,isContentVisible:true,flags:{'pneuma-combattools':{exchange:{state:'waiting',defenderActor:assignedTokenActor.uuid}}}};
+  hooks.createChatMessage.forEach(f=>f(defaultAttack));
+ });
+ await page.waitForSelector('.pneuma-eye-notification.is-attack');
+ await page.evaluate(()=>{
+  hooks.deleteChatMessage.forEach(f=>f(defaultAttack));
+  game.user.isGM=true;
+ });
+ assert.equal(await page.evaluate(()=>actorInFocus()),undefined,'GM does not use assigned character fallback');
+ await page.evaluate(()=>{game.user.isGM=false;canvas.tokens.placeables=[];testIncoming=[];hooks.controlToken.forEach(f=>f());});
+ assert.equal(await page.evaluate(()=>actorInFocus().uuid),'Actor.test','No scene token falls back to assigned actor');
+ await page.waitForFunction(()=>!moduleEntry.api.getNeuralIntrusionActor() && document.querySelector('.pneuma-eye-lamp[data-kind=jacked].is-on'));
  await page.evaluate(()=>{
   window.stableEKG=document.querySelector('.pneuma-eye-ekg');
   window.message={id:'attack',visible:true,isContentVisible:true,flags:{'pneuma-combattools':{exchange:{state:'waiting',defenderActor:actor.uuid,total:99,title:'SECRET'}}}};

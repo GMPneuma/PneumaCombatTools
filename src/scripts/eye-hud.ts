@@ -1,4 +1,4 @@
-import {bindStatusActions, closeStatusActions, createIntrusionGlitches} from "./neural-intrusion.js";
+import {bindStatusActions, closeStatusActions} from "./neural-intrusion.js";
 import {forceOutEntries} from "./quickhack/force-out.js";
 import {injuryGuidance} from "./injury-notices.js";
 import { collectHUDConditions, lastingDrugs } from "./hud-conditions.js";
@@ -16,7 +16,6 @@ declare global { interface SettingConfig {
   "pneuma-combattools.biomonitorFlashSeconds": number;
   "pneuma-combattools.eyeHUDMessage": HUDMessage | null;
   "pneuma-combattools.eyeHUD": boolean;
-  "pneuma-combattools.neuralIntrusionGlitches": boolean;
   "pneuma-combattools.eyeHUDAnimateMessages": boolean;
   "pneuma-combattools.forcePlayerHUDAnimations": boolean;
   "pneuma-combattools.eyeHUDPosition": { x: number; y: number; right?: number } | null;
@@ -101,8 +100,17 @@ const dismissed = new Set<string>();
 const attacks = new Map<string, ChatMessage>();
 function actorInFocus(): Actor | undefined {
   const tokens = canvas.tokens?.controlled ?? [];
-  if (tokens.length) return tokens.length === 1 && tokens[0]?.actor?.isOwner ? tokens[0].actor : undefined;
-  return game.user?.isGM ? undefined : game.user?.character ?? undefined;
+  if (tokens.length === 1 && tokens[0]?.actor?.isOwner) return tokens[0].actor;
+  if (game.user?.isGM) return;
+  const character = game.user?.character;
+  const owned = (canvas.tokens?.placeables ?? []).filter(token => token.actor?.isOwner);
+  // Players with one owned scene token need not also configure a User Character.
+  if (!character) return owned.length === 1 ? owned[0]!.actor ?? undefined : undefined;
+  // Unlinked tokens carry their own HP, connections and attack recipient UUID.
+  const matches = owned.filter(token => token.document.actorId === character.id || token.actor!.uuid === character.uuid);
+  if (matches.length === 1) return matches[0]!.actor ?? character;
+  // Do not choose an arbitrary synthetic actor when several copies are on the scene.
+  return character;
 }
 type HUDConditions = ReturnType<typeof collectHUDConditions>;
 export function eyeConditions(actor: Actor, data: HUDConditions = collectHUDConditions(actor)): Notice[] {
@@ -426,42 +434,49 @@ function animateIncomingMessages(rows: HTMLElement[]) {
     text.append(line);
     const beam = line.animate([
       { top: "0%", opacity: 1, offset: 0 },
-      { top: "100%", opacity: 1, offset: .26 },
-      { top: "100%", opacity: 0, offset: .28 },
-      { top: "50%", opacity: 0, offset: .62 },
-      { top: "50%", opacity: 1, offset: .70 },
-      { top: "50%", opacity: 1, offset: .73 },
-      { top: "50%", opacity: 0, offset: .76 },
-      { top: "0%", opacity: 1, offset: .78 },
-      { top: "100%", opacity: 1, offset: .94 },
+      { top: "100%", opacity: 1, offset: .07 },
+      { top: "100%", opacity: 0, offset: .09 },
+      { top: "50%", opacity: 0, offset: .70 },
+      { top: "50%", opacity: 1, offset: .82 },
+      { top: "50%", opacity: 1, offset: .85 },
+      { top: "50%", opacity: 0, offset: .88 },
+      { top: "0%", opacity: 1, offset: .90 },
+      { top: "100%", opacity: 1, offset: .98 },
       { top: "100%", opacity: 0, offset: 1 }
-    ], { duration: 1800, easing: "linear" });
+    ], { duration: 6000, easing: "linear" });
     const arrival = text.animate([
       { transform: center, clipPath: "inset(0 0 100% 0)", opacity: 1, offset: 0 },
-      { transform: center, clipPath: "inset(0)", opacity: 1, offset: .26 },
-      { transform: center, clipPath: "inset(0)", opacity: 1, offset: .62 },
-      { transform: center, clipPath: "inset(49% 0)", opacity: 1, offset: .70 },
-      { transform: center, clipPath: "inset(49% 0)", opacity: 1, offset: .73 },
-      { transform: center, clipPath: "inset(50% 0)", opacity: 0, offset: .76 },
-      { transform: "none", clipPath: "inset(0 0 100% 0)", opacity: 0, offset: .77 },
-      { transform: "none", clipPath: "inset(0 0 100% 0)", opacity: 1, offset: .78 },
-      { transform: "none", clipPath: "inset(0)", opacity: 1, offset: .94 },
+      { transform: center, clipPath: "inset(0)", opacity: 1, offset: .07 },
+      { transform: center, clipPath: "inset(0)", opacity: 1, offset: .70 },
+      { transform: center, clipPath: "inset(49% 0)", opacity: 1, offset: .82 },
+      { transform: center, clipPath: "inset(49% 0)", opacity: 1, offset: .85 },
+      { transform: center, clipPath: "inset(50% 0)", opacity: 0, offset: .88 },
+      { transform: "none", clipPath: "inset(0 0 100% 0)", opacity: 0, offset: .89 },
+      { transform: "none", clipPath: "inset(0 0 100% 0)", opacity: 1, offset: .90 },
+      { transform: "none", clipPath: "inset(0)", opacity: 1, offset: .98 },
       { transform: "none", clipPath: "inset(0)", opacity: 1, offset: 1 }
-    ], { duration: 1800, easing: "linear" });
+    ], { duration: 6000, easing: "linear" });
     const cleanup = () => { beam.cancel(); line.remove(); };
     arrival.onfinish = cleanup;
     arrival.oncancel = cleanup;
   }
 }
 
-const intrusionGlitches = createIntrusionGlitches(() => {
+/** Read-only integration: Visual Tools owns optional screen effects. */
+function neuralIntrusionActor(): string | undefined {
   const actor = actorInFocus();
-  return game.settings!.get(MODULE, "neuralIntrusionGlitches") && game.settings!.get(MODULE, "eyeHUDAnimateMessages")
-    && actor?.isOwner && forceOutEntries(actor).length ? actor.uuid : undefined;
-});
+  return actor?.isOwner && forceOutEntries(actor).length ? actor.uuid : undefined;
+}
+let publishedIntrusion: string | undefined;
+function publishIntrusionState(): void {
+  const actorUuid = neuralIntrusionActor();
+  if (actorUuid === publishedIntrusion) return;
+  publishedIntrusion = actorUuid;
+  Hooks.callAll("pneumaCombatToolsNeuralIntrusionChanged", actorUuid);
+}
 function render() {
   closeStatusActions();
-  intrusionGlitches.sync();
+  publishIntrusionState();
   const incomingRows: HTMLElement[] = [];
   if (!game.settings!.get(MODULE, "eyeHUD")) {
     for (const key of flashNotices.keys()) removeFlashNotice(key);
@@ -642,6 +657,8 @@ function render() {
 }
 export function registerEyeHUD() {
   registerHUDMessages(schedule, showFlashNotice);
+  const module = game.modules!.get(MODULE) as unknown as {api?: Record<string, unknown>};
+  module.api = {...module.api, getNeuralIntrusionActor: neuralIntrusionActor};
   const crewActive = !!game.modules?.get("pneuma-crewtools")?.active;
   game.settings!.register(MODULE, "crewHUDIntegration", { name: "Integrate with Pneuma’s Crew Tools HUD", hint: "Minimize Biomon into Crew Tools’ HUD. Falls back to the normal control when that HUD is unavailable.", scope: "client", config: crewActive, type: Boolean, default: false, onChange: schedule });
   game.settings!.register(MODULE, "eyeHUDDock", { name: "Biomon position", hint: "Choose the top-left or top-right position. Top left sits diagonally below Crew Tools when its HUD is visible, otherwise below navigation and beside canvas tools. Integration does not change placement. Combat bar Top right overrides this choice to Top left until that dock is changed.", scope: "client", config: true, type: String, choices: { right: "Top right", left: "Top left" }, default: "right", onChange: schedule });
@@ -663,7 +680,6 @@ export function registerEyeHUD() {
     schedule();
   } });
   game.settings!.register(MODULE, "eyeHUDMinimized", { scope: "client", config: false, type: Boolean, default: false, onChange: schedule });
-  game.settings!.register(MODULE, "neuralIntrusionGlitches", {name: "Neural Intrusion screen glitches", hint: "Prominent 1.8-second screen interference, first after 1 second then every 6–10 seconds while your focused character has a detected incoming connection. Respects reduced motion and your HUD animation preference.", scope: "client", config: true, type: Boolean, default: true, onChange: schedule});
   game.settings!.register(MODULE, "biomonitorFlashSeconds", { name: "Biomonitor indicator flash duration", hint: "Seconds to flash a newly detected effect; ongoing conditions remain lit afterward. Zero disables flashing.", scope: "client", config: true, type: Number, default: 8, range: { min: 0, max: 60, step: 1 } });
   Hooks.on("pneumaCombatToolsExposure", (uuid: string, kind: LampId) => {
     signalExposure(uuid, kind, game.settings!.get(MODULE, "biomonitorFlashSeconds"), !!game.combat?.started);
@@ -676,9 +692,9 @@ export function registerEyeHUD() {
   game.settings!.register(MODULE, "eyeHUDPosition", { scope: "client", config: false, type: Object, default: null });
   Hooks.once("ready", () => { for (const message of game.messages ?? []) remember(message); messageChanged(); });
   Hooks.on("pneumaCombatBarDockChanged", schedule);
-  for (const hook of ["controlToken", "canvasReady"]) Hooks.on(hook, schedule);
+  for (const hook of ["controlToken", "canvasReady", "createToken", "deleteToken"]) Hooks.on(hook, schedule);
   Hooks.on("updateUser", (user: User) => { if (user.id === game.user?.id) schedule(); });
-  Hooks.on("updateToken", (token: TokenDocument) => { if (hoveredHUDToken?.document === token || canvas.tokens?.controlled.some(controlled => controlled.document === token)) schedule(); });
+  Hooks.on("updateToken", (token: TokenDocument) => { if (hoveredHUDToken?.document === token || canvas.tokens?.controlled.some(controlled => controlled.document === token) || !game.user?.isGM && (token.actor?.isOwner || token.actorId === game.user?.character?.id)) schedule(); });
   Hooks.on("hoverToken", (token: Token, entered: boolean) => {
     if (entered) hoveredHUDToken = token;
     else if (hoveredHUDToken === token) hoveredHUDToken = undefined;

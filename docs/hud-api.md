@@ -102,3 +102,7 @@ Flash only: center-screen scan, hold, collapse, then disappear after four second
 Flash + queued: existing dramatic arrival and dismissible HUD row. `expires` is zero; `duration` does not expire this mode. Queued messages remain client-session state (reload clears them). Existing calls without `mode` retain their timed behavior. Disabling HUD hides both modes. No chat card is created. Recipient permissions are unchanged. Requires API version 2.
 
 The GM may enforce HUD animations for players using "Force animated HUD messages for players". This hides and overrides the player animation setting for both delivery modes and effect arrivals. GMs retain their own preference. Device reduced-motion preferences still apply.
+
+## Optional screen-effect integration
+
+`game.modules.get("pneuma-combattools").api.getNeuralIntrusionActor()` returns the focused owned actor UUID when a detected incoming connection exists, or undefined. `pneumaCombatToolsNeuralIntrusionChanged` publishes that value when it changes. Consumers should read the API at ready and listen for changes; they own their rendering and settings. Visual Tools uses this contract. Combat Tools has no screen glitch or fire renderer.

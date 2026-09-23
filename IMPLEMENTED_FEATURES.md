@@ -163,7 +163,7 @@ Horizontal combat bar clears the visible macro hotbar when their horizontal span
 
 - Native attack dialogs containing Combat Tools unaware/improvised fields now recalculate height within the viewport, scroll form content separately from the Confirm/Cancel footer, and give Additional Mods a visible input and comma-separated hint. Native inputs, modifier handling and listeners are preserved.
 
-- Implemented: detected incoming Jack-In is a persistent Neural Intrusion biomonitor icon. Right-click On Fire to extinguish; right-click Neural Intrusion to select a detected netrunner and invoke the existing ejection flow. Optional per-user screen interference lasts 1.8 seconds, first after 1 second then following 6–10 second pauses, with six prominent cyan/purple distortion bands, only for the focused owned actor, respecting reduced motion and HUD animation preference. Initial detection notices are retained.
+- Implemented: detected incoming Jack-In is a persistent Neural Intrusion biomonitor icon. Right-click On Fire to extinguish; right-click Neural Intrusion to select a detected netrunner and invoke the existing ejection flow. Optional per-user screen interference lasts 1.8 seconds, first after 1 second then following 6–10 second pauses, with horizontal backdrop distortion, red/cyan channel separation, irregular tears and scanlines, only for the focused owned actor, respecting reduced motion and HUD animation preference. Initial detection notices are retained.
 
 - Status icon right-click actions now use a compact body-mounted floating panel with shared CTH surface tokens; no HUD layout changes. Duplicate unnamed netrunner choices are numbered. Dismisses on outside click, Escape, scrolling, resize or removal of the source icon.
 
@@ -183,3 +183,26 @@ Horizontal combat bar clears the visible macro hotbar when their horizontal span
 - Implemented settings cleanup: four combat bar placement radio choices shared by Module Settings and its compact editor, retaining saved dock/orientation values. Related attack cards, evasion/area, movement/initiative, injuries/effects, QuickHack, combat bar, token HUD and Biomonitor settings are grouped and ordered together.
 
 - Settings polish implemented: flexible labels, compact inline Homebrew button, Allow Cover Up Homebrew label, labeled custom-status rows, and QuickHack message groups by source/target and action. Removed Test status HUD and all production demo rendering/controls; live HUD remains.
+
+- Fixed combat bar Roll Initiative contrast: use a foreground-colored dice icon on the dark flyout while retaining the native tracker action.
+
+- Manual roll flyout now has a Manual Rolls header (`.pneuma-roll-flyout-title`). Opening focuses the menu itself, leaving all choices unselected; arrow keys focus the first/last choice. Hover and keyboard focus still highlight individual actions without shifting layout.
+
+- Settings layout correction: native submenu buttons stay single-line at 28px high; grid rows keep labels and controls aligned, with hints spanning below.
+
+
+
+
+- Player HUD focus uses the assigned character’s unique owned scene token when none is individually selected, including unlinked actors. This shares the correct identity across vitals, conditions, incoming attacks, Neural Intrusion and Crew HUD state. Falls back to the assigned world actor without a unique match; GMs retain selection-only behavior. Token lifecycle/updates refresh this fallback.
+
+- HUD queued-message arrival now lasts six seconds, with 1.2-second center reveal and three-second center hold before collapse/relocation. Player focus also uses a single owned scene token when no User Character is assigned; multiple owned tokens without an assignment require selection.
+
+- Message animation tuning: initial reveal shortened to 0.42 seconds within the existing six-second sequence; the center message stays visible longer, with collapse and exit timing unchanged.
+
+- Jacked In now uses a custom round, keyed neural connector with circular contacts and a cable base in both the Biomonitor indicator and animated arrival. Preserves the existing status color.
+
+- Jacked In icon revised to a diagonal audio-style neural jack with segmented tip, solid grip and curved cable; replaces the round connector design.
+
+
+
+- Superseding screen-effect ownership: removed all Neural Intrusion glitch rendering and settings from Combat Tools; moved them to PneumaVisualTools. Combat Tools retains detection/status/ejection and exposes read-only getNeuralIntrusionActor() plus the pneumaCombatToolsNeuralIntrusionChanged hook. The fire-screen experiment is canceled and removed, not shipped.

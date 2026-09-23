@@ -19,6 +19,23 @@ try {
  assert.equal(await page.getByLabel('Status name',{exact:true}).inputValue(),'In Jail');
  const button=await page.locator('.pneuma-evasion-controls button').boundingBox();assert.equal(button.height,28);
  const label=await page.locator('.pneuma-combat-settings label').first().boundingBox();assert.ok(label.height<25,'Long checkbox label stays on one line with available space');
+ await page.evaluate(()=>{
+ const group=document.querySelector('.pneuma-combat-settings fieldset');
+ group.insertAdjacentHTML('beforeend','<div class="form-group"><label>Critical injuries</label><button data-key="pneuma-combattools.criticalInjuries"><i>▦</i> Configure damage types</button><p class="notes">Choose which damage types allow critical injuries.</p></div><div class="form-group"><label>Injury damage: turn-end HUD reminder</label><div class="form-fields"><input type="checkbox"></div><p class="notes">Remind owners and GM about unpaid damage cards.</p></div><div class="form-group"><label>Custom Cyberpunk statuses</label><button data-key="pneuma-combattools.customStatusesMenu"><i>☷</i> Edit custom statuses</button></div>');
+ });
+ for(const width of [620,480]) {
+ await page.locator('.pneuma-combat-settings').evaluate((el,width)=>el.style.width=width+'px',width);
+ for(const button of await page.locator('.pneuma-combat-settings button[data-key]').all()) {
+  const box=await button.boundingBox();assert.equal(box.height,28);
+  assert.ok(await button.evaluate(el=>el.scrollWidth<=el.clientWidth),'Button text fits');
+ }
+ const aligned=await page.locator('.pneuma-combat-settings .form-group').evaluateAll(rows=>rows.every(row=>{
+  const label=row.querySelector(':scope > label').getBoundingClientRect();
+  const control=row.querySelector(':scope > button, :scope > input, :scope > .form-fields').getBoundingClientRect();
+  return Math.abs((label.y+label.height/2)-(control.y+control.height/2))<2;
+ }));assert.ok(aligned,'Controls remain on the label row');
+ }
+ await page.locator('.pneuma-combat-settings').evaluate(el=>el.style.width='620px');
  await page.screenshot({path:tmpdir()+'/pct-settings-polish.png'});
  console.log('Settings subform browser checks passed.');
 } finally {await browser.close();}

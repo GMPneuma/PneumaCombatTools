@@ -36,7 +36,7 @@ Enable Combat Tools and libWrapper in your world. Keep an active GM connected fo
 - **All guides:** [Documentation index](docs/README.md).
 - **Planned work:** [Backlog](BACKLOG.md). [Changelog](CHANGELOG.md) records releases.
 
-The 0.7.0 release passed build, regression and browser-fixture checks. Live Foundry multiplayer verification remains separate. Some effects still require GM adjudication; the guides distinguish those from automated behavior.
+The 0.8.0 release passed build, regression and browser-fixture checks. Live Foundry multiplayer verification remains separate. Some effects still require GM adjudication; the guides distinguish those from automated behavior.
 
 ## Development
 

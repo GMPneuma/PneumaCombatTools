@@ -677,3 +677,28 @@ Damage with existing Add Effect slots; Body/Head critical injury; native base d1
 - Settings polish implemented: flexible labels, compact inline Homebrew button, Allow Cover Up Homebrew label, labeled custom-status rows, and QuickHack message groups by source/target and action. Removed Test status HUD and all production demo rendering/controls; live HUD remains.
 
 - Neural Intrusion visual tuning: amplified to six prominent bands for 1.8 seconds, first after 1 second then after 6–10 second pauses, for user evaluation before toning down.
+
+- Fixed combat bar Roll Initiative contrast: use a foreground-colored dice icon on the dark flyout while retaining the native tracker action.
+
+- Manual roll flyout now has a Manual Rolls header (`.pneuma-roll-flyout-title`). Opening focuses the menu itself, leaving all choices unselected; arrow keys focus the first/last choice. Hover and keyboard focus still highlight individual actions without shifting layout.
+
+- Neural Intrusion visual revision: replace colored bands with Cyberpunk-inspired backdrop tearing, red/cyan channel separation and scanlines. Retain current 1.8-second bursts and timing for evaluation; no capture, DOM cloning or per-frame script loop.
+
+- Settings layout correction: native submenu buttons stay single-line at 28px high; grid rows keep labels and controls aligned, with hints spanning below.
+
+
+
+
+- Player HUD focus uses the assigned character’s unique owned scene token when none is individually selected, including unlinked actors. This shares the correct identity across vitals, conditions, incoming attacks, Neural Intrusion and Crew HUD state. Falls back to the assigned world actor without a unique match; GMs retain selection-only behavior. Token lifecycle/updates refresh this fallback.
+
+- HUD queued-message arrival now lasts six seconds, with 1.2-second center reveal and three-second center hold before collapse/relocation. Player focus also uses a single owned scene token when no User Character is assigned; multiple owned tokens without an assignment require selection.
+
+- Message animation tuning: initial reveal shortened to 0.42 seconds within the existing six-second sequence; the center message stays visible longer, with collapse and exit timing unchanged.
+
+- Jacked In now uses a custom round, keyed neural connector with circular contacts and a cable base in both the Biomonitor indicator and animated arrival. Preserves the existing status color.
+
+- Jacked In icon revised to a diagonal audio-style neural jack with segmented tip, solid grip and curved cable; replaces the round connector design.
+
+
+
+- Superseding screen-effect ownership: removed all Neural Intrusion glitch rendering and settings from Combat Tools; moved them to PneumaVisualTools. Combat Tools retains detection/status/ejection and exposes read-only getNeuralIntrusionActor() plus the pneumaCombatToolsNeuralIntrusionChanged hook. The fire-screen experiment is canceled and removed, not shipped.

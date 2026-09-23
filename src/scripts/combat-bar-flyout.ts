@@ -94,6 +94,11 @@ export async function showBarControls(root: HTMLElement,row: HTMLElement): Promi
   const template=document.createElement("template");template.innerHTML=html;
   const nativeRow=Array.from(template.content.querySelectorAll<HTMLElement>("[data-combatant-id]")).find(row=>row.dataset.combatantId===entry.id);
   for(const control of Array.from(nativeRow?.querySelectorAll<HTMLElement>(".combatant-control")??[])){
+    // Native initiative artwork can be black; use the bar's inherited foreground color.
+    if (control.dataset.control === "rollInitiative") {
+      const icon = document.createElement("i"); icon.className = "fas fa-dice-d20";
+      icon.setAttribute("aria-hidden", "true"); control.replaceChildren(icon);
+    }
     control.addEventListener("click",event=>{
       event.preventDefault();event.stopPropagation();
       if(!barEntries().some(row=>row.id===entry.id)||barCombat()?.id!==combat.id)return;

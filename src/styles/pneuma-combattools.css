@@ -844,10 +844,6 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 
 #pneuma-eye-hud .pneuma-eye-lamp[data-kind=intrusion] { --lamp:#e1a0ff; position:relative; }
 #pneuma-eye-hud .pneuma-eye-lamp .pneuma-intrusion-bolt { position:absolute; top:14px; left:calc(50% + 6px); font-size:13px; line-height:16px; color:#ffe16b; text-shadow:0 0 3px #000; }
-#pneuma-neural-glitch { position:fixed; inset:0; pointer-events:none; z-index:10000; overflow:hidden; }
-#pneuma-neural-glitch > div { position:absolute; left:0; right:0; height:6vh; pointer-events:none; background:repeating-linear-gradient(0deg,#ba80ff55 0 3px,#73eceb55 3px 5px,transparent 5px 9px); border-top:3px solid #73ecebcc; border-bottom:2px solid #ba80ffaa; backdrop-filter:hue-rotate(90deg) contrast(1.8) saturate(1.8); animation:pneuma-neural-glitch 1800ms steps(4,end) both; }
-@keyframes pneuma-neural-glitch { 0%,100% { opacity:0; transform:translateX(0); } 10%,45%,80% { opacity:.95; transform:translateX(18px); } 25%,60%,90% { opacity:.7; transform:translateX(-14px); } }
-@media (prefers-reduced-motion:reduce) { #pneuma-neural-glitch { display:none; } }
 
 /* Floating status actions share CTH panel styling without inheriting large HUD icons. */
 .pneuma-status-actions { position:fixed; z-index:10000; width:max-content; max-width:min(320px,calc(100vw - 16px)); max-height:calc(100vh - 16px); overflow:auto; box-sizing:border-box; font-family:var(--font-primary, sans-serif); }
@@ -886,11 +882,11 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 .pneuma-combat-settings [hidden], .pneuma-bar-settings-body [hidden] { display: none !important; }
 
 /* Settings use available width instead of native equal-width label columns. */
-.pneuma-combat-settings .form-group { gap: 6px 12px; }
+.pneuma-combat-settings .form-group { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 12px; }
 .pneuma-combat-settings .form-group > label { flex: 1 1 260px; min-width: 0; overflow-wrap: normal; word-break: normal; }
 .pneuma-combat-settings .form-group > input[type="checkbox"] { flex: 0 0 20px; margin-left: auto; }
-.pneuma-combat-settings .form-group > .notes { flex: 0 0 100%; margin-top: 0; }
-.pneuma-combat-settings .form-group > .form-fields { flex: 1 1 240px; min-width: 0; }
+.pneuma-combat-settings .form-group > .notes { grid-column: 1 / -1; margin-top: 0; }
+.pneuma-combat-settings .form-group > .form-fields { min-width: 0; max-width: 320px; justify-content: flex-end; }
 .pneuma-combat-settings .pneuma-evasion-controls > button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; height: 28px; line-height: normal; padding: 0 8px; }
 .pneuma-combat-settings .pneuma-evasion-controls > button > i { flex: 0 0 auto; margin: 0; }
 #pneuma-custom-statuses .pneuma-custom-status-row { grid-template-columns: minmax(0,1fr) minmax(0,1.5fr) 32px 32px; align-items: end; gap: 8px; padding: 10px 0; border-bottom: 1px solid #8885; }
@@ -903,3 +899,18 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 #pneuma-quickhack-settings legend { font-weight: bold; }
 #pneuma-quickhack-settings .form-group { display: grid; grid-template-columns: minmax(0,1fr) minmax(180px,1fr); gap: 10px; margin: 8px 0; }
 #pneuma-quickhack-settings select { width: 100%; }
+
+#pneuma-combat-bar .pneuma-bar-controls [data-control="rollInitiative"] { background: none; color: inherit; }
+#pneuma-combat-bar .pneuma-bar-controls [data-control="rollInitiative"] i { color: inherit; }
+
+.pneuma-roll-flyout:focus { outline: none; }
+.pneuma-roll-flyout-title { padding: 5px 10px 8px; margin-bottom: 3px; border-bottom: 1px solid #ffffff24; color: #a8d8d6; font-size: 12px; font-weight: bold; }
+
+/* Native submenu actions reserve their text width rather than wrapping into tall buttons. */
+.pneuma-combat-settings button[data-key] { display: inline-flex; align-items: center; justify-content: center; gap: 5px; width: auto; min-width: 180px; height: 28px; margin: 0; padding: 0 8px; white-space: nowrap; line-height: normal; }
+.pneuma-combat-settings button[data-key] i { flex: 0 0 auto; margin: 0; }
+.pneuma-combat-settings .pneuma-evasion-controls > button[data-key] { min-width: 0; }
+
+
+/* Audio-style neural connector shares the indicator and arrival-animation color. */
+i.pneuma-neural-plug::before { content: ""; display: inline-block; width: 1em; height: 1em; vertical-align: middle; background: currentColor; -webkit-mask: url("icons/neural-plug.svg") center / contain no-repeat; mask: url("icons/neural-plug.svg") center / contain no-repeat; }

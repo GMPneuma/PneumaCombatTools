@@ -11,7 +11,7 @@ export const lamps = [
   { id: "biotoxin", name: "Biotoxin", icon: "fa-biohazard", match: /biotoxin/i },
   { id: "fire", name: "On fire", icon: "fa-fire", match: /on[ _-]?fire|burning|incendiary/i },
   { id: "addict", name: "Addict", icon: "fa-pills", match: /addiction|addicted/i },
-  { id: "jacked", name: "Jacked In", icon: "fa-plug", match: /^jacked in$/i },
+  { id: "jacked", name: "Jacked In", icon: "pneuma-neural-plug", match: /^jacked in$/i },
   { id: "intrusion", name: "Neural Intrusion", icon: "fa-brain", match: /^neural intrusion$/i },
   { id: "unconscious", name: "Unconscious", icon: "fa-bed", match: /unconscious/i },
 ] as const;

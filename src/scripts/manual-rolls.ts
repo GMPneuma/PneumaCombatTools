@@ -317,6 +317,8 @@ export function openManualRolls(anchor = document.querySelector<HTMLElement>("[d
   if(closeRollFlyout){closeRollFlyout();return;}
   if(!anchor)return;
   const panel=document.createElement("div");panel.className="pneuma-roll-flyout";panel.setAttribute("role","menu");panel.setAttribute("aria-label","Manual rolls");
+  const heading=document.createElement("div");heading.className="pneuma-roll-flyout-title";heading.textContent="Manual Rolls";heading.setAttribute("aria-hidden","true");panel.append(heading);
+  panel.tabIndex=-1;
   const events=new AbortController();
   const close=(focus=false)=>{events.abort();panel.remove();anchor.setAttribute("aria-expanded","false");closeRollFlyout=undefined;if(focus&&anchor.isConnected)anchor.focus();};
   closeRollFlyout=()=>close();anchor.setAttribute("aria-expanded","true");
@@ -333,14 +335,14 @@ export function openManualRolls(anchor = document.querySelector<HTMLElement>("[d
   const rect=anchor.getBoundingClientRect(),bounds=panel.getBoundingClientRect();
   panel.style.left=Math.max(8,Math.min(rect.left,window.innerWidth-bounds.width-8))+"px";
   panel.style.top=Math.max(8,Math.min(rect.top-bounds.height-6,window.innerHeight-bounds.height-8))+"px";
-  panel.querySelector<HTMLButtonElement>("button")?.focus();
+  panel.focus({preventScroll:true});
   document.addEventListener("pointerdown",event=>{if(!panel.contains(event.target as Node)&&!anchor.contains(event.target as Node))close();},{signal:events.signal});
   document.addEventListener("keydown",event=>{
     if(event.key==="Escape"){event.preventDefault();close(true);}
     else if(event.key==="Tab")close();
     else if(["ArrowDown","ArrowUp","Home","End"].includes(event.key)){
       event.preventDefault();const buttons=Array.from(panel.querySelectorAll("button")),index=buttons.indexOf(document.activeElement as HTMLButtonElement);
-      const next=event.key==="Home"?0:event.key==="End"?buttons.length-1:(index+(event.key==="ArrowDown"?1:-1)+buttons.length)%buttons.length;buttons[next]?.focus();
+      const next=event.key==="Home"?0:event.key==="End"?buttons.length-1:index<0?(event.key==="ArrowDown"?0:buttons.length-1):(index+(event.key==="ArrowDown"?1:-1)+buttons.length)%buttons.length;buttons[next]?.focus();
     }
   },{signal:events.signal});
   window.addEventListener("resize",()=>close(),{signal:events.signal});
