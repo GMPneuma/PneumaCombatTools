@@ -70,3 +70,19 @@ test("an old movement card cannot apply after its combat is reset",async()=>{
  await assert.rejects(applyRibsDamage(f.messages[0].id,f.users[0]),/no longer/);assert.equal(f.actor.updates,0);
  await warnBrokenRibs(f.doc,f.record);assert.equal(f.messages.length,2);await applyRibsDamage(f.messages[1].id,f.users[0]);assert.equal(f.actor.updates,1);
 });
+
+test("Foreign Object body and head have separate movement cards and receipts alongside ribs",async()=>{
+ const f=fixture();f.ribs();f.actor.items.push({type:"criticalInjury",name:"Foreign Object"},{type:"criticalInjury",name:"Foreign Object (H)"});
+ await warnBrokenRibs(f.doc,{...f.record,onFoot:4});assert.equal(f.messages.length,0);
+ await warnBrokenRibs(f.doc,f.record);assert.equal(f.messages.length,3);
+ assert.deepEqual(f.messages.map(m=>get(m,path).injury),["Broken Ribs","Foreign Object (Body)","Foreign Object (Head)"]);
+ for(const m of f.messages){assert(m.content.includes(get(m,path).injury));await applyRibsDamage(m.id,f.users[1]);await applyRibsDamage(m.id,f.users[1]);}
+ assert.equal(f.actor.system.derivedStats.hp.value,15);assert.equal(f.actor.system.armor.sp,11);
+ await warnBrokenRibs(f.doc,f.record);assert.equal(f.messages.length,3);
+});
+test("removed Foreign Object cannot apply stale damage; renamed source qualifies",async()=>{
+ const f=fixture();f.actor.items.push({type:"criticalInjury",name:"Renamed",_stats:{compendiumSource:"Compendium.foo.xTQ2T50UGNY8DrHl"}});
+ await warnBrokenRibs(f.doc,f.record);assert.equal(f.messages.length,1);
+ f.actor.items=[];await assert.rejects(applyRibsDamage(f.messages[0].id,f.users[1]),/no longer active/);
+ await warnBrokenRibs(f.doc,f.record);assert.doesNotMatch(f.messages[0].content,/data-ribs-apply/);
+});

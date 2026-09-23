@@ -8,6 +8,7 @@ export interface Grapple {
   state: "waiting" | "choice" | "active" | "ended";
   purpose: "grab" | "break"; breaks?: string; endedBy?: string;
   attack: SkillResult; defense?: SkillResult; note: string; choke?: ChokeSequence;
+  establishedRound?: number;
   lastAction?: "release" | "choke" | "throw";
   tokenPlacement?: { scaleX: number; scaleY: number };
   operation?: { action: string; user: string };
@@ -42,12 +43,19 @@ export function needsTwoHands(item: object): boolean {
 export function grappleWeaponBlocked(actor: Actor, item: object): boolean {
   return needsTwoHands(item) && actorGrapples(actor).length > 0;
 }
-export function grappleMenu(source: Token | undefined, target: Token | undefined): { action: string; label: string }[] {
+export function grappleActionBlocked(g:Grapple):boolean {
+  if(g.establishedRound===undefined||!g.combat)return false;
+  const combat=game.combats?.get(g.combat);
+  if(!combat?.started)return true;
+  const round=Number(combat.round),index=combat.turns?.findIndex(c=>c.token?.uuid===g.source.token)??-1;
+  return round<=g.establishedRound||(round===g.establishedRound+1&&index>=0&&Number(combat.turn)<index);
+}
+export function grappleMenu(source: Token | undefined, target: Token | undefined): { action: string; label: string; disabled?:boolean; title?:string }[] {
   if (!source?.actor || !target?.actor) return [];
   const own = grappleFor(source.document), theirs = grappleFor(target.document);
   if (own && (source === target || [own.source.token, own.target.token].includes(target.document.uuid))) {
-    return own.source.token === source.document.uuid ? [{action:"choke",label:"Choke"},{action:"throw",label:"Throw"},{action:"release",label:"Release"}]
-      : [{action:"escape",label:"Escape"}];
+    return own.source.token === source.document.uuid ? ["choke","throw","release"].map(action=>({action,label:action[0]!.toUpperCase()+action.slice(1)+" — "+own.target.name,disabled:grappleActionBlocked(own)||action==="choke"&&own.choke?.combat===own.combat&&own.choke?.round===Number(game.combats?.get(own.combat??"")?.round),title:grappleActionBlocked(own)?"Available from the grappler’s next turn":""}))
+      : [{action:"escape",label:"Escape — "+own.source.name}];
   }
   if (theirs?.source.token === target.document.uuid) return [{action:"break",label:"Break Grapple"}];
   return source !== target && !own && !theirs ? [{action:"grab",label:"Grab"}] : [];

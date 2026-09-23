@@ -68,7 +68,7 @@ try {
  assert.equal(await page.locator('[data-aoe-action="damage"] .fa-droplet').count(),1);
  await page.evaluate(async()=>{
   const {areaContent}=await import("/scripts/aoe/workflow.js");
-  data.exchange.damage={status:"rolled",result:{html:"DAMAGE"}};
+  data.exchange.damage={status:"rolled",result:{html:"DAMAGE",values:{total:20,bonus:0,location:"body",ablation:1,ammo:"basic",ignorePercent:0,ignoreBelow:0,lethal:true}}};
   data.rows[0].damage={applications:['<div class="pneuma-damage-applied">Target damage result</div>']};
   document.querySelector('#card').innerHTML=areaContent(data);
  });

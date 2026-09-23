@@ -149,7 +149,7 @@ Own-token HUDs show self controls instead of standard combat actions while retai
 - The minimized HUD shows an EKG and bell with a Biomonitor, otherwise a bell. New notices temporarily expand, play one ticker pass, then minimize; reduced motion uses eight seconds. Manual changes cancel the temporary behavior without overwriting the saved preference. Ordinary expanded messages scroll three times then rest centered.
 - Multiple notices use previous/count/next and per-message local Clear. Incoming attacks link to their card. The GM Send HUD Message control is in the live expanded HUD, not settings. Durations: 60 seconds, 5 minutes, 15 minutes, 1 hour, 6 hours or Until Cleared. New API notices are session-local, including Until Cleared; reload clears them.
 - HUD API v1 supports send/remove/dismiss/list, stable source/ID replacement, optional expiry, local delivery and GM delivery to connected recipients. Hook-driven updates and stable DOM preserve EKG playback/focus; there is no polling loop.
-- See [Status HUD](docs/cybereye-hud.md) and [HUD API](docs/hud-api.md). This focused overlay does not implement the optional Current Action window.
+- See [Status HUD](docs/cybereye-hud.md) and [HUD API](docs/hud-api.md). The HUD and chat cards are the chosen interface; the separate Current Action window is canceled.
 
 ### Settings and visual responsibilities — implemented
 
@@ -192,59 +192,16 @@ No priority order or new implementation authorization is implied.
 - **Partial-feature follow-ups:** custom QuickHacks and the manual QuickHack boundaries in feature 6; per-condition behavior inventory and damage-status/undo rules; marker lifetime/management; instantaneous-effect HUD integration. Grapple dragging and temporary token scaling are implemented; held-item transfers and general Action/turn enforcement remain manual as documented.
 - **Identity investigation:** scene/token names versus actor names and native damage/undo handoffs, including old cards after scene changes. Keep the confirmed display mismatch distinct from an unproven wrong-target mutation.
 - **Deferred cleanup:** retain legacy QuickHack folders/gear until at least v0.8.0. No QuickHack content/settings conversion, automatic rename, repair or inventory scan is present or implied.
-- **Optional proposal:** Current Action window/history/concurrency checkpoints remain maybe, not approved or implemented. Preserve the detailed proposal below.
+- **Canceled:** the Current Action window and its associated proposal are permanently removed from scope; use the HUD and chat cards.
 - **Live verification:** multi-client Foundry checks remain open for native roll/card integration, owner/GM handoffs, linked/unlinked token identity, status application and encounter lifecycles. The last implementation suite passed 126 automated tests; this roadmap review changed documentation only and did not rerun gameplay tests.
 
 ## Roadmap maintenance
 
 Preserve the original requests and record superseding decisions rather than silently dropping scope. Update current status where the feature is listed, not only by appending a later note. Keep implemented, partial/manual, deferred, optional and verification-only work distinct. Use current source as implementation evidence; retain earlier designs as clearly identified history.
 
-## Current Action window and combat exchange coordination
+## Current Action window — canceled
 
-Status: maybe — retained for possible future consideration, not approved for implementation. Recorded 2026-09-17; updated 2026-09-18.
-
-Current direction: use chat cards for combat resolution; the first implementation is present. General chat cosmetics now belong to PneumaVisualTools. The Current Action window plan below is retained as an optional, historical design; its window/history/checkpoint features are not implemented. Later accepted chat-flow decisions above take precedence over conflicting details in this proposal.
-
-### Purpose and scope
-
-Coordinate combat exchanges involving attackers, defenders, and scene context. Do not recreate a character sheet or Token Action HUD. Reuse native Foundry v12 and Cyberpunk RED rolls, controls, and workflows wherever possible; inspect the actual implementations before designing integrations.
-
-### Window
-
-- A draggable Current Action window with position remembered separately for each user.
-- Consider CrewTools panel styling after inspecting its implementation. The intended narrative-cloud feel comes from an exchange unfolding in place, not comic-book visual styling.
-- Top: a short scrollable history of the previous two or three completed exchanges, with compact outcomes and optional expanded details.
-- Center: current attack/defense/damage progression, updated in place.
-- Bottom: fixed choices for the current user; otherwise show who must respond.
-- Proposed phases: incoming threat, defense choice, hit/miss resolution, damage and any required application, complete.
-- Closing the window must not cancel an unresolved exchange. Pending exchanges must not be silently replaced or treated as completed history.
-
-### Native damage presentation and chat
-
-- Preserve the system's native damage roll, chat message, and dice presentation. Seeing the dice reveal a possible critical is part of the experience.
-- A Roll Damage control may invoke that native workflow; the window reflects its result afterward.
-- Distinguish damage calculated from damage actually applied. Verify the system's critical detection and application sequence before integrating.
-- Chat remains the permanent record. Prefer a compact attack/defense result alongside native damage messages; avoid redundant summaries and a message for every phase. Exact message structure remains undecided.
-
-### Concurrent exchanges and turn checkpoint
-
-- Support two simultaneous exchanges for ROF 2, with capacity for a rare third. Capacity does not grant extra attacks or enforce the full action economy.
-- Attacks and evasions may arrive in either order. Each exchange needs its own stable attack/defense pairing, target, and progress; label response controls clearly.
-- Proposed rule: commit each defense choice before revealing its corresponding attack result. Precise roll visibility and pairing behavior still need design review.
-- The user's preferred direction is the combat turn tracker as the lock/checkpoint, replacing the earlier suggestion to block an attacker after starting one exchange.
-- Proposed checkpoint: prevent ordinary turn advancement while exchanges remain unresolved, identify the outstanding steps, and allow an explicit GM override. Preserve pending exchanges on override.
-- Misses can complete immediately; hits remain pending through required damage resolution. Define completion criteria before implementation.
-- Proposed GM controls: resolve or cancel stalled exchanges, record cancellation, and do not silently undo rolls or resource changes.
-- Phase handlers must reject duplicate or invalid transitions, including repeated rolls or damage application.
-
-### Open design questions
-
-- How to integrate the turn checkpoint with native combat controls, and what happens outside an active combat or on backward/forced turn changes.
-- How users select among concurrent exchanges, and how multiple owners or a GM respond without duplicate resolution.
-- Whether all incoming attacks notify, or only attacks needing a response; appropriate GM/NPC presentation and information about unidentified attackers.
-- Whether to show only exchanges involving characters the user handles; exact history and pending-list presentation.
-- Reliable native hooks for attack, defense, damage dice, criticals, and application; compatibility with existing modules.
-- Do not intercept unrelated character-sheet, macro, or other-module actions without a separate scope decision.
+Permanently canceled by user decision on 2026-09-21. The HUD and chat cards are the chosen interface for combat information and resolution. The separate window, its history view, and its proposed concurrency/turn checkpoints are removed from planned scope, not deferred. The detailed proposal has been removed; do not reintroduce it as a future feature.
 
 ## Actor / Token identity consistency
 
@@ -350,7 +307,7 @@ Improvised damage is now selected by the attacker (player or GM), after agreeing
 
 - Superseding visual decision: restore the original solid CTH icons; use a combat-knife silhouette for Melee Attack. The regular-weight variation was rejected.
 
-- Implemented first cybereye status HUD: selected-actor condition display, pending attack notices, movable/collapsible panel, client visibility and safe interactive preview. This authorizes a focused condition/alert overlay, not the earlier broader Current Action window. Full condition synchronization and automation remain planned.
+- Implemented first cybereye status HUD: selected-actor condition display, pending attack notices, movable/collapsible panel, client visibility and safe interactive preview. This implements the focused condition/alert overlay. The earlier broader Current Action window was subsequently canceled. Full condition synchronization and automation remain planned.
 
 Biomonitor revision: header displays the actor name followed by Biomonitor. Compact single-line condition rows retain native icons, with a plus fallback and full text on hover. No counts, collapse control, empty-state panel, or telemetry footer. One scrolling ALERT: Incoming Attack banner links to the latest pending card and acknowledges the currently displayed alerts locally. The overlay hides when empty. Reduced-motion users receive static alert text. Preview is now named Test Biomonitor; End test remains available in its header.
 
@@ -427,7 +384,7 @@ Critical injury damage types: Quickhacks now default to disabled. Explicitly sav
 
 ### Hover EKG — implemented
 
-- User-requested EKG below a hovered token: Medtech viewers or GM world **Always show EKG** override only. Reuses Biomonitor state animations without numeric HP; independent of hover DV/weapon requirements. Native token visibility remains authoritative. Browser fixtures cover role/setting gates, HP changes, positioning and cleanup; live Foundry verification remains open. See [Hover EKG](docs/hover-ekg.md).
+- User-requested EKG below a hovered token: Medtech viewers, any viewer hovering a target with an installed Biomonitor, or GM world **Always show EKG** override. Reuses Biomonitor state animations without numeric HP; independent of hover DV/weapon requirements. Native token visibility remains authoritative. Browser fixtures cover role/setting gates, HP changes, positioning and cleanup; live Foundry verification remains open. See [Hover EKG](docs/hover-ekg.md).
 
 ### Refresh performance
 
@@ -570,3 +527,153 @@ Supersedes the Dismembered Leg dodge and Broken Ribs movement-trigger gaps in th
 - **GM navigation exception (2026-09-21):** GM bar gestures and context-menu ping/pan ignore token visibility; players retain native visibility checks.
 
 - **Combat bar GM pull ping (2026-09-21):** Shift-long-click uses native pull ping; ordinary Shift-click remains local, and players cannot pull others.
+
+- **Review fixes (2026-09-21):** movement records follow the scene-active encounter, not sidebar previews. Combat bar turn changes reveal the active portrait and End Turn in both orientations.
+
+## Tester feedback implementation (unreleased)
+
+- Removed the general initiative controls from CTH; encounter initiative actions are on the combat bar round flyout. Self-CTH retains its conditional speedware reroll.
+- Added self-HUD thrown weapons/grenades. Grenades use ground placement without enemy targeting; single-target throws require one other target.
+- Added 64/80/96 px combat-bar portrait choices. Top docking with an autohide tab is available; bottom preferences are preserved.
+- Added opt-in automatic NPC evasion, gated by RAW eligibility. AoE additionally rejects penalties, movement cost/borrowing and Cover Up. GM still places successful AoE evaders.
+- Connected Impair Movement/Slow to timed MOVE effects, Sonic Shock to temporary native Damaged Ear and Deafened, Overheat to Strong fire, and System Reset to timed sleep/wake-on-damage plus Prone. Existing Synapse Burnout damage control remains.
+- Detected active incoming Jack-In appears in situational HUD statuses, with identity disclosure governed by existing routing. New player detection uses the existing dramatic HUD animation and respects animation/accessibility settings. Later silent/failed hacks retain detected awareness for that connection.
+- Manual Quickhack handling remains: Lure, Puppet, Shard Ejection. Short Circuit and Cyberware Malfunction now use shared timed disablement. Identical movement hacks refresh duration and retain the strongest amount rather than stack; distinct hacks remain separate native effects.
+- Incendiary behavior is unchanged. Interrupted damage, duplicate dice and AoE cleanup changes are outside this implementation batch.
+- Verification: automated coverage and build are recorded in the task result; live Foundry/multiplayer verification is outstanding.
+
+## Shared disablement and top combat bar (unreleased)
+
+- Connected Short Circuit (GM chooses up to three), Cyberware Malfunction (attacking player chooses one plus installed options), and Microwaver (DV15 Cybertech, GM chooses two). Timed sources last 60 seconds / 20 rounds; EMP grenades retain combat-end duration.
+- Native item effects/rolls and Combat Tools eligibility respect independent causes. Temporary cyberleg penalties restore without physical injury items or enabling previously disabled effects. Hand assignments/descriptive abilities remain adjudicated.
+- Added per-client **Combat bar placement: Top (autohide tab)**: horizontal, initially collapsed, hover/focus reveal, click-to-pin, Escape/minimize collapse, open-menu protection, downward controls. Bottom preferences are retained.
+- Supersedes earlier source-dispatch and top-placement deferrals. Arbitrary third-party/native attack interception, combination-weapon modes and out-of-combat selection creation remain outside this integration.
+- Automated build/workflow/browser validation is recorded in the task result. Live Foundry/multiplayer remains unverified; no deployment or release performed.
+
+- Movement controls now anchor to the lower-left of the screen above Players, independently of combat-bar placement, size and minimization. This supersedes the earlier lower-right-of-bar placement.
+
+## Combat bar layout correction (unreleased)
+
+Supersedes earlier top-placement and detached movement-control descriptions. Top placement, autohide tab and placement setting are removed. All four movement buttons stay at the bottom-left corner inside one shared translucent bar above Players. Portraits extend upward (vertical) or rightward (horizontal); round counter/arrows remain at the top or far right respectively. Movement anchoring survives all portrait sizes and minimization. Build and browser geometry/visual checks passed; live Foundry verification remains outstanding.
+
+## Players control: minimized mode (unreleased)
+
+Click the native Players heading to cycle **Online → All → Minimized → Online**. Minimized hides every player row and retains the heading as the restore button. The small mode label and tooltip describe the current/next state. Enter and Space also operate the heading.
+
+The state is saved per client and survives rerenders, user connections and application recreation. Native online/all filtering, row permissions and context menus remain in use. Native AV hiding behavior remains authoritative. The combat bar follows the Players panel height through its existing resize observer. Browser checks cover the cycle, filtering, keyboard restore, persistence, joins and compact height; live Foundry verification remains outstanding.
+
+Vertical combat-bar turn controls now place Previous and Next side by side above the round counter. This supersedes earlier stacked-arrow descriptions; horizontal controls remain stacked at the far right.
+
+Previous/Next turn arrows point left/right in both orientations; vertical layout keeps the two buttons side by side above the round counter.
+
+## Combat Bar settings shortcut (unreleased)
+
+The former one-click orientation toggle is now a gear button opening a compact **Combat Bar** settings window. It is available while expanded or minimized. The window reuses Foundry v12 SettingsConfig's prepared rows and native settings-category template, in the same order as the Module Settings Combat Bar group: visibility, portrait size, layout, name-only tooltips, and initial movement mode.
+
+Labels, hints, choices and current values come from the registered settings. Native SETTINGS_MODIFY permission filters world settings, and permissions/choices are rechecked when saving. Each change saves immediately through game.settings.set and invokes its existing callback; **Done** closes the window. Reopening reads current settings. If visibility is turned off, the window remains available to restore it; Module Settings is also always available.
+
+Build and targeted automated/browser verification are recorded in the task result; live Foundry verification remains outstanding.
+
+## EMP Effect behavior settings (unreleased)
+
+Added a GM-only **EMP Effect behavior > Configure** submenu under Combat & Evasion. Separate GM/player profiles default to RAW/manual selection. Both offer Fashionware-excluding equal, foundational 2×, foundational ½× and no-foundational draws. Each random profile has an **Avoid overlapping host/option picks** checkbox.
+
+Player selection also supports a saved random shortlist of up to 2×X candidates, from which the entitled player picks X (or all remaining eligible candidates if fewer). The shortlist draw can use any of the four random methods. Candidate IDs and behavior are saved before publishing the selection card; reopening or changing settings does not redraw. The player-facing picker omits unoffered parent names and its result lists chosen components without disclosing additional cascaded items. GM results retain the full affected list.
+
+Existing source counts, chooser ownership, protected components, duration and restoration remain authoritative: EMP normally chooses two, Short Circuit three, Cyberware Malfunction one. Manual methods retain eligible Fashionware. The existing EMP immunity setting moved into this submenu without changing its saved key. Automated and browser validation is recorded in the task result; live multi-client Foundry verification remains outstanding.
+
+- Implemented: EMP Effect behavior includes **Exclude BioWare (Pneuma Homebrew)**, off by default. Excludes Grafted Muscle and Bone Lace and Enhanced Antibodies from direct selection for all GM/player methods, including manual and shortlists. Recognizes native source identities after renaming. New requests snapshot this option; existing requests retain their policy.
+
+- Implemented: optional Internal Frame disablement consequences: prevent player movement (GM repositioning allowed), and a configurable native all-actions penalty. Both default off; overlapping penalties use the strongest value and expire with disablement. EMP/Microwaver hardened-item policy defaults to exclusion, or can consume an unaffected selection without reroll. Uses native self/child/sibling shielding; Quickhacks bypass EMP hardening. New requests snapshot these settings.
+
+- Revised EMP settings: GM chooses 2 / Random; player sees all and picks / saved 2xX shortlist / Random. Shared positive eligibility checkboxes for Fashionware, BioWare (Pneuma Homebrew), and Foundational, with Standard/2x/half foundational weight. Eligibility applies to manual and random selection; weighting also applies to shortlists. Existing source protections remain. Legacy per-side random methods migrate to shared options, preferring GM random settings when the two sides conflict. Existing pending requests retain their saved policy.
+
+- Internal Frame disablement: optional MOVE reduced by checkbox and numeric amount (off by default). Uses a native MOVE modifier with zero floor; Cannot move takes precedence. Overlapping frame reductions use the strongest active value and restore when their disablements expire. New requests snapshot the option.
+
+- Removed the Combat resolution toggle: combat chat-card flows are core module behavior and always active for Combat Tools attacks. Removed the ordinary HUD attack fallback to native-only cards. Previously saved false values no longer affect routing; other feature settings remain independent.
+
+- Grapple follow-up controls now live in Self-CTH Close Combat: grappler Choke/Throw/Release, defender Escape with grappler name. Established grapple actions wait until the grappler's next turn (not the establishment round), checked by the GM as well as the HUD. Original opposed-roll card remains intact; subsequent actions post separate results. Chat retains initial response/hold choices and GM recovery controls. Result cards retain original whisper/blind recipients.
+
+- Connected Foreign Object (Body/Head) to Broken Ribs movement damage: distinct injury-labeled cards and once-per-turn receipts, retaining brokenRibs storage and data-ribs-apply control. Private owner/GM delivery and manual Apply 5 damage remain. Full coverage/gaps: docs/body-head-injury-coverage.md.
+
+- Implemented injury automation without action-economy enforcement: Cracked Skull x3 penetrating aimed-headshot damage in Combat Tools applications (native bonus/reduction/nonlethal/undo data preserved); MOVE floor 1 for Collapsed Lung/Broken Leg/Dismembered Leg, respecting active MOVE=0 overrides. New injury HUD warnings, persistent medical guidance, Perception/speech skill reminders, advisory next-turn ear/spinal notices, and optional turn-end unpaid movement-damage reminder. No actions spent or movement/action restrictions enforced by these notices. Existing native injury modifiers remain authoritative.
+
+## Optional Crew Tools / Biomon HUD integration
+Crew Tools exposes a client-only `api.hudShortcuts` v1 content-slot registration API with availability subscriptions. Combat Tools offers opt-in per-user integration when Crew Tools is active: its minimized alert button uses that slot, with original status colors and a standalone fallback when hidden/unavailable. Expanded Biomon can dock top right or top left below navigation and beside canvas controls. Defaults are unchanged. Automated checks do not replace live Foundry testing.
+
+## HUD Alert Delivery API
+API v2 adds opt-in `mode: "flash"` (four-second dramatic-only notice) and `mode: "queued"` (dramatic arrival plus player-dismissible queue, no expiry). Legacy calls keep timed behavior. Queued alerts are not evicted by later alerts; reload clears session state. Animation preferences and recipient permissions remain respected.
+
+## GM-enforced player HUD animations
+The GM-only world setting "Force animated HUD messages for players" hides the player animation preference and overrides it while enabled, including flash-only API alerts and effect arrivals. GMs retain their personal preference; saved player preferences return when enforcement is disabled. Device reduced-motion preferences remain respected.
+
+### Crew HUD shortcut correction
+Enabling integration now immediately adds a persistent Combat Tools Biomon button below the Crew icon, without widening the calendar. It opens/minimizes Biomon and retains health/alert colors while expanded, minimized, or disabled. Hidden/unavailable Crew HUD still uses the standalone fallback.
+
+### Integrated EKG placement
+Integrated minimized Biomon retains EKG and actor name at its selected dock without a bell. Top-left minimized and expanded views anchor 8px below and right of the Crew HUD bounds, supplied through its public shortcut API. Queued messages follow below, left-aligned with the clear X first. Standalone behavior is unchanged.
+
+Integrated Biomon messages use up to 600px of available screen width independently of the minimized EKG; actor name remains aligned to the EKG.
+
+Biomon position is available to every user without Crew Tools. Standalone top-left docks expanded and minimized HUDs at the window corner, retaining the bell; integrated top-left retains the Crew HUD-relative anchor.
+
+Top-left placement correction: integration only changes the shortcut, not HUD positioning. Both modes use visible Crew HUD bounds, falling back to map navigation/canvas-control bounds when absent. Supersedes standalone window-corner placement.
+
+Biomon toggle icon: approved solid 25px broken heart with a 15px foreground bell, thin transparent crack and separation. Used in standalone and Crew HUD buttons, inheriting existing status colors.
+
+Biomon icon spacing refinement complete: smaller 26px footprint and slightly smaller foreground bell; click targets unchanged.
+
+Biomonitor maintenance: removed disabled manual-drag implementation (legacy setting retained), shared validated HP reading and message alignment decisions, reused one condition snapshot per redraw, and removed empty flash containers on dismissal/expiry. No intended layout or rule changes.
+
+Movement display size refinement complete: smaller counter, larger Reset/Run controls.
+
+Combat Bar settings: opening uses Foundry render focus handling, avoiding getComputedStyle errors from focusing a window before its DOM exists.
+
+Horizontal combat bar clears the visible macro hotbar when their horizontal spans overlap, including collapsed Players and hotbar resizing. Vertical placement stays unchanged.
+
+## Chat dice menu (approved, implemented locally; live verification pending)
+
+Damage with existing Add Effect slots; Body/Head critical injury; native base d10 with Critical Success/Critical Failure; GM-created group skill checks with player selection, optional/hidden DV and inline results. Added Interact with armor (on by default) for ad-hoc damage and Half Armor SP across native/module damage cards. Opposed checks deferred; explosive roll type excluded. Native skill dialog retained for each requested check.
+
+- Implemented: player-accessible STAT roll at any time (1d10 strictly under current STAT; no Critical Success/Critical Failure). Selected owned token or assigned character; no combat/GM dependency.
+
+- Implemented group-check presentation revision: colored outcomes and clickable totals with expanded modifiers; separate Roll details summary removed.
+
+- Implemented approved roll-menu UI revision: anchored flyout and clean native form layouts; damage dropdown 1d6–8d6. No result-card redesign.
+
+- Group-check disclosure correction: every rendered row starts with its full roll hidden. Clicking the row total reveals both the native roll and expanded `.d10-data-details` modifier breakdown; clicking again hides the entire detail block. Visibility is initialized on the rendered DOM so saved HTML or theme display rules cannot leave the roll open by default.
+
+- Group checks now use native `.rollcard-top`, `.rollcard-bottom` and `.cpr-block` styling. `.pneuma-group-heading` places the skill and `.pneuma-group-dv` on one line; replaces the standalone h3/paragraph header. Existing cards receive the updated header on render. Hidden-DV visibility, result colors and collapsed roll details remain unchanged.
+
+- Implemented shared chat-only button styling across attack/evasion, damage, AoE, grapple, Quickhack, EMP, instant effects, injuries and manual/group checks. Half Armor has a checked-box + solid selected fill; actions share sizing, icon treatments, focus, busy and disabled/completed states. Recovery/cancel controls have amber/red borders. Skin tokens and stable-geometry rules are documented in [chat-buttons.md](docs/chat-buttons.md). Existing action selectors and handlers are retained. Supersedes previous per-flow button sizing and faint Half Armor selection styling.
+
+- Cyberpunk roll dialog includes Custom Roll below the standard roll, with aligned count × sides controls rendered as x d y (1–20 dice; 1–100 sides). Separate Roll Cyberpunk / Roll Custom actions. Custom rolls use Foundry dice/rendering and current roll visibility, without the Cyberpunk base/modifier or Critical Success/Failure rules. `.pneuma-custom-dice` styles inputs; `.pneuma-custom-roll-card` retains native generic dice markup.
+
+- Superseding Cyberpunk dialog layout: shared Label and Modifier, Standard Cyberpunk 1D10 / Custom radio choices, and one Roll button. Standard is selected initially; Custom unlocks the 1–20 dice / 1–100 sides inputs. Both modes use the label and modifier. Only Standard uses Critical Success/Failure. `.pneuma-roll-modes` and `.pneuma-custom-roll:disabled` style the choices and locked fields. Replaces the previous two-button layout.
+
+- Damage cards now pair `.pneuma-interact-armor` (default on) to the left of `.pneuma-half-armor` in `.pneuma-armor-controls`. Turning interaction off bypasses SP and armor ablation and disables Half Armor; turning it on restores the original armor calculation. The world setting **Show armor controls on normal damage cards** defaults off; enabling it shows both controls on normal/native/AoE cards. Chat-menu manual damage always shows both. The pair uses a compact two-column grid so controls stay side by side. Manual damage preserves its initial dialog armor choice and allows changing it on the card. Controls use shared toggle skin tokens; shields and native damage options are unchanged.
+
+- Native attack dialogs containing Combat Tools unaware/improvised fields now recalculate height within the viewport, scroll form content separately from the Confirm/Cancel footer, and give Additional Mods a visible input and comma-separated hint. Native inputs, modifier handling and listeners are preserved.
+
+- Implemented: detected incoming Jack-In is a persistent Neural Intrusion biomonitor icon. Right-click On Fire to extinguish; right-click Neural Intrusion to select a detected netrunner and invoke the existing ejection flow. Optional per-user screen interference lasts 240ms every 20–40 seconds, only for the focused owned actor, respecting reduced motion and HUD animation preference. Initial detection notices are retained.
+
+- Status icon right-click actions now use a compact body-mounted floating panel with shared CTH surface tokens; no HUD layout changes. Duplicate unnamed netrunner choices are numbered. Dismisses on outside click, Escape, scrolling, resize or removal of the source icon.
+
+- Combat bar: bottom-left vertical height ends below the lowest main canvas-tool button, with a scrolling combatant list and canvas-tool stacking priority. A new per-user Top right dock anchors movement controls at top right; portraits extend left horizontally or down vertically, and round controls stay at the opposite end. Top right temporarily forces BiomonHUD left without changing its saved preference. Both settings screens explain the override.
+
+- Top-right correction: End Turn uses viewport-clamped positioning outside HUD clipping and checks portrait visibility only along the scrolling axis. Horizontal flyouts sit 4px below the bar, reserving extra room only when sharing the active portrait with a visible End Turn button.
+
+- Performance cleanup: native Quickhack rolls validate at start, after dialogs/confirmation and after roll rendering rather than at every intermediate await; ownership, range, wall sight, connection and hack-availability checks remain. Combat connections now persist detection, identity-reveal evidence and response audience. HUD/ejection reads no longer search chat, and deleting a card does not remove a detected link. No chat-history awareness migration or compatibility reconstruction is performed.
+- Instant-effect expiration runs for the departing actor at turn end and all encounter participants at round rollover, with world-time expiration retained for actors outside started combats. Unrelated combat updates do not trigger expiration. Status synchronization ignores unrelated effects/cosmetic updates, combines passive refreshes, and preserves explicit operations and failure recovery. Status action menus close through HUD lifecycle cleanup instead of a page-wide observer. Item-marker and grapple hooks inspect changed flag paths directly, including nested/dotted/deletion forms.
+
+- Ad-hoc damage uses the same `renderDamage` application-row renderer as normal combat damage: `.pneuma-damage-application-box > .pneuma-damage-controls` contains the bolt + “to selected target” recipient on the left and three `.pneuma-damage-status-slot` controls on the right. Ad-hoc cards omit the recorded-target row and retain creator/GM effect-edit permissions, shared Shift-click armor/application options, and their existing critical-injury/recovery actions. The separate manual application/effect-slot builder is removed.
+
+- Both normal and ad-hoc damage cards persist selected-target applications in `damage.selectedTargets` and rebuild an “Applied to” list (`.pneuma-damage-target-history`) from that state on every render. Each successful selected-target application adds one named entry; repeated deliberate applications remain separate. Names are HTML-escaped. Native numeric receipts remain expandable below the list. Message writes use state snapshots to avoid sharing mutable in-flight damage state with document updates.
+
+- Add Effects picker: collapsible Instant Effects, Body Crits, Head Crits, Drugs, Pharma and Misc sections, omitting empty categories, addiction entries, and Lightly/Seriously/Mortally Wounded statuses. Instant Effects opens initially; editing a slot opens its current category. Native details/summary controls support keyboard navigation; duplicate choices remain disabled and None clears a slot. Custom configured statuses fall back to Misc. Picker scope: `.pneuma-damage-status-picker .pneuma-effect-category`.
+
+- Implemented settings cleanup: four combat bar placement radio choices shared by Module Settings and its compact editor, retaining saved dock/orientation values. Related attack cards, evasion/area, movement/initiative, injuries/effects, QuickHack, combat bar, token HUD and Biomonitor settings are grouped and ordered together.
+
+- Settings polish implemented: flexible labels, compact inline Homebrew button, Allow Cover Up Homebrew label, labeled custom-status rows, and QuickHack message groups by source/target and action. Removed Test status HUD and all production demo rendering/controls; live HUD remains.
+
+- Neural Intrusion visual tuning: amplified to six prominent bands for 1.8 seconds, first after 1 second then after 6–10 second pauses, for user evaluation before toning down.

@@ -420,3 +420,69 @@ Root: `.pneuma-injury-card.rollcard[data-injury="broken-ribs"]`. Retains native 
 `[data-ribs-apply]` is a standard button labeled **Apply 5 damage**, visible to the affected actor's owners and GMs. The card is whispered to those owners and GMs; NPC reminders are GM-only unless an NPC has an owner. Applied or withdrawn cards omit the button; ended-combat cards disable it. Server-side validation also rejects reset-combat cards. No timeout or automatic damage application. Area Evasion buttons retain their existing selectors and now show the leg restriction as a disabled-button tooltip, refreshing when injury/item state changes.
 
 Example selector: `.pneuma-injury-card[data-state="pending"] [data-ribs-apply] { font-weight: bold; }`.
+
+## Quickhack effect summaries (unreleased)
+
+Existing .pneuma-quickhack-card .pneuma-quickhack-effect summaries now report timed MOVE, native fire and temporary injury/sleep application. Root, sections, state selectors, native roll classes, visibility, and controls remain unchanged. Example: .pneuma-quickhack-card .pneuma-quickhack-effect { font-weight: 600; }. Detection uses existing HUD message animation and owner-filtered situational tiles; no chat selector was removed.
+
+## Shared cyberware disablement (unreleased)
+
+Quickhack summaries retain .pneuma-quickhack-effect and report pending selection or no eligible components. Selection cards retain .pneuma-emp-card, [data-emp-select] and .pneuma-emp-result; source names/durations distinguish EMP, Short Circuit, Cyberware Malfunction and Microwaver. Malfunction selections are whispered to GMs and owners of the attacking Netrunner.
+
+Microwaver uses .pneuma-instant-card and .pneuma-instant-effect[data-effect="microwaver"], native roll markup and existing resistance controls. A successful Combat Tools hit creates it once, preserving whispers/blind visibility. No ordinary weapon damage button is shown. Example: .pneuma-instant-effect[data-effect="microwaver"] { border-color: #47c9dd; }.
+
+## EMP method and shortlist presentation (unreleased)
+
+The existing .pneuma-emp-card, [data-emp-select], .pneuma-emp-selection, .pneuma-emp-choice and .pneuma-emp-result selectors remain. Cards now distinguish manual selection, random selection and a saved player shortlist. Counts/durations remain source-specific. Random dialogs use **Draw and disable**; player random dialogs omit the inventory preview. Shortlist dialogs use the saved candidate set and require only the entitled count, with no unoffered parent labels on player clients. Player shortlist results list selected names; GMs see all affected names, including cascade results. Whispers continue to follow the entitled chooser's actor ownership.
+
+Example: .pneuma-emp-selection .pneuma-emp-choice { padding-block: 2px; }. No native roll classes or resistance-card controls are changed. The settings window uses .pneuma-emp-settings, profile fieldsets and existing Foundry form-group controls.
+
+- EMP results: .pneuma-emp-card .pneuma-emp-result includes Hardened — unaffected names for consumed protected selections, and No items disabled for a fully resisted draw. Same whisper recipients and saved shortlist visibility; native selection button and card scope unchanged.
+
+- Grapple follow-up controls now live in Self-CTH Close Combat: grappler Choke/Throw/Release, defender Escape with grappler name. Established grapple actions wait until the grappler's next turn (not the establishment round), checked by the GM as well as the HUD. Original opposed-roll card remains intact; subsequent actions post separate results. Chat retains initial response/hold choices and GM recovery controls. Result cards retain original whisper/blind recipients.
+
+- Connected Foreign Object (Body/Head) to Broken Ribs movement damage: distinct injury-labeled cards and once-per-turn receipts, retaining brokenRibs storage and data-ribs-apply control. Private owner/GM delivery and manual Apply 5 damage remain. Full coverage/gaps: docs/body-head-injury-coverage.md.
+
+- Cracked Skull: captured native damage result retains totals/breakdown/undo and adds .pneuma-injury-damage explanatory text for x3 penetrating headshot damage. Actor HP and captured hpReduction/rawDamageDealt/totalDamageDealt reflect the correction; bonus damage is unchanged. Injury reminders use the existing HUD message presentation and do not add chat-action controls.
+
+## Manual rolls and half armor (unreleased)
+
+Manual cards use `.rollcard.pneuma-combat-message.pneuma-manual-card[data-manual-kind="damage|critical|group"]`. Damage retains native roll markup and existing `data-pneuma-section="damage-roll"` / `damage-apply` sections. `.pneuma-manual-controls` holds selected-token application, three `.pneuma-damage-status-slot` Add Effect controls, qualifying injury roll and GM recovery. `.pneuma-manual-receipts` records injury recipients. Native injury cards retain their rollcard/d6 detail classes. No existing selectors removed.
+
+Group requests use `.pneuma-group-dv`, `.pneuma-group-rows > li[data-group-user]` and `.pneuma-group-action`. Rows display Waiting/Rolling/total and optional Success/Fail; native skill detail HTML lives in `details`. Only the owning player or GM sees Roll; GM can release an unfinished row. Hidden DV text is replaced only on GM render. Flags store `manualRoll` state, selected actor/user rows and results. Damage/critical cards retain native whisper/blind modes; group requests are public.
+
+`.pneuma-half-armor[aria-pressed="true"]` marks a local Half Armor SP choice. Native cards retain their `data-action="applyDamage"` control, with its armor-ignore value adjusted before native application. Module cards pass the choice to their existing coordinator; AoE applies it to the chosen row. Armor-bypassing rolls disable the toggle. The choice is for the next application and resets on rerender; it never edits stored armor. Example: `.pneuma-manual-card .pneuma-group-action button { font-size: 12px; }`.
+
+### STAT roll
+
+`.pneuma-combat-message.pneuma-stat-card` wraps the unchanged native base rollcard and `.pneuma-stat-result[data-stat-outcome="success|fail"]`. The result shows STAT name, current value captured at roll time, die result and Success/Fail. No application or response controls. Uses native whisper/blind roll-mode visibility; no GM coordinator or combat state. Example: `.pneuma-stat-card [data-stat-outcome="success"] strong { font-weight: bold; }`. Existing selectors remain unchanged.
+
+### Group-check result presentation revision
+
+The `details`/`summary` Roll details control is removed. `.pneuma-group-total[aria-expanded]` is now the keyboard-accessible toggle; `.pneuma-group-details[hidden]` spans the row below. Opening it removes the native `.d10-data-details.hide` state so stat, skill and modifier totals are already visible; native rollcard classes and modifier tooltips remain. `.pneuma-group-outcome[data-outcome="success|fail"]` colors Success green and Fail red. STAT outcome `strong` text uses the same colors. Existing saved group cards are upgraded when rendered. No visibility or roll permissions change. Example: `.pneuma-group-outcome[data-outcome="success"] { color: green; }`.
+
+### Manual roll configuration UI
+
+The chat icon opens `.pneuma-roll-flyout` with `[data-roll-choice]` menu buttons; Group Check is GM-only. Native dialogs use `.pneuma-roll-dialog .pneuma-manual-form`, `.pneuma-roll-pair`, `.pneuma-roll-checks`, and `.pneuma-roll-hint`. Damage uses a 1d6–8d6 select beside its modifier. Configuration-only change; existing result-card selectors, native roll calculations and visibility modes are unchanged.
+
+- Group-check disclosure correction: every rendered row starts with its full roll hidden. Clicking the row total reveals both the native roll and expanded `.d10-data-details` modifier breakdown; clicking again hides the entire detail block. Visibility is initialized on the rendered DOM so saved HTML or theme display rules cannot leave the roll open by default.
+
+- Group checks now use native `.rollcard-top`, `.rollcard-bottom` and `.cpr-block` styling. `.pneuma-group-heading` places the skill and `.pneuma-group-dv` on one line; replaces the standalone h3/paragraph header. Existing cards receive the updated header on render. Hidden-DV visibility, result colors and collapsed roll details remain unchanged.
+
+- Implemented shared chat-only button styling across attack/evasion, damage, AoE, grapple, Quickhack, EMP, instant effects, injuries and manual/group checks. Half Armor has a checked-box + solid selected fill; actions share sizing, icon treatments, focus, busy and disabled/completed states. Recovery/cancel controls have amber/red borders. Skin tokens and stable-geometry rules are documented in [chat-buttons.md](chat-buttons.md). Existing action selectors and handlers are retained. Supersedes previous per-flow button sizing and faint Half Armor selection styling.
+
+- Cyberpunk roll dialog includes Custom Roll below the standard roll, with aligned count × sides controls rendered as x d y (1–20 dice; 1–100 sides). Separate Roll Cyberpunk / Roll Custom actions. Custom rolls use Foundry dice/rendering and current roll visibility, without the Cyberpunk base/modifier or Critical Success/Failure rules. `.pneuma-custom-dice` styles inputs; `.pneuma-custom-roll-card` retains native generic dice markup.
+
+- Selected chat toggles now use charcoal fill, white text/checkmark and a red border. `--pneuma-chat-button-selected-border` independently controls the selected border for reskinning; sizing and behavior are unchanged.
+
+- Superseding Cyberpunk dialog layout: shared Label and Modifier, Standard Cyberpunk 1D10 / Custom radio choices, and one Roll button. Standard is selected initially; Custom unlocks the 1–20 dice / 1–100 sides inputs. Both modes use the label and modifier. Only Standard uses Critical Success/Failure. `.pneuma-roll-modes` and `.pneuma-custom-roll:disabled` style the choices and locked fields. Replaces the previous two-button layout.
+
+- Damage cards now pair `.pneuma-interact-armor` (default on) to the left of `.pneuma-half-armor` in `.pneuma-armor-controls`. Turning interaction off bypasses SP and armor ablation and disables Half Armor; turning it on restores the original armor calculation. The world setting **Show armor controls on normal damage cards** defaults off; enabling it shows both controls on normal/native/AoE cards. Chat-menu manual damage always shows both. The pair uses a compact two-column grid so controls stay side by side. Manual damage preserves its initial dialog armor choice and allows changing it on the card. Controls use shared toggle skin tokens; shields and native damage options are unchanged.
+
+- AoE decline-evasion tooltip and accessible label now read **Don't Evade**; action and selectors are unchanged.
+
+- Ad-hoc damage uses the same `renderDamage` application-row renderer as normal combat damage: `.pneuma-damage-application-box > .pneuma-damage-controls` contains the bolt + “to selected target” recipient on the left and three `.pneuma-damage-status-slot` controls on the right. Ad-hoc cards omit the recorded-target row and retain creator/GM effect-edit permissions, shared Shift-click armor/application options, and their existing critical-injury/recovery actions. The separate manual application/effect-slot builder is removed.
+
+- Both normal and ad-hoc damage cards persist selected-target applications in `damage.selectedTargets` and rebuild an “Applied to” list (`.pneuma-damage-target-history`) from that state on every render. Each successful selected-target application adds one named entry; repeated deliberate applications remain separate. Names are HTML-escaped. Native numeric receipts remain expandable below the list. Message writes use state snapshots to avoid sharing mutable in-flight damage state with document updates.
+
+- Add Effects picker: collapsible Instant Effects, Body Crits, Head Crits, Drugs, Pharma and Misc sections, omitting empty categories, addiction entries, and Lightly/Seriously/Mortally Wounded statuses. Instant Effects opens initially; editing a slot opens its current category. Native details/summary controls support keyboard navigation; duplicate choices remain disabled and None clears a slot. Custom configured statuses fall back to Misc. Picker scope: `.pneuma-damage-status-picker .pneuma-effect-category`.

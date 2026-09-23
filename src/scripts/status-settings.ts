@@ -57,7 +57,7 @@ class CustomStatusForm extends FormApplication {
     html.find("[data-add-status]").on("click", () => {
       const row = document.createElement("div"); row.className = "pneuma-custom-status-row";
       row.dataset.statusId = "pneuma-custom-" + foundry.utils.randomID();
-      row.innerHTML = '<input class="status-name" aria-label="Status name" placeholder="Name" required><input class="status-img" aria-label="Icon path" placeholder="Icon path" required><button type="button" data-pick-icon title="Choose icon"><i class="fas fa-image"></i></button><button type="button" data-remove-status title="Remove"><i class="fas fa-trash"></i></button>';
+      row.innerHTML = '<label>Status name<input class="status-name" aria-label="Status name" placeholder="Name" required></label><label>Icon path<input class="status-img" aria-label="Icon path" placeholder="Icon path" required></label><button type="button" data-pick-icon title="Choose icon"><i class="fas fa-image"></i></button><button type="button" data-remove-status title="Remove"><i class="fas fa-trash"></i></button>';
       html.find(".pneuma-custom-status-rows").append(row);
     });
     html.on("click", "[data-remove-status]", event => { event.currentTarget.closest(".pneuma-custom-status-row")?.remove(); });

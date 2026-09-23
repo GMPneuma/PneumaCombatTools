@@ -1,4 +1,5 @@
 import {createEKGTrace,vitalState} from "./biomonitor.js";
+import {hasBiomonitor} from "./eye-hud.js";
 const MODULE="pneuma-combattools";
 declare global {interface SettingConfig {"pneuma-combattools.alwaysShowEKG":boolean}}
 export function isMedtech(actor:Actor|undefined):boolean {
@@ -17,7 +18,7 @@ function viewer():Actor|undefined {
 let hovered:Token|undefined,panel:HTMLDivElement|undefined;
 let shownState="";
 function clear(){panel?.remove();panel=undefined;shownState="";}
-function permitted(){return game.settings!.get(MODULE,"alwaysShowEKG")||isMedtech(viewer());}
+function permitted(){return game.settings!.get(MODULE,"alwaysShowEKG")||isMedtech(viewer())||!!hovered?.actor&&hasBiomonitor(hovered.actor);}
 function position(){
   if(!panel||!hovered||!canvas.stage||!canvas.app)return;
   const bounds=(canvas.app.view as HTMLCanvasElement).getBoundingClientRect();
@@ -42,12 +43,12 @@ function refresh(){
   position();
 }
 export function registerHoverEKG(){
-  game.settings!.register(MODULE,"alwaysShowEKG",{name:"Always show EKG",hint:"Show the hovered token EKG to everyone. When off, only a selected owned Medtech (or assigned Medtech when none is selected) can see it. No numeric HP is shown.",scope:"world",config:true,type:Boolean,default:false,onChange:refresh});
+  game.settings!.register(MODULE,"alwaysShowEKG",{name:"Always show EKG",hint:"Show the hovered token EKG to everyone. When off, a selected owned Medtech (or assigned Medtech when none is selected) can see it, and anyone can see a target with an installed Biomonitor. No numeric HP is shown.",scope:"world",config:true,type:Boolean,default:false,onChange:refresh});
   Hooks.on("hoverToken",(token:Token,entered:boolean)=>{if(entered)hovered=token;else if(hovered===token)hovered=undefined;else return;refresh();});
   Hooks.on("controlToken",refresh);
   Hooks.on("updateUser",refresh);
   Hooks.on("updateActor",(actor:Actor)=>{if(actor.uuid===hovered?.actor?.uuid||actor.uuid===viewer()?.uuid)refresh();});
-  for(const hook of ["createItem","updateItem","deleteItem"])Hooks.on(hook,(item:Item)=>{if(item.parent?.uuid===viewer()?.uuid)refresh();});
+  for(const hook of ["createItem","updateItem","deleteItem"])Hooks.on(hook,(item:Item)=>{if(item.parent?.uuid===viewer()?.uuid||item.parent?.uuid===hovered?.actor?.uuid)refresh();});
   Hooks.on("updateToken",(token:TokenDocument)=>{if(token===hovered?.document||token.actor?.uuid===viewer()?.uuid)refresh();});
   Hooks.on("refreshToken",(token:Token)=>{if(token===hovered){if(!token.isVisible)clear();else refresh();}});
   Hooks.on("deleteToken",(token:TokenDocument)=>{if(token===hovered?.document){hovered=undefined;clear();}});

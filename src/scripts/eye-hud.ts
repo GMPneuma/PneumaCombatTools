@@ -1,20 +1,38 @@
+import {bindStatusActions, closeStatusActions, createIntrusionGlitches} from "./neural-intrusion.js";
+import {forceOutEntries} from "./quickhack/force-out.js";
+import {injuryGuidance} from "./injury-notices.js";
 import { collectHUDConditions, lastingDrugs } from "./hud-conditions.js";
 import {movementHUD} from "./aoe/movement.js";
 import { grappleHUD } from "./grapple/state.js";
 import { registerHUDMessages, postHUDMessage, listHUDMessages, dismissHUDMessage, hudMessageKey } from "./hud-messages.js";
 import { getItemMarkers } from "./item-markers.js";
-import { createEKGTrace, vitalState, indicatorState, signalExposure, clearRoundExposures, lamps, type LampId } from "./biomonitor.js";
+import { createEKGTrace, vitalState, indicatorState, signalExposure, clearRoundExposures, type LampId } from "./biomonitor.js";
 const MODULE = "pneuma-combattools";
 declare global { interface SettingConfig {
   "pneuma-combattools.biomonitorShowHP": boolean;
   "pneuma-combattools.eyeHUDMinimized": boolean;
+  "pneuma-combattools.crewHUDIntegration": boolean;
+  "pneuma-combattools.eyeHUDDock": string;
   "pneuma-combattools.biomonitorFlashSeconds": number;
   "pneuma-combattools.eyeHUDMessage": HUDMessage | null;
   "pneuma-combattools.eyeHUD": boolean;
+  "pneuma-combattools.neuralIntrusionGlitches": boolean;
   "pneuma-combattools.eyeHUDAnimateMessages": boolean;
-  "pneuma-combattools.eyeHUDPreview": boolean;
+  "pneuma-combattools.forcePlayerHUDAnimations": boolean;
   "pneuma-combattools.eyeHUDPosition": { x: number; y: number; right?: number } | null;
 } }
+
+function hudAnimationsEnabled(): boolean {
+  return (!game.user?.isGM && game.settings!.get(MODULE, "forcePlayerHUDAnimations")) || game.settings!.get(MODULE, "eyeHUDAnimateMessages");
+}
+function syncAnimationSettingVisibility(scope: ParentNode = document): void {
+  scope.querySelectorAll<HTMLElement>('[name="pneuma-combattools.forcePlayerHUDAnimations"]').forEach(control => { const row = control.closest<HTMLElement>(".form-group"); if (row) row.hidden = !game.user?.isGM; });
+  const forced = !game.user?.isGM && game.settings!.get(MODULE, "forcePlayerHUDAnimations");
+  scope.querySelectorAll<HTMLElement>('[name="pneuma-combattools.eyeHUDAnimateMessages"]').forEach(control => {
+    const row = control.closest<HTMLElement>(".form-group");
+    if (row) row.hidden = forced;
+  });
+}
 
 const messageDurations = [[60, "60 Seconds"], [300, "5 Minutes"], [900, "15 Minutes"], [3600, "1 Hour"], [21600, "6 Hours"]] as const;
 type HUDMessage = { id: string; text: string; recipients: string[]; expires: number };
@@ -74,12 +92,6 @@ const guidance: Record<string, string> = {
   "Broken Ribs": "Moving on foot may cause injury damage at turn end.",
   "Prone": "You are on the ground.",
 };
-const demo: Notice[] = [
-  { title: "Crushed Windpipe", detail: "You cannot speak." },
-  { title: "Broken Arm", detail: "Left arm unusable." },
-  { title: "Spinal Injury", detail: "Next turn: movement only." },
-  { title: "Medical notice", detail: "Multiple conditions can appear together." },
-];
 let root: HTMLElement | undefined;
 let hudBody: HTMLElement | undefined;
 let medicalSignature = "";
@@ -92,20 +104,67 @@ function actorInFocus(): Actor | undefined {
   if (tokens.length) return tokens.length === 1 && tokens[0]?.actor?.isOwner ? tokens[0].actor : undefined;
   return game.user?.isGM ? undefined : game.user?.character ?? undefined;
 }
-export function eyeConditions(actor: Actor): Notice[] {
-  return collectHUDConditions(actor).medical.map(row => ({...row, detail: guidance[row.title] ?? "View actor sheet for details."}));
+type HUDConditions = ReturnType<typeof collectHUDConditions>;
+export function eyeConditions(actor: Actor, data: HUDConditions = collectHUDConditions(actor)): Notice[] {
+  return data.medical.map(row => ({...row, detail: injuryGuidance[row.title] ?? guidance[row.title] ?? "View actor sheet for details."}));
 }
 function displayedActor(): Actor | undefined {
   const token = hoveredHUDToken;
   return token?.isVisible && !token.isPreview && canvas.activeLayer === canvas.tokens && token.actor && hasBiomonitor(token.actor)
     ? token.actor : actorInFocus();
 }
+interface CrewShortcutAPI {
+  version: number;
+  isAvailable(): boolean;
+  getBounds?(): DOMRect | undefined;
+  register(id: string, content: HTMLElement): void;
+  unregister(id: string): void;
+  subscribe(listener: () => void): () => void;
+}
+let crewShortcuts: CrewShortcutAPI | undefined;
+function biomonLeftDock(): boolean {
+  return game.settings!.get(MODULE, "combatBarDock") === "top-right" || game.settings!.get(MODULE, "eyeHUDDock") === "left";
+}
+function leftAlignedMessages(): boolean {
+  return integratedHUD() || biomonLeftDock();
+}
+function readHUDVitals(actor: Actor | undefined) {
+  const hp = Number(foundry.utils.getProperty(actor ?? {}, "system.derivedStats.hp.value"));
+  const max = Number(foundry.utils.getProperty(actor ?? {}, "system.derivedStats.hp.max"));
+  const valid = Number.isFinite(hp) && Number.isFinite(max) && max > 0;
+  const state = valid ? vitalState(hp, max) : "unknown" as const;
+  return { hp, max, valid, state };
+}
+function integratedHUD(): boolean {
+  return !!game.settings!.get(MODULE, "crewHUDIntegration") && !!crewShortcuts?.isAvailable();
+}
+let crewButton: HTMLButtonElement | undefined;
+function updateCrewButton(actor: Actor | undefined, alert: boolean, title: string): void {
+  if (!integratedHUD()) { crewShortcuts?.unregister(MODULE); return; }
+  if (!crewButton) {
+    crewButton = control("", async () => {
+      const open = game.settings!.get(MODULE, "eyeHUD") && !game.settings!.get(MODULE, "eyeHUDMinimized");
+      await game.settings!.set(MODULE, "eyeHUD", true);
+      await game.settings!.set(MODULE, "eyeHUDMinimized", !!open);
+    });
+    crewButton.id = "pneuma-biomon-shortcut";
+    crewButton.append(biomonIcon());
+  }
+  const open = game.settings!.get(MODULE, "eyeHUD") && !game.settings!.get(MODULE, "eyeHUDMinimized");
+  crewButton.title = title;
+  crewButton.setAttribute("aria-label", open ? "Minimize Biomon" : "Open Biomon");
+  crewButton.setAttribute("aria-expanded", String(!!open));
+  crewButton.dataset.state = readHUDVitals(actor).state;
+  crewButton.classList.toggle("has-alert", alert);
+  crewShortcuts!.register(MODULE, crewButton);
+}
 function positionAttachments() {
   if (!root || !attachments) return;
   const bounds = root.getBoundingClientRect();
-  const width = Math.min(600, Math.max(0, bounds.right - 8));
+  const leftDock = leftAlignedMessages();
+  const width = Math.min(600, Math.max(0, leftDock ? window.innerWidth - bounds.left - 8 : bounds.right - 8));
   attachments.style.width = width + "px";
-  attachments.style.left = Math.max(8, bounds.right - width) + "px";
+  attachments.style.left = Math.max(8, leftDock ? bounds.left : bounds.right - width) + "px";
   attachments.style.top = bounds.bottom + "px";
   const identity = attachments.querySelector<HTMLElement>(".pneuma-eye-identity");
   if (identity) {
@@ -117,6 +176,7 @@ function exchange(message: ChatMessage): Record<string, unknown> | undefined {
   return foundry.utils.getProperty(message, "flags." + MODULE + ".exchange") as Record<string, unknown> | undefined;
 }
 function remember(message: ChatMessage) {
+  if(foundry.utils.getProperty(message,"flags.pneuma-combattools.quickhack"))schedule();
   const data = exchange(message);
   const previous = attacks.get(message.id!);
   if (!data && !previous) return;
@@ -135,6 +195,11 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, className: strin
   if (text) node.textContent = text;
   return node;
 }
+function biomonIcon(): HTMLElement {
+  const icon = element("span", "pneuma-biomon-icon");
+  icon.setAttribute("aria-hidden", "true");
+  return icon;
+}
 function control(label: string, action: () => void) {
   const button = element("button", "pneuma-eye-button", label);
   button.type = "button"; button.addEventListener("click", action); return button;
@@ -144,13 +209,20 @@ function position(panel: HTMLElement, x: number, y: number) {
   panel.style.top = Math.max(8, Math.min(y, window.innerHeight - panel.offsetHeight - 8)) + "px";
   positionAttachments();
 }
-let preferredPosition: { right: number; y: number } | undefined;
-let draggingHUD = false;
-// Retain manual placement for later; docking currently supersedes saved positions.
-const HUD_DRAG_ENABLED = false;
 let observedSidebar: HTMLElement | null = null;
-const sidebarResizeObserver = new ResizeObserver(() => { if (root) restoreHUDPosition(root); });
+const sidebarResizeObserver = new ResizeObserver(() => { if (root) dockHUD(root); });
+const dockResizeObserver = new ResizeObserver(() => { if (root) dockHUD(root); });
 function dockHUD(panel: HTMLElement) {
+  if (biomonLeftDock()) {
+    const controls = document.getElementById("controls")?.getBoundingClientRect();
+    const navigation = document.getElementById("navigation")?.getBoundingClientRect();
+    const crew = crewShortcuts?.getBounds?.();
+    const x = Math.max(8, crew ? crew.right + 8 : controls && controls.width ? controls.right + 8 : 108);
+    const y = Math.max(8, crew ? crew.bottom + 8 : navigation && navigation.height ? navigation.bottom + 8 : 80);
+    panel.style.maxWidth = Math.max(0, window.innerWidth - x - 8) + "px";
+    position(panel, x, y);
+    return;
+  }
   const sidebar = document.getElementById("sidebar");
   if (sidebar !== observedSidebar) {
     sidebarResizeObserver.disconnect();
@@ -162,37 +234,6 @@ function dockHUD(panel: HTMLElement) {
   panel.style.maxWidth = Math.max(0, edge - 16) + "px";
   position(panel, edge - 8 - panel.offsetWidth, 8);
 }
-function restoreHUDPosition(panel: HTMLElement) {
-  if (!HUD_DRAG_ENABLED) { dockHUD(panel); return; }
-  if (draggingHUD) return;
-  if (!preferredPosition) {
-    const saved = game.settings!.get(MODULE, "eyeHUDPosition");
-    preferredPosition = { right: saved?.right ?? (saved?.x !== undefined ? saved.x + 600 : window.innerWidth - 16), y: saved?.y ?? 16 };
-  }
-  position(panel, preferredPosition.right - panel.offsetWidth, preferredPosition.y);
-}
-function drag(panel: HTMLElement, handle: HTMLElement) {
-  handle.addEventListener("pointerdown", event => {
-    if (event.button !== 0 || (event.target as HTMLElement).closest("button, select, [role=button]")) return;
-    event.preventDefault();
-    const box = panel.getBoundingClientRect(), dx = event.clientX - box.left, dy = event.clientY - box.top;
-    handle.setPointerCapture(event.pointerId);
-    draggingHUD = true;
-    const move = (e: PointerEvent) => position(panel, e.clientX - dx, e.clientY - dy);
-    const end = (e: PointerEvent) => {
-      handle.removeEventListener("pointermove", move); handle.removeEventListener("pointerup", end);
-      handle.removeEventListener("pointercancel", end);
-      draggingHUD = false;
-      const bounds = panel.getBoundingClientRect();
-      if (e.type === "pointerup" && (bounds.left !== box.left || bounds.top !== box.top)) {
-        preferredPosition = { right: bounds.right, y: bounds.top };
-        void game.settings!.set(MODULE, "eyeHUDPosition", { x: bounds.left, y: bounds.top, right: bounds.right });
-      } else restoreHUDPosition(panel);
-    };
-    handle.addEventListener("pointermove", move); handle.addEventListener("pointerup", end);
-    handle.addEventListener("pointercancel", end);
-  });
-}
 function openCard(id: string) {
   void ui.sidebar!.activateTab("chat");
   const card = document.querySelector<HTMLElement>('#chat-log [data-message-id="' + CSS.escape(id) + '"]');
@@ -200,7 +241,6 @@ function openCard(id: string) {
   else ui.notifications!.info("Open the pending Combat Tools resolution card in chat.");
 }
 
-let previewHP = 40;
 let ekgPaused = false;
 let lampTimer: ReturnType<typeof setTimeout> | undefined;
 function createEKG(state: ReturnType<typeof vitalState> | "unknown", compact = false) {
@@ -219,12 +259,9 @@ function createEKG(state: ReturnType<typeof vitalState> | "unknown", compact = f
   syncPlayback();
   return svg;
 }
-function vitals(actor: Actor | undefined, states: ReturnType<typeof indicatorState>, preview: boolean) {
+function vitals(actor: Actor | undefined, states: ReturnType<typeof indicatorState>, data: HUDConditions) {
   const box = element("div", "pneuma-eye-vitals");
-  const hp = Number(preview ? previewHP : foundry.utils.getProperty(actor!, "system.derivedStats.hp.value"));
-  const max = Number(preview ? 40 : foundry.utils.getProperty(actor!, "system.derivedStats.hp.max"));
-  const valid = Number.isFinite(hp) && Number.isFinite(max) && max > 0;
-  const state = valid ? vitalState(hp, max) : "unknown";
+  const { hp, max, valid, state } = readHUDVitals(actor);
   box.dataset.state = state;
   box.append(element("div", "pneuma-eye-medical-label", "Vitals"));
   const reading = element("div", "pneuma-eye-hp");
@@ -235,7 +272,7 @@ function vitals(actor: Actor | undefined, states: ReturnType<typeof indicatorSta
   box.append(svg);
   const labels = { normal: "Normal", wounded: "Wounded", serious: "Seriously wounded", critical: "Critical", flatline: "Flatline", unknown: "HP unavailable" };
   box.append(element("div", "pneuma-eye-vital-state", labels[state]));
-  const activeDrugs = new Set(preview ? ["Boost", "Stim"] : actor ? collectHUDConditions(actor).drugs : []);
+  const activeDrugs = new Set(data.drugs);
   const drugLights = element("div", "pneuma-eye-drug-lights");
   for (const drug of lastingDrugs.filter(drug => activeDrugs.has(drug.name))) {
     const light = element("span", "pneuma-eye-drug-light is-on");
@@ -255,10 +292,18 @@ function vitals(actor: Actor | undefined, states: ReturnType<typeof indicatorSta
     light.setAttribute("role", "img"); light.setAttribute("aria-label", light.title);
     const icon = element("i", "fas " + lamp.icon); icon.setAttribute("aria-hidden", "true");
     light.append(icon, element("span", "", lamp.name)); indicators.append(light);
+    if (lamp.id === "intrusion") {
+      const bolt = element("i", "fas fa-bolt pneuma-intrusion-bolt"); bolt.setAttribute("aria-hidden", "true"); light.append(bolt);
+    }
+    if (actor?.isOwner && (lamp.id === "fire" || lamp.id === "intrusion")) {
+      light.title += lamp.id === "fire" ? " · Right-click: Extinguish" : " · Right-click: Eject Netrunner";
+      light.setAttribute("aria-label", light.title);
+    }
     if (lamp.expires) next = Math.min(next, lamp.expires);
   }
   if (lampTimer) clearTimeout(lampTimer);
   if (Number.isFinite(next)) lampTimer = setTimeout(schedule, Math.max(10, next - Date.now() + 20));
+  if (actor?.isOwner) bindStatusActions(indicators, actor, schedule);
   box.append(indicators);
   return box;
 }
@@ -278,17 +323,16 @@ function clearEffectArrivals() {
   effectArrivals.clear(); effectOverlay?.remove(); effectOverlay = undefined;
   syncArrivalLights();
 }
-function updateEffectArrivals(actor: Actor | undefined, preview: boolean) {
-  const identity = preview ? "preview" : actor?.uuid;
-  const data = actor ? collectHUDConditions(actor) : undefined;
-  const active: EffectArrival[] = lastingDrugs.filter(drug => (preview ? ["Boost", "Stim"] : data?.drugs ?? []).includes(drug.name))
+function updateEffectArrivals(actor: Actor | undefined, data: HUDConditions) {
+  const identity = actor?.uuid;
+  const active: EffectArrival[] = lastingDrugs.filter(drug => (data?.drugs ?? []).includes(drug.name))
     .map(drug => ({key: "drug:" + drug.name, name: drug.name, icon: drug.icon, color: drug.kind === "drug" ? "#ff666b" : "#65e9a0"}));
-  const colors = { poison: "#76ef69", radiation: "#ffe16b", biotoxin: "#d892ff", fire: "#ff853e", addict: "#ff666b", jacked: "#64f1df", unconscious: "#ead56c" };
-  if (identity) for (const lamp of indicatorState(identity, preview ? ["Poison", "Addiction"] : data?.exposures ?? [], game.settings!.get(MODULE, "biomonitorFlashSeconds"), !preview && !!game.combat?.started)) {
+  const colors = { poison: "#76ef69", radiation: "#ffe16b", biotoxin: "#d892ff", fire: "#ff853e", addict: "#ff666b", jacked: "#64f1df", intrusion: "#e1a0ff", unconscious: "#ead56c" };
+  if (identity) for (const lamp of indicatorState(identity, data?.exposures ?? [], game.settings!.get(MODULE, "biomonitorFlashSeconds"), !!game.combat?.started)) {
     if (lamp.on) active.push({ key: "exposure:" + lamp.id, name: lamp.name, icon: lamp.icon, color: colors[lamp.id] });
   }
   const current = new Set(active.map(effect => effect.key));
-  const enabled = game.settings!.get(MODULE, "eyeHUDAnimateMessages") && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const enabled = hudAnimationsEnabled() && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   // Opening or switching a monitor establishes a baseline; existing conditions are not new events.
   if (identity !== effectActor || !enabled) {
     clearEffectArrivals(); effectActor = identity; previousEffects = current; return;
@@ -329,9 +373,41 @@ function updateEffectArrivals(actor: Actor | undefined, preview: boolean) {
   syncArrivalLights();
 }
 
+/** Flash-only notices have no queued row or dismiss button. */
+const flashNotices = new Map<string, { row: HTMLElement; timer: ReturnType<typeof setTimeout> }>();
+function removeFlashNotice(key: string): void {
+  const notice = flashNotices.get(key);
+  if (!notice) return;
+  clearTimeout(notice.timer);
+  notice.row.remove();
+  flashNotices.delete(key);
+  if (!flashNotices.size) document.getElementById("pneuma-hud-flashes")?.remove();
+}
+function showFlashNotice(notice: import("./hud-messages.js").HUDNotice, remove = false): void {
+  const key = hudMessageKey(notice);
+  removeFlashNotice(key);
+  if (remove || !game.settings!.get(MODULE, "eyeHUD")) return;
+  const row = element("div", "pneuma-hud-flash");
+  row.setAttribute("role", "status");
+  row.textContent = notice.text;
+  let stack = document.getElementById("pneuma-hud-flashes");
+  if (!stack) { stack = element("div", "pneuma-hud-flashes"); stack.id = "pneuma-hud-flashes"; document.body.append(stack); }
+  stack.append(row);
+  const animated = hudAnimationsEnabled() && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (animated) row.animate([
+    { clipPath: "inset(0 0 100% 0)", opacity: 1, offset: 0 },
+    { clipPath: "inset(0)", opacity: 1, offset: .18 },
+    { clipPath: "inset(0)", opacity: 1, offset: .8 },
+    { clipPath: "inset(49% 0)", opacity: 1, offset: .94 },
+    { clipPath: "inset(50% 0)", opacity: 0, offset: 1 }
+  ], { duration: 4000, fill: "forwards" });
+  const timer = setTimeout(() => removeFlashNotice(key), 4000);
+  flashNotices.set(key, { row, timer });
+}
+
 /** Animate the real text, retaining its layout slot and private recipient filtering. */
 function animateIncomingMessages(rows: HTMLElement[]) {
-  if (!game.settings!.get(MODULE, "eyeHUDAnimateMessages") || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  if (!hudAnimationsEnabled() || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const entries = rows.map(row => {
     const text = row.firstElementChild as HTMLElement;
     const bounds = text.getBoundingClientRect();
@@ -378,10 +454,18 @@ function animateIncomingMessages(rows: HTMLElement[]) {
   }
 }
 
+const intrusionGlitches = createIntrusionGlitches(() => {
+  const actor = actorInFocus();
+  return game.settings!.get(MODULE, "neuralIntrusionGlitches") && game.settings!.get(MODULE, "eyeHUDAnimateMessages")
+    && actor?.isOwner && forceOutEntries(actor).length ? actor.uuid : undefined;
+});
 function render() {
+  closeStatusActions();
+  intrusionGlitches.sync();
   const incomingRows: HTMLElement[] = [];
-  const preview = game.settings!.get(MODULE, "eyeHUDPreview");
-  if (!game.settings!.get(MODULE, "eyeHUD") && !preview) {
+  if (!game.settings!.get(MODULE, "eyeHUD")) {
+    for (const key of flashNotices.keys()) removeFlashNotice(key);
+    updateCrewButton(actorInFocus(), false, "Open Biomon");
     clearEffectArrivals(); effectActor = undefined; previousEffects.clear();
     sidebarResizeObserver.disconnect(); observedSidebar = null;
     attachments?.remove(); attachments = undefined;
@@ -389,82 +473,71 @@ function render() {
     if (lampTimer) clearTimeout(lampTimer);
     return;
   }
-  const prefersMinimized = !preview && game.settings!.get(MODULE, "eyeHUDMinimized");
+  const prefersMinimized = game.settings!.get(MODULE, "eyeHUDMinimized");
   const ownActor = actorInFocus();
   const actor = displayedActor();
+  const data: HUDConditions = actor ? collectHUDConditions(actor) : { medical: [], situational: [], drugs: [], exposures: [] };
   const shared = !!actor && actor.uuid !== ownActor?.uuid;
-  const monitor = preview || !!actor;
+  const monitor = !!actor;
   const savedMessage = game.settings!.get(MODULE, "eyeHUDMessage");
   const custom = savedMessage && !dismissedLegacyMessages.has(savedMessage.id) && savedMessage.expires > Date.now() && savedMessage.recipients.includes(game.user!.id!) ? savedMessage : undefined;
-  const pending = preview || !ownActor ? [] : [...attacks.values()].filter(message => {
+  const pending = !ownActor ? [] : [...attacks.values()].filter(message => {
     const data = exchange(message);
     return message.visible && message.isContentVisible && !dismissed.has(message.id!)
       && data?.defenderActor === ownActor!.uuid;
   });
   type AlertEntry = { key: string; text: string; open?: () => void; clear: () => void };
-  const messages: AlertEntry[] = preview ? [
-    { key: "preview-attack", text: "Incoming Attack", open: () => { ui.notifications!.info("Biomonitor test: a live alert opens its chat card."); }, clear: () => {} },
-    { key: "preview-message", text: "Check your equipment", clear: () => {} }
-  ] : [
+  const messages: AlertEntry[] = [
     ...pending.map(message => ({ key: "attack:" + message.id!, text: "Incoming Attack", open: () => openCard(message.id!), clear: () => { dismissed.add(message.id!); } })),
     ...(custom ? [{ key: "legacy:" + custom.id, text: custom.text, clear: () => { dismissedLegacyMessages.add(custom.id); } }] : []),
     ...listHUDMessages().map(message => ({ key: hudMessageKey(message), text: message.text, clear: () => dismissHUDMessage(message.source, message.id) }))
   ];
   const minimized = prefersMinimized;
-  const rows = minimized ? [] : preview ? demo : monitor && actor ? eyeConditions(actor) : [];
+  const rows = minimized ? [] : monitor && actor ? eyeConditions(actor, data) : [];
   const panel = root ??= element("section", "pneuma-eye-hud");
   panel.id = "pneuma-eye-hud"; panel.setAttribute("aria-label", "Status HUD · " + (actor?.name ?? "No character") + (shared ? " · Biomonitor link" : ""));
-  if (HUD_DRAG_ENABLED && !panel.dataset.draggable) { drag(panel, panel); panel.dataset.draggable = "true"; }
   const header = element("header", "pneuma-eye-header");
   panel.classList.toggle("is-shared", shared);
-  panel.classList.toggle("is-docked", !HUD_DRAG_ENABLED);
-  if (preview) {
-    const end = control("End test", () => { void game.settings!.set(MODULE, "eyeHUDPreview", false); });
-    end.title = "Preview only — no actor changes"; header.append(end);
-    const state = document.createElement("select"); state.setAttribute("aria-label", "Test HP state");
-    for (const [label, hp] of [["Normal",40],["Wounded",30],["Seriously wounded",18],["Critical",9],["Flatline",0]] as const) state.append(new Option(label, String(hp)));
-    state.value = String(previewHP); state.addEventListener("change", () => { previewHP = Number(state.value); render(); }); header.append(state);
-    header.append(control("Test lights", () => { for (const lamp of lamps) signalExposure("preview", lamp.id, game.settings!.get(MODULE, "biomonitorFlashSeconds")); render(); }));
-  }
-  if (game.user?.isGM && !minimized && !preview) {
+  panel.classList.add("is-docked");
+  if (game.user?.isGM && !minimized) {
     const send = control("", openHUDMessageDialog);
     send.append(element("i", "fas fa-envelope"));
     send.setAttribute("aria-label", "Send HUD Message");
     send.title = "Send a message to connected players";
     header.append(send);
   }
+  delete panel.dataset.vitalState;
   if (minimized && monitor && actor) {
     const mini = element("div", "pneuma-eye-vitals pneuma-eye-mini-vitals");
-    const hp = Number(foundry.utils.getProperty(actor, "system.derivedStats.hp.value"));
-    const max = Number(foundry.utils.getProperty(actor, "system.derivedStats.hp.max"));
-    const state = Number.isFinite(hp) && Number.isFinite(max) && max > 0 ? vitalState(hp, max) : "unknown";
+    const { state } = readHUDVitals(actor);
     mini.dataset.state = state;
+    panel.dataset.vitalState = state;
     mini.append(createEKG(state, true));
     header.append(mini);
   }
-  if (!preview) {
+  if (!(minimized && integratedHUD())) {
     const toggle = control(minimized ? "" : "−", async () => {
       await game.settings!.set(MODULE, "eyeHUDMinimized", !minimized);
       schedule();
     });
     toggle.setAttribute("aria-label", minimized ? "Expand status HUD" : "Minimize status HUD");
-    toggle.title = minimized ? (pending.length ? "Incoming attack" : custom?.text ?? "Open status HUD") : "Minimize status HUD";
-    if (minimized) { const icon = element("i", "fas fa-bell"); icon.setAttribute("aria-hidden", "true"); toggle.append(icon); }
+    toggle.title = minimized ? (messages[0]?.text ?? "Open status HUD") : "Minimize status HUD";
+    if (minimized) { toggle.append(biomonIcon()); }
     header.append(toggle);
   }
   panel.classList.toggle("is-minimized", minimized);
   panel.classList.toggle("has-mini-vitals", minimized && monitor);
-  panel.classList.toggle("has-alert", !!pending.length || !!custom);
+  panel.classList.toggle("has-alert", messages.length > 0);
   const body = hudBody ??= element("div", "pneuma-eye-body");
   const extras = attachments ??= element("div", "pneuma-eye-attachments");
   extras.id = "pneuma-eye-attachments";
   const identity = extras.querySelector(".pneuma-eye-identity");
-  if (actor && (game.user?.isGM || shared) && !preview) {
+  if (actor && (game.user?.isGM || shared || integratedHUD())) {
     const name = identity ?? element("div", "pneuma-eye-identity");
     name.textContent = actor.name + (shared ? " · BIOMONITOR LINK" : "");
     if (!identity) extras.prepend(name);
   } else identity?.remove();
-  const nextMessages = JSON.stringify([preview, ownActor?.name, messages.map(message => [message.key, message.text])]);
+  const nextMessages = JSON.stringify([ownActor?.name, messages.map(message => [message.key, message.text])]);
   if (nextMessages !== messageSignature) {
     const previouslyShown = new Map(Array.from(extras.querySelectorAll<HTMLElement>("[data-notice-key]")).map(row => [row.dataset.noticeKey, row]));
     const messageArea = element("div", "pneuma-eye-notifications");
@@ -482,7 +555,7 @@ function render() {
       if (message.open) text.setAttribute("aria-label", "Incoming attack: open chat card");
       row.append(text);
       const clear = control("×", () => { message.clear(); messageSignature = ""; render(); });
-      clear.setAttribute("aria-label", "Clear notification: " + message.text); clear.disabled = preview;
+      clear.setAttribute("aria-label", "Clear notification: " + message.text);
       row.append(clear); messageArea.append(row);
     }
     const previous = extras.querySelector(".pneuma-eye-notifications");
@@ -490,27 +563,26 @@ function render() {
     messageSignature = nextMessages;
   }
   if (!minimized) {
-    const disabled = preview ? [{ name: "Cyberarm", detail: "Disabled", item: undefined }] : Array.from(actor?.items ?? [])
-      .filter(item => String(item.type) === "cyberware" && (!!getItemMarkers(item).disabled || !!getItemMarkers(item).emp))
-      .map(item => ({ name: item.name ?? "Cyberware", detail: getItemMarkers(item).emp ? "Disabled — EMP" : getItemMarkers(item).disabled?.description ?? "Disabled", item }));
-    const data = actor ? collectHUDConditions(actor) : { medical: [], situational: [], drugs: [], exposures: [] };
-    const lampStates = monitor ? indicatorState(preview ? "preview" : actor!.uuid, preview ? ["Poison", "Addiction"] : data.exposures,
-      game.settings!.get(MODULE, "biomonitorFlashSeconds"), !preview && !!game.combat?.started) : [];
-    const grappleRows = preview ? [{id:"preview-grapple",text:"Grappling: Booster",detail:"−2 Actions"},{id:"preview-choke",text:"Choking: Booster — 1/3",detail:"Consecutive rounds"}] : actor ? [...grappleHUD(actor),...movementHUD(actor)] : [];
-    const nextMedical = JSON.stringify([monitor, preview, actor?.uuid, actor?.isOwner, previewHP, grappleRows, data,
+    const disabled = Array.from(actor?.items ?? [])
+      .filter(item => String(item.type) === "cyberware" && (!!getItemMarkers(item).disabled || !!getItemMarkers(item).emp || !!getItemMarkers(item).cyberware))
+      .map(item => ({ name: item.name ?? "Cyberware", detail: [getItemMarkers(item).emp?.label,getItemMarkers(item).cyberware?.label,getItemMarkers(item).disabled?.description].filter(Boolean).join("; ") || "Disabled", item }));
+    const lampStates = monitor ? indicatorState(actor!.uuid, data.exposures,
+      game.settings!.get(MODULE, "biomonitorFlashSeconds"), !!game.combat?.started) : [];
+    const grappleRows = actor ? [...grappleHUD(actor),...movementHUD(actor)] : [];
+    const nextMedical = JSON.stringify([monitor, actor?.uuid, actor?.isOwner, grappleRows, data,
       actor && foundry.utils.getProperty(actor, "system.derivedStats.hp"), rows,
       disabled.map(entry => [entry.item?.id, entry.name, entry.detail]), lampStates,
       game.settings!.get(MODULE, "biomonitorShowHP")]);
     if (nextMedical !== medicalSignature) {
       const medical = element("div", "pneuma-eye-medical");
       const vitalColumn = element("div", "pneuma-eye-vitals-column");
-      if (monitor) vitalColumn.append(vitals(actor, lampStates, preview));
+      if (monitor) vitalColumn.append(vitals(actor, lampStates, data));
       medical.append(vitalColumn);
       const conditions = element("div", "pneuma-eye-conditions");
       conditions.append(element("div", "pneuma-eye-medical-label", "Biological Scan"));
       for (const notice of rows) {
         const text = notice.detail === "View actor sheet for details." ? notice.title : notice.title + " — " + notice.detail;
-        const row = control("", () => { if (!preview && actor?.isOwner) actor.sheet?.render(true); });
+        const row = control("", () => { if (actor?.isOwner) actor.sheet?.render(true); });
         const glyph = element("span", "pneuma-eye-glyph", "+");
         glyph.setAttribute("aria-hidden", "true");
         if (notice.icon) { glyph.textContent = ""; const img = document.createElement("img"); img.src = notice.icon; img.alt = ""; glyph.append(img); }
@@ -538,7 +610,7 @@ function render() {
     } else previousMedical?.remove();
     const dock = element("div", "pneuma-eye-status-dock");
     dock.setAttribute("aria-label", "Situational statuses");
-    const statuses = preview ? [{title:"Cover",detail:"Cover"},{title:"Prone",detail:"Prone"},{title:"Readied Action",detail:"Readied Action"}] : data.situational;
+    const statuses = data.situational;
     for (const status of [...statuses, ...grappleRows.map(row => ({title: row.text, detail: row.detail}))]) {
       const tile = element("span", "pneuma-eye-situation", status.title);
       tile.title = status.detail; dock.append(tile);
@@ -551,29 +623,47 @@ function render() {
   if (!minimized && body.parentElement !== panel) panel.append(body);
   else if (minimized) body.remove();
   // Expanded HUD has no header row. Controls share the Implant Integrity label.
-  const previousControls = [...Array.from(panel.querySelectorAll(".pneuma-eye-header, .pneuma-eye-inline-controls")), ...Array.from(extras.querySelectorAll(".pneuma-eye-preview-controls"))];
-  const controlParent = preview ? extras : minimized ? panel : panel.querySelector(".pneuma-eye-cyber-heading") ?? panel;
-  header.className = preview ? "pneuma-eye-preview-controls" : minimized ? "pneuma-eye-header" : "pneuma-eye-inline-controls";
+  const previousControls = Array.from(panel.querySelectorAll(".pneuma-eye-header, .pneuma-eye-inline-controls"));
+  const controlParent = minimized ? panel : panel.querySelector(".pneuma-eye-cyber-heading") ?? panel;
+  header.className = minimized ? "pneuma-eye-header" : "pneuma-eye-inline-controls";
   header.removeAttribute("title"); header.removeAttribute("aria-label");
   if (previousControls.length !== 1 || previousControls[0]?.outerHTML !== header.outerHTML || previousControls[0]?.parentElement !== controlParent) {
     previousControls.forEach(controls => controls.remove()); controlParent.append(header);
   }
-  if (!panel.isConnected) document.body.append(panel);
+  panel.classList.toggle("is-integrated-mini", minimized && integratedHUD());
+  updateCrewButton(actor, messages.length > 0, messages[0]?.text ?? "Biomon");
+  if (panel.parentElement !== document.body) document.body.append(panel);
   extras.classList.toggle("is-minimized", minimized);
+  extras.classList.toggle("is-integrated", leftAlignedMessages());
   if (!extras.isConnected) document.body.append(extras);
-  restoreHUDPosition(panel);
+  dockHUD(panel);
   animateIncomingMessages(incomingRows);
-  updateEffectArrivals(actor, preview);
+  updateEffectArrivals(actor, data);
 }
 export function registerEyeHUD() {
-  registerHUDMessages(schedule);
+  registerHUDMessages(schedule, showFlashNotice);
+  const crewActive = !!game.modules?.get("pneuma-crewtools")?.active;
+  game.settings!.register(MODULE, "crewHUDIntegration", { name: "Integrate with Pneuma’s Crew Tools HUD", hint: "Minimize Biomon into Crew Tools’ HUD. Falls back to the normal control when that HUD is unavailable.", scope: "client", config: crewActive, type: Boolean, default: false, onChange: schedule });
+  game.settings!.register(MODULE, "eyeHUDDock", { name: "Biomon position", hint: "Choose the top-left or top-right position. Top left sits diagonally below Crew Tools when its HUD is visible, otherwise below navigation and beside canvas tools. Integration does not change placement. Combat bar Top right overrides this choice to Top left until that dock is changed.", scope: "client", config: true, type: String, choices: { right: "Top right", left: "Top left" }, default: "right", onChange: schedule });
+  Hooks.once("ready", () => {
+    const entry = game.modules?.get("pneuma-crewtools");
+    const api = (entry as unknown as { api?: { hudShortcuts?: CrewShortcutAPI } } | undefined)?.api?.hudShortcuts;
+    if (entry?.active && api?.version === 1) { crewShortcuts = api; api.subscribe(schedule); }
+    for (const id of ["controls", "navigation"]) { const node = document.getElementById(id); if (node) dockResizeObserver.observe(node); }
+    schedule();
+  });
+  Hooks.on("renderSceneNavigation", schedule);
+  Hooks.on("renderSceneControls", schedule);
   game.settings!.register(MODULE, "biomonitorShowHP", { name: "Show Biomonitor HP numbers", hint: "When off, hover over or focus the heartbeat animation to reveal current and maximum HP.", scope: "client", config: true, type: Boolean, default: true, onChange: schedule });
+  game.settings!.register(MODULE, "forcePlayerHUDAnimations", { name: "Force animated HUD messages for players", hint: "Hide the players’ animation setting and keep HUD message and effect animations enabled for them. GMs keep their own preference. Device reduced-motion preferences still apply.", scope: "world", config: true, type: Boolean, default: false, onChange: () => { syncAnimationSettingVisibility(); schedule(); } });
+  Hooks.on("renderSettingsConfig", (_app: SettingsConfig, html: JQuery) => { if (html[0]) syncAnimationSettingVisibility(html[0]); });
   game.settings!.register(MODULE, "eyeHUDAnimateMessages", { name: "Animate HUD messages and effect icons", hint: "Scan new private messages into view at screen center, collapse them into a bright line, then reveal them below the HUD. New drug and exposure icons scan and blink three times before lighting up. Disable to show all indicators directly. Respects reduced-motion preferences.", scope: "client", config: true, type: Boolean, default: true, onChange: () => {
     clearEffectArrivals();
     attachments?.querySelectorAll<HTMLElement>(".pneuma-eye-notification > :first-child").forEach(text => text.getAnimations().forEach(animation => animation.cancel()));
     schedule();
   } });
   game.settings!.register(MODULE, "eyeHUDMinimized", { scope: "client", config: false, type: Boolean, default: false, onChange: schedule });
+  game.settings!.register(MODULE, "neuralIntrusionGlitches", {name: "Neural Intrusion screen glitches", hint: "Prominent 1.8-second screen interference, first after 1 second then every 6–10 seconds while your focused character has a detected incoming connection. Respects reduced motion and your HUD animation preference.", scope: "client", config: true, type: Boolean, default: true, onChange: schedule});
   game.settings!.register(MODULE, "biomonitorFlashSeconds", { name: "Biomonitor indicator flash duration", hint: "Seconds to flash a newly detected effect; ongoing conditions remain lit afterward. Zero disables flashing.", scope: "client", config: true, type: Number, default: 8, range: { min: 0, max: 60, step: 1 } });
   Hooks.on("pneumaCombatToolsExposure", (uuid: string, kind: LampId) => {
     signalExposure(uuid, kind, game.settings!.get(MODULE, "biomonitorFlashSeconds"), !!game.combat?.started);
@@ -582,9 +672,10 @@ export function registerEyeHUD() {
   });
   game.settings!.register(MODULE, "eyeHUDMessage", { scope: "world", config: false, type: Object, default: null, onChange: messageChanged });
   game.settings!.register(MODULE, "eyeHUD", { name: "Status HUD", hint: "Show your vitals, conditions, statuses and private notifications.", scope: "client", config: true, type: Boolean, default: true, onChange: schedule });
-  game.settings!.register(MODULE, "eyeHUDPreview", { name: "Test status HUD", hint: "Preview sample conditions and an interactive attack alert. Changes no actor data. Use End test to exit.", scope: "client", config: true, type: Boolean, default: false, onChange: schedule });
+  // Keep the old hidden setting registered for compatibility; manual dragging is retired.
   game.settings!.register(MODULE, "eyeHUDPosition", { scope: "client", config: false, type: Object, default: null });
   Hooks.once("ready", () => { for (const message of game.messages ?? []) remember(message); messageChanged(); });
+  Hooks.on("pneumaCombatBarDockChanged", schedule);
   for (const hook of ["controlToken", "canvasReady"]) Hooks.on(hook, schedule);
   Hooks.on("updateUser", (user: User) => { if (user.id === game.user?.id) schedule(); });
   Hooks.on("updateToken", (token: TokenDocument) => { if (hoveredHUDToken?.document === token || canvas.tokens?.controlled.some(controlled => controlled.document === token)) schedule(); });
@@ -605,7 +696,7 @@ export function registerEyeHUD() {
     });
   }
   Hooks.on("createChatMessage", remember); Hooks.on("updateChatMessage", remember);
-  Hooks.on("deleteChatMessage", (message: ChatMessage) => { const tracked = attacks.delete(message.id!); dismissed.delete(message.id!); if (tracked) schedule(); });
-  for (const hook of ["renderSidebar", "collapseSidebar"]) Hooks.on(hook, () => { if (root) restoreHUDPosition(root); });
-  window.addEventListener("resize", () => { if (root) restoreHUDPosition(root); });
+  Hooks.on("deleteChatMessage", (message: ChatMessage) => { const tracked = attacks.delete(message.id!); dismissed.delete(message.id!); if (tracked || foundry.utils.getProperty(message,"flags.pneuma-combattools.quickhack")) schedule(); });
+  for (const hook of ["renderSidebar", "collapseSidebar"]) Hooks.on(hook, () => { if (root) dockHUD(root); });
+  window.addEventListener("resize", () => { if (root) dockHUD(root); });
 }

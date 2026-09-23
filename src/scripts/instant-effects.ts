@@ -59,7 +59,7 @@ async function resolveInstant(s:InstantState,req:InstantRequest,user:User,save:(
     delete s.nonce;delete s.user;await save();return;
   }
   if(req.action!=="apply"||s.state!=="failed")throw Error("Resolve the resistance check first.");
-  if(s.id==="emp"&&!game.combat?.started)throw Error("Start combat before applying EMP; its duration is until combat ends.");
+  if((s.id==="emp"||s.id==="microwaver")&&!game.combat?.started)throw Error("Start combat before applying "+instantEffects[s.id].name+".");
   if(e.damage&&s.damage===undefined) {
     const roll=await new Roll(e.damage).evaluate();s.damage=roll.total!;s.damageHTML=await roll.render();await save();
     const {Dice}=await nativeAPI();await Dice.handle3dDice(roll,rollMode);
@@ -67,7 +67,7 @@ async function resolveInstant(s:InstantState,req:InstantRequest,user:User,save:(
   s.state="applying";await save();
   try {
     if(e.damage){const hp=Number(foundry.utils.getProperty(actor,"system.derivedStats.hp.value"));if(!Number.isFinite(hp))throw Error("Target HP unavailable.");await actor.update({"system.derivedStats.hp.value":hp-s.damage!} as never);s.summary=s.damage+" direct HP damage; armor unchanged";reportExposure(actor,s.id);}
-    else if(s.id==="emp") {await createEmp(actor,{count:2,chooser:"gm",mode:"equal",policy:{foundational:true,cascade:true,electronics:true,immune:game.settings!.get(M,"empImmunity").split(/[\n,;]/)}});s.summary="EMP selection created — GM chooses two items; until combat ends";}
+    else if(s.id==="emp"||s.id==="microwaver") {const selection=await createEmp(actor,{...(s.id==="microwaver"?{source:"microwaver",seconds:60}:{}),count:2,chooser:"gm",mode:"equal",policy:{foundational:true,cascade:true,electronics:true,immune:game.settings!.get(M,"empImmunity").split(/[\n,;]/)}});s.summary=!selection?"No eligible cyberware or carried electronics":s.id==="microwaver"?"Microwaver selection created — two items; 60 seconds":"EMP selection created — two items; until combat ends";}
     else if(s.id==="flashbang"||s.id==="teargas") {await temporaryInjury(actor,"Damaged Eye");if(s.id==="flashbang")await temporaryInjury(actor,"Damaged Ear");s.summary="Temporary native injury effects: 1 minute; no bonus damage";}
     else if(s.id==="smoke") {
       const token=canvas.tokens?.placeables.find(t=>t.actor?.uuid===actor.uuid);if(!token||!canvas.scene)throw Error("Open the target scene to place smoke.");
@@ -125,7 +125,22 @@ function send(message:string,request:InstantRequest) {
   if(game.user!.id===gm.id){const next=queue.catch(()=>{}).then(()=>handle(w));queue=next;return next;}
   return new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(w.id);reject(Error("Effect not confirmed by GM."));},30000);pending.set(w.id,{resolve,reject,timer});game.socket!.emit("module."+M,w);});
 }
+/** Persist the claim before creating a resistance card; never duplicate it on later chat updates. */
+const microwavePending=new Set<string>();
+export async function dispatchMicrowaver(message:ChatMessage) {
+  const data=foundry.utils.getProperty(message,"flags."+M+".exchange") as {disableSource?:string;state?:string;hit?:boolean;defenderActor?:string}|undefined;
+  if(game.user?.id!==empGM()?.id||data?.disableSource!=="microwaver"||data.state!=="resolved"||!data.hit||microwavePending.has(message.id!)||foundry.utils.getProperty(message,"flags."+M+".microwaverClaim"))return;
+  microwavePending.add(message.id!);
+  try {
+    const actor=data.defenderActor?await fromUuid(data.defenderActor) as Actor|null:null;
+    if(!actor)throw Error("Microwaver target is unavailable.");
+    await message.update({["flags."+M+".microwaverClaim"]:true});
+    await createInstantCard(actor,"microwaver",message);
+  } catch(error) {ui.notifications!.error("Microwaver resistance card interrupted. Use Add effects > Microwaver to resolve manually. "+String(error));}
+  finally {microwavePending.delete(message.id!);}
+}
 export function registerInstantEffects() {
+  for(const hook of ["createChatMessage","updateChatMessage"])Hooks.on(hook,(message:ChatMessage)=>{void dispatchMicrowaver(message);});
   registerEffectEvents();
   registerInstantLifetimes();
   Hooks.once("ready",()=>{

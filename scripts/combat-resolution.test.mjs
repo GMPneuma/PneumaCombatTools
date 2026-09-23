@@ -1,3 +1,4 @@
+globalThis.Hooks ??= {once(){},on(){}};
 import { registerHooks } from "node:module";
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -324,6 +325,8 @@ test("selected damage remains reusable while recorded damage applies only once",
  await request("damage","damageApply",{application:"selected",applicationId:"repeat2",targetUuid:"Token.selected",options:damageOptions});
  assert.equal(originalCalls,1);assert.equal(selectedCalls,3);
  assert.equal(get(msg,"flags.pneuma-combattools.exchange.damage.applications").length,4);
+ assert.equal(get(msg,"flags.pneuma-combattools.exchange.damage.selectedTargets").length,3);
+ assert.deepEqual(get(msg,"flags.pneuma-combattools.exchange.damage.selectedTargets").slice(1).map(row=>row.id),["repeat1","repeat2"]);
  assert.equal(get(msg,"flags.pneuma-combattools.exchange.damage.recordedApplied"),true);
 });
 test("selected damage recipient requires one controlled owned token",async()=>{
@@ -475,4 +478,22 @@ test("leg injuries block melee and ranged claims and invalidate an open defense 
  message("injury");await assert.rejects(request("injury","claim"),/Cannot evade/);
  actor.items=[];const claim=await request("injury","claim");actor.items.push({type:"criticalInjury",name:"Dismembered Leg"});
  await assert.rejects(request("injury","commit",{nonce:claim.nonce,defense:defense()}),/conditions changed/);assert.equal(updates,0);await request("injury","release",{nonce:claim.nonce});
+});
+
+
+test("half armor uses native 50 percent without double halving or losing armor bypass",async()=>{
+ for(const [original,half,expected] of [[0,true,50],[50,true,50],[50,false,0],[100,true,100]]) {
+  setup();const msg=await rolled();msg.flags["pneuma-combattools"].exchange.damage.result.values.ignorePercent=original;
+  const calls=[];actor._applyDamage=async(...args)=>calls.push(args);
+  await request("damage","damageApply",{options:damageOptions,halfArmor:half});
+  assert.equal(calls[0][5],expected);
+ }
+});
+
+
+test("armor interaction off bypasses SP and ablation without changing stored roll",async()=>{
+ setup();const msg=await rolled();const calls=[];actor._applyDamage=async(...args)=>calls.push(args);
+ await request("damage","damageApply",{options:damageOptions,interactArmor:false,halfArmor:true});
+ assert.equal(calls[0][3],0);assert.equal(calls[0][5],100);
+ assert.equal(msg.flags["pneuma-combattools"].exchange.damage.result.values.ablation,2);
 });

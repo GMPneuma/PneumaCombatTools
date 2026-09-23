@@ -43,7 +43,7 @@ try {
   await page.locator('.native-detail').click();assert.equal(await page.evaluate(()=>details),1);
   await page.evaluate(()=>{g.note='Choke: 1/3';for(let i=0;i<3;i++)renderGrapple(message,wrap(document.querySelector('#card')));});
   assert.equal(await page.locator('.pneuma-grapple-note').innerText(),'Choke: 1/3');
-  assert.equal(await page.locator('.pneuma-grapple-controls button').count(),3);
+  assert.equal(await page.locator('.pneuma-grapple-controls button').count(),0);
   assert.equal(await page.locator('img[src*="modules/pneuma-chat-dice/"]').count(),2);
  }
  await page.evaluate(()=>{g.state='ended';g.note='Released';renderGrapple(message,wrap(document.querySelector('#card')));});

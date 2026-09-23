@@ -1,3 +1,4 @@
+import {updateTouchesPath} from "./update-path.js";
 import {effectDuration} from "./effect-duration.js";
 import { masterStatuses, type StatusDefinition } from "./status-catalog.js";
 const MODULE = "pneuma-combattools";
@@ -91,7 +92,16 @@ export function statusAuthority(actor: Actor): boolean {
   users.sort((a, b) => Number(b.isGM) - Number(a.isGM) || a.id!.localeCompare(b.id!));
   return users[0]?.id === game.user?.id;
 }
+const refreshRequests = new Map<string, Promise<void>>();
 export function syncActorStatuses(actor: Actor, changedIds: string[] = [], initialize = false, requestedActive?: boolean): Promise<void> {
+  // Only passive refreshes are merged. Explicit status toggles retain their order.
+  if (changedIds.length || requestedActive !== undefined) return syncStatuses(actor, changedIds, initialize, requestedActive);
+  const key = actor.uuid + ":" + initialize;
+  const existing = refreshRequests.get(key); if (existing) return existing;
+  const next = Promise.resolve().then(() => { refreshRequests.delete(key); return syncStatuses(actor, [], initialize); });
+  refreshRequests.set(key, next); return next;
+}
+function syncStatuses(actor: Actor, changedIds: string[], initialize: boolean, requestedActive?: boolean): Promise<void> {
   if (!["character", "mook"].includes(String(actor.type))) return Promise.resolve();
   const previous = queues.get(actor.uuid) ?? Promise.resolve();
   const next = previous.catch(() => {}).then(async () => {
@@ -129,6 +139,7 @@ export function registerStatusSync(): void {
     Hooks.on(hook, (item: Item, changesOrOptions: object, optionsOrUser: object | string) => {
       const context = hook === "updateItem" ? optionsOrUser : changesOrOptions;
       if (typeof context === "object" && "pneumaStatusSync" in context) return;
+      if (hook === "updateItem" && !["name","type","effects","system","flags."+MODULE+".statusId","flags.core.sourceId","_stats.compendiumSource"].some(path=>updateTouchesPath(changesOrOptions,path))) return;
       if (item.parent instanceof Actor && ["criticalInjury", "drug"].includes(String(item.type))) notify(item.parent);
     });
   }
@@ -136,8 +147,10 @@ export function registerStatusSync(): void {
     Hooks.on(hook, (effect: ActiveEffect, changesOrOptions: object, optionsOrUser: object | string) => {
       const context = hook === "updateActiveEffect" ? optionsOrUser : changesOrOptions;
       if (typeof context === "object" && "pneumaStatusSync" in context) return;
-      if (effect.parent instanceof Actor) notify(effect.parent, [...effect.statuses, ...(previousStatuses.get(effect) ?? [])]);
-      else if (effect.parent instanceof Item && effect.parent.parent instanceof Actor) notify(effect.parent.parent);
+      const ids = [...effect.statuses, ...(previousStatuses.get(effect) ?? [])].filter(id=>bound.some(status=>status.id===id));
+      if (hook === "updateActiveEffect" && !["statuses","disabled","name","system.isSuppressed"].some(path=>updateTouchesPath(changesOrOptions,path))) {previousStatuses.delete(effect);return;}
+      if (effect.parent instanceof Actor && ids.length) notify(effect.parent, ids);
+      else if (effect.parent instanceof Item && effect.parent.parent instanceof Actor && ["criticalInjury","drug"].includes(String(effect.parent.type))) notify(effect.parent.parent);
       previousStatuses.delete(effect);
     });
   }

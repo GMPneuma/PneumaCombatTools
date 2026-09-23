@@ -8,10 +8,11 @@ const get=<T>(doc:object,key=path)=>foundry.utils.getProperty(doc,key) as T|unde
 const escape=(s:string)=>s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]!);
 let queue:Promise<unknown>=Promise.resolve();
 function work<T>(fn:()=>Promise<T>):Promise<T>{const next=queue.catch(()=>{}).then(fn);queue=next;return next;}
-interface RibsCard {actor:string;token:string;name:string;combat:string;turn:string;epoch:string;distance:number;applied?:boolean}
+const movementInjuries=["Broken Ribs","Foreign Object (Body)","Foreign Object (Head)"] as const;
+interface RibsCard {injury?:string;actor:string;token:string;name:string;combat:string;turn:string;epoch:string;distance:number;applied?:boolean}
 export function ribsContent(data:RibsCard):string {
   const eligible=data.distance>4;
-  return `<div class="pneuma-injury-card rollcard" data-injury="broken-ribs" data-state="${data.applied?"applied":eligible?"pending":"withdrawn"}"><div class="rollcard-top"><div class="cpr-block">${escape(data.name)} &mdash; Broken Ribs</div></div><div class="rollcard-bottom"><p>${data.applied?"5 damage applied directly to HP.":eligible?`Moved ${Number(data.distance.toFixed(2))}m/yd on foot. At the end of this turn: 5 damage directly to HP.`:"Movement reset to 4m/yd or less; no damage due."}</p>${!data.applied&&eligible?'<button type="button" data-ribs-apply>Apply 5 damage</button>':""}</div></div>`;
+  return `<div class="pneuma-injury-card rollcard" data-injury="broken-ribs" data-state="${data.applied?"applied":eligible?"pending":"withdrawn"}"><div class="rollcard-top"><div class="cpr-block">${escape(data.name)} &mdash; ${escape(data.injury??"Broken Ribs")}</div></div><div class="rollcard-bottom"><p>${data.applied?"5 damage applied directly to HP.":eligible?`Moved ${Number(data.distance.toFixed(2))}m/yd on foot. At the end of this turn: 5 damage directly to HP.`:"Movement reset to 4m/yd or less; no damage due."}</p>${!data.applied&&eligible?'<button type="button" data-ribs-apply>Apply 5 damage</button>':""}</div></div>`;
 }
 /** Runs after accepted movement only. The saved movement snapshot avoids animation/preview and rapid-move races. */
 export async function warnBrokenRibs(doc:TokenDocument,record:MoveRecord):Promise<void> {
@@ -20,13 +21,15 @@ export async function warnBrokenRibs(doc:TokenDocument,record:MoveRecord):Promis
   return work(async()=>{
     const combat=game.combats?.get(record.combat);if(!combat?.started)return;
     const epoch=get<string>(combat,`flags.${MODULE}.evasionEpoch`)??"";
-    const message=game.messages?.find(m=>{const d=get<RibsCard>(m);return d?.actor===actor.uuid&&d.combat===record.combat&&d.turn===record.turn&&d.epoch===epoch;});
-    if(message){const d=foundry.utils.deepClone(get<RibsCard>(message)!);if(!d.applied&&d.distance!==record.onFoot){d.distance=record.onFoot!;await message.update({content:ribsContent(d),[path]:d} as never);}return;}
-    if(record.onFoot!<=4||!hasInjury(actor,"Broken Ribs"))return;
-    const data:RibsCard={actor:actor.uuid,token:doc.uuid,name:doc.name??actor.name??"Character",combat:record.combat,turn:record.turn,epoch,distance:record.onFoot!};
+    for(const injury of movementInjuries){
+    const message=game.messages?.find(m=>{const d=get<RibsCard>(m);return (d?.injury??"Broken Ribs")===injury&&d?.actor===actor.uuid&&d.combat===record.combat&&d.turn===record.turn&&d.epoch===epoch;});
+    if(message){const d=foundry.utils.deepClone(get<RibsCard>(message)!);if(!d.applied&&(d.distance!==record.onFoot||!hasInjury(actor,injury))){d.distance=hasInjury(actor,injury)?record.onFoot!:0;await message.update({content:ribsContent(d),[path]:d} as never);}continue;}
+    if(record.onFoot!<=4||!hasInjury(actor,injury))continue;
+    const data:RibsCard={injury,actor:actor.uuid,token:doc.uuid,name:doc.name??actor.name??"Character",combat:record.combat,turn:record.turn,epoch,distance:record.onFoot!};
     // Injury reminders are shared with the affected player's owners and GMs, never other players' private NPC data.
     const whisper=game.users?.filter(u=>u.isGM||actor.testUserPermission(u,"OWNER")).map(u=>u.id!)??[];
     await ChatMessage.create({content:ribsContent(data),speaker:ChatMessage.getSpeaker({actor,token:doc}),whisper,flags:{[MODULE]:{brokenRibs:data}}} as never);
+    }
   });
 }
 export async function applyRibsDamage(id:string,user:User):Promise<void> {
@@ -41,6 +44,7 @@ export async function applyRibsDamage(id:string,user:User):Promise<void> {
     const receipts=get<Record<string,string[]>>(actor,`flags.${MODULE}.ribsApplications`)??{};
     const messages=receipts[data.combat]??[];
     if(!messages.includes(id)){
+      if(!hasInjury(actor,data.injury??"Broken Ribs"))throw Error("This injury is no longer active.");
       const hp=Number(foundry.utils.getProperty(actor,"system.derivedStats.hp.value"));
       if(!Number.isFinite(hp))throw Error("Character HP is unavailable.");
       // HP and receipt share one actor update, so retrying a failed card write cannot apply twice.

@@ -1,3 +1,4 @@
+import {updateTouchesPath} from "./update-path.js";
 const MODULE = "pneuma-combattools";
 export interface ItemMarker { label: string; description?: string }
 export interface MarkedItem { flags?: unknown }
@@ -60,7 +61,7 @@ export function registerItemMarkers(): void {
     if (html[0]) decorateItemList(html[0], sheet.actor);
   });
   Hooks.on("updateItem", (item: Item, changes: Record<string, unknown>) => {
-    if (!JSON.stringify(changes).includes("itemMarkers")) return;
+    if (!updateTouchesPath(changes, "flags.pneuma-combattools.itemMarkers")) return;
     // Native document updates refresh actor sheets; the open CTH also needs rebuilding.
     const hud = canvas.tokens?.hud;
     if (item.parent && hud?.rendered) hud.render(true);

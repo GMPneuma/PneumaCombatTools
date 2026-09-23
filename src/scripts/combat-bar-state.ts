@@ -9,6 +9,7 @@ declare global {
     "pneuma-combattools.combatBar": boolean;
     "pneuma-combattools.combatBarNameOnly": boolean;
     "pneuma-combattools.combatBarSize": string;
+    "pneuma-combattools.combatBarDock": "bottom-left" | "top-right";
     "pneuma-combattools.combatBarOrientation": "vertical" | "horizontal";
     "pneuma-combattools.combatBarMinimized": boolean;
     "pneuma-combattools.combatBarMovement": MovementMode;

@@ -36,3 +36,5 @@ Reset withdraws an unpaid warning when distance returns to 4m/yd or less. Re-cro
 Actual blast/shell escape distance counts even when the optional MOVE charge is off. Being carried and next-turn MOVE debt do not count as on-foot movement. Ordinary token drags are treated as walking; the GM decides whether to apply the reminder for vehicles, teleportation or other unusual movement.
 
 The starting-position outline is attached directly to the native token layer at saved scene coordinates. It remains fixed during token animation and drag previews, follows canvas pan/zoom, mirrors token visibility, and is removed on reset, token destruction, or scene teardown. Automated PIXI browser checks cover these transitions; live Foundry verification remains pending.
+
+Movement tracking and reset origins follow the scene's active started encounter (including unlinked encounters), not the encounter previewed in the sidebar.

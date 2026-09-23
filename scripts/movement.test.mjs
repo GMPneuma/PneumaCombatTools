@@ -31,9 +31,9 @@ function fixture(){
  const scene={id:'scene',grid:{units:'m',distance:2},tokens:[],flags:{}};
  const doc={id:'t',uuid:'Scene.scene.Token.t',x:0,y:0,elevation:5,_source:{x:0,y:0,elevation:5},parent:scene,flags:{}};
  const token={document:doc,isOwner:true,getCenterPoint:p=>({x:p.x+50,y:p.y+50}),checkCollision:()=>false};doc.object=token;scene.tokens.push(doc);
- const participant={id:'p',tokenId:'t'};const combat={id:'c',scene,started:true,round:1,turn:0,combatants:[participant],turns:[participant]};
+ const participant={id:'p',tokenId:'t'};const combat={id:'c',scene,active:true,started:true,round:1,turn:0,combatants:[participant],turns:[participant]};
  globalThis.canvas={grid:{size:100,type:1},scene};globalThis.CONST={GRID_TYPES:{SQUARE:1}};
- globalThis.game={combat,combats:new Map([['c',combat]]),user:{id:'gm'},users:[{id:'gm',active:true,isGM:true}],settings:{register(){},get:()=>true}};
+ globalThis.game={combat,combats:Object.assign(new Map([['c',combat]]),{find(fn){return [...this.values()].find(fn);}}),user:{id:'gm'},users:[{id:'gm',active:true,isGM:true}],settings:{register(){},get:()=>true}};
  registerMovement();
  function commit(changes,options={}){for(const fn of hooks.preUpdateToken)fn(doc,changes,options);for(const [key,value]of Object.entries(changes)){if(key==='flags.pneuma-combattools.movement')doc.flags={'pneuma-combattools':{movement:value}};else {doc[key]=value;if(key in doc._source)doc._source[key]=value;}}return options;}
  doc.update=async(changes,options)=>commit(changes,options);
@@ -82,4 +82,14 @@ test('on-foot distance follows counter diagonals, resets, and actual escape rath
  f.commit({x:400},{pneumaAreaMove:true,pneumaAreaDistance:8});assert.equal(currentMovement(f.doc).onFoot,8);assert.equal(currentMovement(f.doc).spent,0);
  f.commit({x:500});assert.equal(currentMovement(f.doc).onFoot,10);await resetMovement(f.token);assert.equal(currentMovement(f.doc).onFoot,8);
  f.combat.round=2;f.commit({x:500});assert.equal(currentMovement(f.doc).onFoot,2);
+});
+
+test('sidebar preview cannot replace the scene active movement record or reset origin',async()=>{
+ const f=fixture();f.commit({x:100});f.commit({x:200});
+ const preview={...f.combat,id:'preview',active:false,round:7};
+ game.combats.set(preview.id,preview);game.combat=preview;
+ f.commit({x:300});
+ assert.equal(currentMovement(f.doc).combat,'c');assert.equal(currentMovement(f.doc).spent,3);assert.equal(currentMovement(f.doc).start.x,0);
+ await resetMovement(f.token);assert.equal(f.doc.x,0);
+ f.combat.scene=null;f.commit({x:100});assert.equal(currentMovement(f.doc).combat,'c','Unlinked active encounter also tracks scene tokens');
 });

@@ -59,7 +59,7 @@ Everyone can view their own Status HUD without a Biomonitor. Select your token, 
 
 Hovering a visible character with an installed Biomonitor can show their stats. The colored edge and character name identify that view. **The messages remain yours.** Clearing an attack notice does not answer the attack; open its card to respond.
 
-In module settings, **Status HUD** toggles the display, **Animate HUD messages and effect icons** controls the scanline arrivals for your client, and **Test status HUD** previews the display without changing a character. Your self-token HUD also has a bell toggle. Use the minimize control beside Implant Integrity to collapse the display.
+In module settings, **Status HUD** toggles the display, **Animate HUD messages and effect icons** controls the scanline arrivals for your client. Your self-token HUD also has a bell toggle. Use the minimize control beside Implant Integrity to collapse the display.
 
 ## Movement and conditions
 

@@ -1,3 +1,9 @@
+import {registerHooks} from "node:module";
+registerHooks({resolve(specifier,context,next){
+ if(specifier==="./combat-resolution.js"&&context.parentURL?.endsWith("/attack-menu.js"))
+  return {shortCircuit:true,url:"data:text/javascript,export const startCombatExchange=(...args)=>globalThis.exchangeHandler(...args);"};
+ return next(specifier,context);
+}});
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { canShowQuickhack, attackEntries, attackFromHUD } from "../dist/scripts/attack-menu.js";
@@ -15,18 +21,19 @@ test("autofire matches CPR capability checks",()=>{
   assert.deepEqual(rows.filter(r=>r.autofire).map(r=>r.name),["Exotic","SMG"]);
 });
 function setup(handler) {
+ globalThis.exchangeHandler=(...args)=>sheet._onRoll(...args);
  const sheet={_getFireCheckbox:()=>"suppressive",_onRoll:handler};
  const actor={isOwner:true,uuid:"Actor.test",items:[weapon("SMG",{weaponType:"smg"})],sheet};sheet.actor=actor;
  const attacker={id:"attacker",actor,document:{id:"attacker"},can:()=>true,control:()=>true};
  const target={id:"target",isVisible:true,actor:{},setTarget(value,options){assert.equal(value,true);assert.equal(options.releaseOthers,true);}};
- globalThis.game={user:{id:"user"}};
+ globalThis.game={user:{id:"user"},settings:{get:()=>false}};
  globalThis.canvas={tokens:new Map([[attacker.id,attacker],[target.id,target]])};
  return {actor,sheet,attacker,target};
 }
-test("native handler receives exact actor, token, item event and mode without mutating sheet",async()=>{
+test("combat exchange receives exact tokens, item, mode and event despite legacy false setting",async()=>{
  const event={currentTarget:{dataset:{itemId:"SMG"}},ctrlKey:true};
  for(const mode of ["attack","aimed","autofire"]){
-  let calls=0;const f=setup(async function(e){calls++;assert.equal(e,event);assert.equal(this.actor,f.actor);assert.equal(this.token,f.attacker.document);assert.equal(this._getFireCheckbox(),mode);});
+  let calls=0;const f=setup(async function(attacker,target,itemId,receivedMode,e){calls++;assert.equal(e,event);assert.equal(attacker,f.attacker);assert.equal(target,f.target);assert.equal(itemId,"SMG");assert.equal(receivedMode,mode);});
   await attackFromHUD(f.attacker,f.target,"SMG",mode,event);assert.equal(calls,1);assert.equal(f.sheet._getFireCheckbox(),"suppressive");assert.equal(f.sheet.token,undefined);
  }
 });
@@ -35,6 +42,7 @@ test("rejects stale items and lost ownership, blocks duplicate pending calls and
  await attackFromHUD(f.attacker,f.target,"missing","attack",{});assert.equal(calls,0);
  f.actor.isOwner=false;await attackFromHUD(f.attacker,f.target,"SMG","attack",{});assert.equal(calls,0);f.actor.isOwner=true;
  const pending=attackFromHUD(f.attacker,f.target,"SMG","attack",{});
+ await new Promise(resolve=>setImmediate(resolve));
  await attackFromHUD(f.attacker,f.target,"SMG","attack",{});assert.equal(calls,1);release();await pending;
  f.sheet._onRoll=async()=>{throw new Error("cancelled");};await assert.rejects(attackFromHUD(f.attacker,f.target,"SMG","attack",{}));
  f.sheet._onRoll=async()=>{calls++;};await attackFromHUD(f.attacker,f.target,"SMG","attack",{});assert.equal(calls,2);
@@ -104,7 +112,7 @@ test("attack and hover share installed cyberweapon and attachment eligibility", 
  parent.system.equipped="carried";
  assert.deepEqual(attackEntries(items).map(r=>r.name),["Cyber","Cyber blade"]);
 });
-test("installed weapons route through native attack handler and reject removal", async () => {
+test("installed weapons route through combat exchange and reject removal", async () => {
  let calls=0;
  const f=setup(async()=>{calls++;});
  f.actor.items=[weapon("Cyber",{equipped:"owned",isInstalled:true,isWeapon:true},{type:"cyberware"})];

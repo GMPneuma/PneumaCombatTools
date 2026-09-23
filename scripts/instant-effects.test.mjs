@@ -1,3 +1,4 @@
+globalThis.Hooks ??= {once(){},on(){}};
 import assert from "node:assert/strict";
 import {test} from "node:test";
 import {registerHooks} from "node:module";
@@ -81,4 +82,58 @@ test('timed item effects expire without deleting drug inventory',async()=>{
  f.actor.allApplicableEffects=function*(){yield* this.effects;yield* drug.effects;};
  await f.actor.createEmbeddedDocuments('ActiveEffect',[{name:'Linked marker',origin:drug.uuid,statuses:['manual'],duration:{seconds:10,startTime:100}}]);
  await expireInstantActor(f.actor,111);assert.equal(f.actor.items.size,1);assert.equal(effect.disabled,true);assert.equal(f.actor.effects.size,0);
+});
+
+test('Quickhack Overheat burns 4 at turn end once; System Reset wakes on damage without standing',async()=>{
+ const {applyQuickhackCondition}=await import('../dist/scripts/quickhack/conditions.js');const f=setup();
+ await applyQuickhackCondition(f.actor,'overheat');await applyQuickhackCondition(f.actor,'overheat');assert.equal(f.actor.effects.size,1);assert.equal(f.actor.system.derivedStats.hp.value,40);
+ await burnTurn(f.actor,'c:1:0');await burnTurn(f.actor,'c:1:0');assert.equal(f.actor.system.derivedStats.hp.value,36);
+ await applyQuickhackCondition(f.actor,'system-reset');const prone=masterStatuses.find(s=>s.name==='Prone').id;await clearInstantCondition(f.actor,'sleep');assert(f.actor.effects.some(e=>e.statuses.has(prone)));
+});
+test('Quickhack MOVE effects roll once, preserve stronger repeats, and expire without editing base MOVE',async()=>{
+ const {applyQuickhackCondition}=await import('../dist/scripts/quickhack/conditions.js');const f=setup();globalThis.CONST={ACTIVE_EFFECT_MODES:{ADD:2}};
+ globalThis.Roll=class{async evaluate(){this.total=4;return this;}};f.actor.system.stats.move={value:6};
+ assert.equal(await applyQuickhackCondition(f.actor,'slow','blindroll'),4);const effect=[...f.actor.effects][0];assert.deepEqual(effect.changes,[{key:'system.stats.move.value',mode:2,value:'-4',priority:20}]);assert.equal(f.actor.system.stats.move.value,6);assert.deepEqual(diceModes,['blindroll']);
+ game.time.worldTime=120;globalThis.Roll=class{async evaluate(){this.total=2;return this;}};assert.equal(await applyQuickhackCondition(f.actor,'slow'),4);assert.equal(f.actor.effects.size,1);
+ await applyQuickhackCondition(f.actor,'impair-movement');assert.equal(f.actor.effects.size,2);await expireInstantActor(f.actor,180);assert.equal(f.actor.effects.size,0);assert.equal(f.actor.system.stats.move.value,6);
+});
+test('Sonic Shock applies temporary native injury and deafness, preserving permanent conditions',async()=>{
+ const {applyQuickhackCondition}=await import('../dist/scripts/quickhack/conditions.js');const f=setup();await applyQuickhackCondition(f.actor,'sonic-shock');assert.equal(f.actor.items.size,1);assert.equal(f.actor.system.derivedStats.hp.value,40);assert(f.actor.effects.some(e=>e.statuses.has(masterStatuses.find(s=>s.name==='Deafened').id)));await expireInstantActor(f.actor,160);assert.equal(f.actor.items.size,0);assert.equal(f.actor.effects.size,0);
+ await f.actor.createEmbeddedDocuments('Item',[{name:'Damaged Ear',type:'criticalInjury'}]);await f.actor.toggleStatusEffect(masterStatuses.find(s=>s.name==='Deafened').id);await applyQuickhackCondition(f.actor,'sonic-shock');await expireInstantActor(f.actor,300);assert.equal(f.actor.items.size,1);assert(f.actor.effects.some(e=>e.statuses.has(masterStatuses.find(s=>s.name==='Deafened').id)));
+});
+
+test('Microwaver has native Cybertech resistance and creates a timed two-item GM selection',async()=>{
+ const f=setup();game.combat={id:'c',started:true,flags:{},async update(data){for(const [k,v]of Object.entries(data))set(this,k,v)}};
+ game.combats.set('c',game.combat);
+ await f.actor.createEmbeddedDocuments('Item',[{name:'Cyberarm',type:'cyberware',system:{isInstalledInActor:true,isFoundational:true},flags:{}}]);
+ globalThis.ChatMessage={create:async()=>({id:'card'})};globalThis.Dialog=class{render(){}};
+ const s=await resist(f,'microwaver',15);
+ assert.equal(s.state,'failed','DV ties fail');
+ await handleInstant(s,{action:'apply'},f.gm,f.save);
+ const request=Object.values(game.combat.flags['pneuma-combattools'].empRequests)[0];
+ assert.equal(request.count,2);assert.equal(request.seconds,60);assert.equal(request.source,'microwaver');assert.equal(request.chooser,'gm');
+ assert.equal(f.actor.system.derivedStats.hp.value,40);
+ assert.equal(ammoProfile('microwaver','grenade'),undefined);
+});
+test('Microwaver dispatches once after a hit, preserves privacy, and skips misses',async()=>{
+ const f=setup(),made=[];globalThis.ChatMessage={create:async data=>{made.push(data);return {id:'child'}},getSpeaker:()=>({})};
+ const {dispatchMicrowaver}=await import('../dist/scripts/instant-effects.js');
+ const m={id:'attack',whisper:['gm'],blind:true,flags:{'pneuma-combattools':{exchange:{disableSource:'microwaver',state:'waiting',hit:false,defenderActor:f.actor.uuid}}},async update(data){for(const [k,v]of Object.entries(data))set(this,k,v)}};
+ await dispatchMicrowaver(m);assert.equal(made.length,0);
+ Object.assign(m.flags['pneuma-combattools'].exchange,{state:'resolved',hit:false});await dispatchMicrowaver(m);assert.equal(made.length,0);
+ m.flags['pneuma-combattools'].exchange.hit=true;
+ await Promise.all([dispatchMicrowaver(m),dispatchMicrowaver(m)]);await dispatchMicrowaver(m);
+ assert.equal(made.length,1);assert.deepEqual(made[0].whisper,['gm']);assert.equal(made[0].blind,true);assert.equal(made[0].flags['pneuma-combattools'].instant.effect.id,'microwaver');
+});
+
+test('expiration checks departing actor, round participants and out-of-combat time only',async()=>{
+ const f=setup(),second=new Actor(),outside=new Actor();game.actors.push(second,outside);
+ for(const actor of [f.actor,second,outside])await actor.createEmbeddedDocuments('ActiveEffect',[{name:'Timed',duration:{seconds:1,startTime:0}}]);
+ const combat={id:'turn-test',started:true,round:1,turn:0,combatant:{actor:f.actor},combatants:[{actor:f.actor},{actor:second}]};
+ game.combats=new Collection([[combat.id,combat]]);registerInstantLifetimes();hooks.createCombat[0](combat);
+ const flush=()=>new Promise(resolve=>setTimeout(resolve,0));
+ hooks.updateCombat[0](combat);await flush();assert.equal(f.actor.effects.size,1,'Unrelated update does not expire effects');
+ hooks.updateWorldTime[0]();await flush();assert.equal(outside.effects.size,0);assert.equal(second.effects.size,1);assert.equal(f.actor.effects.size,1);
+ combat.turn=1;combat.combatant={actor:second};hooks.updateCombat[0](combat);await flush();assert.equal(f.actor.effects.size,0);assert.equal(second.effects.size,1);
+ combat.round=2;combat.turn=0;combat.combatant={actor:f.actor};hooks.updateCombat[0](combat);await flush();assert.equal(second.effects.size,0);
 });

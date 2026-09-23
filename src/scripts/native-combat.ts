@@ -82,6 +82,39 @@ export async function spendBonusLuck(actor: Actor, bonus: number): Promise<void>
 }
 interface AttackChoice { unaware: boolean; improvised: boolean; improvisedDice?: number }
 const attackChoices = new WeakMap<NativeRoll, AttackChoice>();
+/** Keep native form inputs/listeners and footer; only split scrolling from actions. */
+export function layoutAttackDialog(app: FormApplication, root?: HTMLElement): void {
+  if(!root)return;
+  const form=root.matches("form.dialog-sheet")?root:root.querySelector<HTMLElement>("form.dialog-sheet");
+  const windowRoot=root.closest<HTMLElement>(".window-app")??(root.matches(".window-app")?root:null);
+  const footer=form?.querySelector<HTMLElement>(".dialog-footer");
+  if(!form||!windowRoot||!footer)return;
+  windowRoot.classList.add("pneuma-attack-dialog");
+  let body=form.querySelector<HTMLElement>(":scope > .pneuma-attack-dialog-body");
+  if(!body){body=document.createElement("div");body.className="pneuma-attack-dialog-body";
+    for(const child of Array.from(form.childNodes))if(child!==footer)body.append(child);
+    form.prepend(body);
+  }
+  const mods=form.querySelector<HTMLInputElement>('input[name="additionalMods"]');
+  if(mods){
+    mods.setAttribute("aria-label","Additional modifiers");mods.placeholder="e.g. 1, -2";
+    mods.closest(".dialog-item")?.classList.add("pneuma-additional-mods-row");
+    if(!form.querySelector(".pneuma-modifier-hint")){
+      const hint=document.createElement("p");hint.className="pneuma-modifier-hint";
+      hint.id=windowRoot.id+"-modifier-hint";hint.textContent="Separate modifiers with commas, e.g. 1, -2.";
+      mods.closest(".dialog-item")?.append(hint);mods.setAttribute("aria-describedby",hint.id);
+    }
+  }
+  requestAnimationFrame(()=>{
+    if(!windowRoot.isConnected)return;
+    const previousFlex=body!.style.flex;body!.style.flex="0 0 auto";
+    const contentHeight=body!.scrollHeight;body!.style.flex=previousFlex;
+    const chromeHeight=windowRoot.getBoundingClientRect().height-body!.getBoundingClientRect().height;
+    const height=Math.min(window.innerHeight-16,Math.ceil(contentHeight+chromeHeight+2));
+    const top=Math.max(8,Math.min(windowRoot.getBoundingClientRect().top,window.innerHeight-height-8));
+    app.setPosition({height,top});
+  });
+}
 export function registerAttackDialog(): void {
   Hooks.on("renderCPRRollDialog", (app: FormApplication & { rollData?: NativeRoll }, html: JQuery) => {
     const choice = app.rollData && attackChoices.get(app.rollData);
@@ -106,6 +139,7 @@ export function registerAttackDialog(): void {
       validate(); label.append(select); row.append(label);
       html.find(".total-mods").first().before(row);
     }
+    layoutAttackDialog(app,html[0]);
     if (!game.user?.isGM) return;
     const row = document.createElement("li");
     row.className = "dialog-item flexrow pneuma-unaware-choice";

@@ -1,3 +1,5 @@
+import {halfArmorSelected, interactArmorSelected} from "../half-armor.js";
+import {automaticNPCEvasion} from "../evasion-settings.js";
 import {evasionBlocked} from "../injury-rules.js";
 import {ammoProfile,instantId} from "../instant-catalog.js";
 import {newInstant,instantContent,instantDone,handleInstant,bindInstantControls,type InstantState,type InstantRequest} from "../instant-effects.js";
@@ -94,7 +96,7 @@ export function areaContent(data:AreaAttack):string {
   const rows=data.rows.map(r=>`<div role="listitem" class="pneuma-aoe-target" data-aoe-row="${esc(r.uuid)}" data-state="${r.state}" style="--pneuma-ammo-color:${profile?.color??"#d44a40"}">
     <img src="${esc(r.img)}" alt="" width="24" height="24"><span class="pneuma-aoe-name">${esc(r.name)}</span><span class="pneuma-aoe-response">
     ${r.state==="waiting" ? (data.kind==="suppression"?btn("roll","fa-brain","Concentration",r.uuid):btn("roll","fa-person-running","Evade",r.uuid))
-      +(data.settings.coverUp&&data.kind!=="suppression"?btn("other","fa-shield","Cover Up: Prone, double SP and ablation",r.uuid):"")+(data.kind==="suppression"?"":btn("decline","fa-xmark","Not evade",r.uuid))
+      +(data.settings.coverUp&&data.kind!=="suppression"?btn("other","fa-shield","Cover Up: Prone, double SP and ablation",r.uuid):"")+(data.kind==="suppression"?"":btn("decline","fa-xmark","Don't Evade",r.uuid))
       : esc(r.state==="hit"?(data.kind==="suppression"?"Suppressed: Move to cover; Run if needed":r.coverUp?"Cover Up · Prone · SP ×2 / ablation ×2":"Hit"):r.state==="miss"?"Avoided":r.state==="rolling"?"Rolling…":"Cover Up — GM review")}
     ${["waiting","hit"].includes(r.state)&&!r.damage?btn("exclude","fa-user-slash","GM: exclude target (cover / not on foot)",r.uuid):""}
     ${r.state==="miss"&&!r.damage?btn("forcehit","fa-crosshairs","GM: override as affected",r.uuid):""}
@@ -343,7 +345,7 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
     ChatMessage.applyRollMode(messageData,exchange.rollMode as "roll");await ChatMessage.create(messageData);
   } finally {starting.delete(actor.uuid);}
 }
-async function respond(message:ChatMessage,data:AreaAttack,row:TargetRow) {
+async function respond(message:ChatMessage,data:AreaAttack,row:TargetRow,automatic=false) {
   const nonce=foundry.utils.randomID();await send(message.id!,"claim",{target:row.uuid,nonce});
   let committed=false;
   try {
@@ -352,7 +354,8 @@ async function respond(message:ChatMessage,data:AreaAttack,row:TargetRow) {
     if(!item)throw Error(name+" skill is missing.");
     let roll=item.createRoll("skill",actor);
     if(data.kind!=="suppression"&&data.settings.evadePenalty)roll.addMod([{value:data.settings.evadePenalty,source:"Area evasion homebrew"}]);
-    if(!await roll.handleRollDialog({ctrlKey:false,metaKey:false,type:"pneuma-area"},actor,item))return;
+    if(automatic){if(!automaticArea(actor,data))throw Error("Automatic area evasion requires RAW rules.");roll.luck=0;}
+    else if(!await roll.handleRollDialog({ctrlKey:false,metaKey:false,type:"pneuma-area"},actor,item))return;
     checkedLuck(Number(foundry.utils.getProperty(actor,"system.stats.luck.value")),0,roll.luck);
     if(data.kind!=="suppression"){const blocked=evasionBlocked(actor);if(blocked)throw Error(blocked);}
     roll=await item.confirmRoll(roll);await spendBonusLuck(actor,roll.luck);await roll.roll();
@@ -383,7 +386,25 @@ async function syncTemplate(message:ChatMessage,data:AreaAttack) {
   }
 }
 
+function automaticArea(actor:Actor,data:AreaAttack) {
+  const s=data.settings;
+  return automaticNPCEvasion(actor)&&data.kind!=="suppression"&&s.evade==="raw"&&!s.evadePenalty&&!s.evadeMove&&!s.evadeBorrow&&!s.coverUp;
+}
+const autoRows=new Set<string>();
+export async function automateArea(message:ChatMessage) {
+  const data=flag(message);if(!data||data.phase!=="responses"||game.user?.id!==gm()?.id||autoRows.has(message.id!))return;
+  autoRows.add(message.id!);
+  try{
+    for(const original of data.rows){
+      const current=flag(message);const row=current?.rows.find(r=>r.uuid===original.uuid);
+      if(!current||row?.state!=="waiting"||!row.eligible)continue;
+      const actor=await actorAt(row.uuid);if(!automaticArea(actor,current)||evasionBlocked(actor))continue;
+      await respond(message,current,row,true);
+    }
+  }finally{autoRows.delete(message.id!);}
+}
 export function registerAreaAttacks() {
+  Hooks.on("updateChatMessage",(message:ChatMessage)=>{void automateArea(message).catch(errors);});
   registerAreaSettings();registerAreaMovement();registerSmoke();
   const refreshActors=new Set<string>();let refreshQueued=false;
   for(const hook of ["createItem","updateItem","deleteItem","createActiveEffect","updateActiveEffect","deleteActiveEffect"])Hooks.on(hook,(doc:Item|ActiveEffect)=>{
@@ -410,7 +431,7 @@ export function registerAreaAttacks() {
   });
   Hooks.on("createChatMessage",(message:ChatMessage)=>{
     const data=flag(message);if(!data||game.user?.id!==gm()?.id)return;
-    const next=queue.catch(()=>{}).then(async()=>{await syncTemplate(message,data);await save(message,data);});queue=next;void next.catch(errors);
+    const next=queue.catch(()=>{}).then(async()=>{await syncTemplate(message,data);await save(message,data);});queue=next;void next.then(()=>automateArea(message)).catch(errors);
   });
   Hooks.on("deleteChatMessage",(message:ChatMessage)=>{
     const data=flag(message);if(!data?.templateId||game.user?.id!==gm()?.id)return;
@@ -465,7 +486,7 @@ export function registerAreaAttacks() {
           else if(action==="roll"&&row)await respond(message,data,row);
           else if(action==="move"&&row)await moveOutside(message,data,row);
           else if(action==="damage")await rollDamage(message.id!,data.exchange,(a,extra)=>send(message.id!,"damage",{damageRequest:{...extra,action:a}}),event.shiftKey);
-          else if(action==="apply"&&row)await applyFromCard(rowExchange(data,row),(a,extra)=>send(message.id!,"damage",{target:row.uuid,damageRequest:{...extra,action:a}}),event.shiftKey);
+          else if(action==="apply"&&row)await applyFromCard(rowExchange(data,row),(a,extra)=>send(message.id!,"damage",{target:row.uuid,damageRequest:{...extra,action:a}}),event.shiftKey,row.uuid,"recorded",halfArmorSelected(event),interactArmorSelected(event));
           else if(action==="damageReset"||action==="damageResolved")await send(message.id!,"damage",{target:row?.uuid,damageRequest:{action}});
           else await send(message.id!,action,{target:row?.uuid});
         }catch(e){errors(e);}finally{button.disabled=false;}

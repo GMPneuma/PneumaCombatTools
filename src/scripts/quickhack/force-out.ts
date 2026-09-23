@@ -7,55 +7,47 @@ import { resultFlag, delivery, escapeHTML, type QuickhackResult } from "./messag
 import { canOperate, roleFor, nativeQuickhackRoll, criticalD10 } from "./rolls.js";
 import { enabled, label, routing } from "./settings.js";
 import { isNetrunnerEjected } from "./rules.js";
-import { resultConnectionValid, ejectConnection } from "./connections.js";
+import { resultConnectionValid, ejectConnection, combatConnections, trackingCombat, type Connection } from "./connections.js";
 
 interface Request { quickhackType: string; messageId: string; requesterId: string; total: number; rollContent?: string; connectionId?: string; id?: string; rollerId?: string; gmId?: string }
 interface Pending { request: Request; rollerId: string; timer: ReturnType<typeof setTimeout> }
 const pending = new Map<string, Pending>();
 const busy = new Set<string>();
 const channel = `module.${MODULE}`;
-/** A connection can be identified by either its detected Jack-In or a later noisy hack. */
-function revealConnection(result: QuickhackResult, connectionId: string | undefined, source: Actor, target: Actor): boolean {
-  const config = routing();
-  return [...game.messages ?? []].some(message => {
-    const evidence = resultFlag(message);
-    if (!evidence?.alerted || evidence.sourceActorUuid !== source.uuid || evidence.targetActorUuid !== target.uuid
-      || evidence.combatUuid !== result.combatUuid
-      || (evidence.type === "jackIn" ? message.id : evidence.connectionId) !== connectionId) return false;
-    if (!source.hasPlayerOwner && target.hasPlayerOwner) {
-      return evidence.type === "jackIn" ? config.npcToPlayerJackInRevealAttacker : config.npcToPlayerQuickhackRevealAttacker;
-    }
-    return evidence.revealAttacker;
-  });
+function connectionRevealed(connection: Connection, source: Actor, target: Actor): boolean {
+  const awareness = connection.awareness, config = routing();
+  if (!source.hasPlayerOwner && target.hasPlayerOwner) return !!awareness &&
+    (awareness.jackInDetected && config.npcToPlayerJackInRevealAttacker || awareness.quickhackDetected && config.npcToPlayerQuickhackRevealAttacker);
+  return !!awareness?.revealAttacker;
 }
 async function contextFor(id: string) {
-  const message = game.messages!.get(id) as ChatMessage | undefined; const result = message && resultFlag(message);
-  if (!message || !result?.alerted) return;
-  const source = await fromUuid(result.sourceActorUuid) as Actor | null;
-  const target = await fromUuid(result.targetActorUuid) as Actor | null;
-  const connectionId = result.type === "jackIn" ? message.id! : result.connectionId;
-  if (source && target && resultConnectionValid(source, { ...result, connectionId })) return { message, result, source, target, connectionId, revealAttacker: revealConnection(result, connectionId, source, target) };
+  const message = game.messages?.get(id) as ChatMessage | undefined;
+  const saved = message && resultFlag(message);
+  const connection = combatConnections().find(c=>c.id === id || saved && saved.combatUuid === trackingCombat()?.uuid && c.id === (saved.type === "jackIn" ? id : saved.connectionId));
+  const result: QuickhackResult | undefined = connection ? {
+    type:"quickhack",combatUuid:trackingCombat()?.uuid,sourceActorUuid:connection.sourceActorUuid,targetActorUuid:connection.targetActorUuid,
+    sourceTokenUuid:connection.sourceTokenUuid,targetTokenUuid:connection.targetTokenUuid,connectionId:connection.id,
+    alerted:!!connection.awareness?.alerted,revealAttacker:!!connection.awareness?.revealAttacker,audience:connection.awareness?.audience??"gm",success:true
+  } : saved;
+  if (!result?.alerted) return;
+  const source = await fromUuid(result.sourceActorUuid) as Actor | null, target = await fromUuid(result.targetActorUuid) as Actor | null;
+  const connectionId = result.type === "jackIn" ? id : result.connectionId;
+  if (source && target && resultConnectionValid(source,{...result,connectionId})) return {
+    result,source,target,connectionId,revealAttacker:connection?connectionRevealed(connection,source,target):!source.hasPlayerOwner&&target.hasPlayerOwner
+      ?(result.type==="jackIn"?routing().npcToPlayerJackInRevealAttacker:routing().npcToPlayerQuickhackRevealAttacker):result.revealAttacker
+  };
 }
-/** Reuse awareness cards and encounter connections, never infer awareness from ownership. */
+/** Encounter state is authoritative; no dependency on retained chat cards. */
 export function forceOutEntries(target: Actor | undefined) {
   if (!target || !enabled() || !canOperate(target)) return [];
-  const entries = new Map<string, { messageId: string; name: string }>();
-  for (const message of game.messages ?? []) {
-    const result = resultFlag(message);
-    if (!result?.alerted || !result.combatUuid || result.targetActorUuid !== target.uuid) continue;
-    const connectionId = result.type === "jackIn" ? message.id! : result.connectionId;
-    const source = { uuid: result.sourceActorUuid } as Actor;
-    if (!resultConnectionValid(source, { ...result, connectionId })) continue;
-    const namedSource = game.actors?.find(actor => actor.uuid === source.uuid)
-      ?? canvas.tokens?.placeables?.find(token => token.actor?.uuid === source.uuid)?.actor;
-    const name = namedSource && revealConnection(result, connectionId, namedSource, target)
-      ? namedSource.name ?? label("Result.UnknownNetrunner") : label("Result.UnknownNetrunner");
-    entries.set(connectionId!, { messageId: message.id!, name });
-  }
-  const rows = [...entries.values()];
-  return rows.map((row, index) => ({ ...row, label: "Eject NetRunner — " + row.name + (rows.length > 1 ? " (" + (index + 1) + ")" : "") }));
+  const rows = combatConnections().filter(c=>c.state === "active" && c.targetActorUuid === target.uuid && c.awareness?.alerted).map(connection=>{
+    const source = game.actors?.find(actor=>actor.uuid===connection.sourceActorUuid)
+      ?? canvas.tokens?.placeables?.find(token=>token.actor?.uuid===connection.sourceActorUuid)?.actor;
+    return {messageId:connection.id,name:source&&connectionRevealed(connection,source,target)?source.name??label("Result.UnknownNetrunner"):label("Result.UnknownNetrunner")};
+  });
+  return rows.map((row,index)=>({...row,label:"Eject NetRunner — "+row.name+(rows.length>1?" ("+(index+1)+")":"")}));
 }
-export async function beginForceOut(message: ChatMessage) {
+export async function beginForceOut(message: Pick<ChatMessage,"id">) {
   if (!enabled() || busy.has(message.id!)) return;
   requireCombatSocket();
   busy.add(message.id!);

@@ -1,3 +1,4 @@
+import {forceOutEntries} from "./quickhack/force-out.js";
 import { masterStatuses } from "./status-catalog.js";
 const normalize = (name: string) => name.trim().toLowerCase();
 export const lastingDrugs = [
@@ -58,11 +59,13 @@ export function collectHUDConditions(actor: Actor) {
     const addiction = /^(.*) (?:addiction|addicted)$/i.exec(localized);
     // Read the enabled native AE itself, including status-free primary effects.
     // Addiction alone lights Addict, not a primary drug icon.
-    if (ids.length || nativeDrug || addiction && lastingDrugFor(addiction[1]!)) add(name, effect.img, false, ids);
+    if (foundry.utils.getProperty(effect,"flags.pneuma-combattools.quickhackEffect") || ids.length || nativeDrug || addiction && lastingDrugFor(addiction[1]!)) add(name, effect.img, false, ids);
   }
   if (game.combat?.started) {
     const connections = foundry.utils.getProperty(game.combat, "flags.pneuma-combattools.quickhackConnections") as Record<string, {state?: string; sourceActorUuid?: string}> | undefined;
     if (Object.values(connections ?? {}).some(connection => connection.state === "active" && connection.sourceActorUuid === actor.uuid)) exposures.add("Jacked In");
   }
+  const incoming=forceOutEntries(actor);
+  if(incoming.length)exposures.add("Neural Intrusion");
   return {medical:[...medical.values()], situational:[...situational.values()], drugs:[...drugs], exposures:[...exposures]};
 }

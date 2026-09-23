@@ -1,13 +1,13 @@
 <form>
-  <p>Custom statuses appear alongside the Cyberpunk master list. They are actor effects and token icons; adding a name does not add mechanics.</p>
+  <p class="notes">Custom statuses appear alongside the Cyberpunk master list. They are actor effects and token icons; adding a name does not add mechanics.</p>
   <div class="pneuma-custom-status-rows">
     {{#each rows}}<div class="pneuma-custom-status-row" data-status-id="{{id}}">
-      <input class="status-name" aria-label="Status name" value="{{name}}" required>
-      <input class="status-img" aria-label="Icon path" value="{{img}}" required>
+      <label>Status name<input class="status-name" aria-label="Status name" value="{{name}}" required></label>
+      <label>Icon path<input class="status-img" aria-label="Icon path" value="{{img}}" required></label>
       <button type="button" data-pick-icon title="Choose icon"><i class="fas fa-image"></i></button>
       <button type="button" data-remove-status title="Remove"><i class="fas fa-trash"></i></button>
     </div>{{/each}}
   </div>
-  <button type="button" data-add-status><i class="fas fa-plus"></i> Add status</button>
-  <button type="submit"><i class="fas fa-save"></i> Save</button>
+  <footer class="sheet-footer flexrow"><button type="button" data-add-status><i class="fas fa-plus"></i> Add status</button>
+  <button type="submit"><i class="fas fa-save"></i> Save statuses</button></footer>
 </form>

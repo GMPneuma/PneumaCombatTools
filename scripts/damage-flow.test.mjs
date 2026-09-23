@@ -8,6 +8,7 @@ try {
  await page.evaluate(installMockLibWrapper);
  await page.setContent('<main><ol><li class="total-mods">Total Mods</li></ol></main>');
  await page.evaluate(()=>{
+  window.hasInjury=(actor,name)=>actor.items?.some(i=>i.name===name)??false;
   window.CONFIG={statusEffects:[{id:"prone",name:"Prone"},{id:"stunned",name:"Stunned"},{id:"blind",name:"Blind"},{id:"dead",name:"Dead"}]};
   window.foundry={utils:{randomID:()=>"application-test"}};
   window.game={settings:{get:()=>true},i18n:{localize:()=>"Damage",format:()=>"Apply damage"},user:{isGM:true},users:{get:()=>({active:true})}};
@@ -38,6 +39,7 @@ try {
  await page.waitForFunction(()=>!!window.resolutionSection);
  const catalog=await readFile(new URL('../dist/scripts/instant-catalog.js',import.meta.url),'utf8');
  await page.addScriptTag({type:'module',content:catalog+'\nObject.assign(window,{instantEffects,instantId});'});
+ await page.addScriptTag({type:"module",content:(await readFile("dist/scripts/status-catalog.js","utf8"))+"\nwindow.masterStatuses=masterStatuses;"});
  const statusSource = await readFile(new URL('../dist/scripts/damage-status.js', import.meta.url), 'utf8');
  await page.addScriptTag({type:'module',content:statusSource.replace(/^import .*$/gm,'')+'\nObject.assign(window,{chooseDamageStatuses,damageStatusChoices,validateDamageStatuses});'});
  await page.waitForFunction(()=>!!window.chooseDamageStatuses);
@@ -47,6 +49,22 @@ try {
  const applicationSource = (await readFile(new URL('../dist/scripts/native-wrappers.js', import.meta.url), 'utf8'))+'\n'+(await readFile(new URL('../dist/scripts/damage-application.js', import.meta.url), 'utf8')).replace(/^import .*$/gm,'');
  await page.addScriptTag({type:'module',content:applicationSource+'\nObject.assign(window,{compactDamageApplication,captureWithChat,captureDamageApplication});'});
  await page.waitForFunction(()=>!!window.compactDamageApplication);
+ const skullResult=await page.evaluate(async()=>{
+   const actor={items:[{name:"Cracked Skull"}],system:{derivedStats:{hp:{value:30}}},async update(data){this.system.derivedStats.hp.value=data["system.derivedStats.hp.value"];}};
+   foundry.utils.getProperty=(o,p)=>p.split(".").reduce((v,k)=>v?.[k],o);
+   const chat={RenderDamageApplicationCard(){}};
+   window.renderTemplate=async(_t,data)=>'<div class="rollcard"><a data-action="toggleVisibility" data-visible-element="d6-data-details">'+data.hpReduction+'</a><div class="d6-data-details">Details</div></div>';
+   let captured;
+   await captureWithChat(chat,actor,"Target","head","skull",async view=>{
+     await view.update({"system.derivedStats.hp.value":16});
+     chat.RenderDamageApplicationCard({actor:view,location:"head",rawDamageDealt:12,totalDamageDealt:17,totalDamageReduction:3,hpReduction:14,damageLethal:true});
+   },undefined,data=>captured={hp:data.hpReduction,raw:data.rawDamageDealt,total:data.totalDamageDealt},true);
+   return {hp:actor.system.derivedStats.hp.value,captured};
+ });
+ assert.deepEqual(skullResult,{hp:10,captured:{hp:20,raw:18,total:23}});
+ const armor=await readFile(new URL('../dist/scripts/half-armor.js',import.meta.url),'utf8');
+ await page.addScriptTag({type:'module',content:armor+'\nObject.assign(window,{halfArmorSelected,interactArmorSelected,halfArmorControl,armorIgnorePercent});'});
+ await page.waitForFunction(()=>!!window.halfArmorControl);
  const damage=(await readFile(new URL('../dist/scripts/damage-flow.js',import.meta.url),'utf8')).replace(/^import .*$/gm,'');
  await page.addScriptTag({type:'module',content:damage.replace('import(path)', 'Promise.resolve({default:window.nativeDamageDialog})')+'\nObject.assign(window,{damageValues,damageContent,renderDamage,rollDamage});'});
  const combat=(await readFile(new URL('../dist/scripts/combat-resolution.js',import.meta.url),'utf8')).replace(/^import .*$/gm,'');
@@ -351,6 +369,14 @@ try {
  assert.equal(applications.count,2);assert.equal(applications.firstName,"Token name");
  assert.equal(applications.expanded,true);assert.equal(applications.secondHidden,true);assert.equal(applications.undo,true);
  assert.equal(applications.horizontal,true);assert.equal(applications.larger,true);
+ const history=await page.evaluate(()=>{
+   const data={...damageFixture,damage:{...damageFixture.damage,selectedTargets:[{id:'one',uuid:'Token.a',name:'Pex <Test>'},{id:'two',uuid:'Token.b',name:'Rage'},{id:'three',uuid:'Token.a',name:'Pex <Test>'}]}};
+   const persisted=JSON.parse(JSON.stringify(data));
+   document.body.innerHTML='<div class="pneuma-combat-message">'+damageContent(persisted)+'</div>';
+   return {names:[...document.querySelectorAll('.pneuma-damage-target-history li')].map(row=>row.textContent),html:document.querySelector('.pneuma-damage-target-history').innerHTML};
+ });
+ assert.deepEqual(history.names,['Pex <Test>','Rage','Pex <Test>']);assert.ok(history.html.includes('&lt;Test&gt;'));
+ await page.screenshot({path:process.env.TEMP+'/pct-damage-history.png'});
  const concurrent=await page.evaluate(async()=>{
    const native='<span data-action="toggleVisibility" data-visible-element="d6-data-details">1</span><div class="d6-data-details">detail</div>';
    window.renderTemplate=async()=>native;
@@ -471,5 +497,19 @@ try {
    return {dice,sent};
  });
  assert.equal(carriedDamage.dice,4);assert.equal(carriedDamage.sent.includes("damageCommit"),true);
+ const pickerGroups=await page.evaluate(async()=>{
+   CONFIG.statusEffects=masterStatuses;
+   game.i18n.localize=value=>value;
+   Dialog.prompt=async config=>{document.body.innerHTML=config.content;return null;};
+   await chooseDamageStatuses([]);
+   const labels=[...document.querySelectorAll('summary')].map(e=>e.firstChild.textContent.trim());
+   const noExcluded=![...document.querySelectorAll('.pneuma-damage-status-choice')].some(e=>/addict|wounded/i.test(e.textContent));
+   const firstOpen=document.querySelector('details').open;
+   const head=masterStatuses.find(s=>s.group==='head');await chooseDamageStatuses([head.id],0);
+   return {labels,noExcluded,firstOpen,editing:document.querySelector('details[open] summary').firstChild.textContent.trim()};
+ });
+ assert.deepEqual(pickerGroups.labels,['Instant Effects','Body Crits','Head Crits','Drugs','Pharma','Misc']);
+ assert.ok(pickerGroups.noExcluded&&pickerGroups.firstOpen);assert.equal(pickerGroups.editing,'Head Crits');
+ await page.screenshot({path:process.env.TEMP+'/pct-effects-categories.png'});
  console.log('Combat flow browser checks passed: awareness checkbox/reset, native damage metadata, scoped application control, retained expandable result.');
 } finally {await browser.close();}

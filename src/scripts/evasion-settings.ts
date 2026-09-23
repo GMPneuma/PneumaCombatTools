@@ -9,6 +9,7 @@ export interface EvasionHomebrew {
 
 declare global {
   interface SettingConfig {
+    "pneuma-combattools.npcAutoEvasion": boolean;
     "pneuma-combattools.evasionEligibility": "raw" | "none" | "custom";
     "pneuma-combattools.evasionHomebrew": EvasionHomebrew | null;
     "pneuma-combattools.evasionReflex": EvasionQualifier;
@@ -107,7 +108,11 @@ class EvasionHomebrewForm extends FormApplication {
 }
 
 /** Shared settings for Combat Tools ranged-evasion resolution. */
+export function automaticNPCEvasion(actor:Actor):boolean {
+  return !!game.settings!.get(MODULE,"npcAutoEvasion")&&game.settings!.get(MODULE,"evasionEligibility")==="raw"&&!actor.hasPlayerOwner;
+}
 export function registerEvasionSettings() {
+  game.settings!.register(MODULE,"npcAutoEvasion",{name:"Automatic NPC evasion (RAW only)",hint:"Eligible NPCs roll without a GM dialog. Inactive with homebrew evasion; AoE also requires RAW eligibility, no evasion penalties, movement costs or Cover Up.",scope:"world",config:true,type:Boolean,default:false});
   game.settings!.register(MODULE, "evasionEligibility", {
     scope: "world", config: true, name: "PNEUMA_COMBAT_TOOLS.EvasionEligibilityName",
     hint: "PNEUMA_COMBAT_TOOLS.EvasionEligibilityHint", type: String, default: "raw",
@@ -141,7 +146,10 @@ export function registerEvasionSettings() {
       select.parent().append(button);
       if (menuRow[0] !== select.closest(".form-group")[0]) menuRow.remove();
     }
-    const sync = () => button.prop("disabled", select.val() !== "custom" || !game.user!.isGM);
+    const sync = () => {
+      button.prop("disabled", select.val() !== "custom" || !game.user!.isGM);
+      html.find('[name="pneuma-combattools.npcAutoEvasion"]').prop("disabled",select.val()!=="raw");
+    };
     select.on("change", sync);
     sync();
   });

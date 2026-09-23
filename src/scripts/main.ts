@@ -1,3 +1,8 @@
+import {registerChatButtons} from "./chat-buttons.js";
+import {registerHalfArmor} from "./half-armor.js";
+import {registerManualRolls} from "./manual-rolls.js";
+import {registerInjuryNotices} from "./injury-notices.js";
+import {registerPlayersControl} from "./players-control.js";
 import { registerCombatBar } from "./combat-bar.js";
 import {registerInjuryMechanics} from "./injury-mechanics.js";
 import {registerNativeEffectIntegration} from "./native-effect-integration.js";
@@ -52,6 +57,9 @@ const selectedAttacker = () => {
 Hooks.once("init", () => {
   if (game.system!.id !== "cyberpunk-red-core") return;
   registerSocketHealth();
+  registerManualRolls();
+  registerHalfArmor();
+  registerChatButtons();
   registerSelfCTH();
   registerQuickhack(() => { const target = canvas.tokens?.hud?.object ?? undefined; const source = selection && selection.target === target ? selection.attacker : selectedAttacker(); return {source, target, self:isSelfCTH(target,source)}; });
   registerGrapple();
@@ -65,8 +73,10 @@ Hooks.once("init", () => {
   registerEvasionSettings();
   registerCombatResolution();
   registerCombatBar();
+  registerPlayersControl();
   registerMovement();
   registerInjuryMechanics();
+  registerInjuryNotices();
   registerEmp();
   registerInstantEffects();
   registerNativeEffectIntegration();
@@ -168,7 +178,7 @@ Hooks.once("init", () => {
     override getData(options = {}) {
       const attacker = selection && selection.target === this.object ? selection.attacker : selectedAttacker();
       const selfCTH = isSelfCTH(this.object ?? undefined, attacker);
-      if (selfCTH) return {...super.getData(options), standalone: false, selfCTH: true, selfAlertHUD: game.settings!.get(MODULE_ID,"eyeHUD"), selfInitiative: selfInitiativeControl(this.object!)};
+      if (selfCTH) return {...super.getData(options), standalone: false, selfCTH: true, grappleActions:grappleMenu(this.object??undefined,this.object??undefined), selfAlertHUD: game.settings!.get(MODULE_ID,"eyeHUD"), selfInitiative: selfInitiativeControl(this.object!), selfThrown:[...thrownEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[]),...grenadeEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[])]};
       const connection = attacker?.actor && this.object?.actor ? connectionFor(attacker.actor, this.object.actor.uuid) : undefined;
       const sight = !!attacker && !!this.object && quickhackEnabled() && hasQuickhackSight(attacker, this.object);
       const ejectNetrunners = forceOutEntries(this.object?.actor ?? undefined);
@@ -216,6 +226,25 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
     html.find(".col.right").first().append(controls);
   }
   if (data.selfCTH) {
+    html.find("[data-self-close-toggle]").on("click keydown",event=>{
+      if(event.type==="keydown"&&!["Enter"," "].includes(event.key??""))return;
+      event.preventDefault();event.stopPropagation();const panel=html.find("[data-self-close-menu]");panel.prop("hidden",!panel.prop("hidden"));
+    });
+    html.find<HTMLButtonElement>("[data-self-grapple]").on("click",async event=>{
+      event.preventDefault();event.stopPropagation();if(event.currentTarget.disabled)return;
+      await useGrapple(token,token,event.currentTarget.dataset.selfGrapple!);
+      if(hud.object===token)hud.render(true);
+    });
+    html.find("[data-self-thrown-toggle]").on("click keydown",event=>{if(event.type==="keydown"&&!["Enter"," "].includes(event.key??""))return;event.preventDefault();event.stopPropagation();const panel=html.find("[data-self-thrown-menu]");panel.prop("hidden",!panel.prop("hidden"));});
+    html.find<HTMLButtonElement>("[data-self-throw]").on("click",async event=>{
+      event.preventDefault();event.stopPropagation();const button=event.currentTarget;if(button.disabled)return;button.disabled=true;
+      try{
+        const id=button.dataset.selfThrow!;
+        const grenade=grenadeEntries(Array.from(token.actor!.items) as unknown as MenuWeapon[]).some(item=>item.id===id);
+        if(grenade){const {startAreaAttack}=await import("./aoe/workflow.js");await startAreaAttack(token,token,id,"attack");}
+        else {const targets=[...game.user!.targets].filter(target=>target!==token);if(targets.length!==1)throw Error("Target one other token for a thrown weapon. Grenades use ground placement.");await attackFromHUD(token,targets[0]!,id,"attack",event);}
+      }catch(error){ui.notifications!.error((error as Error).message);}finally{button.disabled=false;}
+    });
     html.find<HTMLElement>("[data-self-alert-hud]").on("click keydown",async event=>{
       if(event.type==="keydown"&&!["Enter"," "].includes(event.key??""))return;
       event.preventDefault();event.stopPropagation();const button=event.currentTarget;
@@ -246,8 +275,7 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
     event.preventDefault(); event.stopPropagation();
     const button = event.currentTarget;
     if (button.disabled || !forceOutEntries(token.actor ?? undefined).some(row => row.messageId === button.dataset.ejectMessage)) return;
-    const message = game.messages!.get(button.dataset.ejectMessage!) as ChatMessage | undefined;
-    if (!message) return;
+    const message = {id:button.dataset.ejectMessage!};
     button.disabled = true;
     try { await beginForceOut(message); }
     catch (error) { ui.notifications!.error(error instanceof Error ? error.message : "Eject NetRunner failed."); }

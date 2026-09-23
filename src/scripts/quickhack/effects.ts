@@ -1,3 +1,5 @@
+import {createEmp} from "../emp.js";
+import {applyQuickhackCondition} from "./conditions.js";
 import { requireCombatSocket } from "../socket-health.js";
 import { MODULE } from "./availability.js";
 import { primaryGM } from "./content.js";
@@ -57,29 +59,12 @@ export async function resolveEffect(messageId: string, requesterId: string) {
     if (!enabled()) return;
     let key = "Effect.Summary." + hack.id;
     const details: Record<string, string | number> = { target: escapeHTML(target.name) };
-    if (hack.id === "sonic-shock") {
-      const pack = game.packs!.get("cyberpunk-red-core.core_critical-injuries-head");
-      const index = await pack?.getIndex();
-      const entry = index?.find(document => document.name === "Damaged Ear");
-      const injury = entry ? await pack!.getDocument(entry._id) as Item | undefined : undefined;
-      if (!injury) throw new Error(label("Effect.DamagedEarMissing"));
-      const { _id, ...data } = injury.toObject();
-      if (!enabled()) return;
-      await target.createEmbeddedDocuments("Item", [data as never]);
-    } else if (hack.id === "overheat") {
-      const sourceToken = await fromUuid(result.sourceTokenUuid) as TokenDocument | null;
-      const targetToken = await fromUuid(result.targetTokenUuid) as TokenDocument | null;
-      if (!targetToken) throw new Error("QuickHack target token no longer exists.");
-      await quickhackDamage(source, sourceToken ?? undefined, targetToken, hack.name, hack.automaticDamageFormula!, true);
-    } else if (hack.id === "slow") {
-      details.amount = (await new Roll("1d6").evaluate()).total!;
-    } else if (hack.id === "system-reset") {
-      const registered = new Set(CONFIG.statusEffects.map(status => typeof status === "string" ? status : status.id));
-      const statuses = ["unconscious", "prone"].filter(id => registered.has(id));
-      if (statuses.length && enabled()) await target.createEmbeddedDocuments("ActiveEffect", [{ name: "QuickHack: System Reset", img: "icons/svg/unconscious.svg", statuses,
-        flags: { [String(MODULE)]: { quickhackEffect: hack.id } } }]);
-      if (statuses.length < 2) key = "Effect.Summary.system-reset-manual";
+    if(hack.id==="short-circuit"||hack.id==="cyberware-malfunction") {
+      const request = await createEmp(target,{source:hack.id,sourceActor:source.uuid,origin:message.uuid??message.id!,seconds:60,count:hack.id==="short-circuit"?3:1,chooser:hack.id==="short-circuit"?"gm":"player",mode:"equal",policy:{foundational:true,cascade:hack.id==="cyberware-malfunction",electronics:false,immune:[]}});
+      if (!request) {await effectSummary(message, "No eligible cyberware to disable.");return;}
     }
+    const amount=await applyQuickhackCondition(target,hack.id,message.blind?"blindroll":message.whisper.length?"gmroll":"roll");
+    if(amount!==undefined)details.amount=amount;
     await effectSummary(message, label(key, details));
   } catch (error) {
     console.error(MODULE, error);

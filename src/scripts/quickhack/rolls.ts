@@ -13,11 +13,9 @@ export async function nativeQuickhackRoll(actor: Actor, item: RollItem, title: s
   let roll = item.createRoll(String(item.type) === "role" ? "roleAbility" : "skill", actor, { rollSubType: "mainRoleAbility" });
   roll.rollTitle = title;
   if (!await roll.handleRollDialog({ ctrlKey: false, metaKey: false, type: "chat" }, actor, item)) return null;
-  if (!validate() || !canOperate(actor)) return null;
   roll = await item.confirmRoll(roll);
-  if (!validate()) return null;
+  if (!validate() || !canOperate(actor)) return null;
   if (audience.blind) await rollHidden(roll); else await roll.roll();
-  if (!validate()) return null;
   const content = await nativeCard(roll);
   if (!validate()) return null;
   const message = publish ? await ChatMessage.create({ content, ...audience,

@@ -37,3 +37,9 @@ Pneuma's Combat Tools for Foundry v12 and Cyberpunk RED Core.
 ## Project records
 
 The [changelog](../CHANGELOG.md) records releases; the [backlog](../BACKLOG.md) preserves requests and deferred work. The [status mechanics audit](status-mechanics-audit.md) identifies automation gaps. The [cleanup audit](cleanup-audit.md) and [earlier code audit](audit-2026-09-19.md) are engineering records, not player instructions or promises of current functionality.
+
+## Workflow reference
+
+[Flow and chat-card map](flow-map.md): initiation, decisions, buttons, data owners, outcomes and recovery.
+
+[Body and head injury coverage](body-head-injury-coverage.md): connected mechanics and remaining gaps for both charts.

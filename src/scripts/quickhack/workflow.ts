@@ -3,7 +3,7 @@ import { availableQuickhacks, quickhackId, MODULE, type QuickhackItem } from "./
 import { getQuickhack } from "./catalog.js";
 import { enabled, label, mode, routing } from "./settings.js";
 import { roleFor, canOperate, criticalD10, gmAudience, nativeQuickhackRoll, publicAudience } from "./rolls.js";
-import { escapeHTML, postResult, type QuickhackResult } from "./messages.js";
+import { escapeHTML, postResult, resultFlag, type QuickhackResult } from "./messages.js";
 import { isQuickhackSuccessful, isQuickhackTargetAlerted, isTargetAware, isWithinJackInRange } from "./rules.js";
 import { resolveJackInRouting, resolveQuickhackRouting } from "./routing-config.js";
 import { requestEffect } from "./effects.js";
@@ -59,12 +59,14 @@ export async function executeQuickhack(source: Token, target: Token, id: string)
       sourceTokenUuid: source.document.uuid, targetTokenUuid: target.document.uuid };
     if (hack) {
       const success = isQuickhackSuccessful(roll.total, hack.dv);
-      const alerted = isQuickhackTargetAlerted({ success, silentOnSuccess: hack.silentOnSuccess, targetIsPlayer: scenario.targetIsPlayer });
+      const alreadyAware=!!connection?.awareness?.alerted;
+      const alerted = alreadyAware||isQuickhackTargetAlerted({ success, silentOnSuccess: hack.silentOnSuccess, targetIsPlayer: scenario.targetIsPlayer });
       const route = resolveQuickhackRouting(routing(), scenario);
       const data: QuickhackResult = { ...base, type: "quickhack", connectionId: connection?.id, quickhackId: hack.id, success, alerted, ...route };
       const detail = (route.showInterfaceTotal ? `<p>${label("Quickhack.InterfaceSummary", { interface: roll.total })}</p>` : "")
         + `<p>${label(alerted ? "Quickhack.AwarenessShort" : "Quickhack.UnawareShort", { target: escapeHTML(target.name) })}</p>`;
       const message = await postResult(source, target, data, `${hack.name} · DV${hack.dv}`, label(success ? "Quickhack.SuccessShort" : "Quickhack.FailureShort"), detail, roll.content);
+      if (message && combatUuid) await establishConnection(message);
       if (message && success && valid()) await requestEffect(message);
     } else {
       const automatic = !!roleFor(target.actor!);

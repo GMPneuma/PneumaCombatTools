@@ -12,6 +12,7 @@ export const lamps = [
   { id: "fire", name: "On fire", icon: "fa-fire", match: /on[ _-]?fire|burning|incendiary/i },
   { id: "addict", name: "Addict", icon: "fa-pills", match: /addiction|addicted/i },
   { id: "jacked", name: "Jacked In", icon: "fa-plug", match: /^jacked in$/i },
+  { id: "intrusion", name: "Neural Intrusion", icon: "fa-brain", match: /^neural intrusion$/i },
   { id: "unconscious", name: "Unconscious", icon: "fa-bed", match: /unconscious/i },
 ] as const;
 export type LampId = typeof lamps[number]["id"];
@@ -59,6 +60,8 @@ export function indicatorState(uuid: string, names: string[], seconds: number, u
     for (const kind of held) active.add(kind);
   }
   const events = flashes.get(uuid);
+  if (!active.has("intrusion")) events?.delete("intrusion");
+  if (!active.has("fire") && previous?.has("fire")) events?.delete("fire");
   const now = Date.now();
   for (const [kind, expires] of events ?? []) if (expires <= now) events!.delete(kind);
   if (events && !events.size) flashes.delete(uuid);

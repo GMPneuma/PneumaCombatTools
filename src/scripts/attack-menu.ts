@@ -4,7 +4,7 @@ import { improvisedSource, thrownRollItem } from "./thrown-weapons.js";
 import { isQuickhackLauncher } from "./quickhack/availability.js";
 import { availableWeapons, type EquipmentItem } from "./weapon-data.js";
 
-/** HUD eligibility only; all attack mechanics stay in the CPR sheet handler. */
+/** HUD eligibility and routing; combat exchanges reuse native CPR rolls. */
 export type AttackMode = "attack" | "aimed" | "autofire" | "suppressive";
 export interface MenuWeapon extends EquipmentItem {
   id: string | null; name: string | null; img?: string | null; type: string;
@@ -37,10 +37,6 @@ export function grenadeEntries(items: MenuWeapon[]) {
     .map(item => ({ id: item.id, name: item.name, img: item.img }));
 }
 
-interface CPRSheet extends ActorSheet {
-  _onRoll(event: JQuery.ClickEvent): Promise<void>;
-  _getFireCheckbox(event: JQuery.ClickEvent): string;
-}
 const rolling = new Set<string>();
 export async function attackFromHUD(attacker: Token, target: Token, itemId: string, mode: AttackMode,
   event: JQuery.ClickEvent) {
@@ -65,29 +61,17 @@ export async function attackFromHUD(attacker: Token, target: Token, itemId: stri
     if(mode==="aimed"&&areaKind(nativeItem,"attack"))throw Error("Area attacks cannot make aimed shots.");
   }
   if(!item)return;
-  const sheet = actor.sheet as CPRSheet | null;
-  if (!sheet || typeof sheet._onRoll !== "function") throw new Error("CPR attack handler unavailable.");
   if (rolling.has(actor.uuid)) return;
   rolling.add(actor.uuid);
   try {
     // Restore the captured attacker/defender before entering the native workflow.
     if (!attacker.control({ releaseOthers: true })) return;
     target.setTarget(true, { releaseOthers: true });
-    if (item.category === "thrown" || game.settings?.get("pneuma-combattools", "combatResolution")) {
-      const { startCombatExchange } = await import("./combat-resolution.js");
-      if (item.category === "thrown") {
-        const source = itemId === "__improvised" ? await improvisedSource() : actor.items.get(itemId)!.toObject();
-        await startCombatExchange(attacker, target, itemId, "attack", event,
-          { item: thrownRollItem(source, actor), source, improvised: itemId === "__improvised" });
-      } else await startCombatExchange(attacker, target, itemId, mode, event);
-      return;
-    }
-    // Per-call sheet context: choose this button's mode without changing saved sheet fire-mode flags.
-    const context = Object.create(sheet) as CPRSheet;
-    Object.defineProperties(context, {
-      _getFireCheckbox: { value: () => mode },
-      token: { value: attacker.document },
-    });
-    await sheet._onRoll.call(context, event);
+    const { startCombatExchange } = await import("./combat-resolution.js");
+    if (item.category === "thrown") {
+      const source = itemId === "__improvised" ? await improvisedSource() : actor.items.get(itemId)!.toObject();
+      await startCombatExchange(attacker, target, itemId, "attack", event,
+        { item: thrownRollItem(source, actor), source, improvised: itemId === "__improvised" });
+    } else await startCombatExchange(attacker, target, itemId, mode, event);
   } finally { rolling.delete(actor.uuid); }
 }

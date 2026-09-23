@@ -1,5 +1,5 @@
 import {evasionBlocked} from "./injury-rules.js";
-import { empDisabled } from "./emp-rules.js";
+import { empDisabled, isMicrowaver } from "./emp-rules.js";
 import { requireCombatSocket } from "./socket-health.js";
 import { grappleWeaponBlocked } from "./grapple/state.js";
 import { PendingCardRefresh } from "./pending-card-refresh.js";
@@ -7,7 +7,7 @@ import { setItemMarker } from "./item-markers.js";
 import type { CriticalMethod } from "./critical-injury.js";
 import { resolutionSection, rollOutcomeClass } from "./card-structure.js";
 import { damageContent, handleDamage, renderDamage, type DamageState, type DamageRequest } from "./damage-flow.js";
-import { homebrew } from "./evasion-settings.js";
+import { homebrew, automaticNPCEvasion } from "./evasion-settings.js";
 import { checkedLuck, evasionButtonLabel, evasionOffer, type EvasionOffer } from "./evasion-rules.js";
 import { attackDialog, registerAttackDialog, diceJSON, evasionDialog, nativeAPI, nativeCard, registerEvasionDialog, rollHidden, spendBonusLuck,
   type RollItem } from "./native-combat.js";
@@ -19,13 +19,13 @@ const MODULE = "pneuma-combattools";
 const CHANNEL = "module." + MODULE;
 declare global {
   interface SettingConfig {
-    "pneuma-combattools.combatResolution": boolean;
     "pneuma-combattools.hideAttackWeapon": boolean;
   }
 }
 interface Usage { round: string; used: number; lastPayment?: string }
 interface Defense { total: number; html: string; dice: string[]; bonus: number; fee: number; penalty: number }
 export interface Exchange {
+  disableSource?: "microwaver";
   areaAmmo?: {type:string;variety:string};
   attacker: string; defender: string; defenderActor: string; attackerName: string; defenderName: string;
   ranged: boolean; category: string; title: string; dv?: number; total: number; html: string; dice: string[];
@@ -149,7 +149,7 @@ export function exchangeContent(data: Exchange): string {
       "pneuma-defense-result " + rollOutcomeClass(!data.hit));
   }
   const opposed = data.unaware ? "Defender unaware — no evasion" : data.defense ? "Evasion " + data.defense.total : data.ranged ? "DV " + data.dv : "Defense declined";
-  const damageControl = data.weaponId
+  const damageControl = data.disableSource==="microwaver" ? "" : data.weaponId
     ? '<button type="button" class="pneuma-result-damage" data-action="pneumaRollDamage" aria-label="Roll damage" title="Roll damage (Shift-click for options; manual override allowed)"><i class="fas fa-droplet" aria-hidden="true"></i></button>'
     : legacyDamage;
   return '<div class="pneuma-resolution-card">'
@@ -160,7 +160,7 @@ export function exchangeContent(data: Exchange): string {
     + '</strong></p>') + damageContent(data) + '</div>';
 }
 async function writeExchange(message: ChatMessage, data: Exchange): Promise<void> {
-  const changes: Record<string, unknown> = { ["flags." + MODULE + ".exchange"]: data, content: exchangeContent(data) };
+  const changes: Record<string, unknown> = { ["flags." + MODULE + ".exchange"]: foundry.utils.deepClone(data), content: exchangeContent(data) };
   if (!data.damage && flag<Exchange>(message, "exchange")?.damage)
     changes["flags." + MODULE + ".exchange.-=damage"] = null;
   await message.update(changes);
@@ -211,6 +211,7 @@ export async function handleCombatRequest(request: Request): Promise<Claim | und
   const user = game.users?.get(request.user) as User | undefined;
   if (!message || !stored || !user?.active) throw new Error("Combat exchange is unavailable.");
   if (request.action.startsWith("damage")) {
+    if(stored.disableSource==="microwaver")throw Error("Resolve Microwaver resistance instead of weapon damage.");
     if (!user.isGM && (message.blind || (message.whisper.length && !message.whisper.includes(user.id) && message.author?.id !== user.id)))
       throw new Error("This is a private exchange.");
     const data = foundry.utils.deepClone(stored);
@@ -295,7 +296,7 @@ async function request(message: string, action: Request["action"], extra: Partia
     game.socket!.emit(CHANNEL, { kind: "request", gm: gm.id, packet });
   });
 }
-async function respond(message: ChatMessage, evade: boolean): Promise<void> {
+async function respond(message: ChatMessage, evade: boolean, automatic = false): Promise<void> {
   const data = flag<Exchange>(message, "exchange")!;
   if (data.state === "applying") { await request(message.id!, "resume"); retry.delete(message.id!); return; }
   if (!evade) { await request(message.id!, "decline"); return; }
@@ -320,7 +321,8 @@ async function respond(message: ChatMessage, evade: boolean): Promise<void> {
       && (item.name === name || item.name?.toLowerCase() === "evasion")) as RollItem | undefined;
     if (!skill) throw new Error("The defender has no Evasion skill item.");
     const roll = skill.createRoll("skill", actor);
-    if (!await evasionDialog(roll, actor, skill, claim.offer.penalty, claim.offer.cost)) return;
+    if(automatic){if(!automaticNPCEvasion(actor)||claim.offer.penalty||claim.offer.cost)throw Error("Automatic evasion requires RAW rules.");roll.luck=0;}
+    else if (!await evasionDialog(roll, actor, skill, claim.offer.penalty, claim.offer.cost)) return;
     checkedLuck(Number(foundry.utils.getProperty(actor, "system.stats.luck.value")), claim.offer.cost, roll.luck);
     await rollHidden(roll);
     const result = { nonce: claim.nonce, defense: { total: roll.resultTotal, html: await nativeCard(roll),
@@ -376,7 +378,7 @@ export async function startCombatExchange(attacker: Token, target: Token, itemId
   if (mode === "aimed") await actor.update({ "flags.cyberpunk-red-core.aimedLocation": roll.location } as Parameters<Actor["update"]>[0]);
   const title = game.settings!.get(MODULE, "hideAttackWeapon") ? category : item.name ?? category;
   roll.rollTitle = title;
-  const data: Exchange = { weaponType: type, ...(thrown ? { thrownSource: thrown.source, improvised: thrown.improvised, improvisedDice: choice.improvisedDice } : {}), criticalMethod: type === "grenadeLauncher" ? "Grenade" : type === "rocketLauncher" ? "Rocket" : undefined, weaponId: itemId, attackMode: mode, location: roll.location, unaware: choice.unaware, combatId, combatEpoch, attacker: attacker.document.uuid, defender: target.document.uuid, defenderActor: target.actor!.uuid,
+  const data: Exchange = { ...(!thrown&&isMicrowaver(item)?{disableSource:"microwaver" as const}:{}), weaponType: type, ...(thrown ? { thrownSource: thrown.source, improvised: thrown.improvised, improvisedDice: choice.improvisedDice } : {}), criticalMethod: type === "grenadeLauncher" ? "Grenade" : type === "rocketLauncher" ? "Rocket" : undefined, weaponId: itemId, attackMode: mode, location: roll.location, unaware: choice.unaware, combatId, combatEpoch, attacker: attacker.document.uuid, defender: target.document.uuid, defenderActor: target.actor!.uuid,
     attackerName: attacker.name ?? "", defenderName: target.name ?? "", ranged, category, title, dv,
     total: roll.resultTotal, html: await nativeCard(roll), dice: diceJSON(roll),
     rollMode: game.settings!.get("core", "rollMode") ?? "roll", state: "waiting" };
@@ -422,14 +424,21 @@ export function decorateCombatMessage(root: HTMLElement, data: Exchange): void {
 }
 export function registerCombatResolution(): void {
   for (const [key, name, hint, value] of [
-    ["combatResolution", "Combat resolution", "Attack cards from Combat Tools offer Evade / Do not Evade. Requires an active GM.", true],
     ["hideAttackWeapon", "Hide attack weapon names", "Use Ranged, Melee or Unarmed instead of weapon names on Combat Tools attack cards.", false],
   ] as const) game.settings!.register(MODULE, key, { name, hint, scope: "world", config: true, type: Boolean, default: value });
   registerEvasionDialog();
   registerAttackDialog();
   const pendingCards = new PendingCardRefresh(message => { ui.chat?.updateMessage(message); });
   const refreshPending = () => pendingCards.refresh();
-  Hooks.on("createChatMessage", (message: ChatMessage) => pendingCards.remember(message));
+  Hooks.on("createChatMessage", (message: ChatMessage) => {
+    pendingCards.remember(message);
+    const data=flag<Exchange>(message,"exchange");
+    if(authority()?.id!==game.user?.id||data?.state!=="waiting")return;
+    void tokenActor(data.defender).then(async actor=>{
+      if(!automaticNPCEvasion(actor))return;
+      if(offer(actor,data.ranged,currentCombat(data)).allowed)await respond(message,true,true);
+    }).catch(error=>ui.notifications!.error("NPC evasion: "+(error as Error).message));
+  });
   Hooks.on("updateChatMessage", (message: ChatMessage) => pendingCards.remember(message));
   Hooks.on("deleteChatMessage", (message: ChatMessage) => { if (message.id) pendingCards.forget(message.id); });
   Hooks.on("updateActor", (actor: Actor) => pendingCards.refresh(actor.uuid));
@@ -493,6 +502,7 @@ export function registerCombatResolution(): void {
     if (data.state === "cancelled") return;
     html.find(".message-sender").text(data.attackerName + " → " + data.defenderName);
     if (data.state === "resolved") {
+      if(data.disableSource==="microwaver")return;
       void renderDamage(message, data, html, (action, extra) => request(message.id!, action, extra))
         .catch(error => console.warn(MODULE, error));
       return;

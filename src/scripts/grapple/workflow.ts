@@ -1,9 +1,10 @@
+import {updateTouchesPath} from "../update-path.js";
 import { requireCombatSocket } from "../socket-health.js";
 import { rollOutcomeClass, styleOpposedRolls } from "../card-structure.js";
 import { nativeCard, rollHidden, spendBonusLuck, type RollItem } from "../native-combat.js";
 import { masterStatuses } from "../status-catalog.js";
 import { chokeDamage, nextChoke, winsGrab } from "./rules.js";
-import { MODULE, property, grapples, grappleFor, actorGrapples, type Grapple, type Participant, type SkillResult } from "./state.js";
+import { MODULE, grappleActionBlocked, property, grapples, grappleFor, actorGrapples, type Grapple, type Participant, type SkillResult } from "./state.js";
 
 const CHANNEL = `module.${MODULE}`;
 const escapeHTML = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]!);
@@ -69,6 +70,13 @@ async function save(scene: Scene, g: Grapple) {
       const changes: Record<string,unknown> = {content:grappleContent(g),[`flags.${MODULE}.grapple`]:g};
       if (!g.operation) changes[`flags.${MODULE}.grapple.-=operation`] = null;
       if (!g.choke) changes[`flags.${MODULE}.grapple.-=choke`] = null;
+      const history=property<Grapple>(message,"grappleHistory");
+      if(history)changes.content=grappleContent(history);
+      else if(g.state==="active")changes["flags."+MODULE+".grappleHistory"]={...g};
+      const previous=property<Grapple>(message,"grapple");
+      if(history&&previous?.revision!==g.revision&&!g.operation){
+        await ChatMessage.create({content:grappleContent(g),speaker:message.speaker,whisper:message.whisper,blind:message.blind} as never);
+      }
       await message.update(changes);
       // Completed history belongs in chat, not in the encounter active-state map.
       if (g.state === "ended") await owner.update({[`flags.${MODULE}.grapples.-=${g.id}`]:null});
@@ -198,10 +206,11 @@ export async function handleGrappleRequest(r: GrappleRequest): Promise<string | 
       texture: {scaleX: tokenPlacement.scaleX < 0 ? -0.8 : 0.8,
         scaleY: tokenPlacement.scaleY < 0 ? -0.8 : 0.8},
     });
-    const next: Grapple = {...locked,state:"active",revision:g.revision+1,note:"Grapple active: −2 Actions; no two-handed weapons. Grabbing hand occupied. Held token follows the grappler; defender cannot use Move Action."};
+    const next: Grapple = {...locked,establishedRound:g.combat?Number(game.combats?.get(g.combat)?.round):undefined,state:"active",revision:g.revision+1,note:"Grapple active: −2 Actions; no two-handed weapons. Grabbing hand occupied. Held token follows the grappler; defender cannot use Move Action."};
     delete next.operation; await save(scene,next); return;
   }
   if (g.state !== "active") throw new Error("Establish the grapple first.");
+  if (grappleActionBlocked(g)) throw new Error("Grapple actions are available from the grappler’s next turn.");
   if (r.action === "release") { await save(scene,{...g,operation:{action:r.action,user:r.user}}); await end(scene,{...g,lastAction:"release"},`${g.source.name} released ${g.target.name} (no Action).`); return; }
   if (!["choke","throw"].includes(r.action)) throw new Error("Unknown grapple action.");
   const body = Number(foundry.utils.getProperty(source.actor!,"system.stats.body.value"));
@@ -304,11 +313,12 @@ export function renderGrapple(message: ChatMessage, html: JQuery) {
   const card = html.find(".pneuma-grapple-card");
   // Preserve native roll nodes already decorated by Chat Dice and other render hooks.
   // Roll markup changes through message.update, before the normal render hook sequence.
-  card.attr("data-state",g.state);
-  card.find(".pneuma-grapple-note").text(g.note);
+  const history=property<Grapple>(message,"grappleHistory")??g;
+  card.attr("data-state",history.state);
+  card.find(".pneuma-grapple-note").text(history.note);
   // Also decorate older saved cards in place; ties belong to the responding Brawling roll.
   const rolls = card[0]?.querySelector<HTMLElement>(".pneuma-grapple-rolls");
-  if (g.lastAction) rolls?.remove();
+  if (history.lastAction) rolls?.remove();
   else if (rolls) styleOpposedRolls(rolls,g.defense ? winsGrab(g.attack.total,g.defense.total) : undefined);
   const controls = html.find(".pneuma-grapple-controls").empty();
   const source = scene?.tokens.find(t => t.uuid === g.source.token), target = scene?.tokens.find(t => t.uuid === g.target.token);
@@ -327,13 +337,7 @@ export function renderGrapple(message: ChatMessage, html: JQuery) {
     if (canSource || game.user?.isGM) add(`Retry ${g.operation.action}`,() => act(g.operation!.action));
   } else if (g.state === "waiting" && canTarget) add("Roll Brawling",() => respond(g));
   else if (g.state === "choice" && canSource) { add("Hold Target",() => act("hold"));add("Take Held Object",() => act("take")); }
-  else if (g.state === "active") {
-    if (canSource) { add("Choke",() => act("choke"));add("Throw",() => act("throw"));add("Release",() => act("release")); }
-    if (canTarget) add("Escape",async () => {
-      if (!target?.object || !source?.object) throw new Error("Open the grapple's scene to escape.");
-      await useGrapple(target.object,source.object,"escape");
-    });
-  }
+
   if (game.user?.isGM && g.state !== "ended") add("End (GM)",() => act("cancel"));
 }
 export function registerGrapple() {
@@ -350,7 +354,7 @@ export function registerGrapple() {
   });
   Hooks.on("renderChatMessage",renderGrapple);
   const refresh = (owner: Scene | Combat,changes: object) => {
-    if (!JSON.stringify(changes).includes("grapples")) return;
+    if (!updateTouchesPath(changes, "flags.pneuma-combattools.grapples")) return;
     for (const g of Object.values(property<Record<string,Grapple>>(owner,"grapples") ?? {})) {
       const message = game.messages?.get(g.message ?? "");
       if (message) void ui.chat?.updateMessage(message as ChatMessage,false);

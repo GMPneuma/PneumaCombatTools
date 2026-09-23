@@ -26,7 +26,7 @@
       <div class="form-group"><label for="pct-evade-borrow">Borrow remaining cost from next turn</label><input id="pct-evade-borrow" type="checkbox" name="evadeBorrow" {{checked evadeBorrow}}></div>
       <div class="form-group"><label for="pct-evade">Evasion eligibility</label><select id="pct-evade" name="evade">{{selectOptions evadeChoices selected=evade}}</select></div>
       <div class="form-group"><label for="pct-evade-penalty">Evasion modifier</label><input id="pct-evade-penalty" type="number" name="evadePenalty" value="{{evadePenalty}}" min="-20" max="20"></div>
-      <div class="form-group"><label for="pct-cover-up" data-cover-up-label>Cover Up</label><input id="pct-cover-up" type="checkbox" name="coverUp" {{checked coverUp}}></div>
+      <div class="form-group"><label for="pct-cover-up" data-cover-up-label>Allow Cover Up Homebrew</label><input id="pct-cover-up" type="checkbox" name="coverUp" {{checked coverUp}}></div>
       <p class="notes">Cover Up: stay in place, become Prone, double armor SP for this damage application, and double armor ablation even if no damage penetrates. RAW explosive evasion must exceed the attack. Shell defense ties avoid the attack.</p>
     </details>
   </div>

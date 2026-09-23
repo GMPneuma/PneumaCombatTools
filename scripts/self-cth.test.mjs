@@ -34,3 +34,10 @@ test('native reroll targets just this combatant, preserves turn and prevents dup
 test('Pneuma HomeBrew is a default-off world setting',()=>{
  fixture();globalThis.Hooks={on(){}};let settings;game.settings.register=(_module,key,value)=>{settings={key,...value};};registerSelfCTH();assert.equal(settings.key,'pneumaHomebrew');assert.equal(settings.name,'Speedware allows Rerolling Initiative');assert.equal(settings.scope,'world');assert.equal(settings.default,false);
 });
+
+test('NPC automation requires opt-in and RAW, never player-owned actors',async()=>{
+ globalThis.FormApplication=class{};const {automaticNPCEvasion}=await import('../dist/scripts/evasion-settings.js');let mode='raw',on=true;
+ globalThis.game={settings:{get:(_m,key)=>key==='npcAutoEvasion'?on:mode}};
+ assert(automaticNPCEvasion({hasPlayerOwner:false}));assert(!automaticNPCEvasion({hasPlayerOwner:true}));
+ for(mode of ['custom','none'])assert(!automaticNPCEvasion({hasPlayerOwner:false}));mode='raw';on=false;assert(!automaticNPCEvasion({hasPlayerOwner:false}));
+});

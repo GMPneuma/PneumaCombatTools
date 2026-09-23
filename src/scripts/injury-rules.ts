@@ -1,5 +1,5 @@
 import {masterStatuses} from "./status-catalog.js";
-import {empDisabled} from "./emp-rules.js";
+import {empReferences,activeDisables} from "./emp-rules.js";
 import {getItemMarkers} from "./item-markers.js";
 /** Read native injury items as well as markers, including the interval before status synchronization. */
 export function hasInjury(actor:Actor,name:string):boolean {
@@ -18,6 +18,6 @@ export function evasionBlocked(actor:Actor):string|undefined {
     &&foundry.utils.getProperty(item,"system.type")==="cyberLeg"
     &&foundry.utils.getProperty(item,"system.isFoundational")===true
     &&(foundry.utils.getProperty(item,"system.isInstalledInActor")??foundry.utils.getProperty(item,"system.isInstalled"))===true
-    &&(empDisabled(item)||!!getItemMarkers(item).disabled)))return "Cannot evade: disabled Cyberleg.";
+    &&(empReferences(item).some(id=>game.combats?.get(id)?.started)||activeDisables(item).some(e=>e.source!=="cyberware-malfunction")||!!getItemMarkers(item).disabled)))return "Cannot evade: disabled Cyberleg.";
   return undefined;
 }

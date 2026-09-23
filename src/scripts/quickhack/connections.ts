@@ -1,7 +1,7 @@
 import { requireCombatSocket } from "../socket-health.js";
 import { MODULE } from "./availability.js";
 import { primaryGM } from "./content.js";
-import { resultFlag } from "./messages.js";
+import { resultFlag, type QuickhackResult } from "./messages.js";
 import { canOperate } from "./rolls.js";
 import { enabled } from "./settings.js";
 import { waitForResult } from "./effects.js";
@@ -9,6 +9,7 @@ import { waitForResult } from "./effects.js";
 export interface Connection {
   id: string; sourceActorUuid: string; targetActorUuid: string; sourceTokenUuid: string; targetTokenUuid: string;
   state: "active" | "ejected" | "disconnected"; connectedAt: number;
+  awareness?: {alerted:boolean; revealAttacker:boolean; jackInDetected:boolean; quickhackDetected:boolean; audience:string};
 }
 const keyFor = (sourceUuid: string, targetUuid: string) => encodeURIComponent(sourceUuid + "|" + targetUuid).replaceAll(".", "%2E");
 export const trackingCombat = () => game.combat?.started ? game.combat : undefined;
@@ -25,7 +26,17 @@ export function resultConnectionValid(source: Actor, result: { combatUuid?: stri
   if (!enabled() || trackingCombat()?.uuid !== result.combatUuid) return false;
   return !result.combatUuid || !!result.connectionId && !!activeConnection(source, result.targetActorUuid, result.connectionId);
 }
-interface ConnectRequest { quickhackType: "connect"; id: string; messageId: string; requesterId: string }
+export function combatConnections(combat = trackingCombat()): Connection[] {
+  return Object.values(foundry.utils.getProperty(combat ?? {}, `flags.${MODULE}.quickhackConnections`) ?? {});
+}
+function mergeAwareness(connection: Connection, result: QuickhackResult) {
+  const old = connection.awareness;
+  return {alerted: !!old?.alerted || result.alerted, revealAttacker: !!old?.revealAttacker || result.alerted && result.revealAttacker,
+    jackInDetected: !!old?.jackInDetected || result.alerted && result.type === "jackIn",
+    quickhackDetected: !!old?.quickhackDetected || result.alerted && result.type === "quickhack",
+    audience: result.alerted ? result.audience : old?.audience ?? result.audience};
+}
+interface ConnectRequest { quickhackType: "connect" | "awareness"; id: string; messageId: string; requesterId: string }
 interface DisconnectRequest { quickhackType: "disconnect"; id: string; requesterId: string; combatUuid: string; sourceUuid: string; targetUuid: string; connectionId: string }
 interface Reply { quickhackType: "connected"; id: string; requesterId: string; gmId: string; error?: string }
 const requests = new Map<string, { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
@@ -41,7 +52,7 @@ async function connect(request: ConnectRequest) {
   if (!primaryGM() || !enabled()) throw new Error("QuickHack is disabled or no active GM is available.");
   const message = await waitForResult(request.messageId);
   const result = message && resultFlag(message);
-  if (!message || !result || result.type !== "jackIn" || message.author?.id !== request.requesterId) throw new Error("Invalid Jack-In result.");
+  if (!message || !result || (request.quickhackType === "connect" ? result.type !== "jackIn" : result.type !== "quickhack") || message.author?.id !== request.requesterId) throw new Error("Invalid Jack-In result.");
   const combat = trackingCombat();
   if (!combat || combat.uuid !== result.combatUuid) throw new Error("Start combat to track QuickHack connections.");
   const actor = await fromUuid(result.sourceActorUuid) as Actor | null;
@@ -49,11 +60,20 @@ async function connect(request: ConnectRequest) {
   if (!actor || !requester || !canOperate(actor, requester)) throw new Error("Jack-In actor is unavailable.");
   await serialized(combat, async () => {
     if (!enabled() || trackingCombat()?.uuid !== combat.uuid) throw new Error("QuickHack is disabled or the encounter changed.");
+    if (request.quickhackType === "awareness") {
+      const connection = activeConnection(actor,result.targetActorUuid,result.connectionId);
+      if (!connection) return;
+      const awareness = mergeAwareness(connection,result);
+      if (!connection.awareness || Object.entries(awareness).some(([key,value])=>connection.awareness?.[key as keyof typeof awareness]!==value))
+        await combat.update({[`flags.${MODULE}.quickhackConnections.${keyFor(actor.uuid,result.targetActorUuid)}.awareness`]:awareness});
+      return;
+    }
     if (isEjected(actor, result.targetActorUuid)) throw new Error("Ejected: cannot Jack In to this target again during this encounter.");
     // Each result can establish a connection only once; old cards never reopen ejected links.
     if (foundry.utils.getProperty(message, `flags.${MODULE}.quickhack.connectionRecorded`)) return;
     const connection: Connection = { id: message.id!, sourceActorUuid: actor.uuid, targetActorUuid: result.targetActorUuid,
       sourceTokenUuid: result.sourceTokenUuid, targetTokenUuid: result.targetTokenUuid, state: "active", connectedAt: Number(message.timestamp) };
+    connection.awareness = mergeAwareness(connection,result);
     const previous = connectionFor(actor, result.targetActorUuid);
     if (previous && previous.id !== connection.id && previous.connectedAt >= connection.connectedAt) return;
     // Encounter-owned state survives reloads without leaking restrictions into a new combat.
@@ -64,7 +84,7 @@ async function connect(request: ConnectRequest) {
 export async function establishConnection(message: ChatMessage) {
   if (!enabled()) return;
   requireCombatSocket();
-  const request: ConnectRequest = { quickhackType: "connect", id: foundry.utils.randomID(), messageId: message.id!, requesterId: game.user!.id };
+  const request: ConnectRequest = { quickhackType: resultFlag(message)?.type === "quickhack" ? "awareness" : "connect", id: foundry.utils.randomID(), messageId: message.id!, requesterId: game.user!.id };
   if (primaryGM()) return connect(request);
   if (!game.users!.some(user => user.active && user.isGM)) throw new Error("An active GM is required to track Jack-In connections.");
   await new Promise<void>((resolve, reject) => {
@@ -111,11 +131,12 @@ export async function jackOut(source: Actor, targetUuid: string) {
   });
 }
 export function registerConnections() {
+
   game.socket!.on(channel, (payload: ConnectRequest | DisconnectRequest | Reply) => {
     if (!payload || !enabled()) return;
     if (payload.quickhackType === "disconnect" && primaryGM()) {
       void disconnect(payload).then(() => sendReply(payload), error => sendReply(payload, String(error)));
-    } else if (payload.quickhackType === "connect" && primaryGM()) {
+    } else if ((payload.quickhackType === "connect" || payload.quickhackType === "awareness") && primaryGM()) {
       void connect(payload).then(() => sendReply(payload), error => sendReply(payload, String(error)));
     } else if (payload.quickhackType === "connected" && payload.requesterId === game.user!.id) {
       const gm = game.users!.filter(user => user.active && user.isGM).sort((a,b) => a.id.localeCompare(b.id))[0];

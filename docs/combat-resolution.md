@@ -1,6 +1,6 @@
 # Combat resolution
 
-Start an attack through Combat Tools with one owned attacker selected and a target. The GM/world **Combat resolution** switch is on by default. Disabling it restores the native attack routing. Paired attack cards are specific to Combat Tools attacks. Native Evasion rolls are nevertheless guarded against Dismembered Leg and disabled installed Cyberlegs.
+Start an attack through Combat Tools with one owned attacker selected and a target. Combat Tools attacks always use the combat chat-card flow; there is no separate Combat resolution toggle. Paired attack cards are specific to Combat Tools attacks. Native Evasion rolls are nevertheless guarded against Dismembered Leg and disabled installed Cyberlegs.
 
 1. Confirm the native attack dialog. Native weapon/ammo handling runs. The attack roll and its dice stay undisplayed while the card awaits a defense choice.
 2. The defender's owner or a GM chooses **Evade** or **Do not Evade** on the attack card.

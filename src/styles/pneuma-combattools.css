@@ -156,7 +156,7 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 
 /* Resolution works with native cards even when visual customization is disabled. */
 .pneuma-defense-controls { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 6px 0 0; }
-.pneuma-defense-controls button { width: 100%; margin: 0; padding: 4px 8px; min-height: 32px; line-height: 1.4; }
+.pneuma-defense-controls button { width: 100%; }
 .pneuma-defense-result { margin-top: 6px; }
 .pneuma-evasion-note { font-weight: bold; padding: 4px; }
 /* Combat exchange structure only; ordinary native chat cards are unchanged. */
@@ -272,8 +272,8 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 /* Apply the icon well to the image too, and override native chat button specificity. */
 .pneuma-combat-message .pneuma-damage-status-slot img,
 #chat-log .chat-message.pneuma-combat-message .pneuma-damage-status-slot {
-  background: var(--pneuma-status-background, #333);
-  border: 1px solid var(--pneuma-status-border, #111); border-radius: 3px; color: #eee;
+  background: var(--pneuma-status-background, var(--pneuma-chat-button-icon-background, #333));
+  border: 1px solid var(--pneuma-status-border, var(--pneuma-chat-button-icon-border, #111)); border-radius: 3px; color: #eee;
 }
 .pneuma-combat-message .pneuma-damage-status-slot img { box-sizing: border-box; }
 #chat-log .chat-message.pneuma-combat-message .pneuma-damage-status-slot:hover,
@@ -298,7 +298,7 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 
 /* Compact Biomonitor HUD. */
 #pneuma-eye-hud { position:fixed; z-index:70; width:min(370px,calc(100vw - 16px)); max-height:calc(100vh - 16px); overflow:auto; box-sizing:border-box; color:#b8efeb; background:linear-gradient(135deg,rgba(5,22,28,.80),rgba(5,12,21,.72)); border:1px solid #487a82; border-left:3px solid #64f1df; border-radius:2px 12px 2px 2px; box-shadow:0 8px 28px #0008,inset 0 0 20px #2ba8ba12; font:12px/1.45 monospace; text-shadow:none; }
-#pneuma-eye-hud .pneuma-eye-header { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 10px; cursor:move; touch-action:none; border-bottom:1px solid #457078; }
+#pneuma-eye-hud .pneuma-eye-header { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 10px; cursor:default; touch-action:auto; border-bottom:1px solid #457078; }
 #pneuma-eye-hud .pneuma-eye-body { max-height:55vh; overflow:auto; padding:0 9px; }
 #pneuma-eye-hud button { font:inherit; color:inherit; box-shadow:none; border-radius:0; margin:0; cursor:pointer; }
 #pneuma-eye-hud .pneuma-eye-condition { display:block; width:100%; padding:6px 0; border:0; border-bottom:1px solid #35515d; background:transparent; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.4; }
@@ -429,7 +429,7 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 .pneuma-aoe-name { flex:1; min-width:60px; overflow-wrap:anywhere; }
 .pneuma-aoe-target img { border:0; object-fit:cover; }
 .pneuma-aoe-response { display:flex; align-items:center; gap:3px; font-size:0.9em; flex-wrap:wrap; }
-.pneuma-aoe-card button[data-aoe-action] { width:26px; height:26px; padding:0; margin:0; line-height:24px; }
+.pneuma-aoe-card button[data-aoe-action] { width:var(--pneuma-chat-button-height,28px); height:var(--pneuma-chat-button-height,28px); padding:0; }
 .pneuma-aoe-card .pneuma-aoe-defense .rollcard-top { display:none; }
 .pneuma-aoe-card { min-width:0; overflow-wrap:anywhere; }
 .pneuma-aoe-actions { display:flex; gap:4px; padding:5px; }
@@ -471,12 +471,12 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 }
 #hud .pneuma-movement-hud .attribute { width:100%; height:auto; margin:0; }
 #hud .pneuma-movement-hud input[type="text"] {
-  width:100%; height:42px; padding:2px 5px; text-align:center; font-size:32px; line-height:36px;
+  width:100%; height:32px; padding:2px 5px; text-align:center; font-size:24px; line-height:28px;
   pointer-events:none;
 }
 #hud .pneuma-movement-hud .pneuma-movement-controls { display:grid; grid-template-columns:1fr 1fr; gap:4px; width:100%; }
 #hud .pneuma-movement-hud .control-icon {
-  box-sizing:border-box; flex:none; width:100%; height:20px; margin:0; padding:0 3px; font-size:11px; line-height:18px; text-align:center;
+  box-sizing:border-box; flex:none; width:100%; height:26px; margin:0; padding:0 3px; font-size:14px; line-height:24px; text-align:center;
   pointer-events:auto; cursor:pointer;
 }
 #hud .pneuma-movement-hud .control-icon[hidden] { display:none; }
@@ -496,7 +496,7 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 /* Ammunition identity and reusable instant-effect controls. */
 .pneuma-aoe-target[style] { border-left: 3px solid var(--pneuma-ammo-color); padding-left: 4px; }
 .pneuma-instant-effect { border-left: 3px solid var(--pneuma-ammo-color); padding: 4px 6px; margin: 3px 0; min-width: 0; overflow-wrap: anywhere; }
-.pneuma-instant-effect button { width: auto; font-size: 11px; line-height: 20px; padding: 0 5px; }
+.pneuma-instant-effect button { width: auto; }
 .pneuma-instant-effect .pneuma-instant-roll, .pneuma-instant-effect .pneuma-instant-damage { min-width: 0; }
 
 /* Approved compact HUD: preserve the three-column monitor; dock statuses inside and private notices outside. */
@@ -542,14 +542,10 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 #pneuma-eye-hud .pneuma-eye-inline-controls { display:flex; align-items:center; gap:3px; flex-shrink:0; padding:0; }
 #pneuma-eye-hud .pneuma-eye-inline-controls .pneuma-eye-button { padding:0 4px; line-height:16px; }
 #pneuma-eye-attachments .pneuma-eye-identity { overflow-wrap:anywhere; text-align:left; color:#b8efeb; font:11px/1.4 monospace; margin-top:3px; text-shadow:0 1px 3px #000; }
-#pneuma-eye-attachments .pneuma-eye-preview-controls { display:flex; flex-wrap:wrap; gap:4px; pointer-events:auto; margin-top:6px; }
-#pneuma-eye-attachments .pneuma-eye-preview-controls button, #pneuma-eye-attachments .pneuma-eye-preview-controls select { width:auto; color:#b8efeb; background:#122c36; border:1px solid #608a90; font:11px/1.4 monospace; }
 
 /* Incoming text travels from screen center without changing the notification layout. */
 #pneuma-eye-attachments .pneuma-eye-notification > :first-child { display:block; transform-origin:center; }
 
-/* Manual dragging is retained in source but inactive while docked. */
-#pneuma-eye-hud.is-docked .pneuma-eye-header { cursor:default; touch-action:auto; }
 
 /* Scan beam rides the revealed edge, then becomes the central collapse line. */
 #pneuma-eye-attachments .pneuma-eye-notification > :first-child { position:relative; }
@@ -572,7 +568,7 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
   margin: 0;
   padding: 4px;
   box-sizing: border-box;
-  background: var(--color-header-background, rgba(0, 0, 0, .5));
+  background: rgba(0, 0, 0, .5);
   border: 1px solid var(--color-border-dark, #333);
   border-radius: 3px;
   box-shadow: 0 0 10px var(--color-shadow-dark, #000);
@@ -609,7 +605,7 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 #pneuma-combat-bar .pneuma-bar-token { display: flex; align-items: center; justify-content: center; width: calc(var(--portrait-size, 40px) + 2px); height: calc(var(--portrait-size, 40px) + 2px); padding: 0; line-height: normal; border: 0; border-radius: 0; }
 #pneuma-combat-bar .pneuma-bar-token img { display: block; width: var(--portrait-size, 40px); height: var(--portrait-size, 40px); max-width: var(--portrait-size, 40px); flex: 0 0 var(--portrait-size, 40px); object-fit: cover; border-radius: 0; margin: 0; }
 #pneuma-combat-bar .pneuma-bar-end { position: absolute; left: calc(100% + 4px); width: 56px; height: 24px; font-size: 11px; line-height: 22px; white-space: nowrap; background: var(--color-header-background, rgba(0, 0, 0, .5)); border: 1px solid var(--color-border-dark, #333); }
-#pneuma-combat-bar footer { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; flex: none; border-top: 1px solid var(--color-border-dark, #333); padding-top: 3px; }
+#pneuma-combat-bar footer { display: grid; grid-template-columns: 23px 23px; gap: 2px; flex: none; align-self: flex-start; margin: 0; padding: 0; border: 0; background: transparent; order: 3; }
 #pneuma-combat-bar footer button { display: flex; align-items: center; justify-content: center; justify-self: center; width: 23px; height: 24px; font-size: 13px; line-height: 1; }
 #pneuma-combat-bar footer i { pointer-events: none; margin: 0; line-height: 1; }
 #pneuma-combat-bar button[aria-pressed="true"] { color: var(--color-border-highlight, #ff6400); border-color: currentColor; }
@@ -631,14 +627,279 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 /* Personal layout controls stay available to players and outside combat. */
 #pneuma-combat-bar .pneuma-bar-display { display: flex; justify-content: center; gap: 2px; flex: none; }
 #pneuma-combat-bar .pneuma-bar-display button { width: 20px; height: 18px; line-height: 16px; font-size: 13px; }
-#pneuma-combat-bar header { flex-direction: column; align-items: center; }
-#pneuma-combat-bar header button { width: calc(var(--portrait-size, 40px) + 4px); height: 18px; line-height: 16px; }
+#pneuma-combat-bar header { flex-direction: row; align-items: center; order: 0; }
+#pneuma-combat-bar ol { order: 1; }
+#pneuma-combat-bar .pneuma-bar-display { order: 2; align-self: flex-start; }
+#pneuma-combat-bar header button { width: calc((var(--portrait-size, 40px) + 2px) / 2); height: 18px; line-height: 16px; }
 #pneuma-combat-bar[data-orientation="horizontal"] { flex-direction: row; align-items: center; width: max-content; }
-#pneuma-combat-bar[data-orientation="horizontal"] .pneuma-bar-display { flex-direction: column; }
-#pneuma-combat-bar[data-orientation="horizontal"] header { gap: 0; }
+#pneuma-combat-bar.is-gm:not(.is-minimized) { min-width: 58px; }
+#pneuma-combat-bar[data-orientation="horizontal"] footer { order: 0; align-self: flex-end; }
+#pneuma-combat-bar[data-orientation="horizontal"] .pneuma-bar-display { order: 1; flex-direction: column; align-self: flex-end; }
+#pneuma-combat-bar[data-orientation="horizontal"] ol { order: 2; }
+#pneuma-combat-bar[data-orientation="horizontal"] header { order: 3; flex-direction: column; gap: 0; align-self: flex-start; }
 #pneuma-combat-bar[data-orientation="horizontal"] header button { width: 22px; height: 18px; }
 #pneuma-combat-bar[data-orientation="horizontal"] ol { display: flex; gap: 4px; min-width: 0; overflow-x: auto; overflow-y: hidden; padding: 2px; }
 #pneuma-combat-bar[data-orientation="horizontal"] li.combatant { flex: none; margin: 0; }
-#pneuma-combat-bar[data-orientation="horizontal"] footer { border-top: 0; border-left: 1px solid var(--color-border-dark, #333); padding-top: 0; padding-left: 3px; }
-#pneuma-combat-bar.is-minimized { width: 30px; }
-#pneuma-combat-bar.is-minimized.is-gm { width: max-content; }
+
+#pneuma-combat-bar.is-minimized { width: max-content; min-width: 30px; }
+#pneuma-combat-bar.is-minimized.is-gm { width: max-content; min-width: 58px; }
+
+#token-hud .pneuma-self-thrown { position:absolute; left:calc(100% + 8px); top:0; width:240px; max-height:60vh; overflow:auto; padding:6px; pointer-events:all; }
+#token-hud .pneuma-self-thrown[hidden] { display:none; }
+#token-hud .pneuma-self-thrown button { display:block; width:100%; text-align:left; }
+
+
+/* Third native Players state: retain the heading as the restore control. */
+#players.pneuma-players-minimized ol { display: none; }
+#players h3:has(.pneuma-players-mode) .players-mode { display: none; }
+#players h3 .pneuma-players-mode { float: right; font-size: 10px; font-weight: normal; margin-left: 6px; }
+#players h3[role="button"]:focus-visible { outline: 1px solid var(--color-border-highlight, #ff6400); outline-offset: 1px; }
+
+#pneuma-combat-bar-settings .pneuma-bar-settings-body { max-height: 65vh; overflow-y: auto; padding-right: 4px; }
+#pneuma-combat-bar-settings .form-group { margin-bottom: 1rem; }
+#pneuma-combat-bar-settings .form-group > label { line-height: 1.25; }
+#pneuma-combat-bar-settings .sheet-footer { margin-top: 8px; }
+
+#pneuma-emp-settings .pneuma-emp-settings-body { max-height:70vh; overflow:auto; }
+#pneuma-emp-settings fieldset { margin:0 0 10px; }
+#pneuma-emp-settings [hidden] { display:none; }
+#pneuma-emp-settings .sheet-footer { margin-top:8px; }
+
+#pneuma-combat-bar .pneuma-bar-initiative { flex-direction: row; align-items: center; gap: 4px; }
+#pneuma-combat-bar .pneuma-bar-initiative button { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; font-size: 14px; }
+/* Combat Tools owns the status colors of its persistent Crew HUD shortcut. */
+#pneuma-eye-hud.is-minimized.is-integrated-mini { width:124px; }
+#pneuma-biomon-shortcut { display:flex; align-items:center; justify-content:center; width:34px; height:26px; min-height:0; margin:0; padding:0; border:0; background:none; box-shadow:none; color:#b8efeb; font-size:20px; line-height:1; cursor:pointer; }
+#pneuma-biomon-shortcut i { margin:0; }
+#pneuma-biomon-shortcut[data-state=wounded] { color:#ead56c; }
+#pneuma-biomon-shortcut[data-state=serious] { color:#ffa455; }
+#pneuma-biomon-shortcut:is([data-state=critical],[data-state=flatline]) { color:#ff6262; }
+#pneuma-biomon-shortcut.has-alert { color:#ffb45f; }
+#pneuma-biomon-shortcut:focus-visible { outline:1px solid currentColor; }
+
+/* Flash-only API alerts never occupy the dismissible HUD queue. */
+.pneuma-hud-flashes { position:fixed; z-index:100; left:50%; top:50%; transform:translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; gap:16px; pointer-events:none; }
+.pneuma-hud-flash { width:max-content; max-width:calc(100vw - 48px); color:#ffb45f; font:bold 28px/1.4 monospace; text-align:center; overflow-wrap:anywhere; text-shadow:0 0 8px #ff8a2477; pointer-events:none; }
+
+/* Integrated EKG stays at its selected dock; messages follow below, clear control first. */
+#pneuma-eye-attachments.is-integrated .pneuma-eye-notifications { text-align:left; }
+#pneuma-eye-attachments.is-integrated .pneuma-eye-notification { justify-content:flex-start; }
+#pneuma-eye-attachments.is-integrated .pneuma-eye-notification > :first-child { min-width:0; text-align:left; overflow-wrap:anywhere; }
+#pneuma-eye-attachments.is-integrated .pneuma-eye-notification > :last-child { order:-1; flex-shrink:0; }
+
+/* Shared solid heart + foreground bell, with transparent crack and separation. */
+.pneuma-biomon-icon { display:inline-block; width:26px; height:26px; flex:0 0 26px; vertical-align:middle; background:currentColor; mask:url("icons/biomon-alert.svg") center / contain no-repeat; }
+
+/* Manual rolls retain native roll-card internals and shared damage effect slots. */
+.pneuma-manual-controls { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:6px; }
+.pneuma-manual-controls > button { width:auto; flex:1 1 auto; }
+.pneuma-manual-controls .pneuma-damage-status-effects { display:flex; gap:3px; }
+.pneuma-group-rows { list-style:none; padding:0; margin:0; }
+.pneuma-group-rows > li { display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:6px; padding:5px 0; border-bottom:1px solid #7775; }
+.pneuma-group-details { grid-column:1 / -1; }
+.pneuma-group-details[hidden] { display:none; }
+.pneuma-group-total { cursor:pointer; }
+.pneuma-group-total:focus-visible { outline:1px solid currentColor; }
+.pneuma-group-outcome[data-outcome="success"], .pneuma-stat-result[data-stat-outcome="success"] strong { color:var(--pneuma-chat-success,#287a35); font-weight:bold; }
+.pneuma-group-outcome[data-outcome="fail"], .pneuma-stat-result[data-stat-outcome="fail"] strong { color:var(--pneuma-chat-failure,#b52020); font-weight:bold; }
+.pneuma-group-action button { width:auto; margin:0; }
+.pneuma-group-player { display:flex; align-items:center; gap:6px; }
+[data-pneuma-manual-rolls] { cursor:pointer; }
+
+.pneuma-half-armor { width: auto; }
+
+
+/* Chat dice menu: same dark surface and restrained accent as the combat flyouts. */
+.pneuma-roll-flyout { position:fixed; z-index:10000; width:210px; max-width:calc(100vw - 16px); max-height:calc(100vh - 16px); overflow:auto; padding:5px; border:1px solid #777; border-radius:5px; background:rgba(18,22,24,.97); box-shadow:0 3px 14px #0009; color:#eee; }
+.pneuma-roll-flyout button { display:flex; align-items:center; gap:10px; width:100%; margin:0; padding:8px 10px; border:0; border-radius:3px; background:transparent; color:inherit; text-align:left; line-height:20px; }
+.pneuma-roll-flyout button:hover,.pneuma-roll-flyout button:focus-visible { background:#ffffff18; outline:1px solid #79bdbc; box-shadow:none; }
+.pneuma-roll-flyout i { width:18px; text-align:center; color:#a8d8d6; }
+.pneuma-roll-flyout small { margin-left:auto; color:#aaa; font-size:10px; }
+.pneuma-roll-dialog .pneuma-manual-form { display:flex; flex-direction:column; gap:12px; padding:4px 2px 12px; }
+.pneuma-roll-dialog .form-group { display:flex; flex-direction:column; align-items:stretch; gap:4px; margin:0; }
+.pneuma-roll-dialog .form-group > label { flex:0 0 auto; font-weight:600; }
+.pneuma-roll-dialog .form-fields { width:100%; }
+.pneuma-roll-dialog .form-fields > input,.pneuma-roll-dialog .form-fields > select { width:100%; min-width:0; height:30px; }
+.pneuma-roll-pair { display:grid; grid-template-columns:1fr 1fr; align-items:end; gap:12px; }
+.pneuma-roll-checks { display:flex; flex-direction:column; gap:6px; padding-top:3px; border-top:1px solid #8885; }
+.pneuma-roll-check { display:flex; align-items:center; gap:6px; min-height:30px; }
+.pneuma-roll-check input,.pneuma-roll-dialog .pneuma-group-player input { flex:0 0 auto; margin:0; }
+.pneuma-roll-dialog .pneuma-roll-hint { font-size:12px; opacity:.8; margin:0; line-height:1.4; }
+.pneuma-roll-dialog .pneuma-roll-character { margin:0; font-weight:bold; }
+.pneuma-roll-dialog fieldset { margin:0; padding:8px; max-height:240px; overflow:auto; border:1px solid #8885; }
+.pneuma-roll-dialog .pneuma-group-player { min-height:30px; }
+
+.pneuma-manual-card .pneuma-group-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:6px 8px; }
+.pneuma-group-heading > :first-child { min-width:0; overflow-wrap:anywhere; }
+.pneuma-group-heading .pneuma-group-dv { flex:0 0 auto; margin:0; font-size:12px; }
+
+/* Shared chat-button skin tokens. Override these, not workflow selectors. */
+:root {
+  --pneuma-chat-button-background: var(--color-bg-option, #e3e3df);
+  --pneuma-chat-button-color: var(--color-text-primary, #242829);
+  --pneuma-chat-button-border: var(--color-border-dark-tertiary, #777);
+  --pneuma-chat-button-hover-background: var(--color-bg-option, #e3e3df);
+  --pneuma-chat-button-hover-color: var(--color-text-primary, #242829);
+  --pneuma-chat-button-focus: #398b91;
+  --pneuma-chat-button-selected: #303030;
+  --pneuma-chat-button-selected-border: #b52020;
+  --pneuma-chat-button-selected-color: #fff;
+  --pneuma-chat-button-recovery-border: #a86b13;
+  --pneuma-chat-button-cancel-border: #b52020;
+  --pneuma-chat-button-icon-background: #333;
+  --pneuma-chat-button-icon-color: #eee;
+  --pneuma-chat-button-icon-border: #111;
+  --pneuma-chat-button-height: 28px;
+  --pneuma-chat-button-font-size: 13px;
+  --pneuma-chat-button-font-weight: 500;
+  --pneuma-chat-button-line-height: 18px;
+  --pneuma-chat-button-padding: 4px 8px;
+  --pneuma-chat-button-margin: 2px;
+  --pneuma-chat-button-gap: 5px;
+  --pneuma-chat-button-border-width: 1px;
+  --pneuma-chat-button-radius: 3px;
+  --pneuma-chat-button-disabled-opacity: .55;
+  --pneuma-chat-button-complete-opacity: .8;
+  --pneuma-chat-button-hover-shadow: inset 0 0 0 1px currentColor;
+  --pneuma-chat-button-focus-width: 2px;
+  --pneuma-chat-button-focus-offset: 2px;
+  --pneuma-chat-button-state-icon-size: 16px;
+  --pneuma-chat-button-spinner-size: 12px;
+  --pneuma-chat-button-spinner-width: 2px;
+  --pneuma-chat-button-spinner-track: #888;
+  --pneuma-chat-button-spinner-color: #222;
+  --pneuma-chat-button-transition-time: .12s;
+  --pneuma-chat-success: #287a35;
+  --pneuma-chat-failure: #b52020;
+}
+/* These state-invariant metrics defeat theme hover rules that otherwise move controls. */
+.pneuma-chat-button.pneuma-chat-button {
+  --pct-button-bg: var(--pneuma-chat-button-background);
+  --pct-button-ink: var(--pneuma-chat-button-color);
+  --pct-button-border: var(--pneuma-chat-button-border);
+  display:inline-flex !important; align-items:center !important; justify-content:center !important; gap:var(--pneuma-chat-button-gap) !important;
+  width:auto !important; min-width:0 !important; max-width:100% !important; font-style:normal !important; white-space:normal !important;
+  box-sizing:border-box !important; position:relative !important; inset:auto !important;
+  min-height:var(--pneuma-chat-button-height) !important; height:auto !important;
+  padding:var(--pneuma-chat-button-padding) !important; margin:var(--pneuma-chat-button-margin) !important;
+  border:var(--pneuma-chat-button-border-width) solid var(--pct-button-border) !important; border-radius:var(--pneuma-chat-button-radius) !important;
+  font-family:var(--pneuma-chat-button-font-family, inherit) !important; font-size:var(--pneuma-chat-button-font-size) !important;
+  font-weight:var(--pneuma-chat-button-font-weight) !important; line-height:var(--pneuma-chat-button-line-height) !important;
+  letter-spacing:normal !important; text-indent:0 !important; text-decoration:none !important;
+  color:var(--pct-button-ink) !important; background:var(--pct-button-bg) !important;
+  transform:none !important; scale:1 !important; translate:none !important; animation:none !important;
+  transition:background-color var(--pneuma-chat-button-transition-time),color var(--pneuma-chat-button-transition-time),border-color var(--pneuma-chat-button-transition-time),box-shadow var(--pneuma-chat-button-transition-time) !important;
+  text-shadow:none !important; box-shadow:none !important; cursor:pointer;
+}
+.pneuma-chat-button.pneuma-chat-button:hover:not(:disabled):not([aria-disabled="true"]),
+.pneuma-chat-button.pneuma-chat-button:focus-visible { box-shadow:var(--pneuma-chat-button-hover-shadow) !important; }
+.pneuma-chat-button[data-chat-kind="action"]:hover:not(:disabled):not([aria-disabled="true"]) { --pct-button-bg:var(--pneuma-chat-button-hover-background); --pct-button-ink:var(--pneuma-chat-button-hover-color); }
+.pneuma-chat-button.pneuma-chat-button:focus-visible { outline:var(--pneuma-chat-button-focus-width) solid var(--pneuma-chat-button-focus) !important; outline-offset:var(--pneuma-chat-button-focus-offset) !important; }
+.pneuma-chat-button.pneuma-chat-icon { flex:0 0 var(--pneuma-chat-button-height) !important; width:var(--pneuma-chat-button-height) !important; min-width:var(--pneuma-chat-button-height) !important; height:var(--pneuma-chat-button-height) !important; padding:0 !important; }
+.pneuma-chat-button > i { margin:0 !important; transform:none !important; transition:none !important; }
+.pneuma-chat-button[data-chat-kind="toggle"]::before { content:"☐"; display:inline-block; width:var(--pneuma-chat-button-state-icon-size); flex:0 0 var(--pneuma-chat-button-state-icon-size); font-size:var(--pneuma-chat-button-state-icon-size); text-align:center; }
+.pneuma-chat-button[data-chat-kind="toggle"][aria-pressed="true"] { --pct-button-bg:var(--pneuma-chat-button-selected); --pct-button-ink:var(--pneuma-chat-button-selected-color); --pct-button-border:var(--pneuma-chat-button-selected-border); }
+.pneuma-chat-button[data-chat-kind="toggle"][aria-pressed="true"]::before { content:"☑"; }
+.pneuma-chat-button[data-chat-kind="recovery"] { --pct-button-border:var(--pneuma-chat-button-recovery-border); }
+.pneuma-chat-button[data-chat-kind="cancel"] { --pct-button-border:var(--pneuma-chat-button-cancel-border); }
+.pneuma-chat-button.pneuma-damage-status-slot { --pct-button-bg:var(--pneuma-status-background,var(--pneuma-chat-button-icon-background)); --pct-button-ink:var(--pneuma-chat-button-icon-color); --pct-button-border:var(--pneuma-status-border,var(--pneuma-chat-button-icon-border)); }
+.pneuma-chat-button.pneuma-chat-button:is(:disabled,[aria-disabled="true"]) { opacity:var(--pneuma-chat-button-disabled-opacity); cursor:default; }
+.pneuma-chat-button.pneuma-chat-complete { opacity:var(--pneuma-chat-button-complete-opacity) !important; }
+.pneuma-chat-complete::before { content:"✓"; }
+.pneuma-chat-complete.pneuma-chat-icon > * { display:none; }
+/* Busy feedback overlays the existing footprint; labels and layout remain intact. */
+.pneuma-chat-button.pneuma-chat-busy { color:transparent !important; opacity:var(--pneuma-chat-button-complete-opacity) !important; }
+.pneuma-chat-busy > * { visibility:hidden; }
+.pneuma-chat-busy::after { content:""; position:absolute; width:var(--pneuma-chat-button-spinner-size); height:var(--pneuma-chat-button-spinner-size); top:50%; left:50%; margin:calc(var(--pneuma-chat-button-spinner-size) / -2 - var(--pneuma-chat-button-spinner-width)); border:var(--pneuma-chat-button-spinner-width) solid var(--pneuma-chat-button-spinner-track); border-top-color:var(--pneuma-chat-button-spinner-color); border-radius:50%; animation:pneuma-chat-spin .8s linear infinite; }
+@keyframes pneuma-chat-spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) { .pneuma-chat-busy::after { animation:none; } }
+
+.pneuma-chat-action-icon { flex:0 0 var(--pneuma-chat-button-state-icon-size); width:var(--pneuma-chat-button-state-icon-size); text-align:center; }
+
+.pneuma-custom-dice { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); gap:10px; align-items:end; margin-bottom:8px; }
+.pneuma-custom-dice label { display:flex; flex-direction:column; gap:4px; }
+.pneuma-custom-dice input { width:100%; height:30px; text-align:center; }
+.pneuma-custom-dice > span { line-height:30px; }
+
+.pneuma-roll-modes .pneuma-roll-hint { margin-left:22px; margin-bottom:8px; }
+.pneuma-custom-roll:disabled { opacity:.5; }
+
+.pneuma-armor-controls { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(0,1fr); align-items:stretch; gap:var(--pneuma-chat-button-gap); --pneuma-chat-button-padding:4px; --pneuma-chat-button-margin:2px 0; --pneuma-chat-button-font-size:12px; }
+.pneuma-armor-controls > button { min-width:0; width:100%; }
+
+/* Native attack form: scroll inputs independently of Confirm/Cancel. */
+.pneuma-attack-dialog.window-app { max-height:calc(100vh - 16px); }
+.pneuma-attack-dialog .window-content { display:flex; flex-direction:column; min-height:0; overflow:hidden !important; }
+.pneuma-attack-dialog form.dialog-sheet { display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden; }
+.pneuma-attack-dialog .pneuma-attack-dialog-body { flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden; padding-right:4px; }
+.pneuma-attack-dialog .dialog-footer { flex:0 0 auto; margin-top:6px; }
+.pneuma-attack-dialog .dialog-grid { flex:0 0 auto; height:auto; max-height:none; overflow:visible; }
+.pneuma-attack-dialog .pneuma-additional-mods-row { flex-wrap:wrap; align-items:center; }
+.pneuma-attack-dialog input[name="additionalMods"] { border:1px solid var(--color-border-dark-tertiary,#777) !important; border-radius:3px; background:var(--color-bg-option,#fff8) !important; padding:3px 6px; height:28px; text-align:left; }
+.pneuma-attack-dialog .pneuma-modifier-hint { flex:0 0 100%; margin:3px 0 5px; font-size:12px; line-height:1.3; opacity:.8; white-space:normal; }
+.pneuma-attack-dialog .pneuma-improvised-damage-choice > label { display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; }
+.pneuma-attack-dialog .pneuma-improvised-damage-choice select { flex:0 0 auto; min-width:130px; }
+.pneuma-attack-dialog .pneuma-unaware-choice > label { display:flex; align-items:center; gap:6px; padding:4px 0; }
+.pneuma-attack-dialog .pneuma-unaware-choice input { margin:0; flex:0 0 auto; }
+
+#pneuma-eye-hud .pneuma-eye-lamp[data-kind=intrusion] { --lamp:#e1a0ff; position:relative; }
+#pneuma-eye-hud .pneuma-eye-lamp .pneuma-intrusion-bolt { position:absolute; top:14px; left:calc(50% + 6px); font-size:13px; line-height:16px; color:#ffe16b; text-shadow:0 0 3px #000; }
+#pneuma-neural-glitch { position:fixed; inset:0; pointer-events:none; z-index:10000; overflow:hidden; }
+#pneuma-neural-glitch > div { position:absolute; left:0; right:0; height:6vh; pointer-events:none; background:repeating-linear-gradient(0deg,#ba80ff55 0 3px,#73eceb55 3px 5px,transparent 5px 9px); border-top:3px solid #73ecebcc; border-bottom:2px solid #ba80ffaa; backdrop-filter:hue-rotate(90deg) contrast(1.8) saturate(1.8); animation:pneuma-neural-glitch 1800ms steps(4,end) both; }
+@keyframes pneuma-neural-glitch { 0%,100% { opacity:0; transform:translateX(0); } 10%,45%,80% { opacity:.95; transform:translateX(18px); } 25%,60%,90% { opacity:.7; transform:translateX(-14px); } }
+@media (prefers-reduced-motion:reduce) { #pneuma-neural-glitch { display:none; } }
+
+/* Floating status actions share CTH panel styling without inheriting large HUD icons. */
+.pneuma-status-actions { position:fixed; z-index:10000; width:max-content; max-width:min(320px,calc(100vw - 16px)); max-height:calc(100vh - 16px); overflow:auto; box-sizing:border-box; font-family:var(--font-primary, sans-serif); }
+.pneuma-status-actions button { display:flex; align-items:center; gap:6px; width:100%; min-height:28px; margin:0; padding:4px; border:0; border-radius:2px; background:transparent; color:inherit; font:inherit; line-height:1.3; text-align:left; box-shadow:none; transform:none; }
+.pneuma-status-actions button > i { flex:0 0 16px; font-size:14px; line-height:18px; text-align:center; margin:0; }
+.pneuma-status-actions button > span { overflow-wrap:anywhere; }
+.pneuma-status-actions button:hover,.pneuma-status-actions button:focus-visible { background:#ffffff18; outline:1px solid #ffffff55; box-shadow:none; transform:none; }
+
+#pneuma-combat-bar ol { scrollbar-width:thin; }
+#pneuma-combat-bar ol::-webkit-scrollbar { display:block; width:5px; height:5px; }
+#pneuma-combat-bar ol::-webkit-scrollbar-thumb { background:#8888; border-radius:3px; }
+#pneuma-combat-bar[data-dock="top-right"] footer { order:0; align-self:flex-end; }
+#pneuma-combat-bar[data-dock="top-right"] .pneuma-bar-display { order:1; align-self:flex-end; }
+#pneuma-combat-bar[data-dock="top-right"] ol { order:2; }
+#pneuma-combat-bar[data-dock="top-right"] header { order:3; }
+#pneuma-combat-bar[data-dock="top-right"][data-orientation="horizontal"] { flex-direction:row-reverse; }
+#pneuma-combat-bar[data-dock="top-right"][data-orientation="horizontal"] footer,
+#pneuma-combat-bar[data-dock="top-right"][data-orientation="horizontal"] .pneuma-bar-display { align-self:flex-start; }
+
+.pneuma-damage-targets { margin:6px 0; font-size:12px; }
+.pneuma-damage-target-history { margin:2px 0; padding-left:20px; }
+.pneuma-damage-target-history li { overflow-wrap:anywhere; }
+
+.pneuma-damage-status-picker { max-height:min(440px,60vh); }
+.pneuma-effect-category { border-top:1px solid #8885; margin-top:4px; }
+.pneuma-effect-category summary { cursor:pointer; padding:7px 4px; font-weight:bold; }
+.pneuma-effect-category summary > span { float:right; font-weight:normal; opacity:.65; }
+.pneuma-effect-category .pneuma-damage-status-choice { padding:4px 8px; margin:0; min-height:28px; }
+.pneuma-effect-category .pneuma-damage-status-choice:hover { background:#8882; }
+.pneuma-effect-category .pneuma-damage-status-choice:has(input:disabled) { opacity:.5; }
+
+/* Combat bar placement shares native saved fields in both settings windows. */
+.pneuma-bar-positions { display: grid; grid-template-columns: 1fr; gap: 5px; flex: 2; }
+.pneuma-bar-positions label { display: flex; align-items: center; gap: 6px; font-weight: normal; cursor: pointer; }
+.pneuma-bar-positions input[type="radio"] { flex: 0 0 auto; margin: 0; }
+.pneuma-combat-settings [hidden], .pneuma-bar-settings-body [hidden] { display: none !important; }
+
+/* Settings use available width instead of native equal-width label columns. */
+.pneuma-combat-settings .form-group { gap: 6px 12px; }
+.pneuma-combat-settings .form-group > label { flex: 1 1 260px; min-width: 0; overflow-wrap: normal; word-break: normal; }
+.pneuma-combat-settings .form-group > input[type="checkbox"] { flex: 0 0 20px; margin-left: auto; }
+.pneuma-combat-settings .form-group > .notes { flex: 0 0 100%; margin-top: 0; }
+.pneuma-combat-settings .form-group > .form-fields { flex: 1 1 240px; min-width: 0; }
+.pneuma-combat-settings .pneuma-evasion-controls > button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; height: 28px; line-height: normal; padding: 0 8px; }
+.pneuma-combat-settings .pneuma-evasion-controls > button > i { flex: 0 0 auto; margin: 0; }
+#pneuma-custom-statuses .pneuma-custom-status-row { grid-template-columns: minmax(0,1fr) minmax(0,1.5fr) 32px 32px; align-items: end; gap: 8px; padding: 10px 0; border-bottom: 1px solid #8885; }
+#pneuma-custom-statuses .pneuma-custom-status-row label { display: grid; gap: 4px; min-width: 0; font-size: 12px; }
+#pneuma-custom-statuses .pneuma-custom-status-row input { width: 100%; min-width: 0; }
+#pneuma-custom-statuses .pneuma-custom-status-row button { height: 28px; margin: 0; }
+#pneuma-custom-statuses .pneuma-custom-status-rows { max-height: 55vh; overflow-y: auto; margin-bottom: 10px; }
+#pneuma-custom-statuses footer { display: flex; gap: 8px; margin-top: 12px; }
+#pneuma-quickhack-settings fieldset { margin: 0 0 12px; padding: 10px; }
+#pneuma-quickhack-settings legend { font-weight: bold; }
+#pneuma-quickhack-settings .form-group { display: grid; grid-template-columns: minmax(0,1fr) minmax(180px,1fr); gap: 10px; margin: 8px 0; }
+#pneuma-quickhack-settings select { width: 100%; }

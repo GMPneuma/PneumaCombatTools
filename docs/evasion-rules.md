@@ -37,3 +37,7 @@ Earlier draft settings are hidden and retained. Until this form is first saved, 
 ## Deferred implementation
 
 The initial implementation is documented in [combat resolution](combat-resolution.md), including qualification limits, GM coordination, outside-combat behavior and rewind handling. Live Foundry verification remains pending.
+
+## Automatic NPC evasion (unreleased)
+
+Optional world setting, off by default. Only actors without player owners qualify, and only while evasion eligibility is RAW. Uses the same native skill calculation and existing claim/commit flow, with no GM modifier dialog and no LUCK spending. Ineligible targets remain manual. AoE also requires its saved RAW eligibility, zero evasion penalty, no movement cost/borrowing and no Cover Up; suppressive-fire Concentration stays manual. Successful AoE evaders still require GM placement outside the blast. Homebrew settings disable automation at runtime.

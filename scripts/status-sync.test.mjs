@@ -132,3 +132,17 @@ test("editing a status ID removes the old injury binding",async()=>{
  effect.statuses=new Set(["custom"]);hooks.updateActiveEffect(effect,{statuses:["custom"]},{},"gm");
  await syncActorStatuses(actor);assert.equal(actor.items.size,0);assert.equal(actor.effects.size,1);
 });
+
+test('passive sync coalesces but explicit remove/add operations retain order',async()=>{
+ const actor=setup();await actor.createEmbeddedDocuments('Item',[{name:'Broken Leg',type:'criticalInjury',effects:[]}]);
+ const a=syncActorStatuses(actor),b=syncActorStatuses(actor);assert.equal(a,b);await a;
+ await Promise.all([syncActorStatuses(actor,[leg.id],false,false),syncActorStatuses(actor,[leg.id],false,true)]);
+ assert.equal(actor.items.size,1);assert.equal(actor.effects.size,1);
+});
+test('unrelated effects and cosmetic item updates skip reconciliation',async()=>{
+ const actor=setup();let scans=0;const iterator=actor.items[Symbol.iterator].bind(actor.items);actor.items[Symbol.iterator]=()=>{scans++;return iterator();};
+ const hooks={};globalThis.Hooks={on:(h,f)=>(hooks[h]??=[]).push(f),once:()=>{}};registerStatusSync();
+ const item=new Item({type:'drug',name:'Stim'},actor),effect=new Effect({name:'Unrelated',statuses:['prone']},actor);
+ hooks.updateItem[0](item,{img:'new.png'},{});hooks.updateActiveEffect[0](effect,{disabled:true},{});
+ await new Promise(resolve=>setTimeout(resolve,0));assert.equal(scans,0);
+});

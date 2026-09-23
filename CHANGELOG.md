@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.0 - 2026-09-23
+
+- Expand combat bar docking, portrait sizes, scrolling, native initiative controls, and shared settings; add minimized Players-list mode.
+- Refine Biomonitor placement, Crew Tools HUD integration, notifications, and status actions. Add detected Neural Intrusion, netrunner ejection, and prominent optional screen glitches for visual tuning.
+- Add configurable EMP selection, cyberware disablement, hardened/BioWare eligibility, and internal-frame behavior.
+- Connect additional QuickHack effects and injury workflows; add self-HUD grapple actions and injury reminders.
+- Add manual damage, critical injury, group skill, STAT, standard Cyberpunk, and custom dice rolls through the chat-roll menu.
+- Unify damage application controls and persistent selected-target receipts; add armor interaction and half-SP controls.
+- Organize Add Effects into collapsible categories, excluding addictions and wounded statuses; standardize chat buttons.
+- Reorganize module settings and improve native attack dialogs, custom statuses, and QuickHack message configuration. Remove the HUD test mode.
+- Reduce duplicate validation and status refreshes; keep connection awareness on encounter state and scope timed-effect expiration to turn/round boundaries.
+
+Validation: production build, automated regressions, and browser fixtures. Live Foundry multiplayer verification remains separate. Jack-In tracking requires a started combat. Screen glitches remain deliberately amplified pending visual tuning.
+
 ## 0.5.5 - 2026-09-21
 
 - Add a compact floating combat bar above Players with square actor artwork, native combatant visibility and active-turn highlighting.

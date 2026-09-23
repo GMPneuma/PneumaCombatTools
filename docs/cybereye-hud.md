@@ -47,7 +47,7 @@ The HUD is pinned 8px from the top and 8px left of Foundry's right sidebar, incl
 
 The minimize button sits beside **Implant Integrity**. The displayed character name stays below the relevant expanded or minimized view. Use **Status HUD** in settings, or the bell on your own token's HUD, to toggle the display.
 
-**Test status HUD** shows sample conditions, lights and notifications without changing actors. **End test** returns to live data. HUD size, HP display and other presentation preferences are available in module settings.
+HUD size, HP display and other presentation preferences are available in module settings.
 
 ## Verification
 

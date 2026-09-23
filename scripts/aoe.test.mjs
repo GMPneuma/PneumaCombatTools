@@ -305,3 +305,19 @@ test("leg injury blocks shell/blast evasion and late commits, but leaves Concent
   await assert.rejects(f.request("commit",{nonce:"n",total:30,html:"defense"}),/Cannot evade/);await f.request("release",{nonce:"n"});
  }
 });
+
+test('automatic area defense skips all dialogs, rolls NPCs once and retains manual escape placement',async()=>{
+ const {automateArea}=await import('../dist/scripts/aoe/workflow.js');const f=fixture();
+ game.settings.get=(_m,k)=>k==='areaSettings'?defaults:k==='npcAutoEvasion'?true:k==='evasionEligibility'?'raw':k==='rollMode'?'roll':false;
+ await startAreaAttack(f.source,f.target,'w','attack');const message=game.messages[0];let rolls=0;
+ for(const token of canvas.tokens.placeables){token.actor.hasPlayerOwner=false;token.actor.items.push({id:'evade',type:'skill',name:'Evasion',createRoll(){return {luck:0,rollCard:'native',resultTotal:30,handleRollDialog(){throw Error('Unexpected GM dialog')},async roll(){rolls++},wasCritical(){return false}}},async confirmRoll(r){return r}});}
+ await Promise.all([automateArea(message),automateArea(message)]);const data=message.flags[M].aoe;assert(rolls>0);assert(data.rows.every(r=>r.state==='miss'));assert(data.rows.every(r=>!r.moved));const n=rolls;await automateArea(message);assert.equal(rolls,n);
+});
+test('homebrew area defense settings and player ownership prevent NPC automation',async()=>{
+ const {automateArea}=await import('../dist/scripts/aoe/workflow.js');
+ for(const changed of [{evade:'everyone'},{evadePenalty:-1},{evadeMove:true},{evadeBorrow:true},{coverUp:true},{player:true}]){
+  const f=fixture();game.settings.get=(_m,k)=>k==='areaSettings'?{...defaults,...changed}:k==='npcAutoEvasion'?true:k==='evasionEligibility'?'raw':k==='rollMode'?'roll':false;
+  await startAreaAttack(f.source,f.target,'w','attack');for(const token of canvas.tokens.placeables)token.actor.hasPlayerOwner=!!changed.player;
+  const message=game.messages[0];await automateArea(message);assert(message.flags[M].aoe.rows.every(r=>r.state==='waiting'));
+ }
+});

@@ -1,3 +1,4 @@
+globalThis.Hooks ??= {once(){},on(){}};
 import assert from "node:assert/strict";
 import { test } from "node:test";
 globalThis.FormApplication = class {};
@@ -237,7 +238,7 @@ test("CTH eject menu needs awareness, current active connection and target owner
  f.target.testUserPermission=()=>false;game.user.isGM=false;
  assert.equal(forceOutEntries(f.target).length,0);
  game.user.isGM=true;f.target.testUserPermission=()=>true;
- const result=f.cards[0].flags[MODULE].quickhack;result.alerted=false;
+ const result=connectionFor(f.source,f.target.uuid).awareness;result.alerted=false;
  assert.equal(forceOutEntries(f.target).length,0);
  result.alerted=true;f.state.enabled=false;assert.equal(forceOutEntries(f.target).length,0);
  f.state.enabled=true;await ejectConnection(f.source,f.target.uuid,f.cards[0].id);
@@ -246,14 +247,14 @@ test("CTH eject menu needs awareness, current active connection and target owner
 test("CTH lists each detected runner once, masks identity and excludes other encounters", async () => {
  const f=fixture();await executeQuickhack(f.a,f.b,"jack-in");
  const first=f.cards[0];const firstResult=first.flags[MODULE].quickhack;
- firstResult.revealAttacker=false;
+ firstResult.revealAttacker=false;connectionFor(f.source,f.target.uuid).awareness.revealAttacker=false;
  f.cards.push({...first,id:"duplicate",flags:{[MODULE]:{quickhack:{...firstResult,type:"quickhack",connectionId:first.id}}}});
  const second={...first,id:"second",timestamp:99,flags:{[MODULE]:{quickhack:{...firstResult,sourceActorUuid:"Actor.other",connectionRecorded:false}}}};
  const other={...f.source,uuid:"Actor.other",name:"Secret"};
  f.docs.set(other.uuid,other);game.actors.push(other);f.cards.push(second);
  await establishConnection(second);
  const rows=forceOutEntries(f.target);assert.equal(rows.length,2);
- assert.equal(rows[0].messageId,"duplicate");
+ assert.equal(rows[0].messageId,first.id);
  assert.ok(rows.every(row=>!row.label.includes("Source")&&!row.label.includes("Secret")));
  game.combat={...f.encounter,uuid:"Combat.other",flags:{}};
  assert.equal(forceOutEntries(f.target).length,0);
@@ -296,6 +297,7 @@ test("CTH and ejection card apply current NPC identity settings, including later
   origin.flags[MODULE].quickhack.revealAttacker=false;
   f.state.routing={npcToPlayerJackInRevealAttacker:jackName,npcToPlayerQuickhackRevealAttacker:hackName};
   if(hasHack)f.cards.push({...origin,id:"awareness",flags:{[MODULE]:{quickhack:{...origin.flags[MODULE].quickhack,type:"quickhack",connectionId:origin.id}}}});
+  if(hasHack)await establishConnection(f.cards.at(-1));
   const show=jackName||(hackName&&hasHack);
   const rows=forceOutEntries(f.target);assert.equal(rows.length,1);
   assert.equal(rows[0].name,show?"Runner <One>":"PNEUMA_COMBAT_TOOLS.Quickhack.Result.UnknownNetrunner{}");
@@ -353,4 +355,42 @@ test("QuickHack menu icons prefer actor item, then world item, then catalog artw
  assert.equal(actorQuickhacks(f.source).find(h=>h.id==="overheat").img,"world.png");
  f.source.items.push(hack("owned",{img:"actor.png"}));
  assert.equal(actorQuickhacks(f.source).find(h=>h.id==="overheat").img,"actor.png");
+});
+
+test('successful noisy hack alerts NPC; later failed or silent hacks never erase detection',async()=>{
+ const f=fixture();f.target.hasPlayerOwner=false;f.state.total=30;await executeQuickhack(f.a,f.b,'jack-in');
+ let result=f.cards.at(-1).flags[MODULE].quickhack;assert.equal(result.alerted,false);
+ await executeQuickhack(f.a,f.b,'lure');assert.equal(f.cards.at(-1).flags[MODULE].quickhack.alerted,false);
+ await executeQuickhack(f.a,f.b,'puppet');assert.equal(f.cards.at(-1).flags[MODULE].quickhack.alerted,true);
+ f.state.total=1;await executeQuickhack(f.a,f.b,'lure');result=f.cards.at(-1).flags[MODULE].quickhack;assert.equal(result.success,false);assert.equal(result.alerted,true);
+});
+
+test('detection HUD notice reaches only the target owner and announces a connection once',async()=>{
+ const {announceDetection}=await import('../dist/scripts/quickhack/integration.js');const {listHUDMessages}=await import('../dist/scripts/hud-messages.js');
+ const f=fixture();game.ready=true;f.target.hasPlayerOwner=false;f.state.total=30;await executeQuickhack(f.a,f.b,'jack-in');await executeQuickhack(f.a,f.b,'puppet');const message=f.cards.at(-1);
+ const before=listHUDMessages().length;announceDetection(message);assert.equal(listHUDMessages().length,before,'GM gets no personal detection notice');
+ game.user={id:'player',isGM:false};f.target.isOwner=false;announceDetection(message);assert.equal(listHUDMessages().length,before);
+ f.target.isOwner=true;announceDetection(message);const notice=listHUDMessages().at(-1);assert.equal(notice.text,'NETRUNNER DETECTED — NEURAL LINK COMPROMISED');assert(!notice.text.includes(f.source.name));
+ announceDetection(message);assert.equal(listHUDMessages().length,before+1);
+ const {dismissHUDMessage}=await import('../dist/scripts/hud-messages.js');dismissHUDMessage(notice.source,notice.id);
+});
+test('incoming detector reflects active detected connections and clears on Jack Out',async()=>{
+ const {collectHUDConditions}=await import('../dist/scripts/hud-conditions.js');const f=fixture();f.target.allApplicableEffects=()=>[];f.target.hasPlayerOwner=false;f.state.total=30;
+ await executeQuickhack(f.a,f.b,'jack-in');assert(!collectHUDConditions(f.target).exposures.includes('Neural Intrusion'));
+ await executeQuickhack(f.a,f.b,'puppet');assert(collectHUDConditions(f.target).exposures.includes('Neural Intrusion'));
+ await jackOut(f.source,f.target.uuid);assert(!collectHUDConditions(f.target).exposures.includes('Neural Intrusion'));
+});
+
+test('encounter awareness survives deleted chat; ejection does not require the card',async()=>{
+ const f=fixture();await executeQuickhack(f.a,f.b,'jack-in');const id=f.cards[0].id;
+ f.cards.length=0;
+ game.messages[Symbol.iterator]=()=>{throw Error('HUD must not scan messages');};
+ assert.equal(forceOutEntries(f.target)[0].messageId,id);
+ f.source.hasPlayerOwner=false;f.state.total=20;f.target.items.push({...f.role,type:'skill',name:'Concentration'});
+ await beginForceOut({id});assert.equal(connectionFor(f.source,f.target.uuid).state,'ejected');
+});
+test('native quickhack roll retains checks at input and outcome boundaries without redundant middle checks',async()=>{
+ const f=fixture();const {nativeQuickhackRoll}=await import('../dist/scripts/quickhack/rolls.js');let checks=0;
+ await nativeQuickhackRoll(f.source,f.role,'Test',{blind:false,whisper:[]},()=>{checks++;return true;},undefined,false);
+ assert.equal(checks,3);assert.equal(f.state.rolls,1);
 });

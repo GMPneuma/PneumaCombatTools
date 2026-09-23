@@ -92,7 +92,7 @@ export async function finishTimedEffects(combat:Combat) {
     let changed=false;
     for(const effect of allEffects(actor)) {
       const injury=String((effect.parent as Item)?.type)==="criticalInjury"||masterStatuses.some(s=>s.binding?.kind==="injury"&&effect.statuses.has(s.id));
-      if(injury||!hasDuration(effect.duration))continue;
+      if(injury||foundry.utils.getProperty(effect,"flags."+M+".disableRequest")||!hasDuration(effect.duration))continue;
       const linked=effect.duration?.combat;
       const combatId=typeof linked==="string"?linked:linked?.id;
       if(combatId&&combatId!==combat.id)continue;
@@ -135,13 +135,28 @@ export function registerInstantLifetimes() {
   Hooks.once("ready",refresh);Hooks.on("canvasReady",refresh);
   Hooks.on("createActor",rememberHP);Hooks.on("createToken",(t:TokenDocument)=>{if(t.actor)rememberHP(t.actor);});
   Hooks.on("deleteActor",(a:Actor)=>hpValues.delete(a.uuid));
-  Hooks.on("updateWorldTime",()=>enqueue(async()=>{for(const a of actors())await expireInstantActor(a);}));
+  Hooks.on("updateWorldTime",()=>enqueue(async()=>{
+    const inCombat=new Set(Array.from(game.combats??[]).filter(c=>c.started).flatMap(c=>Array.from(c.combatants).map(row=>row.actor?.uuid)));
+    for(const a of actors())if(!inCombat.has(a.uuid))await expireInstantActor(a);
+  }));
   // preUpdate is local to the initiating client. Cached values also cover remote writes received by the elected GM.
   Hooks.on("preUpdateActor",rememberHP);
   Hooks.on("updateActor",(a:Actor)=>{const before=hpValues.get(a.uuid),after=Number(foundry.utils.getProperty(a,"system.derivedStats.hp.value"));hpValues.set(a.uuid,after);if(before!==undefined&&after<before)enqueue(()=>clearInstantCondition(a,"sleep"));});
   Hooks.on("createCombat",rememberCombat);Hooks.on("preUpdateCombat",rememberCombat);
   Hooks.on("deleteCombat",(c:Combat)=>{previous.delete(c.id!);enqueue(()=>finishTimedEffects(c));});
-  Hooks.on("updateCombat",(c:Combat)=>{const p=previous.get(c.id!);rememberCombat(c);if(p?.started&&!c.started){enqueue(()=>finishTimedEffects(c));return;}enqueue(async()=>{for(const a of actors())await expireInstantActor(a);});if(!p?.actor||!p.started||!c.started)return;
-    if((c.round??0)>p.round||c.round===p.round&&(c.turn??0)>p.turn)enqueue(()=>burnTurn(p.actor!,c.id+":"+p.round+":"+p.turn));
+  Hooks.on("updateCombat",(c:Combat)=>{
+    const p=previous.get(c.id!);rememberCombat(c);
+    if(p?.started&&!c.started){enqueue(()=>finishTimedEffects(c));return;}
+    if(!p?.started||!c.started)return;
+    const nextRound=(c.round??0)>p.round;
+    if(!nextRound && !((c.round??0)===p.round&&(c.turn??0)>p.turn))return;
+    enqueue(async()=>{
+      // Resolve the departing actor's end-turn condition before expiring it.
+      if(p.actor)await burnTurn(p.actor,c.id+":"+p.round+":"+p.turn);
+      const due=new Map<string,Actor>();
+      if(p.actor)due.set(p.actor.uuid,p.actor);
+      if(nextRound)for(const row of c.combatants??[])if(row.actor)due.set(row.actor.uuid,row.actor);
+      for(const actor of due.values())await expireInstantActor(actor);
+    });
   });
 }

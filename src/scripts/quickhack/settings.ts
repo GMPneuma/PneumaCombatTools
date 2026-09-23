@@ -25,14 +25,19 @@ class QuickhackSettings extends FormApplication {
   }
   override getData() {
     const config = routing();
-    return { rows: [
-      { key: "npcToPlayerJackInAudience", title: label("Settings.Question.DetectedJackInAudience"), choices: { targetOwners: "Only the Target and GM", public: "Everyone" } },
-      { key: "npcToPlayerJackInShowTotals", title: label("Settings.Question.JackInTotals"), choices: { true: "Show totals", false: "Hide totals" } },
-      { key: "npcToPlayerJackInRevealAttacker", title: "NPC Jack-In: identify attacker", choices: { true: "Show NPC name", false: "Unknown Netrunner" } },
-      { key: "npcToPlayerQuickhackAudience", title: label("Settings.Question.QuickhackAudience"), choices: { targetOwners: "Only the Target and GM", public: "Everyone" } },
-      { key: "npcToPlayerQuickhackRevealAttacker", title: "NPC QuickHack: identify attacker", choices: { true: "Show NPC name", false: "Unknown Netrunner" } },
-      { key: "playerToNpcJackInAudience", title: label("Settings.Question.ShareNpcAwareness"), choices: { sourceOwners: "Only the Attacker and GM", public: "Everyone", gm: "Only GM" } },
-    ].map(row => ({ ...row, value: String(config[row.key as keyof RoutingConfig]) })) };
+    const rows = [
+      { key: "npcToPlayerJackInAudience", title: "Who sees a detected Jack-In?", choices: { targetOwners: "Only the Target and GM", public: "Everyone" } },
+      { key: "npcToPlayerJackInShowTotals", title: "Roll totals", choices: { true: "Show totals", false: "Hide totals" } },
+      { key: "npcToPlayerJackInRevealAttacker", title: "Attacker identity", choices: { true: "Show NPC name", false: "Unknown Netrunner" } },
+      { key: "npcToPlayerQuickhackAudience", title: "Who sees the QuickHack?", choices: { targetOwners: "Only the Target and GM", public: "Everyone" } },
+      { key: "npcToPlayerQuickhackRevealAttacker", title: "Attacker identity", choices: { true: "Show NPC name", false: "Unknown Netrunner" } },
+      { key: "playerToNpcJackInAudience", title: "Who sees NPC awareness?", choices: { sourceOwners: "Only the Attacker and GM", public: "Everyone", gm: "Only GM" } },
+    ].map(row => ({ ...row, value: String(config[row.key as keyof RoutingConfig]) }));
+    return { groups: [
+      {title:"NPC → Player: Jack-In", rows:rows.slice(0,3)},
+      {title:"NPC → Player: QuickHack", rows:rows.slice(3,5)},
+      {title:"Player → NPC: Jack-In", rows:rows.slice(5)},
+    ] };
   }
   protected override async _updateObject(_event: Event, data: Record<string, unknown>) {
     if (!game.user!.isGM) return;

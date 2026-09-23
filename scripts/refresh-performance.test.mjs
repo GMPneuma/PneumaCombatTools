@@ -33,7 +33,7 @@ test('QuickHack filters HUD events, batches updates, and refreshes only changed 
 test('movement batches repeated token refreshes and filters combat flags; reordering checks turn identities',()=>{
  const draws=[];const tokens=['a','b'].map(id=>({id,document:{id},visible:false}));
  const scene={id:'scene'},combat={id:'c',started:true,scene,round:1,turn:0,turns:tokens.map(t=>({id:t.id,tokenId:t.id}))};
- const f=fixture('dist/scripts/movement.js',{game:{combat,settings:{register(){},get:()=>true}},canvas:{scene,tokens:{placeables:tokens}},CONST:{GRID_TYPES:{SQUARE:1}},recordStep(){},draws});
+ const f=fixture('dist/scripts/movement.js',{barCombat:()=>combat,game:{combat,settings:{register(){},get:()=>true}},canvas:{scene,tokens:{placeables:tokens}},CONST:{GRID_TYPES:{SQUARE:1}},recordStep(){},draws});
  vm.runInContext('draw = token => draws.push(token.id);registerMovement();',f.ctx);
  f.fire('canvasReady');f.flush();assert.deepEqual(draws,['a','b']);draws.length=0;
  f.fire('updateCombat',combat,{flags:{empRequests:{}}});f.flush();assert.deepEqual(draws,[]);

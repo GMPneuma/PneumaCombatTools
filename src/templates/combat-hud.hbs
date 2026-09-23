@@ -3,6 +3,17 @@
 {{/if}}
 <div class="col right pneuma-combat-column" {{#if selfCTH}}data-self-cth{{/if}}>
 {{#if selfCTH}}
+  {{#if grappleActions.length}}
+  <div class="control-icon" role="button" tabindex="0" data-self-close-toggle title="Close Combat" aria-label="Close Combat"><i class="fas fa-hand-back-fist" aria-hidden="true"></i></div>
+  <section class="pneuma-panel" data-self-close-menu hidden>
+    {{#each grappleActions}}<button type="button" data-self-grapple="{{action}}" title="{{title}}" {{#if disabled}}disabled{{/if}}>{{label}}</button>{{/each}}
+  </section>
+  {{/if}}
+  <div class="control-icon" role="button" tabindex="0" data-self-thrown-toggle title="Thrown weapons and grenades" aria-label="Thrown weapons and grenades"><i class="fas fa-bomb" aria-hidden="true"></i></div>
+  <section class="pneuma-panel pneuma-self-thrown" data-self-thrown-menu hidden>
+    {{#each selfThrown}}<button type="button" data-self-throw="{{id}}">{{name}}</button>{{else}}<p>No thrown weapons or grenades.</p>{{/each}}
+    <button type="button" data-self-throw="__improvised">Improvised (requires target)</button>
+  </section>
   <div class="control-icon" role="button" tabindex="0" data-self-alert-hud title="Toggle Alert HUD" aria-label="Toggle Alert HUD" aria-pressed="{{selfAlertHUD}}">
     <i class="fas fa-bell" aria-hidden="true"></i>
   </div>
@@ -41,7 +52,7 @@
       {{/each}}
       {{#each grappleActions}}
       <li data-attack-category="brawling" hidden>
-        <button type="button" class="combat-weapon-name" data-grapple-action="{{action}}"><i class="fas fa-hand-back-fist" aria-hidden="true"></i><span>{{label}}</span></button>
+        <button type="button" class="combat-weapon-name" data-grapple-action="{{action}}" title="{{title}}" {{#if disabled}}disabled{{/if}}><i class="fas fa-hand-back-fist" aria-hidden="true"></i><span>{{label}}</span></button>
       </li>
       {{/each}}
       {{#each grenades}}

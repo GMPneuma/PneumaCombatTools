@@ -1,3 +1,4 @@
+import {postHUDMessage} from "../hud-messages.js";
 import { MODULE, LEGACY_MODULE } from "./availability.js";
 import { registerQuickhackSheet } from "./sheet.js";
 import { enabled, registerQuickhackSettings } from "./settings.js";
@@ -58,6 +59,17 @@ function refreshQuickhack() {
   if (game.ready && enabled() && primaryGM()) void initializeQuickhackContent().catch(reportError);
 }
 function reportError(error: unknown) { console.error(MODULE, error); ui.notifications!.error(error instanceof Error ? error.message : "QuickHack failed."); }
+const announced=new Set<string>();
+export function announceDetection(message:ChatMessage) {
+    const result=resultFlag(message);
+    if(!game.ready||!enabled()||!result?.alerted)return;
+    const target=canvas.tokens?.placeables?.find(t=>t.actor?.uuid===result.targetActorUuid)?.actor??game.actors?.find(a=>a.uuid===result.targetActorUuid);
+    if(!target||game.user?.isGM||!target.isOwner)return;
+    const key=result.combatUuid+":"+(result.type==="jackIn"?message.id:result.connectionId??message.id);
+    const earlier=[...game.messages??[]].some(m=>m.id!==message.id&&resultFlag(m)?.alerted&&resultFlag(m)?.targetActorUuid===result.targetActorUuid&&resultFlag(m)?.sourceActorUuid===result.sourceActorUuid&&resultFlag(m)?.combatUuid===result.combatUuid&&(resultFlag(m)?.type==="jackIn"?m.id:resultFlag(m)?.connectionId)===(result.type==="jackIn"?message.id:result.connectionId));
+    if(announced.has(key)||earlier)return;announced.add(key);
+    postHUDMessage({source:MODULE,id:message.id!,text:"NETRUNNER DETECTED — NEURAL LINK COMPROMISED",duration:60});
+}
 export function registerQuickhack(context: () => {source?: Token; target?: Token; self?: boolean} = () => ({})) {
   registerQuickhackSheet(executeActorAction);
   registerQuickhackSettings(refreshQuickhack);
@@ -83,6 +95,7 @@ export function registerQuickhack(context: () => {source?: Token; target?: Token
     }
   };
   Hooks.on("createChatMessage", remember);
+  Hooks.on("createChatMessage",announceDetection);
   Hooks.on("updateChatMessage", remember);
   Hooks.on("deleteChatMessage", (message: ChatMessage) => {remember(message);cards.delete(message.id!);});
   Hooks.on("deleteCombat", () => {if(enabled()){refreshSight();refreshCards();}});

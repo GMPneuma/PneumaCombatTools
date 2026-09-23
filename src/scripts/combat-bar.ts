@@ -1,6 +1,7 @@
+import {openCombatBarSettings} from "./combat-bar-settings.js";
 import {barCombat, barEntries, canEndTurn, movementMode, MOVEMENT_MODES, registerBarMovement, validMode, type BarEntry} from "./combat-bar-state.js";
 import {requestEndTurn,registerBarTurns} from "./combat-bar-turn.js";
-import {showBarStatuses,showBarControls,closeBarFlyout,leaveBarFlyout,navigateBarEntry} from "./combat-bar-flyout.js";
+import {showBarStatuses,showBarControls,showBarInitiative,closeBarFlyout,leaveBarFlyout,navigateBarEntry} from "./combat-bar-flyout.js";
 
 const MODULE = "pneuma-combattools";
 let root: HTMLElement | undefined;
@@ -21,13 +22,41 @@ function cancelHold(): void {
 
 function position(): void {
   if (!root) return;
+  const sidebar = document.getElementById("sidebar")?.getBoundingClientRect();
+  const edge = sidebar?.width ? sidebar.left : window.innerWidth;
+  const controls = document.getElementById("controls");
+  const layers: number[] = [];
+  for (let node: HTMLElement | null = controls; node; node = node.parentElement) {
+    const z = Number.parseInt(getComputedStyle(node).zIndex); if (Number.isFinite(z) && z > 0) layers.push(z);
+  }
+  root.style.zIndex = String(layers.length ? Math.max(0, Math.min(...layers) - 1) : 19);
+  if (root.dataset.dock === "top-right") {
+    root.style.left = "auto"; root.style.bottom = "auto"; root.style.top = "8px";
+    root.style.right = Math.max(8, window.innerWidth - edge + 8) + "px";
+    root.style.maxHeight = Math.max(100, window.innerHeight - 24) + "px";
+    root.style.maxWidth = Math.max(150, edge - 24) + "px";
+    positionEndTurn(); return;
+  }
+  root.style.top = "auto"; root.style.right = "auto";
   const anchor = players?.getBoundingClientRect();
   const visible = anchor && anchor.width > 0 && anchor.height > 0;
-  const top = visible ? anchor.top : window.innerHeight - 12;
+  let top = visible ? anchor.top : window.innerHeight - 12;
+  // Horizontal portraits extend over the macro area when Players is collapsed.
+  const hotbar = document.getElementById("hotbar");
+  const macros = hotbar?.getBoundingClientRect();
+  if (root.dataset.orientation === "horizontal" && macros && macros.width > 0 && macros.height > 0
+      && getComputedStyle(hotbar!).visibility !== "hidden"
+      && 15 + root.offsetWidth > macros.left && 15 < macros.right) {
+    top = Math.min(top, macros.top);
+  }
   root.style.left = "15px";
-  root.style.bottom = `${window.innerHeight - top + 6}px`;
-  root.style.maxHeight = `${Math.max(100, Math.min(window.innerHeight * 0.6, top - 16))}px`;
-  const sidebar = document.getElementById("sidebar")?.getBoundingClientRect();
+  root.style.bottom = String(window.innerHeight - top + 6) + "px";
+  const mainControls = Array.from(controls?.querySelectorAll<HTMLElement>(":scope > ol.main-controls > li, :scope > ol > li.scene-control") ?? [])
+    .map(button => button.getBoundingClientRect()).filter(bounds => bounds.width > 0 && bounds.height > 0);
+  const controlsBottom = mainControls.length ? Math.max(...mainControls.map(bounds => bounds.bottom)) : controls?.getBoundingClientRect().bottom ?? 8;
+  root.style.maxHeight = root.dataset.orientation === "vertical"
+    ? Math.max(0, top - 6 - controlsBottom - 8) + "px"
+    : Math.max(100, top - 16) + "px";
   root.style.maxWidth = `${Math.max(150, (sidebar?.width ? sidebar.left : window.innerWidth) - 30)}px`;
   positionEndTurn();
 }
@@ -38,14 +67,20 @@ function positionEndTurn(): void {
   const list = root?.querySelector("ol");
   if (!end || !active || !list || !root) return;
   const row = active.getBoundingClientRect(), bounds = list.getBoundingClientRect();
-  end.hidden = row.top < bounds.top - 1 || row.bottom > bounds.bottom + 1 || row.left < bounds.left - 1 || row.right > bounds.right + 1;
-  if (root.dataset.orientation === "horizontal") {
-    end.style.left = `${row.left - root.getBoundingClientRect().left + (row.width - 56) / 2}px`;
-    end.style.top = "-28px";
-    return;
-  }
-  end.style.left = "";
-  end.style.top = `${row.top - root.getBoundingClientRect().top + (row.height - 24) / 2}px`;
+  const horizontal = root.dataset.orientation === "horizontal";
+  // Only the list's scrolling axis determines visibility. Themes and scrollbars can
+  // make the portrait slightly wider/taller than the list on the other axis.
+  end.hidden = horizontal ? row.right <= bounds.left || row.left >= bounds.right
+    : row.bottom <= bounds.top || row.top >= bounds.bottom;
+  const bar = root.getBoundingClientRect();
+  const topRight = root.dataset.dock === "top-right";
+  const x = horizontal ? row.left + (row.width - 56) / 2 : topRight ? bar.left - 60 : bar.right + 4;
+  const y = horizontal ? topRight ? bar.bottom + 4 : bar.top - 28 : row.top + (row.height - 24) / 2;
+  // Viewport coordinates keep the control out of app/scroll clipping in themed HUDs.
+  end.style.position = "fixed";
+  end.style.left = Math.max(4, Math.min(window.innerWidth - 60, x)) + "px";
+  end.style.top = Math.max(4, Math.min(window.innerHeight - 28, y)) + "px";
+  end.style.right = end.style.bottom = "auto";
 }
 
 function button(text: string, title: string, action: string): HTMLButtonElement {
@@ -99,10 +134,7 @@ async function action(event: MouseEvent): Promise<void> {
     await game.settings!.set(MODULE, "combatBarMinimized", !game.settings!.get(MODULE, "combatBarMinimized"));
     return;
   }
-  if (target.dataset.action === "orientation") {
-    await game.settings!.set(MODULE, "combatBarOrientation", game.settings!.get(MODULE, "combatBarOrientation") === "horizontal" ? "vertical" : "horizontal");
-    return;
-  }
+  if (target.dataset.action === "settings") {openCombatBarSettings();return;}
   const combat = barCombat();
   if (target.dataset.action === "token") {
     const id = target.closest<HTMLElement>("[data-entry-id]")?.dataset.entryId ?? "";
@@ -192,14 +224,20 @@ function render(): void {
     bind(root);
     document.body.append(root);
     observer = new ResizeObserver(position);
+    observer.observe(root);
   }
   const anchor = document.getElementById("players");
   if (players !== anchor) {
     observer!.disconnect();
+    observer!.observe(root);
     players = anchor;
     if (players) observer!.observe(players);
     const left = document.getElementById("ui-left");
     if (left) observer!.observe(left);
+  }
+  for (const id of ["sidebar", "hotbar", "controls"]) {
+    const element = document.getElementById(id);
+    if (element) observer!.observe(element);
   }
   position();
   const combat = barCombat();
@@ -208,8 +246,9 @@ function render(): void {
   const endTurn = canEndTurn(combat);
   const size = Number(game.settings!.get(MODULE, "combatBarSize"));
   const orientation = game.settings!.get(MODULE, "combatBarOrientation");
+  const dock = game.settings!.get(MODULE, "combatBarDock");
   const minimized = game.settings!.get(MODULE, "combatBarMinimized");
-  const key = JSON.stringify([size, orientation, minimized, game.settings!.get(MODULE, "combatBarNameOnly"), combat?.id, combat?.round, combat?.turn, game.user?.isGM, mode, endTurn, turnPending, modePending,
+  const key = JSON.stringify([size, orientation, dock, minimized, game.settings!.get(MODULE, "combatBarNameOnly"), combat?.id, combat?.round, combat?.turn, game.user?.isGM, mode, endTurn, turnPending, modePending,
     entries.map(entry => [entry.id, entry.name, entry.img, entry.active, entry.hidden, entry.defeated, !!entry.token])]);
   if (key === renderKey) return;
   renderKey = key;
@@ -217,38 +256,54 @@ function render(): void {
   closeBarFlyout();
   const scroll = root.querySelector("ol")?.scrollTop ?? 0;
   const scrollLeft = root.querySelector("ol")?.scrollLeft ?? 0;
+  const turnKey = combat ? `${combat.id}:${combat.round}:${combat.turn}` : "";
+  const revealActive = root.dataset.turnKey !== turnKey || root.classList.contains("is-minimized") && !minimized || root.dataset.orientation !== orientation || root.dataset.dock !== dock;
   root.replaceChildren();
   root.dataset.orientation = orientation;
+  root.dataset.dock = dock;
   root.classList.toggle("is-minimized", minimized);
   root.classList.toggle("is-gm", !!game.user?.isGM);
-  root.style.setProperty("--portrait-size", `${[32,40,48].includes(size) ? size : 40}px`);
-  root.dataset.turnKey = combat ? `${combat.id}:${combat.round}:${combat.turn}` : "";
+  root.style.setProperty("--portrait-size", `${[32,40,48,64,80,96].includes(size) ? size : 40}px`);
+  root.dataset.turnKey = turnKey;
   root.hidden = !entries.length && !game.user?.isGM;
   const toolbar = document.createElement("div");
   toolbar.className = "pneuma-bar-display";
   const collapse = button(minimized ? "+" : "−", minimized ? "Restore combat bar" : "Minimize combat bar", "minimize");
   collapse.setAttribute("aria-expanded", String(!minimized));
   toolbar.append(collapse);
-  if (!minimized) toolbar.append(button(orientation === "vertical" ? "↔" : "↕", `Switch to ${orientation === "vertical" ? "horizontal" : "vertical"} layout`, "orientation"));
+  const settings = button("", "Combat Bar settings", "settings");
+  const gear = document.createElement("i");gear.className="fas fa-cog";gear.setAttribute("aria-hidden","true");
+  settings.append(gear);toolbar.append(settings);
   root.append(toolbar);
   if (!minimized) {
     if (combat) {
       const header = document.createElement("header");
       if (game.user?.isGM) {
-        const previous = button(orientation === "horizontal" ? "←" : "↑", "Previous turn", "previous-turn");
-        const next = button(orientation === "horizontal" ? "→" : "↓", "Next turn", "next-turn");
+        const previous = button("←", "Previous turn", "previous-turn");
+        const next = button("→", "Next turn", "next-turn");
         previous.disabled = next.disabled = turnPending;
         header.append(previous, next);
       }
       const round = document.createElement("span");
       round.textContent = `R ${combat.round}`;
       round.title = `Round ${combat.round}`;
+      if(game.user?.isGM){
+        round.tabIndex=0;
+        round.setAttribute("aria-label",`Round ${combat.round}: initiative controls`);
+        round.addEventListener("pointerenter",()=>void showBarInitiative(root!,round).catch(report));
+        round.addEventListener("focus",()=>void showBarInitiative(root!,round).catch(report));
+      }
       header.append(round);
       root.append(header);
     }
     const list = document.createElement("ol");
     list.setAttribute("aria-label", combat ? "Combatants" : "Player characters");
     for (const entry of entries) list.append(row(entry));
+    list.addEventListener("wheel", event => {
+      if (root?.dataset.orientation === "horizontal" && list.scrollWidth > list.clientWidth && event.deltaY && !event.ctrlKey) {
+        event.preventDefault(); list.scrollLeft += event.deltaY;
+      }
+    }, {passive:false});
     list.addEventListener("scroll", () => {positionEndTurn();closeBarFlyout();});
     root.append(list);
     list.scrollTop = scroll;
@@ -277,7 +332,17 @@ function render(): void {
     }
     root.append(footer);
   }
-  positionEndTurn();
+  position();
+  if (revealActive && !minimized) {
+    const list = root.querySelector("ol"), active = list?.querySelector<HTMLElement>("li.active");
+    if (list && active) {
+      const bounds = list.getBoundingClientRect(), row = active.getBoundingClientRect();
+      if (orientation === "horizontal") {
+        if (row.left < bounds.left || row.right > bounds.right) list.scrollLeft += row.left - bounds.left - (bounds.width - row.width) / 2;
+      } else if (row.top < bounds.top || row.bottom > bounds.bottom) list.scrollTop += row.top - bounds.top - (bounds.height - row.height) / 2;
+    }
+  }
+  position();
 }
 
 function refresh(): void {if (!frame) frame = requestAnimationFrame(render);}
@@ -296,16 +361,21 @@ export function registerCombatBar(): void {
   registerBarMovement(refresh);
   registerBarTurns();
   game.settings!.register(MODULE, "combatBar", {
-    name: "Show combat bar", hint: "Square actor portraits above Players, with token selection, ping and pan. Movement rules still apply when this display is hidden.",
+    name: "Show combat bar", hint: "Square actor portraits at the selected dock, with token selection, ping and pan. Movement rules still apply when this display is hidden.",
     scope: "client", config: true, type: Boolean, default: true, onChange: refresh,
+  });
+  game.settings!.register(MODULE, "combatBarDock", {
+    name: "Combat bar position", hint: "Top right anchors movement controls in the top-right corner beside the sidebar and forces BiomonHUD to top left. Returning to bottom left restores your saved Biomon position.",
+    scope: "client", config: true, type: String, default: "bottom-left", choices: {"bottom-left":"Bottom left", "top-right":"Top right"},
+    onChange: () => { refresh(); Hooks.callAll("pneumaCombatBarDockChanged"); },
   });
   game.settings!.register(MODULE, "combatBarSize", {
     name: "Combat bar portrait size", hint: "Square actor portrait size on this client.",
     scope: "client", config: true, type: String, default: "40",
-    choices: {32: "Small (32 px)", 40: "Medium (40 px)", 48: "Large (48 px)"}, onChange: refresh,
+    choices: {32: "Small (32 px)", 40: "Medium (40 px)", 48: "Large (48 px)", 64: "Extra large (64 px)", 80: "Huge (80 px)", 96: "Maximum (96 px)"}, onChange: refresh,
   });
   game.settings!.register(MODULE, "combatBarOrientation", {
-    name: "Combat bar layout", hint: "Display actors vertically or horizontally above Players.",
+    name: "Combat bar layout", hint: "Display actors vertically or horizontally from the selected dock.",
     scope: "client", config: true, type: String, default: "vertical",
     choices: {vertical: "Vertical", horizontal: "Horizontal"}, onChange: refresh,
   });
@@ -323,15 +393,16 @@ export function registerCombatBar(): void {
       row.classList.toggle("controlled",!!entries.find(entry=>entry.id===row.dataset.entryId)?.token?.controlled);
     });
   });
-  for (const hook of ["ready", "canvasReady", "renderPlayerList", "renderCombatTracker", "createToken", "updateToken", "deleteToken",
+  for (const hook of ["ready", "canvasReady", "renderPlayerList", "renderSceneNavigation", "renderSceneControls", "collapseSidebar", "renderSidebar", "renderCombatTracker", "createToken", "updateToken", "deleteToken",
     "updateActor", "updateUser", "userConnected", "createCombat", "updateCombat", "deleteCombat", "createCombatant", "updateCombatant", "deleteCombatant"])
     Hooks.on(hook, refresh);
   Hooks.on("canvasTearDown", () => {cancelAnimationFrame(frame); frame = 0; remove();});
+  Hooks.on("renderHotbar", refresh);
   window.addEventListener("resize", position);
   window.addEventListener("pointerup", cancelHold);
   window.addEventListener("pointercancel", cancelHold);
   window.addEventListener("blur", cancelHold);
-  window.addEventListener("pointerdown", event => {if(root&&!root.contains(event.target as Node))closeBarFlyout();});
+  window.addEventListener("pointerdown", event => {if(root&&!root.contains(event.target as Node)){closeBarFlyout();}});
   window.addEventListener("keydown", event => {if(event.key==="Escape")closeBarFlyout();});
   for(const hook of ["createActiveEffect","updateActiveEffect","deleteActiveEffect"])Hooks.on(hook,closeBarFlyout);
 }

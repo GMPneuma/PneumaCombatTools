@@ -6,9 +6,9 @@ try{
  const page=await browser.newPage({viewport:{width:1100,height:800}});
  await page.emulateMedia({reducedMotion:"no-preference"});
  await page.setContent('<style>body{background:#17222c}</style><aside id="sidebar" style="position:fixed;right:0;top:0;width:300px;height:100vh"></aside><div id="chat-log"><div data-message-id="attack">Chat resolution</div></div>');
- await page.addStyleTag({content:await readFile("dist/styles/pneuma-combattools.css","utf8")});
+ await page.addStyleTag({content:(await readFile("dist/styles/pneuma-combattools.css","utf8")).replace("icons/biomon-alert.svg", "data:image/svg+xml;base64," + (await readFile("dist/styles/icons/biomon-alert.svg")).toString("base64"))});
  await page.evaluate(()=>{
-  window.FormApplication=class {};
+  window.injuryGuidance={};window.FormApplication=class {};
   window.Dialog=class {constructor(data){window.messageDialog=data;}render(){return this;}};
   window.hooks={};window.Hooks={on:(k,f)=>(hooks[k]??=[]).push(f),once:(k,f)=>(hooks[k]??=[]).push(f)};
   window.values={};window.settings={};
@@ -24,7 +24,19 @@ try{
   window.foundry={utils:{randomID:()=>String(window.testMessageId=(window.testMessageId??0)+1),getProperty:(o,p)=>p.split(".").reduce((v,k)=>v?.[k],o)}};
   window.ui={sidebar:{activateTab:()=>{window.openedChat=true;}},notifications:{info:()=>{}}};
  });
- await page.addScriptTag({type:"module",content:(await readFile("dist/scripts/socket-health.js","utf8")).replace('const MODULE = "pneuma-combattools";','const SOCKET_MODULE = "pneuma-combattools";').replace("get(MODULE)","get(SOCKET_MODULE)")+"\n"+(await readFile("dist/scripts/hud-messages.js","utf8")).replace(/^import .*;\s*/gm,"")+"\n"+(await readFile("dist/scripts/item-markers.js","utf8")).replace('const MODULE = "pneuma-combattools";', "")+"\n"+(await readFile("dist/scripts/biomonitor.js","utf8"))+"\n"+(await readFile("dist/scripts/grapple/rules.js","utf8"))+"\n"+(await readFile("dist/scripts/grapple/state.js","utf8")).replace(/^import .*;\s*/gm,"").replace('export const MODULE = "pneuma-combattools";', "")+"\nconst movementHUD=()=>[]; const grappleProperty = property;\n"+(await readFile("dist/scripts/status-catalog.js","utf8"))+"\n"+(await readFile("dist/scripts/hud-conditions.js","utf8")).replace(/^import .*;\s*/gm,"")+"\n"+(await readFile("dist/scripts/eye-hud.js","utf8")).replace(/^import .*;\s*/gm,"")+"\nObject.assign(window,{sendHUDMessage,hasBiomonitor,collectHUDConditions});registerEyeHUD();"});
+ await page.addScriptTag({type:"module",content:(await readFile("dist/scripts/socket-health.js","utf8")).replace('const MODULE = "pneuma-combattools";','const SOCKET_MODULE = "pneuma-combattools";').replace("get(MODULE)","get(SOCKET_MODULE)")+"\n"+(await readFile("dist/scripts/hud-messages.js","utf8")).replace(/^import .*;\s*/gm,"")+"\n"+(await readFile("dist/scripts/update-path.js","utf8"))+"\n"+(await readFile("dist/scripts/item-markers.js","utf8")).replace(/^import .*;\s*/gm,"").replace('const MODULE = "pneuma-combattools";', "")+"\n"+(await readFile("dist/scripts/biomonitor.js","utf8"))+"\n"+(await readFile("dist/scripts/grapple/rules.js","utf8"))+"\n"+(await readFile("dist/scripts/grapple/state.js","utf8")).replace(/^import .*;\s*/gm,"").replace('export const MODULE = "pneuma-combattools";', "")+"\nconst forceOutEntries=()=>window.testIncoming??[]; const bindStatusActions=()=>{}; const closeStatusActions=()=>{}; const createIntrusionGlitches=()=>({sync(){},stop(){}}); const movementHUD=()=>[]; const grappleProperty = property;\n"+(await readFile("dist/scripts/status-catalog.js","utf8"))+"\n"+(await readFile("dist/scripts/hud-conditions.js","utf8")).replace(/^import .*;\s*/gm,"")+"\n"+(await readFile("dist/scripts/eye-hud.js","utf8")).replace(/^import .*;\s*/gm,"")+"\nObject.assign(window,{sendHUDMessage,hasBiomonitor,collectHUDConditions});registerEyeHUD();"});
+ const ts = (await import("../node_modules/typescript/lib/typescript.js")).default;
+ const crewRoot = process.env.PNEUMA_CREWTOOLS_ROOT ?? "../PneumaCrewTools";
+ const shortcutSource = await readFile(crewRoot + "/src/hud-shortcuts.ts", "utf8").catch(()=>null);
+ if (shortcutSource) {
+ await page.addStyleTag({content:await readFile(crewRoot + "/dist/styles/pneuma-crewtools.css","utf8")});
+ await page.addScriptTag({type:"module",content:ts.transpile(shortcutSource,{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}) + "\nObject.assign(window,{hudShortcuts,refreshHudShortcuts});"});
+ await page.waitForFunction(()=>window.hudShortcuts);
+ await page.evaluate(()=>{
+   window.crewEntry={active:true,api:{hudShortcuts}};
+   game.modules.get=id=>id==='pneuma-crewtools'?crewEntry:moduleEntry;
+ });
+ }
  await page.waitForFunction(()=>hooks.ready?.length);
  await page.evaluate(()=>{hooks.ready.forEach(f=>f());});
  await page.waitForSelector('.pneuma-eye-medical');
@@ -250,13 +262,174 @@ try{
  const expandedName=await page.locator('.pneuma-eye-identity').boundingBox();
  assert.ok(Math.abs(expandedName.x-expandedHUD.x)<2,'Name returns to expanded HUD left edge');
  assert.equal(await page.locator('#pneuma-eye-hud > .pneuma-eye-header').count(),0);
- await page.evaluate(()=>game.settings.set('pneuma-combattools','eyeHUDPreview',true));
- await page.waitForSelector('[aria-label="Test HP state"]');
- await page.getByLabel('Test HP state').selectOption('30');
- await page.waitForFunction(()=>document.querySelector('.pneuma-eye-vitals').dataset.state==='wounded');
- await page.screenshot({path:process.env.TEMP+'/pneuma-eye-hud-redesign.png'});
- await page.evaluate(()=>game.settings.set('pneuma-combattools','eyeHUDPreview',false));
+
  await page.evaluate(()=>game.settings.set('pneuma-combattools','eyeHUD',false));
  await page.waitForFunction(()=>!document.getElementById('pneuma-eye-hud')&&!document.getElementById('pneuma-eye-attachments'));
- console.log('HUD browser regression passed: classification, native drugs, sharing, private messages, expiry, docking, drag, preview.');
+ if (shortcutSource) {
+ await page.evaluate(()=>{
+   const hud=document.createElement('div');hud.id='pneuma-crewtools-calendar';
+   hud.innerHTML='<span class="pneuma-calendar-date"><span class="pneuma-calendar-weekday">Wednesday</span><span class="pneuma-calendar-month-day">Sep 23</span><span class="pneuma-calendar-year">2045</span></span><div class="pneuma-crew-hud"><button aria-label="Crew">♟</button></div>';
+   document.body.append(hud);refreshHudShortcuts();
+   for(const [id,css] of [['navigation','position:fixed;left:110px;top:0;width:650px;height:90px'],['controls','position:fixed;left:0;top:100px;width:100px;height:400px']]){const node=document.createElement('div');node.id=id;node.style.cssText=css;document.body.append(node);}
+   moduleEntry.api.hud.list().forEach(n=>moduleEntry.api.hud.dismiss(n.source,n.id));
+   values.eyeHUDMessage=null;game.messages=[];actor.system.derivedStats.hp.value=9;
+   game.settings.set('pneuma-combattools','eyeHUD',true);
+   game.settings.set('pneuma-combattools','eyeHUDMinimized',false);
+   game.settings.set('pneuma-combattools','crewHUDIntegration',true);
+ });
+ await page.waitForSelector('#pneuma-crewtools-calendar #pneuma-biomon-shortcut');
+ assert.equal(await page.locator('#pneuma-biomon-shortcut').count(),1,'Enabling immediately registers the button even while expanded');
+ const crewBox=await page.getByRole('button',{name:'Crew',exact:true}).boundingBox();
+ const bioBox=await page.locator('#pneuma-biomon-shortcut').boundingBox();
+ assert.ok(bioBox.y>=crewBox.y+crewBox.height && Math.abs(bioBox.x-crewBox.x)<1,'Biomon sits below Crew in the same column');
+ assert.equal(Math.round((await page.locator('#pneuma-crewtools-calendar').boundingBox()).width),138,'Calendar does not widen');
+ assert.equal(await page.locator('#pneuma-biomon-shortcut').evaluate(b=>getComputedStyle(b).color),'rgb(255, 98, 98)');
+ await page.getByRole('button',{name:'Minimize Biomon',exact:true}).click();
+ await page.waitForSelector('#pneuma-eye-hud.is-integrated-mini');
+ await page.evaluate(()=>moduleEntry.api.hud.send({source:'integration',id:'alert',text:'Incoming hack'}));
+ await page.waitForFunction(()=>document.querySelector('#pneuma-biomon-shortcut').classList.contains('has-alert'));
+ assert.equal(await page.locator('#pneuma-biomon-shortcut').evaluate(b=>getComputedStyle(b).color),'rgb(255, 180, 95)');
+ assert.equal(await page.locator('#pneuma-eye-hud .pneuma-biomon-icon').count(),0,'Integrated EKG has no bell');
+ assert.equal(await page.locator('#pneuma-biomon-shortcut .pneuma-biomon-icon').count(),1,'Crew shortcut uses approved heart and bell');
+ assert.equal(await page.locator('.pneuma-eye-identity').textContent(),'Smitty');
+ const rightMini=await page.locator('#pneuma-eye-hud').boundingBox();
+ assert.ok(rightMini.x>400,'Right docking is retained when integrated');
+ await page.evaluate(()=>game.settings.set('pneuma-combattools','eyeHUDAnimateMessages',false));
+ await page.screenshot({path:process.env.TEMP+'/pneuma-integrated-mini.png'});
+ await page.evaluate(()=>game.settings.set('pneuma-combattools','eyeHUDDock','left'));
+ await page.waitForFunction(()=>document.querySelector('#pneuma-eye-hud').getBoundingClientRect().left<200);
+ const miniLeft=await page.locator('#pneuma-eye-hud').boundingBox();
+ const miniMessages=await page.locator('#pneuma-eye-attachments').boundingBox();
+ assert.ok(miniMessages.width>miniLeft.width*2,'Minimized messages extend beyond EKG width');
+ assert.ok(Math.abs(miniMessages.x-miniLeft.x)<1,'Messages remain left-aligned below EKG');
+ await page.screenshot({path:process.env.TEMP+'/pneuma-minimized-wide-messages.png'});
+ await page.getByRole('button',{name:'Open Biomon',exact:true}).click();
+ await page.waitForFunction(()=>!document.querySelector('#pneuma-eye-hud').classList.contains('is-minimized'));
+ const left=await page.locator('#pneuma-eye-hud').boundingBox();
+ const crewAnchor=await page.locator('#pneuma-crewtools-calendar').boundingBox();
+ assert.ok(Math.abs(left.x-crewAnchor.x-crewAnchor.width-8)<1 && Math.abs(left.y-crewAnchor.y-crewAnchor.height-8)<1,'Expanded panel anchors diagonally below Crew HUD');
+ assert.ok(Math.abs(miniLeft.x-left.x)<1 && Math.abs(miniLeft.y-left.y)<1,'Minimized EKG and expanded HUD share the same anchor');
+ const notice=page.locator('.pneuma-eye-notification').first();
+ const clearBox=await notice.locator(':scope > :last-child').boundingBox();
+ const textBox=await notice.locator(':scope > :first-child').boundingBox();
+ assert.ok(clearBox.x<textBox.x && clearBox.y>=left.y+left.height,'X comes first below HUD');
+ assert.equal(await notice.locator(':scope > :first-child').evaluate(e=>getComputedStyle(e).textAlign),'left');
+ assert.equal(await page.locator('#pneuma-biomon-shortcut').count(),1,'Shortcut persists while expanded');
+ await page.screenshot({path:process.env.TEMP+'/pneuma-integrated-expanded.png'});
+ await page.evaluate(()=>game.settings.set('pneuma-combattools','eyeHUD',false));
+ await page.waitForSelector('#pneuma-eye-hud',{state:'detached'});
+ await page.getByRole('button',{name:'Open Biomon',exact:true}).click();
+ await page.waitForSelector('#pneuma-eye-hud',{state:'visible'});
+ await page.getByRole('button',{name:'Minimize Biomon',exact:true}).click();
+ await page.waitForSelector('#pneuma-eye-hud.is-integrated-mini');
+ await page.evaluate(()=>{document.getElementById('pneuma-crewtools-calendar').remove();refreshHudShortcuts();});
+ await page.waitForFunction(()=>!document.querySelector('#pneuma-eye-hud')?.classList.contains('is-integrated-mini'));
+ assert.equal(await page.locator('.is-integrated-mini').count(),0,'Hidden Crew HUD restores standalone control');
+ await page.evaluate(()=>{const root=document.createElement('div');root.id='pneuma-crewtools-calendar';document.body.append(root);refreshHudShortcuts();});
+ await page.waitForSelector('#pneuma-biomon-shortcut');
+ await page.evaluate(()=>game.settings.set('pneuma-combattools','crewHUDIntegration',false));
+ await page.waitForSelector('#pneuma-biomon-shortcut',{state:'detached'});
+ assert.equal(await page.locator('[data-shortcut-owner]').count(),0,'Opting out removes the registered slot');
+ } else console.log('Crew Tools integration checks skipped: set PNEUMA_CREWTOOLS_ROOT to its checkout.');
+ await page.evaluate(()=>{
+   game.settings.set('pneuma-combattools','crewHUDIntegration',false);
+   game.settings.set('pneuma-combattools','eyeHUD',true);
+   game.settings.set('pneuma-combattools','eyeHUDMinimized',true);
+   game.settings.set('pneuma-combattools','eyeHUDDock','left');
+ });
+ await page.waitForFunction(()=>{const b=document.querySelector('#pneuma-eye-hud')?.getBoundingClientRect();const c=window.hudShortcuts?.getBounds();return b && (c ? Math.abs(b.x-c.right-8)<1 && Math.abs(b.y-c.bottom-8)<1 : b.x>=108 && b.y>=80);});
+ assert.equal(await page.locator('#pneuma-eye-hud .pneuma-biomon-icon').count(),1,'Standalone left HUD uses the same composite icon');
+ assert.equal(await page.evaluate(()=>settings.eyeHUDDock.config),true,'Position setting is always exposed');
+ await page.getByRole('button',{name:'Expand status HUD',exact:true}).click();
+ await page.waitForFunction(()=>!document.querySelector('#pneuma-eye-hud').classList.contains('is-minimized'));
+ const standaloneLeft=await page.locator('#pneuma-eye-hud').boundingBox();
+ if (shortcutSource) {
+   const anchor=await page.locator('#pneuma-crewtools-calendar').boundingBox();
+   assert.equal(standaloneLeft.x,anchor.x+anchor.width+8);
+   assert.equal(standaloneLeft.y,anchor.y+anchor.height+8);
+   await page.evaluate(()=>game.settings.set('pneuma-combattools','crewHUDIntegration',true));
+   await page.waitForSelector('#pneuma-biomon-shortcut');
+   const integratedLeft=await page.locator('#pneuma-eye-hud').boundingBox();
+   assert.equal(integratedLeft.x,standaloneLeft.x,'Integration does not change horizontal placement');
+   assert.equal(integratedLeft.y,standaloneLeft.y,'Integration does not change vertical placement');
+   await page.evaluate(()=>game.settings.set('pneuma-combattools','crewHUDIntegration',false));
+   await page.waitForSelector('#pneuma-biomon-shortcut',{state:'detached'});
+ }
+ await page.screenshot({path:process.env.TEMP+'/pneuma-standalone-top-left.png'});
+ await page.evaluate(()=>game.settings.set('pneuma-combattools','eyeHUDDock','right'));
+ await page.waitForFunction(()=>document.querySelector('#pneuma-eye-hud').getBoundingClientRect().x>8);
+
+ await page.evaluate(()=>{
+  game.settings.set('pneuma-combattools','eyeHUD',true);
+  game.settings.set('pneuma-combattools','eyeHUDAnimateMessages',false);
+  moduleEntry.api.hud.list().forEach(n=>moduleEntry.api.hud.dismiss(n.source,n.id));
+  moduleEntry.api.hud.send({source:'delivery',id:'flash',text:'Dramatic only',mode:'flash'});
+ });
+ await page.waitForSelector('.pneuma-hud-flash');
+ assert.equal(await page.evaluate(()=>moduleEntry.api.hud.list().length),0,'Flash has no queue entry');
+ assert.equal(await page.locator('.pneuma-hud-flash button').count(),0);
+ await page.waitForSelector('.pneuma-hud-flash',{state:'detached',timeout:6000});
+ assert.equal(await page.locator('#pneuma-hud-flashes').count(),0,'Expired flashes remove their empty container');
+ await page.evaluate(()=>{
+  game.settings.set('pneuma-combattools','eyeHUDAnimateMessages',true);
+  moduleEntry.api.hud.send({source:'delivery',id:'animated',text:'Netrunner detected',mode:'flash'});
+ });
+ assert.equal(await page.locator('.pneuma-hud-flash').evaluate(e=>e.getAnimations().length),1);
+ await page.locator('.pneuma-hud-flash').evaluate(e=>{const a=e.getAnimations()[0];a.pause();a.currentTime=1000;});
+ await page.screenshot({path:process.env.TEMP+'/pneuma-flash-alert.png'});
+ await page.evaluate(()=>moduleEntry.api.hud.dismiss('delivery','animated'));
+ assert.equal(await page.locator('.pneuma-hud-flash').count(),0);
+ await page.evaluate(()=>moduleEntry.api.hud.send({source:'delivery',id:'queued',text:'Keep until cleared',mode:'queued',duration:1}));
+ await page.waitForFunction(()=>document.querySelector('.pneuma-eye-notifications')?.textContent.includes('Keep until cleared'));
+ await page.waitForTimeout(1100);
+ assert.equal(await page.evaluate(()=>moduleEntry.api.hud.list().find(n=>n.id==='queued').expires),0);
+ await page.getByRole('button',{name:'Clear notification: Keep until cleared',exact:true}).click();
+ assert.equal(await page.evaluate(()=>moduleEntry.api.hud.list().length),0);
+ await page.evaluate(()=>{
+  game.user.isGM=false;
+  game.settings.set('pneuma-combattools','eyeHUDAnimateMessages',false);
+  const form=document.createElement('div');form.id='animation-setting-test';form.innerHTML='<div class="form-group"><input name="pneuma-combattools.eyeHUDAnimateMessages"></div>';document.body.append(form);
+  game.settings.set('pneuma-combattools','forcePlayerHUDAnimations',true);
+  hooks.renderSettingsConfig.forEach(fn=>fn({},[form]));
+  moduleEntry.api.hud.send({source:'forced',id:'player',text:'Forced player animation',mode:'flash'});
+ });
+ assert.equal(await page.evaluate(()=>settings.forcePlayerHUDAnimations.scope),'world');
+
+ assert.equal(await page.locator('#animation-setting-test .form-group').evaluate(e=>e.hidden),true);
+ assert.equal(await page.locator('.pneuma-hud-flash').evaluate(e=>e.getAnimations().length),1);
+ await page.evaluate(()=>{
+  moduleEntry.api.hud.dismiss('forced','player');game.user.isGM=true;
+  hooks.renderSettingsConfig.forEach(fn=>fn({},[document.getElementById('animation-setting-test')]));
+  moduleEntry.api.hud.send({source:'forced',id:'gm',text:'GM preference',mode:'flash'});
+ });
+ assert.equal(await page.locator('#animation-setting-test .form-group').evaluate(e=>e.hidden),false);
+ assert.equal(await page.locator('.pneuma-hud-flash').evaluate(e=>e.getAnimations().length),0);
+ await page.evaluate(()=>{
+  moduleEntry.api.hud.dismiss('forced','gm');game.user.isGM=false;
+  game.settings.set('pneuma-combattools','forcePlayerHUDAnimations',false);
+  moduleEntry.api.hud.send({source:'forced',id:'restored',text:'Player preference restored',mode:'flash'});
+ });
+ assert.equal(await page.locator('#animation-setting-test .form-group').evaluate(e=>e.hidden),false);
+ assert.equal(await page.locator('.pneuma-hud-flash').evaluate(e=>e.getAnimations().length),0);
+ assert.equal(await page.evaluate(()=>values.eyeHUDAnimateMessages),false);
+ await page.evaluate(()=>{moduleEntry.api.hud.dismiss('forced','restored');document.getElementById('animation-setting-test').remove();});
+ await page.evaluate(()=>{
+   game.user.character=actor;canvas.tokens.controlled=[];
+   values.eyeHUDMinimized=false;values.eyeHUD=true;
+   window.testIncoming=[{messageId:'intruder',name:'Unknown Netrunner'}];
+   hooks.updateCombat.forEach(fn=>fn({},{}));
+ });
+ await page.waitForSelector('.pneuma-eye-lamp[data-kind="intrusion"]');
+ assert.equal(await page.locator('.pneuma-eye-lamp[data-kind="intrusion"]').innerText(),'NEURAL INTRUSION');
+ assert.equal(await page.locator('.pneuma-eye-situation').filter({hasText:'Incoming Jack-In'}).count(),0);
+ await page.screenshot({path:process.env.TEMP+'/pct-neural-intrusion.png'});
+ await page.evaluate(()=>{window.testIncoming=[];hooks.updateCombat.forEach(fn=>fn({},{}));});
+ await page.waitForFunction(()=>!document.querySelector('.pneuma-eye-lamp[data-kind="intrusion"]'));
+ await page.evaluate(()=>{values.eyeHUDDock='right';values.combatBarDock='top-right';hooks.pneumaCombatBarDockChanged.forEach(fn=>fn());});
+ await page.waitForFunction(()=>document.getElementById('pneuma-eye-hud').getBoundingClientRect().left<innerWidth/2);
+ assert.equal(await page.evaluate(()=>values.eyeHUDDock),'right','Combat bar does not overwrite saved Biomon dock');
+ await page.evaluate(()=>{values.combatBarDock='bottom-left';hooks.pneumaCombatBarDockChanged.forEach(fn=>fn());});
+ console.log('GM animation enforcement passed: player override, hidden setting, GM exemption and restored preference.');
+ console.log('HUD delivery modes passed: flash animation, static fallback, expiry, queue and dismissal.');
+ console.log('HUD browser regression passed: classification, native drugs, sharing, private messages, expiry, docking and drag.');
 }finally{await browser.close();}

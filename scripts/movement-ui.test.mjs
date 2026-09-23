@@ -23,7 +23,7 @@ try {
   window.hooks={};window.Hooks={on:(n,f)=>(hooks[n]??=[]).push(f),once(){}};
   window.foundry={utils:{getProperty:(o,p)=>p.split('.').reduce((v,k)=>v?.[k],o)}};
   const scene={id:'scene',grid:{distance:2,units:'m'},tokens:[],flags:{}};
-  const participant={id:'p',tokenId:'t'};const combat={id:'c',scene,started:true,round:1,turn:0,turns:[participant],combatants:[participant]};
+  const participant={id:'p',tokenId:'t'};const combat={id:'c',scene,active:true,started:true,round:1,turn:0,turns:[participant],combatants:[participant]};
   const record={combat:'c',turn:'p:1',start:{x:100,y:200,elevation:5},spent:3};
   const doc={id:'t',uuid:'Scene.scene.Token.t',parent:scene,x:400,y:300,elevation:5,flags:{'pneuma-combattools':{movement:record}}};
   // This HUD fixture applies positions immediately; animation/source divergence is covered in movement.test.mjs.
@@ -39,9 +39,9 @@ try {
   scene.tokens.push(doc);window.token=token;window.doc=doc;window.app=app;
   window.canvas={app,activeLayer:layer,tokens:layer,hud:{element:[document.getElementById('hud')]},grid:{type:1,size:100},scene};layer.placeables=[token];
   window.CONST={GRID_TYPES:{SQUARE:1}};window.ui={notifications:{error:text=>window.error=text,warn:text=>window.error=text}};
-  window.game={combat,combats:new Map([['c',combat]]),user:{id:'gm',isGM:true},users:[{id:'gm',active:true,isGM:true}],settings:{register:(_module,key,config)=>{if(key==='movementTracking')window.movementSetting=config;},get:()=>window.movementEnabled}};
+  window.game={combat,combats:Object.assign(new Map([['c',combat]]),{find(fn){return [...this.values()].find(fn);}}),user:{id:'gm',isGM:true},users:[{id:'gm',active:true,isGM:true}],settings:{register:(_module,key,config)=>{if(key==='movementTracking')window.movementSetting=config;},get:()=>window.movementEnabled}};
  });
- const rules=await readFile('dist/scripts/movement-rules.js','utf8');
+ const rules=(await readFile('dist/scripts/combat-bar-state.js','utf8')).replace('const MODULE = '+JSON.stringify('pneuma-combattools')+';','')+'\n'+await readFile('dist/scripts/movement-rules.js','utf8');
  const movement=(await readFile('dist/scripts/movement.js','utf8')).replace(/^import .*;\s*/gm,'');
  await page.addScriptTag({type:'module',content:rules+'\nconst grappleFor=()=>undefined;const movementEntry=()=>undefined;const areaSettings=()=>({evadeMove:false});\n'+movement+'\nregisterMovement();hooks.refreshToken.forEach(fn=>fn(token));'});
  const counter=page.locator('.pneuma-movement-hud input'),reset=page.getByRole('button',{name:'Reset',exact:true});
@@ -49,7 +49,7 @@ try {
  assert.deepEqual(await page.evaluate(()=>({name:movementSetting.name,scope:movementSetting.scope,default:movementSetting.default})),{name:'Enable movement counters',scope:'world',default:true});
  await page.evaluate(()=>{movementEnabled=false;movementSetting.onChange();});assert.equal(await page.locator('.pneuma-movement-hud').count(),0);
  await page.evaluate(()=>{movementEnabled=true;movementSetting.onChange();});
- assert.equal(await counter.inputValue(),'3 / 6');assert.equal(await counter.evaluate(n=>getComputedStyle(n).fontSize),'32px');
+ assert.equal(await counter.inputValue(),'3 / 6');assert.equal(await counter.evaluate(n=>getComputedStyle(n).fontSize),'24px');
  // Inspect rendered bounds before the deferred redraw: animation must never carry the origin along.
  assert.deepEqual(await page.evaluate(()=>{
   const marker=canvas.tokens.children.find(c=>c.name==='pneuma-movement');
@@ -81,8 +81,9 @@ try {
   await page.evaluate(spent=>{doc.flags['pneuma-combattools'].movement.spent=spent;hooks.refreshToken.forEach(fn=>fn(token));},spent);
   assert.equal(await counter.evaluate(n=>getComputedStyle(n).color),color);
   assert.equal(await run.isVisible(),isRun);
-  if(isRun){assert.match(await counter.getAttribute('title'),/uses your Action/);const runBox=await run.boundingBox(),countBox=await counter.boundingBox(),resetBox=await reset.boundingBox();assert(runBox.y>=countBox.y+countBox.height);assert.equal(runBox.y,resetBox.y);assert(runBox.x>=resetBox.x+resetBox.width);assert.equal(runBox.height,20);assert.equal(resetBox.height,20);}
+  if(isRun){assert.match(await counter.getAttribute('title'),/uses your Action/);const runBox=await run.boundingBox(),countBox=await counter.boundingBox(),resetBox=await reset.boundingBox();assert(runBox.y>=countBox.y+countBox.height);assert.equal(runBox.y,resetBox.y);assert(runBox.x>=resetBox.x+resetBox.width);assert.equal(runBox.height,26);assert.equal(resetBox.height,26);}
  }
+ await page.screenshot({path:process.env.TEMP+'/pneuma-movement-sizing.png'});
  const inputBox=await counter.boundingBox(),resetBox=await reset.boundingBox();assert(resetBox.y>=inputBox.y+inputBox.height);
  await reset.click();await page.waitForFunction(()=>doc.x===100&&doc.y===200&&doc.flags['pneuma-combattools'].movement.spent===0&&!document.querySelector('.pneuma-movement-hud'));
  assert.equal(await counter.count(),0);assert.equal(await page.evaluate(()=>canvas.tokens.children.some(c=>c.name==='pneuma-movement')),false);assert.equal(await page.evaluate(()=>writes.length),1);

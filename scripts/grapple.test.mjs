@@ -34,7 +34,7 @@ function setup(){
  const result=n=>({total:n,html:'<div class="rollcard">'+n+'</div>'});
  async function start(id='g',source=tokens[0],target=tokens[1],action='start'){await request(action,id,{source:source.uuid,target:target.uuid,result:result(15)});}
  async function respond(id='g',total=10){const claim=await request('claim',id);await request('respond',id,{claim,result:result(total)});}
- async function hold(){await start();await respond();await request('hold');}
+ async function hold(advance=true){await start();await respond();await request('hold');if(advance&&combat.started)combat.round++;}
  return {actors,tokens,scene,combat,messages,hooks,replies,users,request,read,start,respond,hold,result};
 }
 test('Choke preserves the printed strict thresholds, not <= shortcuts',()=>{
@@ -70,9 +70,9 @@ test('Choke applies HP once, shows attacker and defender counters, and third rou
  await assert.rejects(f.request('choke','g',{revision:rev}),/changed/);
  await assert.rejects(f.request('choke'),/already applied/);
  assert.match(grappleHUD(a)[1].text,/Choking: b — 1\/3/);assert.match(grappleHUD(b)[1].text,/Being choked by: a — 1\/3/);
- f.combat.round=2;await f.request('choke');f.combat.round=3;await f.request('choke');
+ f.combat.round=3;await f.request('choke');f.combat.round=4;await f.request('choke');
  assert.equal(b.system.derivedStats.hp.value,12);assert.equal(b.effects.some(e=>e.name==='Unconscious'),true);
- f.combat.round=5;assert.equal(grappleHUD(b).length,1);
+ f.combat.round=6;assert.equal(grappleHUD(b).length,1);
  await f.request('choke');assert.equal(f.read().choke.count,1);
 });
 test('Throw ignores armor, applies prone, and ends both participants penalties',async()=>{
@@ -134,7 +134,7 @@ test('Card names are escaped and pending cards do not expose roll HTML',async()=
 
 test('Switching the selected combat cannot redirect grapple metadata or choke rounds',async()=>{
  const f=setup();await f.hold();const other={id:'other',round:50,started:true,flags:{},scene:f.scene,combatants:f.combat.combatants};game.combats.set(other.id,other);game.combat=other;
- await f.request('choke');assert.equal(f.read().combat,'combat');assert.equal(f.read().choke.round,1);assert.equal(get(other,'flags.'+M+'.grapples'),undefined);
+ await f.request('choke');assert.equal(f.read().combat,'combat');assert.equal(f.read().choke.round,2);assert.equal(get(other,'flags.'+M+'.grapples'),undefined);
  assert.equal(get(f.scene,'flags.'+M+'.grapples'),undefined);
 });
 test('Combat reset and deletion clean metadata and both actor penalties',async()=>{
@@ -216,4 +216,18 @@ test('disabled server socket metadata blocks player grapple before dice or cards
  await useGrapple(f.tokens[0].object,f.tokens[1].object,'grab');
  assert.equal(f.messages.size,0);assert.match(errors[0],/Restart the Foundry server/);
  delete game.modules;
+});
+
+test('establishment locks attacker actions until next source turn; self escape names attacker and history stays intact',async()=>{
+ const f=setup();f.combat.turns=[{token:f.tokens[2]},{token:f.tokens[0]},{token:f.tokens[1]}];f.combat.turn=1;
+ await f.hold(false);
+ const original=f.messages.get(f.read().message),content=original.content;
+ for(const action of ['choke','throw','release'])await assert.rejects(f.request(action),/next turn/);
+ assert(grappleMenu(f.tokens[0].object,f.tokens[0].object).every(row=>row.disabled));
+ assert.equal(grappleMenu(f.tokens[1].object,f.tokens[1].object)[0].label,'Escape — a');
+ f.combat.round=2;f.combat.turn=0;await assert.rejects(f.request('choke'),/next turn/);
+ f.combat.turn=1;await f.request('choke');
+ assert.equal(original.content,content);assert(original.content.includes('pneuma-grapple-rolls'));
+ assert.equal(f.messages.size,2);assert([...f.messages.values()].some(m=>m!==original&&m.content.includes('Choke:')));
+ await assert.rejects(f.request('choke'));
 });

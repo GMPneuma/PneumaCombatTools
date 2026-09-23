@@ -8,16 +8,23 @@ export function closeBarFlyout(): void {
   revision++;panel?.remove();panel=undefined;ownerId=undefined;controlsOpen=false;
 }
 
-function createPanel(root: HTMLElement, row: HTMLElement, entry: BarEntry): HTMLElement {
+function createPanel(root: HTMLElement, row: HTMLElement, entry?: BarEntry): HTMLElement {
   closeBarFlyout();
   panel=document.createElement("div");panel.className="pneuma-bar-flyout";
   panel.style.top=`${row.getBoundingClientRect().top-root.getBoundingClientRect().top}px`;
-  ownerId=entry.id;
-  if(entry.active&&root.querySelector(".pneuma-bar-end:not([hidden])"))panel.style.left="calc(100% + 64px)";
+  ownerId=entry?.id;
+  if(entry?.active&&root.querySelector(".pneuma-bar-end:not([hidden])"))panel.style.left="calc(100% + 64px)";
   if(root.dataset.orientation==="horizontal"){
     panel.style.left=`${Math.max(0,Math.min(row.getBoundingClientRect().left-root.getBoundingClientRect().left,window.innerWidth-root.getBoundingClientRect().left-270))}px`;
     panel.style.top="auto";
-    panel.style.bottom=entry.active&&root.querySelector(".pneuma-bar-end:not([hidden])")?"calc(100% + 32px)":"calc(100% + 4px)";
+    panel.style.bottom=entry?.active&&root.querySelector(".pneuma-bar-end:not([hidden])")?"calc(100% + 32px)":"calc(100% + 4px)";
+  }
+  if(root.dataset.dock==="top-right") {
+    if(root.dataset.orientation==="horizontal") {
+      panel.style.top=entry?.active&&root.querySelector(".pneuma-bar-end:not([hidden])")?"calc(100% + 32px)":"calc(100% + 4px)";
+      panel.style.bottom="auto";
+    }
+    else {panel.style.left="auto";panel.style.right=entry?.active?"calc(100% + 64px)":"calc(100% + 4px)";}
   }
   root.append(panel);
   return panel;
@@ -42,6 +49,7 @@ interface NativeTracker {
   viewed: Combat;
   template: string;
   getData(): Promise<object>;
+  _onCombatControl(event: Event): Promise<unknown>;
   _onCombatantControl(event: Event): Promise<unknown>;
   _onPingCombatant(combatant: Pick<Combatant, "sceneId" | "token">): Promise<unknown>;
   _onPanToCombatant(combatant: Pick<Combatant, "sceneId" | "token">): Promise<unknown>;
@@ -102,3 +110,34 @@ export async function showBarControls(root: HTMLElement,row: HTMLElement): Promi
 }
 
 export function leaveBarFlyout(): void {if(!controlsOpen)closeBarFlyout();}
+
+/** Reuse the configured native tracker's encounter-wide initiative actions. */
+export async function showBarInitiative(root: HTMLElement, round: HTMLElement): Promise<void> {
+  const combat=barCombat();
+  if(!game.user?.isGM||!combat||!ui.combat||panel?.classList.contains("pneuma-bar-initiative"))return;
+  const flyout=createPanel(root,round);controlsOpen=true;
+  flyout.classList.add("pneuma-bar-initiative");
+  flyout.setAttribute("aria-label","Initiative controls");
+  const tracker=Object.assign(Object.create(ui.combat),{viewed:combat}) as NativeTracker;
+  const current=revision;
+  const html=await renderTemplate(tracker.template,await tracker.getData());
+  if(current!==revision||!root.isConnected)return;
+  const template=document.createElement("template");template.innerHTML=html;
+  for(const [action,label] of [["rollAll","Roll Initiative All"],["rollNPC","Roll Initiative NPC"],["resetAll","Reset Initiative"]] as const){
+    const control=document.createElement("button");control.type="button";
+    const native=template.content.querySelector<HTMLElement>(`.combat-control[data-control="${action}"]`);
+    if(!native)continue;
+    control.className="combat-control";control.dataset.control=action;
+    control.title=native.title||label;control.setAttribute("aria-label",label);
+    for(const child of Array.from(native.childNodes))control.append(child.cloneNode(true));
+    control.addEventListener("click",event=>{
+      event.preventDefault();event.stopPropagation();
+      if(!game.user?.isGM||barCombat()?.id!==combat.id)return;
+      void tracker._onCombatControl(event).catch(error=>ui.notifications!.error(String(error)));
+      closeBarFlyout();
+    });
+    flyout.append(control);
+  }
+  if(!flyout.children.length){closeBarFlyout();return;}
+  flyout.addEventListener("pointerleave",()=>closeBarFlyout());
+}

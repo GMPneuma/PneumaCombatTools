@@ -2,6 +2,7 @@ import {recordStep,type MoveRecord,type MovePoint} from "./movement-rules.js";
 import {grappleFor} from "./grapple/state.js";
 import {movementEntry} from "./aoe/movement.js";
 import {areaSettings} from "./aoe/settings.js";
+import {barCombat} from "./combat-bar-state.js";
 const MODULE="pneuma-combattools",flag=`flags.${MODULE}.movement`;
 // Prepared coordinates can follow token animation; source coordinates are the committed destination.
 function committedPosition(doc:TokenDocument){
@@ -9,8 +10,8 @@ function committedPosition(doc:TokenDocument){
 }
 declare global {interface SettingConfig {"pneuma-combattools.movementTracking":boolean}}
 export function movementTurn(doc:TokenDocument):{combat:Combat;turn:string}|undefined {
-  const combat=game.combat;
-  if(!combat?.started||combat.scene?.id!==doc.parent?.id)return;
+  const combat=barCombat(doc.parent?.id);
+  if(!combat)return;
   const participant=combat.combatants.find(c=>c.tokenId===doc.id);if(!participant)return;
   const index=combat.turns.findIndex(c=>c.id===participant.id);
   return {combat,turn:participant.id+":"+String(Number(combat.round)-(Number(combat.turn)<index?1:0))};
@@ -126,9 +127,9 @@ export function registerMovement(){
   };
   let turns=new Map<string,string>();
   const refreshTurns=(force=false)=>{
-    const next=new Map<string,string>(),combat=game.combat;
-    if(combat?.started&&combat.scene?.id===canvas.scene?.id)combat.turns.forEach((c,index)=>{
-      if(c.tokenId)next.set(c.tokenId,c.id+":"+String(Number(combat.round)-(Number(combat.turn)<index?1:0)));
+    const next=new Map<string,string>(),combat=barCombat();
+    if(combat)combat.turns.forEach((c,index)=>{
+      if(c.tokenId)next.set(c.tokenId,combat.id+":"+c.id+":"+String(Number(combat.round)-(Number(combat.turn)<index?1:0)));
     });
     for(const token of canvas.tokens?.placeables??[])if(force||turns.get(token.id!)!==next.get(token.id!))enqueue(token);
     turns=next;
@@ -147,11 +148,11 @@ export function registerMovement(){
   Hooks.on("canvasTearDown",()=>{queued.clear();turns.clear();for(const token of displays.keys())clear(token);});
   Hooks.on("canvasReady",()=>refreshTurns(true));
   Hooks.on("updateCombat",(combat:Combat,changes:Record<string,unknown>)=>{
-    if(combat.id===game.combat?.id||"active" in changes)if(["round","turn","active","scene"].some(key=>key in changes))refreshTurns();
+    if(["round","turn","active","scene"].some(key=>key in changes))refreshTurns();
   });
   Hooks.on("deleteCombat",()=>refreshTurns(true));
   for(const hook of ["createCombatant","updateCombatant","deleteCombatant"])Hooks.on(hook,(participant:Combatant,changes:Record<string,unknown>={})=>{
-    if(participant.parent?.id!==game.combat?.id)return;
+    if(participant.parent?.id!==barCombat()?.id)return;
     if(hook!=="updateCombatant"||["initiative","tokenId"].some(key=>key in changes))refreshTurns();
     const token=participant.token?.object;if(token)enqueue(token);
   });

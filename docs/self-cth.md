@@ -27,3 +27,9 @@ Self CTH uses the normal CTH button column beside the native token HUD, with no 
 Self CTH always includes a bell icon labelled Toggle Alert HUD, which toggles the current client Status HUD setting even when disabled in Settings. Re-roll Initiative uses a D10 icon; it remains a native initiative reroll. The speedware world setting carries the Pneuma Homebrew badge and retains its existing stored key/preferences.
 
 Self controls are direct `.control-icon` children of `.pneuma-combat-column`, sharing native button styling, HUD sizing/spacing and the configured CTH icon color. The bell is always present; the D10 appears only when eligible. This supersedes the separate Self panel.
+
+## Initiative and throws (unreleased)
+
+General initiative controls are not shown on CTH. Use the combat bar round flyout for encounter initiative actions. Self-CTH retains the conditional speedware reroll.
+
+The self HUD includes Thrown weapons and grenades. Grenades enter the current scene area-placement workflow without targeting another actor. Thrown weapons and improvised attacks require one other native target. A compact native-style panel lists current inventory. These additions supersede the earlier statement that self controls contain only the bell and optional speedware die.
