@@ -299,8 +299,9 @@ test("failed completion write cannot apply HP twice after reload",async()=>{
   await assert.rejects(request("damage","damageApply",{options:damageOptions}),/already applying/);
   assert.equal(calls,1);
 });
-test("miss override is allowed; private cards and older attacks remain guarded",async()=>{
+test("GM-approved miss override retains private-card and older-attack guards",async()=>{
   setup();const msg=hit();const data=get(msg,"flags.pneuma-combattools.exchange");data.hit=false;
+  await request("damage","damageAllowMiss",{user:"gm"});
   await request("damage","damageClaim",{nonce:"n"});
   await request("damage","damageRelease",{nonce:"n"});
   data.hit=true;msg.blind=true;
@@ -501,4 +502,33 @@ test("selected damage rejects a recipient removed before GM processing without c
  combats.get("combat").combatants=combats.get("combat").combatants.filter(p=>p.token.uuid!=="Token.selected");
  await assert.rejects(request("damage","damageApply",{application:"selected",targetUuid:"Token.selected",options:damageOptions}),/participating tokens/);
  assert.equal(calls,0);assert.equal(get(msg,"flags.pneuma-combattools.exchange.damage.status"),"rolled");
+});
+
+
+test("empty bow loads before native roll creation; cancelling the attack retains its arrow",async()=>{
+ const {startCombatExchange}=await import('../dist/scripts/combat-resolution.js');setup();
+ game.users.filter=()=>[{id:'gm',isGM:true,active:true}];game.user={isGM:false};game.tables={getName:()=>({getResultsForRoll:()=>[{text:'13'}]})};
+ globalThis.canvas={grid:{measurePath:()=>({distance:5})}};const calls=[];
+ const ammo={id:'arrow',name:'Arrows',type:'ammo',system:{variety:'arrow',amount:3}};
+ const roll={luck:0,handleRollDialog:async()=>{calls.push('attack-dialog');return false;}};
+ const bow={id:'bow',name:'Bow',system:{isRanged:true,weaponType:'bow',dvTable:'Bow',ammoVariety:['arrow'],magazine:{value:0,max:1}},
+ getInstalledItems:()=>[ammo],installItems:async()=>true,uninstallItems:async()=>{},reload:async()=>{calls.push('reload');ammo.system.amount--;bow.system.magazine.value=1;},
+ createRoll:()=>{calls.push('create-roll');assert.equal(bow.system.magazine.value,1);return roll;},hasAmmo:()=>bow.system.magazine.value>0,confirmRoll:async()=>{throw Error('Must not confirm canceled attack')}};
+ actor.items=new Map([['bow',bow],['arrow',ammo]]);actor.items[Symbol.iterator]=actor.items.values.bind(actor.items);
+ globalThis.Dialog=class {constructor(data){this.data=data}render(){calls.push('ammo-dialog');this.data.buttons.load.callback({find:()=>({val:()=>'arrow'})});}};
+ const token={actor,center:{x:0,y:0},document:{uuid:'Token.a',elevation:0}},target={actor,center:{x:5,y:0},document:{uuid:'Token.d',elevation:0}};
+ await startCombatExchange(token,target,'bow','attack',{});
+ assert.deepEqual(calls,['ammo-dialog','reload','create-roll','attack-dialog']);assert.equal(bow.system.magazine.value,1);assert.equal(ammo.system.amount,2);assert.equal(messages.size,0);
+});
+
+
+test('missed attacks require explicit GM approval before damage and keep the miss outcome',async()=>{
+ setup();const msg=hit();get(msg,'flags.pneuma-combattools.exchange').hit=false;
+ for(const action of ['damageClaim','damageApply','damageCommit'])await assert.rejects(request('damage',action,{user:'gm',nonce:'n',options:damageOptions}),/GM must allow/);
+ await assert.rejects(request('damage','damageAllowMiss'),/Only a GM/);
+ await request('damage','damageAllowMiss',{user:'gm'});
+ assert.equal(get(msg,'flags.pneuma-combattools.exchange.hit'),false);
+ assert.equal(get(msg,'flags.pneuma-combattools.exchange.damageAllowedOnMiss'),true);
+ await request('damage','damageClaim',{nonce:'n'});
+ assert.equal(get(msg,'flags.pneuma-combattools.exchange.damage.status'),'rolling');
 });

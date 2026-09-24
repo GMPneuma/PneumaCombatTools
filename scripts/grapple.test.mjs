@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {chokeDamage,nextChoke,visibleChoke,winsGrab} from '../dist/scripts/grapple/rules.js';
 import {grappleHUD,grappleMenu,grappleWeaponBlocked} from '../dist/scripts/grapple/state.js';
-import {handleGrappleRequest,registerGrapple,grappleContent,useGrapple} from '../dist/scripts/grapple/workflow.js';
+import {handleGrappleRequest,registerGrapple,grappleContent,useGrapple,renderGrapple} from '../dist/scripts/grapple/workflow.js';
 const M='pneuma-combattools';
 const get=(o,p)=>p.split('.').reduce((v,k)=>v?.[k],o);
 function merge(a,b){for(const [k,v] of Object.entries(b)){if(k.startsWith('-=')){delete a[k.slice(2)];continue;}if(v&&typeof v==='object'&&!Array.isArray(v)){a[k]??={};merge(a[k],v);}else a[k]=structuredClone(v);}return a;}
@@ -83,6 +83,10 @@ test('Throw ignores armor, applies prone, and ends both participants penalties',
 test('Escape and third-party breaks oppose the grappler, preserve penalties until success, and ties fail',async()=>{
  const f=setup();await f.hold();await f.start('escape',f.tokens[1],f.tokens[0],'startBreak');await f.respond('escape',15);
  assert.equal(f.read().state,'active');
+ assert.match(f.read('escape').note,/^Escape failed/);
+ assert.doesNotMatch(grappleContent(f.read('escape')),/Grab failed/);
+ await f.start('failedRescue',f.tokens[2],f.tokens[0],'startBreak');await f.respond('failedRescue',15);
+ assert.match(f.read('failedRescue').note,/^Break Grapple failed/);
  await f.start('rescue',f.tokens[2],f.tokens[0],'startBreak');await f.respond('rescue',14);
  assert.equal(f.actors[0].effects.length,0);assert.equal(f.actors[1].effects.length,0);
 });
@@ -234,3 +238,20 @@ test('establishment locks attacker actions until next source turn; self escape n
 
 test('client-captured grapple encounter survives GM scene and active encounter changes',async()=>{const f=setup(),encounter={combatId:f.combat.id,combatEpoch:'',combatScene:f.scene.id,combatTokens:f.tokens.slice(0,2).map(t=>t.uuid)};f.combat.active=false;const other={...f.combat,id:'other',active:true,flags:{}};game.combats.set('other',other);game.combat=other;canvas.scene={id:'elsewhere'};await f.request('start','g',{encounter,source:f.tokens[0].uuid,target:f.tokens[1].uuid,result:f.result(15)});assert.equal(f.read().combat,'combat');assert.equal(get(other,'flags.'+M+'.grapples'),undefined);});
 test('client-captured grapple refuses a reset before card creation',async()=>{const f=setup();f.combat.flags={[M]:{evasionEpoch:'new'}};await assert.rejects(f.request('start','g',{encounter:{combatId:f.combat.id,combatEpoch:''},source:f.tokens[0].uuid,target:f.tokens[1].uuid,result:f.result(15)}),/reset/);assert.equal(f.messages.size,0);});
+
+
+test('initial chat render ignores the reference until the complete grapple is saved',async()=>{
+ const f=setup(),create=ChatMessage.create;let initialRenders=0;
+ ChatMessage.create=async data=>{
+  const message=await create(data);message.visible=true;message.isContentVisible=true;
+  assert.equal(get(message,'flags.'+M+'.grapple.source'),undefined);
+  assert.doesNotThrow(()=>renderGrapple(message,{find(){throw Error('Initial reference must not be treated as a full record');}}));
+  initialRenders++;return message;
+ };
+ await f.start();assert.equal(initialRenders,1);
+ const g=f.read(),message=f.messages.get(g.message);assert.ok(g.source.token);assert.ok(g.target.token);
+ game.user={id:'observer',isGM:false};let renderedState;
+ const html={find(){return this},attr(_key,v){renderedState=v;return this},text(){return this},empty(){return this}};
+ assert.doesNotThrow(()=>renderGrapple(message,html));assert.equal(renderedState,'waiting');
+ game.user=f.users.get('gm');await f.respond();assert.equal(f.read().state,'choice');
+});

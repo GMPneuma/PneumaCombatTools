@@ -1,0 +1,41 @@
+import type {RollItem} from "./native-combat.js";
+interface BowItem extends RollItem {
+  getInstalledItems(type:string):Item[];
+  installItems(items:Item[]):Promise<boolean>;
+  uninstallItems(items:Item[]):Promise<unknown>;
+  reload():Promise<unknown>;
+}
+const value=(item:Item,path:string)=>foundry.utils.getProperty(item,"system."+path);
+const loaded=(item:Item)=>Number(value(item,"magazine.value"))>0;
+const escape=(text:unknown)=>String(text??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]!);
+function available(actor:Actor,bow:Item):Item[] {
+  const varieties=value(bow,"ammoVariety");
+  return Array.from(actor.items).filter(i=>String(i.type)==="ammo"&&Number(value(i,"amount"))>0&&Array.isArray(varieties)&&varieties.includes(value(i,"variety")));
+}
+/** Native installation remembers the last arrow stack; native reload owns inventory accounting. */
+export async function prepareBowAttack(actor:Actor,item:RollItem):Promise<boolean> {
+  if(value(item,"weaponType")!=="bow"||loaded(item))return true;
+  const bow=item as BowItem;
+  if([bow.getInstalledItems,bow.installItems,bow.uninstallItems,bow.reload].some(fn=>typeof fn!=="function"))throw Error("Native bow loading is unavailable. Load ammunition from the character sheet.");
+  const ammo=available(actor,bow);
+  if(!ammo.length){ui.notifications!.warn("No compatible arrows remain in this character’s inventory.");return false;}
+  const previous=bow.getInstalledItems("ammo")[0];
+  const remembered=ammo.some(i=>i.id===previous?.id)?previous?.id:undefined;
+  const selected=await new Promise<string|null>(resolve=>{
+    new Dialog({title:"Load Bow",content:'<p>Choose ammunition for '+escape(bow.name)+'. Loading is retained if the attack roll is canceled.</p><div class="form-group"><label for="pneuma-bow-ammo">Ammunition</label><select id="pneuma-bow-ammo" name="ammo"><option value=""'+(!remembered?' selected':'')+'>Choose ammunition</option>'+ammo.map(i=>'<option value="'+escape(i.id)+'"'+(i.id===remembered?' selected':'')+'>'+escape(i.name)+' (×'+Number(value(i,"amount"))+')</option>').join('')+'</select></div>',buttons:{load:{label:"Load & Continue",callback:html=>resolve((html as JQuery).find<HTMLSelectElement>('[name="ammo"]').val() as string||null)},cancel:{label:"Cancel",callback:()=>resolve(null)}},default:"load",close:()=>resolve(null)}).render(true);
+  });
+  if(!selected)return false;
+  if(actor.items.get(item.id!)!==item)throw Error("The bow is no longer in this character’s inventory.");
+  // Another action may have loaded the bow while this dialog was open. Do not replace its arrow.
+  if(loaded(bow))return true;
+  const chosen=available(actor,bow).find(i=>i.id===selected);
+  if(!chosen)throw Error("That ammunition is no longer available. Choose again.");
+  const current=bow.getInstalledItems("ammo")[0];
+  if(current?.id!==chosen.id){
+    if(current)await bow.uninstallItems([current]);
+    if(!await bow.installItems([chosen]))return false;
+  }
+  await bow.reload();
+  if(!loaded(bow)){ui.notifications!.warn("The bow could not be loaded. Check its ammunition.");return false;}
+  return true;
+}

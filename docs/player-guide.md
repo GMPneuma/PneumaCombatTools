@@ -35,3 +35,7 @@ Movement counters show used/normal allowance, run indication and a saved start m
 Click the die beside chat's roll-mode selector for Damage, Critical Injury, Cyberpunk Roll or STAT Roll. The GM can also request a Group Check. Click your Roll button on a request; click the resulting total to expand the native roll and modifiers. See [manual rolls](manual-rolls.md).
 
 An unavailable control can indicate no active GM, invalid ownership/target/range, an inactive encounter, an unsupported item, a changed connection or a rule restriction. Correct that condition; do not repeatedly click uncertain damage applications. The GM can inspect recovery controls.
+
+## Bow ammunition (unreleased)
+
+Select your token and attack a target with a bow. If an arrow is already loaded, the attack proceeds with it. Otherwise, choose compatible ammunition from inventory and click **Load & Continue**. The last attached ammunition stack is preselected if it still has stock; an exhausted stack leaves the choice unselected. Canceling this prompt changes nothing. Canceling the attack roll after loading leaves the arrow loaded. Native CPR groups bows and crossbows under the same weapon type, so both use this flow.

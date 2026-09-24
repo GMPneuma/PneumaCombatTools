@@ -929,3 +929,9 @@ i.pneuma-neural-plug::before { content: ""; display: inline-block; width: 1em; h
 .pneuma-area-placement p { margin:6px 0 0; }
 .pneuma-area-placement-controls { font-size:12px; opacity:.85; }
 .pneuma-aoe-card .pneuma-aoe-reposition p { margin:6px 0; }
+
+#pneuma-emp-settings .pneuma-emp-section { margin:0 0 8px; padding:6px 8px; border:1px solid var(--color-border-light-primary); border-radius:3px; }
+#pneuma-emp-settings summary { cursor:pointer; font-weight:bold; }
+#pneuma-emp-settings .form-group > select { flex:1.5; min-width:0; }
+#pneuma-emp-settings input[type="number"] { flex:0 0 64px; }
+#pneuma-emp-settings textarea { width:100%; resize:vertical; }

@@ -1,5 +1,5 @@
 import {markHomebrew} from "./homebrew-badge.js";
-import {EMP_METHODS,empBehavior,normalizeEmpBehavior} from "./emp-behavior.js";
+import {empBehavior,normalizeEmpBehavior} from "./emp-behavior.js";
 const MODULE="pneuma-combattools";
 export class EmpSettingsForm extends FormApplication {
   constructor(){super({});}
@@ -9,10 +9,11 @@ export class EmpSettingsForm extends FormApplication {
   }) as typeof FormApplication.defaultOptions;}
   override getData(){
     const values=empBehavior();
-    return {...values,foundationWeights:{equal:"Standard Weight","foundation-more":"2× Weight","foundation-less":"½ Weight"},hardenedMethods:{exclude:"Exclude hardened items from selection",consume:"Include hardened items; consume the pick with no effect"},profiles:(["gm","player"] as const).map(side=>({
+    const immunity=String(game.settings!.get(MODULE,"empImmunity")??"");
+    return {...values,frameConfigured:values.frameNoMove||values.frameReduceMove||values.frameActionPenalty,protectionConfigured:values.hardened!=="exclude"||!!immunity.trim(),foundationWeights:{equal:"Standard Weight","foundation-more":"2× Weight","foundation-less":"½ Weight"},hardenedMethods:{exclude:"Exclude from selection",consume:"Include; use pick with no effect"},profiles:(["gm","player"] as const).map(side=>({
       side,title:side==="gm"?"When GM picks":"When player picks",...values[side],
-      methods:side==="gm"?EMP_METHODS:{manual:"Player sees all and picks",shortlist:"Player sees 2×X random and picks X",random:"Random"},
-    })),immunity:game.settings!.get(MODULE,"empImmunity")};
+      methods:side==="gm"?{manual:"GM chooses",random:"Random"}:{manual:"Choose from all items",shortlist:"Choose from shortlist",random:"Random"},
+    })),immunity};
   }
   override activateListeners(html:JQuery){
     super.activateListeners(html);
@@ -20,6 +21,10 @@ export class EmpSettingsForm extends FormApplication {
     const biowareLabel=root.querySelector<HTMLElement>("[data-bioware-label]");
     if(biowareLabel)markHomebrew(biowareLabel);
     const update=()=>{
+      const checked=(name:string)=>!!root.querySelector<HTMLInputElement>(`[name="${name}"]`)?.checked;
+      for(const [selector,visible] of [["[data-frame-movement]",!checked("frameNoMove")],["[data-frame-reduction]",checked("frameReduceMove")],["[data-frame-penalty]",checked("frameActionPenalty")]] as const){
+        const element=root.querySelector<HTMLElement>(selector);if(element)element.hidden=!visible;
+      }
       const weights=root.querySelector<HTMLElement>("[data-foundation-weight]");
       if(weights)weights.hidden=!root.querySelector<HTMLInputElement>('[name="includeFoundational"]')?.checked;
       root.querySelectorAll<HTMLElement>("[data-emp-profile]").forEach(section=>{

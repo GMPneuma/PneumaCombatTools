@@ -21,13 +21,13 @@
     {{/each}}
     <p class="notes">Areas respect walls. These distances set the affected area, not weapon range.</p>
     <details class="pneuma-area-rules"><summary>Evasion &amp; Cover Up</summary>
-      <p class="notes">Successful evaders must leave the area. MOVE costs and borrowing are optional homebrew.</p>
+      <p class="notes">Successful evaders must leave the area. RAW explosive evasion must exceed the attack; shell defense ties avoid the attack. MOVE costs and borrowing are optional homebrew.</p>
       <div class="form-group"><label for="pct-evade-move">Charge evasion movement to MOVE</label><input id="pct-evade-move" type="checkbox" name="evadeMove" {{checked evadeMove}}></div>
       <div class="form-group"><label for="pct-evade-borrow">Borrow remaining cost from next turn</label><input id="pct-evade-borrow" type="checkbox" name="evadeBorrow" {{checked evadeBorrow}}></div>
       <div class="form-group"><label for="pct-evade">Evasion eligibility</label><select id="pct-evade" name="evade">{{selectOptions evadeChoices selected=evade}}</select></div>
       <div class="form-group"><label for="pct-evade-penalty">Evasion modifier</label><input id="pct-evade-penalty" type="number" name="evadePenalty" value="{{evadePenalty}}" min="-20" max="20"></div>
       <div class="form-group"><label for="pct-cover-up" data-cover-up-label>Allow Cover Up Homebrew</label><input id="pct-cover-up" type="checkbox" name="coverUp" {{checked coverUp}}></div>
-      <p class="notes">Cover Up: stay in place, become Prone, double armor SP for this damage application, and double armor ablation even if no damage penetrates. RAW explosive evasion must exceed the attack. Shell defense ties avoid the attack.</p>
+      <p class="notes">Adds Cover Up alongside Evasion; enabling it does not remove Evasion. Choose one response: roll Evasion if eligible, or Cover Up without a roll or evasion eligibility requirement. Cover Up keeps you in place, makes you Prone, and takes the hit with double armor SP and double armor ablation, even if no damage penetrates.</p>
     </details>
   </div>
   <footer class="sheet-footer flexrow"><button type="submit"><i class="fas fa-save" aria-hidden="true"></i> Save AoE settings</button></footer>

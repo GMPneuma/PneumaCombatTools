@@ -55,7 +55,9 @@ export function grappleContent(g: Grapple): string {
 }
 function findRecord(scene: Scene, id: string): Grapple | undefined {
   return grapples(scene).find(g => g.id === id) ?? property<Grapple>(game.messages?.find(m => {
-    const value = property<Grapple>(m,"grapple");return value?.id === id && value.scene === scene.id;
+    const value = property<Partial<Grapple>>(m,"grapple");
+    // Creation renders the reference before save() publishes the full record.
+    return value?.id === id && value.scene === scene.id && !!value.source?.token && !!value.target?.token && !!value.attack;
   }) ?? {},"grapple");
 }
 async function save(scene: Scene, g: Grapple) {
@@ -180,8 +182,9 @@ export async function handleGrappleRequest(r: GrappleRequest): Promise<string | 
       if (broken.operation) throw new Error("Finish the original grapple's pending action first.");
       if (broken.state === "active") await end(scene,broken,`${source.name} broke the grapple.`,g.id);
     }
+    const attempt = g.purpose === "grab" ? "Grab" : findRecord(scene,g.breaks ?? "")?.target.token === g.source.token ? "Escape" : "Break Grapple";
     const next: Grapple = {...g,defense,revision:g.revision+1,state:success && g.purpose === "grab" ? "choice" : "ended",
-      note:success ? g.purpose === "grab" ? "Grab succeeded. Choose Hold Target or Take Held Object." : "Grapple broken." : "Grab failed. Ties favor the responding character."};
+      note:success ? g.purpose === "grab" ? "Grab succeeded. Choose Hold Target or Take Held Object." : "Grapple broken." : `${attempt} failed. Ties favor the responding character.`};
     await save(scene,next); claims.delete(key); return;
   }
   if (!owns(source.actor!,user)) throw new Error("Only the grappler's owner or GM can use this action.");
@@ -273,7 +276,7 @@ export async function useGrapple(source: Token, target: Token, action: string) {
       const opponent = action === "escape" && own ? tokenFor(scene,own.source.token) : target.document;
       validatePair(scene,source.document,opponent);
       const encounter=encounterRef(tokenEncounter(scene.id,[source.document.uuid,opponent.uuid]),scene.id,[source.document.uuid,opponent.uuid]);
-      if (!await Dialog.confirm({title:action === "grab" ? "Grab" : "Break Grapple",content:"<p>This costs an Action. Confirm you have a free hand to attempt this Grab.</p>"})) return;
+      if (!await Dialog.confirm({title:action === "grab" ? "Grab" : action === "escape" ? "Escape" : "Break Grapple",content:action === "grab" ? "<p>This costs an Action. Confirm you have a free hand to attempt this Grab.</p>" : "<p>This costs an Action. Attempt to break the grapple?</p>"})) return;
       const result = await brawling(source.actor); if (!result) return;
       resolveEncounter(encounter);
       await request({encounter,scene:scene.id!,id:foundry.utils.randomID(),revision:0,action:action === "grab" ? "start" : "startBreak",source:source.document.uuid,target:opponent.uuid,result,rollMode:game.settings!.get("core","rollMode") ?? "roll"});

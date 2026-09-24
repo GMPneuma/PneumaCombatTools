@@ -1,6 +1,6 @@
 # Verification and maintenance
 
-Release: Combat Tools 0.8.3, reviewed 2026-09-24. Includes consistent encounter ownership, damage-status cleanup, injury/EMP corrections and persistent area-placement instructions.
+Release: Combat Tools 0.8.4, reviewed 2026-09-24. Includes consistent encounter ownership, damage-status cleanup, injury/EMP corrections and persistent area-placement instructions.
 
 ## Evidence levels
 
@@ -52,3 +52,19 @@ Final 0.8.2 typecheck/build and automated suite passed: 352 passed, four optiona
 ## 0.8.3 release validation
 
 Typecheck/build passed; 352 automated tests passed, four optional native-Foundry fixtures skipped. Settings browser regression passed at three widths, including button click, readable dropdown, Crew integration defaults with/without availability, and preservation of saved preferences. Live Foundry verification remains separate.
+
+## Bow loading validation (0.8.4)
+
+Build/typechecking and full suite passed: 362 passed, four optional native-Foundry checks skipped. Tests cover loaded/non-bow bypass, native reload/install order, quantity filtering, stale inventory, cancellation, concurrent loading and failed reloads. The attack integration verifies loading before roll creation and retaining the loaded arrow after attack cancellation. Browser fixture passed and its prompt screenshot was inspected. Native APIs were inspected in official CPR v0.92.4 [loadable source](https://gitlab.com/cyberpunk-red-team/fvtt-cyberpunk-red-core/-/blob/v0.92.4/src/modules/item/mixins/cpr-loadable.js); the live server version and behavior remain unverified.
+
+## Damage-on-miss regression (0.8.4)
+
+Full suite: 363 passed, four optional native-Foundry checks skipped. Browser checks confirm the missed-attack blood drop does not send requests, the override is GM-only, and approval enables the normal damage control. Coordinator tests verify players cannot grant approval, unapproved damage is rejected even for GMs, and approval preserves the miss outcome. Build/typechecking passed.
+
+## Area targeting regression (0.8.4)
+
+Build/typecheck and full suite passed: 366 passed, four optional native-Foundry fixtures skipped. AoE browser checks verify out-of-sight preview hiding, invalid-click rejection, restored preview, cancel/placement cleanup and deletion of both blast and original-aim templates. Workflow regressions cover sight rejection before ammunition consumption, sight changes during the roll dialog, fixed original marker after scatter, and marker visibility. Live Foundry scene/vision testing remains pending.
+
+## 0.8.4 release validation
+
+Production build/typecheck passed. Automated suite: 366 passed, four optional native-Foundry checks skipped, zero failures. Bow loading, AoE, EMP settings save/reopen, and full EMP browser fixtures passed. The EMP fixture now supplies the active scene encounter and expands the optional settings sections before editing. Live Foundry multiplayer and installed-system bow behavior remain unverified.

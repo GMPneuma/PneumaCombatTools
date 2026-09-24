@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.4 - 2026-09-24
+
+- Fix grapple chat rendering before the full record is saved, preventing missing-token errors.
+- Correct failed Escape and Break Grapple wording and confirmation instructions.
+- Prompt for compatible inventory ammunition when attacking with an empty bow/crossbow; load through the native system before the attack roll and remember the attached ammunition type.
+- Disable damage on missed attacks unless the GM enables Allow damage on miss.
+- Require line of sight for initial AoE targeting, hide invalid previews, and retain an original-target marker for explosives after scatter.
+- Clarify Cover Up as a no-roll alternative alongside Evasion; mechanics are unchanged.
+- Streamline EMP settings with grouped selection controls, collapsible protection/frame options, and conditional numeric fields while preserving saved settings.
+
+Validation: production build, automated regressions and targeted browser fixtures. Live Foundry multiplayer verification remains pending. Outside-combat QuickHack changes are not included.
+
 ## 0.8.3 - 2026-09-24
 
 - Fix the compressed Homebrew settings button. Default Biomon to top-left and enable Crew Tools integration by default while retaining saved preferences and standalone fallback.

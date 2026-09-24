@@ -1,6 +1,6 @@
 # Combat Tools roadmap and backlog
 
-## Authorized encounter consistency — implemented locally, 2026-09-24
+## Authorized encounter consistency — included in 0.8.4, 2026-09-24
 
 Use one active, started encounter per action scene; require participating tokens; retain the selected encounter through responses, movement and effects; reject ambiguous selection and invalidated actions. Clean environment assumed. Shared lookup and regression coverage implemented; live multiplayer verification remains open. See [encounter selection](docs/encounters.md).
 
@@ -79,3 +79,9 @@ Disabled cyberlimbs derive their state from combat/item disablement records. Onl
 AoE re-placement: missed aim templates are gray and inactive while waiting for the GM landing point. `.pneuma-aoe-reposition` explains the state and placement bounds; the existing scatter action now reads “Place landing point.” A pointer-transparent `.pneuma-area-placement` status panel keeps placement/cancel instructions visible. The moving preview retains its color; accepting replaces the original template at the actual landing point.
 
 Disablement audit fixes: active native leg-injury modifiers (including renamed native items) offset the cyberleg penalty; disabled/suppressed effects do not. Generic Disabled labels are display-only, including for evasion. Module-owned aggregate limb/frame penalties restore automatically while their item/combat causes remain active, including after manual effect deletion or disabling. Internal-frame policies derive from combat requests and item causes; legacy empty frame markers are removed. CPR modifier metadata repairs also cover Slow and Impair Movement.
+
+### Bow loading flow — implemented locally, 2026-09-24
+
+Approved target-aware bow ammunition prompt, native loading and remembered attached ammo selection implemented with regression coverage. No separate Fire last type button. Covers native bow/crossbow weapon type. Live verification pending.
+
+- EMP settings streamlined: grouped selection controls, collapsible protection and frame options (open when configured), and conditional numeric fields. Existing behavior and saved values retained.

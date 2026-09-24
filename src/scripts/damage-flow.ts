@@ -26,7 +26,7 @@ export interface DamageState {
 export interface DamageOptions { useShield: boolean; damageReductionRole: boolean; damageReductionAE: boolean; brainDamageReduction: boolean }
 export interface DamageRequest {
   encounter?:EncounterRef;
-  action: "damageClaim" | "damageRelease" | "damageCommit" | "damageApply" | "damageReset" | "damageResolved" | "damageStatuses";
+  action: "damageAllowMiss" | "damageClaim" | "damageRelease" | "damageCommit" | "damageApply" | "damageReset" | "damageResolved" | "damageStatuses";
   interactArmor?: boolean; halfArmor?: boolean; statusEffects?: string[]; nonce?: string; damage?: DamageResult; options?: DamageOptions; targetUuid?: string; application?: "recorded" | "selected"; applicationId?: string;
 }
 export async function damageActor(uuid: string): Promise<Actor> {
@@ -50,7 +50,7 @@ export function configureDamage(roll: NativeRoll, data: Exchange): void {
     const maximum = Number(roll.autofireMultiplierMax);
     if (!Number.isFinite(maximum) || maximum < 1)
       throw new Error("No valid Autofire margin or weapon maximum is available.");
-    // A reported miss may be overridden; leave a usable multiplier for the native dialog to review.
+    // A GM-approved miss uses an editable multiplier for the native dialog to review.
     roll.autofireMultiplier = Math.min(Math.max(Number.isFinite(margin) ? margin : 1, 1), maximum);
   }
 }
@@ -111,6 +111,14 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
   if(data.combatId===undefined&&request.encounter)Object.assign(data,request.encounter);
   if(data.combatId!==undefined)resolveEncounter(data);
   if (data.state !== "resolved") throw new Error("Damage requires a resolved attack.");
+
+  if (request.action === "damageAllowMiss") {
+    if (!user.isGM) throw new Error("Only a GM can allow damage on a miss.");
+    if (data.hit !== false) throw new Error("This attack is not a miss.");
+    data.damageAllowedOnMiss = true; await save(); return;
+  }
+  if (data.hit === false && !data.damageAllowedOnMiss && ["damageClaim", "damageCommit", "damageApply"].includes(request.action))
+    throw new Error("This attack missed. A GM must allow damage first.");
 
   if (request.action === "damageStatuses") {
     const attacker = await damageActor(data.attacker);
@@ -334,11 +342,13 @@ export async function renderDamage(message: ChatMessage, data: Exchange, html: J
   };
   const drop = html.find('[data-action="pneumaRollDamage"]');
 
-  if (attacker.isOwner && !data.damage && (!data.improvised || data.improvisedDice)) drop.on("click", event => {
+  const missed = !manual && data.hit === false && !data.damageAllowedOnMiss;
+  if (missed && game.user!.isGM) button("Allow damage on miss", () => send("damageAllowMiss"));
+  if (!missed && attacker.isOwner && !data.damage && (!data.improvised || data.improvisedDice)) drop.on("click", event => {
     event.preventDefault(); event.stopPropagation();
     void rollDamage(message.id!, data, send, !!event.shiftKey).catch(error => { ui.notifications!.error(error.message); ui.chat?.updateMessage(message); });
   });
-  else drop.prop("disabled", true).attr("aria-disabled", "true").attr("title", data.damage ? "Damage already started or resolved" : data.improvised && !data.improvisedDice ? "This older improvised attack has no damage choice. Start a new attack" : "Only the attacker owner or GM can roll damage");
+  else drop.prop("disabled", true).attr("aria-disabled", "true").attr("title", missed ? "Attack missed — a GM can allow damage" : data.damage ? "Damage already started or resolved" : data.improvised && !data.improvisedDice ? "This older improvised attack has no damage choice. Start a new attack" : "Only the attacker owner or GM can roll damage");
   const status = data.damage?.status;
   if (attacker.isOwner && status === "rolling" && retry.has(message.id!))
     button("Finish damage roll", () => rollDamage(message.id!, data, send));

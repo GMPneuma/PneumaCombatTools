@@ -1,18 +1,20 @@
 <form autocomplete="off" class="pneuma-emp-settings">
   <div class="pneuma-emp-settings-body">
+    <fieldset><legend>Selection</legend>
     {{#each profiles}}
-    <fieldset data-emp-profile="{{side}}">
-      <legend>{{title}}</legend>
-      <div class="form-group"><label for="emp-{{side}}-method">Method</label><select id="emp-{{side}}-method" name="{{side}}.method" data-method>{{selectOptions methods selected=method}}</select></div>
+    <div data-emp-profile="{{side}}">
+
+      <div class="form-group"><label for="emp-{{side}}-method">{{title}}</label><select id="emp-{{side}}-method" name="{{side}}.method" data-method>{{selectOptions methods selected=method}}</select></div>
       <div data-shortlist-options>
-        <p class="notes">Draw up to twice the required count once. The player sees only that saved shortlist and chooses X. Fewer eligible items means a smaller list.</p>
+        <p class="notes">Draw a shortlist once, up to twice the required count. The player chooses from that saved list.</p>
       </div>
       <div data-random-options>
-        <div class="form-group"><label for="emp-{{side}}-overlap">Avoid overlapping host/option picks</label><input id="emp-{{side}}-overlap" type="checkbox" name="{{side}}.skipAffected" {{checked skipAffected}}></div>
-        <p class="notes">When host shutdown disables its options, do not spend another selection on an overlapping component. If too few independent components exist, select fewer.</p>
+        <div class="form-group"><label for="emp-{{side}}-overlap">Avoid overlapping picks</label><input id="emp-{{side}}-overlap" type="checkbox" name="{{side}}.skipAffected" {{checked skipAffected}}></div>
+        <p class="notes">Do not pick both a host and an option it disables. Fewer independent items means fewer picks.</p>
       </div>
-    </fieldset>
+    </div>
     {{/each}}
+    </fieldset>
     <p class="notes">EMP normally disables two items. Other effects retain their own count, chooser, exclusions, and duration. All choices use the eligible items below.</p>
     <fieldset><legend>Eligible items</legend>
       <div class="form-group"><label for="emp-fashionware">Fashionware</label><input id="emp-fashionware" type="checkbox" name="includeFashionware" {{checked includeFashionware}}></div>
@@ -22,16 +24,18 @@
       <div class="form-group" data-foundation-weight><label for="emp-weight">Foundational weight</label><select id="emp-weight" name="foundationWeight">{{selectOptions foundationWeights selected=foundationWeight}}</select></div>
       <p class="notes">Shared by both chooser modes. Weight applies to random rolls and shortlist draws. Source-specific protections still apply.</p>
     </fieldset>
-    <fieldset><legend>When an Internal Frame is disabled</legend>
-      <div class="form-group"><label for="emp-frame-move">User cannot move</label><input id="emp-frame-move" type="checkbox" name="frameNoMove" {{checked frameNoMove}}></div>
-      <div class="form-group"><label for="emp-frame-reduce">MOVE reduced by</label><input id="emp-frame-reduce" type="checkbox" name="frameReduceMove" {{checked frameReduceMove}}><input aria-label="MOVE reduction amount" type="number" min="0" step="1" name="frameMoveReduction" value="{{frameMoveReduction}}"></div>
-      <div class="form-group"><label for="emp-frame-actions">Apply a penalty to all actions</label><input id="emp-frame-actions" type="checkbox" name="frameActionPenalty" {{checked frameActionPenalty}}></div>
-      <div class="form-group"><label for="emp-frame-penalty">Penalty amount (subtracted)</label><input id="emp-frame-penalty" type="number" min="0" step="1" name="framePenalty" value="{{framePenalty}}"></div>
-      <p class="notes">Optional consequences for installed Internal/Implanted Linear Frames. All options are off by default. Cannot move takes precedence over MOVE reduction; reduced MOVE cannot fall below zero. Penalties do not stack across repeated hits; they end when disablement ends. The GM can reposition tokens.</p>
-    </fieldset>
-    <div class="form-group"><label for="emp-hardened">Hardened cyberware/electronics</label><select id="emp-hardened" name="hardened">{{selectOptions hardenedMethods selected=hardened}}</select></div>
+    <details class="pneuma-emp-section" {{#if protectionConfigured}}open{{/if}}><summary>Protection &amp; exclusions</summary>
+    <div class="form-group"><label for="emp-hardened">Hardened items</label><select id="emp-hardened" name="hardened">{{selectOptions hardenedMethods selected=hardened}}</select></div>
     <p class="notes">EMP/Microwaver only. Included hardened items consume a selection without being disabled or rerolled. Hardening does not protect against Quickhacks. Uses native self, installed-child and sibling shielding.</p>
-    <div class="form-group"><label for="emp-immunity">EMP: immune items</label><textarea id="emp-immunity" name="immunity" rows="3">{{immunity}}</textarea><p class="notes">Exact item names or compendium source UUIDs, separated by semicolons. Applies to EMP/Microwaver direct selection; host shutdown can still affect installed options.</p></div>
+    <div class="form-group"><label for="emp-immunity">Immune items</label><textarea id="emp-immunity" name="immunity" rows="2">{{immunity}}</textarea><p class="notes">Exact item names or compendium source UUIDs, separated by semicolons. Applies to EMP/Microwaver direct selection; host shutdown can still affect installed options.</p></div>
+    </details>
+    <details class="pneuma-emp-section" {{#if frameConfigured}}open{{/if}}><summary>Internal frame consequences</summary>
+      <div class="form-group"><label for="emp-frame-move">User cannot move</label><input id="emp-frame-move" type="checkbox" name="frameNoMove" {{checked frameNoMove}}></div>
+      <div class="form-group" data-frame-movement><label for="emp-frame-reduce">MOVE reduced by</label><input id="emp-frame-reduce" type="checkbox" name="frameReduceMove" {{checked frameReduceMove}}><input data-frame-reduction aria-label="MOVE reduction amount" type="number" min="0" step="1" name="frameMoveReduction" value="{{frameMoveReduction}}"></div>
+      <div class="form-group"><label for="emp-frame-actions">Apply a penalty to all actions</label><input id="emp-frame-actions" type="checkbox" name="frameActionPenalty" {{checked frameActionPenalty}}></div>
+      <div class="form-group" data-frame-penalty><label for="emp-frame-penalty">Penalty amount (subtracted)</label><input id="emp-frame-penalty" type="number" min="0" step="1" name="framePenalty" value="{{framePenalty}}"></div>
+      <p class="notes">Optional consequences for installed Internal/Implanted Linear Frames. All options are off by default. Cannot move takes precedence over MOVE reduction; reduced MOVE cannot fall below zero. Penalties do not stack across repeated hits; they end when disablement ends. The GM can reposition tokens.</p>
+    </details>
   </div>
   <footer class="sheet-footer flexrow"><button type="submit"><i class="fas fa-save"></i> Save EMP behavior</button></footer>
 </form>

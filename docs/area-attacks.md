@@ -18,7 +18,7 @@ Each target chooses Evade / Don't Evade, optional Cover Up, or a Concentration r
 
 Optional evasion movement accounts for configured MOVE cost and permitted borrowing/debt. Relocation and damage are separate steps. Roll shared damage once, then apply from recipient rows; results collect below the roll. Supported special effects have recipient resolution controls; unknown special ammunition remains manual.
 
-**Allow Cover Up Homebrew** offers Prone plus doubled SP and doubled ablation, including blocked damage. It is an optional campaign rule, not general cover automation.
+**Allow Cover Up Homebrew** adds a choice alongside Evasion; it does not disable Evasion. Choose one response: roll Evasion if eligible, or Cover Up with no roll and no evasion eligibility requirement. Stay in place, become Prone, and take the hit with doubled SP and doubled ablation, including blocked damage. It is an optional campaign rule, not general cover automation.
 
 Suppressive fire uses the native ten-bullet Autofire attack and individual Concentration; a tied response resists. Failure records a cover obligation. The table adjudicates its Move/Run and cover choice.
 
@@ -33,3 +33,9 @@ Implementation: [aoe/workflow.ts](../src/scripts/aoe/workflow.ts), [aoe/settings
 Automatic smoke obscuration: Combat Tools attacks check the attacker-center to target-center line against active saved smoke footprints; blast attacks use the chosen impact point. Crossing smoke adds the native −4 obscured-task modifier once. The attack dialog offers “Ignore smoke” for equipment or GM rulings, and native roll details retain the modifier. This runs at attack preparation, not continuously; it does not infer vision-equipment capabilities or vertical smoke volume.
 
 AoE re-placement: missed aim templates are gray and inactive while waiting for the GM landing point. `.pneuma-aoe-reposition` explains the state and placement bounds; the existing scatter action now reads “Place landing point.” A pointer-transparent `.pneuma-area-placement` status panel keeps placement/cancel instructions visible. The moving preview retains its color; accepting replaces the original template at the actual landing point.
+
+## Target-square visibility and original aim (unreleased)
+
+Initial targeting checks the center of the cursor square against the attacking token’s native sight collision, including GM attacks. Out-of-sight squares hide the preview and reject placement; this is a wall line-of-sight check, not a lighting test. Directional attacks check the aimed-at cursor square. GM scatter placement remains manual within the existing allowed landing region.
+
+Grenades and rockets retain an amber one-square **Original target** marker. The marker stays at the intended point when the blast relocates. Hide/show affects both templates, and deleting the attack message removes both. The marker has no target collection or damage behavior.

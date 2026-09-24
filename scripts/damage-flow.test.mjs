@@ -136,6 +136,22 @@ try {
  assert.deepEqual(result.applyButtons,[' Defender',' to selected target']);
  assert.equal(result.nativeApply,0);assert.equal(result.detail,'22');assert.equal(result.requests.length,0);
  assert.match(result.unaware,/Defender unaware/);
+ const missControls=await page.evaluate(async()=>{
+  const states=[];
+  for(const isGM of [false,true]){
+   game.user.isGM=isGM;const data={...damageFixture,hit:false,damage:undefined};const sent=[];
+   document.body.innerHTML='<div class="message-content">'+exchangeContent(data)+'</div>';
+   await renderDamage({id:'miss'},data,wrap([document.body]),async action=>sent.push(action));
+   const drop=document.querySelector('[data-action="pneumaRollDamage"]');drop.click();
+   const allow=[...document.querySelectorAll('button')].find(b=>b.textContent==='Allow damage on miss');
+   states.push({disabled:drop.getAttribute('aria-disabled'),override:!!allow,sent:sent.length});if(allow){allow.click();await Promise.resolve();if(sent[0]!=='damageAllowMiss')throw Error('Wrong override action');}
+  }
+  game.user.isGM=true;const data={...damageFixture,hit:false,damage:undefined,damageAllowedOnMiss:true};
+  document.body.innerHTML='<div class="message-content">'+exchangeContent(data)+'</div>';
+  await renderDamage({id:'allowed'},data,wrap([document.body]),async()=>{});
+  return {states,enabled:document.querySelector('[data-action="pneumaRollDamage"]').getAttribute('aria-disabled')!=='true'};
+ });
+ assert.deepEqual(missControls,{states:[{disabled:'true',override:false,sent:0},{disabled:'true',override:true,sent:0}],enabled:true});
  const applied=await page.evaluate(async()=>{
   const data={...window.damageFixture,damage:{...window.damageFixture.damage,status:'applied',recordedApplied:true}};
   document.body.innerHTML='<div class="message-content">'+exchangeContent(data)+'</div>';

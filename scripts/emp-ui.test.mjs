@@ -19,7 +19,7 @@ try {
   let serial=0;window.foundry={data:{fields:{ObjectField:class{}}},utils:{getProperty:get,randomID:()=>String(++serial)}};
   window.gm={id:'gm',isGM:true,active:true};window.owner={id:'owner',isGM:false,active:true};
   window.actor={uuid:'Actor.a',name:'Actor <test>',isOwner:true,items:[{id:'a',name:'Cyberarm <img src=x onerror=alert(1)>',type:'cyberware',system:{isInstalledInActor:true,isFoundational:true}},{id:'b',name:'Option',type:'cyberware',system:{isInstalledInActor:true,installedIn:['a']}}],testUserPermission:u=>u.id==='owner'};
-  window.combat={id:'c',started:true,flags:{},async update(changes){for(const [p,v]of Object.entries(changes)){const parts=p.split('.');let node=this;for(const part of parts.slice(0,-1))node=node[part]??={};node[parts.at(-1)]=structuredClone(v);}}};
+  window.canvas={scene:{id:'s'}};window.combat={id:'c',active:true,scene:{id:'s'},combatants:[{actor,token:{uuid:'Scene.s.Token.a',parent:{id:'s'}}}],started:true,flags:{},async update(changes){for(const [p,v]of Object.entries(changes)){const parts=p.split('.');let node=this;for(const part of parts.slice(0,-1))node=node[part]??={};node[parts.at(-1)]=structuredClone(v);}}};
   const users=Object.assign([gm,owner],{get:id=>[gm,owner].find(u=>u.id===id)});
   window.game={user:gm,users,combat,combats:new Map([['c',combat]]),settings:{register:(_m,k,c)=>settingConfigs[k]=c,registerMenu:(_m,k,c)=>menus[k]=c,get:(_m,k)=>k==='empBehavior'?behavior:''},messages:new Map()};
   window.fromUuid=async()=>actor;window.messages=[];
@@ -94,6 +94,7 @@ try {
  assert.equal(await page.locator('[name="includeBioware"]').isChecked(),true);
  assert(await page.locator('[data-bioware-label] .pneuma-homebrew-badge').isVisible());
  await page.locator('[name="includeBioware"]').check();
+ await page.locator('summary').filter({hasText:'Internal frame'}).click();
  assert.equal(await page.locator('[name="frameNoMove"]').isChecked(),false);
  assert.equal(await page.locator('[name="frameActionPenalty"]').isChecked(),false);
  assert.equal(await page.locator('[name="frameReduceMove"]').isChecked(),false);
@@ -102,6 +103,7 @@ try {
  await page.locator('[name="frameNoMove"]').check();
  await page.locator('[name="frameActionPenalty"]').check();
  await page.locator('[name="framePenalty"]').fill('4');
+ await page.locator('summary').filter({hasText:'Protection'}).click();
  await page.selectOption('[name="hardened"]','consume');
  assert.equal(await page.locator('[name="gm.method"] option').count(),2);
  assert.equal(await page.locator('[name="player.method"] option').count(),3);

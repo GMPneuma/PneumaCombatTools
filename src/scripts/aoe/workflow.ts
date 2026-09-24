@@ -11,7 +11,7 @@ import {masterStatuses} from "../status-catalog.js";
 import {moveEvader,registerAreaMovement} from "./movement.js";
 import { MODULE, areaSettings, registerAreaSettings, type AreaSettings } from "./settings.js";
 import { areaKind, confirmAreaRoll, type AreaKind, type AreaWeapon } from "./weapon.js";
-import { evadeAllowed, winsAreaDefense, type Area, type Point } from "./geometry.js";
+import { polygon, evadeAllowed, winsAreaDefense, type Area, type Point } from "./geometry.js";
 import { placeArea, clippedPoints, templateData, areaCoverage } from "./placement.js";
 import { requireCombatSocket } from "../socket-health.js";
 import { smokeAttackDialog, diceJSON, nativeAPI, nativeCard, rollHidden, spendBonusLuck, type RollItem } from "../native-combat.js";
@@ -30,7 +30,7 @@ interface TargetRow {
   claim?:{nonce:string;user:string;expires:number}; damage?:DamageState; moved?:boolean; coverUp?:boolean; moveCost?:number;
 }
 export interface AreaAttack {
-  ammoType?:string; smokeId?:string; scene:string; kind:AreaKind; area:Area; intended:Point; settings:AreaSettings; templateId?:string;
+  ammoType?:string; smokeId?:string; scene:string; kind:AreaKind; area:Area; intended:Point; settings:AreaSettings; templateId?:string; aimTemplateId?:string;
   phase:"scatter"|"responses"; exchange:Exchange; rows:TargetRow[]; special:boolean; areaHidden?:boolean; resolutionComplete?:boolean; effectsResolved?:boolean; attackDiceRevealed?:boolean;
 }
 interface Request {
@@ -99,7 +99,7 @@ export function areaContent(data:AreaAttack):string {
   const rows=data.rows.map(r=>`<div role="listitem" class="pneuma-aoe-target" data-aoe-row="${esc(r.uuid)}" data-state="${r.state}" style="--pneuma-ammo-color:${profile?.color??"#d44a40"}">
     <img src="${esc(r.img)}" alt="" width="24" height="24"><span class="pneuma-aoe-name">${esc(r.name)}</span><span class="pneuma-aoe-response">
     ${r.state==="waiting" ? (data.kind==="suppression"?btn("roll","fa-brain","Concentration",r.uuid):btn("roll","fa-person-running","Evade",r.uuid))
-      +(data.settings.coverUp&&data.kind!=="suppression"?btn("other","fa-shield","Cover Up: Prone, double SP and ablation",r.uuid):"")+(data.kind==="suppression"?"":btn("decline","fa-xmark","Don't Evade",r.uuid))
+      +(data.settings.coverUp&&data.kind!=="suppression"?btn("other","fa-shield","Cover Up instead of Evasion: no roll; Prone, double SP and ablation",r.uuid):"")+(data.kind==="suppression"?"":btn("decline","fa-xmark","Don't Evade",r.uuid))
       : esc(r.state==="hit"?(data.kind==="suppression"?"Suppressed: Move to cover; Run if needed":r.coverUp?"Cover Up · Prone · SP ×2 / ablation ×2":"Hit"):r.state==="miss"?"Avoided":r.state==="rolling"?"Rolling…":"Cover Up — GM review")}
     ${["waiting","hit"].includes(r.state)&&!r.damage?btn("exclude","fa-user-slash","GM: exclude target (cover / not on foot)",r.uuid):""}
     ${r.state==="miss"&&!r.damage?btn("forcehit","fa-crosshairs","GM: override as affected",r.uuid):""}
@@ -114,7 +114,7 @@ export function areaContent(data:AreaAttack):string {
   const applications=data.rows.flatMap(r=>r.damage?.applications??[]).join("");
   return `<section class="rollcard pneuma-aoe-card" data-state="${data.phase==="scatter"?"scatter":waiting?"waiting":"resolved"}"><div class="rollcard-top"><div class="cpr-block"><h3>${esc(data.exchange.title)}${profile?" · "+esc(profile.name):""}</h3></div></div>
     ${resolutionSection("attack",attack)}
-    ${resolutionSection("result",data.phase==="scatter"?"<div class='pneuma-aoe-reposition'><strong>Missed — choose the landing point</strong><p>The gray area marks the original aim and is inactive.</p><p>GM: place the new blast center inside that square. Targets are determined after placement.</p></div>"+btn("scatter","fa-crosshairs","Place landing point"): `<div role="list" class="pneuma-aoe-targets">${rows||"<p>No tokens in the area.</p>"}</div>`)}
+    ${resolutionSection("result",data.phase==="scatter"?"<div class='pneuma-aoe-reposition'><strong>Missed — choose the landing point</strong><p>The amber square marks the original target. The gray area is the inactive original blast.</p><p>GM: place the new blast center inside the original blast square. Targets are determined after placement.</p></div>"+btn("scatter","fa-crosshairs","Place landing point"): `<div role="list" class="pneuma-aoe-targets">${rows||"<p>No tokens in the area.</p>"}</div>`)}
     <div class="pneuma-aoe-actions">${btn("show",data.areaHidden?"fa-eye":"fa-eye-slash",data.areaHidden?"Show attack area":"Hide attack area")}${data.phase==="responses"?btn("add","fa-user-plus","GM: add selected token (manual coverage override)"):""}
     ${data.kind!=="suppression"&&data.phase!=="scatter"&&!data.special&&!data.exchange.damage?btn("damage","fa-droplet","Roll shared damage"):""}
     ${data.exchange.damage?.status==="rolling"?btn("damageReset","fa-unlock","GM: release unfinished damage roll"):""}</div>
@@ -293,10 +293,12 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
     const combat=tokenEncounter(scene,[source.document.uuid]);
     const encounter=encounterRef(combat,scene,[source.document.uuid]);
     const sourcePosition={x:source.x,y:source.y};
-    const area=await placeArea(p=>makeArea(kind,source,p,ammoType==="smoke"?{...s,blastShape:"square",blastSize:10}:s),target.center,
-      kind==="shell"?"Aim the shell area in front of the attacker.":kind==="suppression"?"Aim suppressive fire.":"Place the blast center.",profile?.color);
+    let aimPoint:Point=target.center;
+    const canAim=(p:Point)=>!source.checkCollision(canvas.grid!.getCenterPoint(p),{origin:source.center,type:"sight",mode:"any"});
+    const area=await placeArea(p=>{aimPoint=p;return makeArea(kind,source,p,ammoType==="smoke"?{...s,blastShape:"square",blastSize:10}:s);},target.center,
+      kind==="shell"?"Aim the shell area in front of the attacker.":kind==="suppression"?"Aim suppressive fire.":"Place the blast center in line of sight.",profile?.color,canAim);
     if(!area||canvas.scene?.id!==scene)return;
-    const validate=()=>{const current=resolveEncounter(encounter);if(current&&ammoType!=="smoke")requireParticipants(current,(canvas.tokens?.placeables??[]).filter(t=>t.actor&&!['container','blackIce','demon'].includes(String(t.actor.type))&&areaCoverage(area)({x:t.x,y:t.y,width:t.w,height:t.h})).map(t=>t.document.uuid));};
+    const validate=()=>{if(!canAim(aimPoint))throw Error("The target square is outside the attacker’s line of sight.");const current=resolveEncounter(encounter);if(current&&ammoType!=="smoke")requireParticipants(current,(canvas.tokens?.placeables??[]).filter(t=>t.actor&&!['container','blackIce','demon'].includes(String(t.actor.type))&&areaCoverage(area)({x:t.x,y:t.y,width:t.w,height:t.h})).map(t=>t.document.uuid));};
     validate();
     let item:RollItem=original, thrownSource:object|undefined;
     if(String(original.type)==="ammo"){
@@ -388,6 +390,14 @@ async function syncTemplate(message:ChatMessage,data:AreaAttack) {
   const scene=game.scenes!.get(data.scene) as Scene|undefined;if(!scene)return;
   const values={...templateData(data.area,scene),fillColor:data.phase==="scatter"?"#737980":ammoProfile(data.ammoType)?.color??"#d44a40",borderColor:data.phase==="scatter"?"#737980":ammoProfile(data.ammoType)?.color??"#ffffff",hidden:!!data.areaHidden,user:message.author?.id??game.user!.id,
     flags:{[MODULE]:{areaMessage:message.id,areaShape:data.area}}};
+  if(data.kind==="explosive") {
+    const size=Number(scene.grid.size);
+    const aim:Area={shape:"square",origin:data.intended,direction:0,length:size,width:size};
+    const marker={...templateData(aim,scene),fillColor:"#ffbf47",borderColor:"#ffbf47",hidden:!!data.areaHidden,user:values.user,flags:{[MODULE]:{areaMessage:message.id,areaShape:aim,originalAim:true}}};
+    const existing=data.aimTemplateId?scene.templates.get(data.aimTemplateId):undefined;
+    if(existing)await existing.update(marker as never);
+    else {const created=await scene.createEmbeddedDocuments("MeasuredTemplate",[marker as never]);data.aimTemplateId=created?.[0]?.id??undefined;}
+  }
   const old=data.templateId?scene.templates.get(data.templateId):undefined;
   if(old)await old.update(values as Parameters<MeasuredTemplateDocument["update"]>[0]);
   else {
@@ -434,7 +444,9 @@ export function registerAreaAttacks() {
     const highlight=canvas.interface?.grid.getHighlightLayer(template.highlightId);
     if(highlight)highlight.visible=template.visible;
     if(!template.visible)return;
-    const points=clippedPoints(area).map((n,i)=>n-(i%2?template.document.y:template.document.x));
+    const originalAim=!!foundry.utils.getProperty(template.document,`flags.${MODULE}.originalAim`);
+    if(originalAim&&template.ruler)template.ruler.text="Original target";
+    const points=(originalAim?polygon(area).flatMap(p=>[p.x,p.y]):clippedPoints(area)).map((n,i)=>n-(i%2?template.document.y:template.document.x));
     template.shape=new PIXI.Polygon(points);
     template.template.clear().lineStyle(2,Number(template.document.borderColor),0.8).beginFill(Number(template.document.fillColor),0).drawPolygon(points).endFill();
     template.highlightGrid();
@@ -444,9 +456,10 @@ export function registerAreaAttacks() {
     const next=queue.catch(()=>{}).then(async()=>{await syncTemplate(message,data);await save(message,data);});queue=next;void next.then(()=>automateArea(message)).catch(errors);
   });
   Hooks.on("deleteChatMessage",(message:ChatMessage)=>{
-    const data=flag(message);if(!data?.templateId||game.user?.id!==gm()?.id)return;
+    const data=flag(message);if(!data||game.user?.id!==gm()?.id)return;
     const scene=game.scenes!.get(data.scene) as Scene|undefined;
-    if(scene?.templates.has(data.templateId))void scene.deleteEmbeddedDocuments("MeasuredTemplate",[data.templateId]).catch(errors);
+    const ids=[data.templateId,data.aimTemplateId].filter((id):id is string=>!!id&&!!scene?.templates.has(id));
+    if(ids.length)void scene!.deleteEmbeddedDocuments("MeasuredTemplate",ids).catch(errors);
   });
   Hooks.once("ready",()=>game.socket!.on(`module.${MODULE}`,(p:Request|Reply)=>{
     if(!p||!["request","reply"].includes(p.aoeType))return;

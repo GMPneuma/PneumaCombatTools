@@ -57,14 +57,14 @@ export function areaCoverage(area:Area) {
 }
 
 /** Local preview only: players do not need permission to create scene templates. */
-export async function placeArea(make:(point:Point)=>Area, initial:Point, prompt:string,color="#d44a40"):Promise<Area|null> {
+export async function placeArea(make:(point:Point)=>Area, initial:Point, prompt:string,color="#d44a40",allowed?:(point:Point)=>boolean):Promise<Area|null> {
   if(!canvas.stage || !canvas.app) throw new Error("Open the attack scene first.");
   const stage=canvas.stage, view=canvas.app.view as HTMLCanvasElement;
-  let area=make(initial);
-  const document=new CONFIG.MeasuredTemplate.documentClass({...templateData(area),fillColor:color,borderColor:color,flags:{"pneuma-combattools":{areaShape:area}}} as never,{parent:canvas.scene!} as never);
+  let point=initial, area=make(initial);
+  const document=new CONFIG.MeasuredTemplate.documentClass({hidden:allowed?!allowed(point):false,...templateData(area),fillColor:color,borderColor:color,flags:{"pneuma-combattools":{areaShape:area}}} as never,{parent:canvas.scene!} as never);
   const preview=new CONFIG.MeasuredTemplate.objectClass(document);
   canvas.templates!.preview!.addChild(preview);
-  const draw=()=>{document.updateSource({...templateData(area),fillColor:color,borderColor:color,flags:{"pneuma-combattools":{areaShape:area}}} as never);preview.renderFlags.set({refresh:true});};
+  const draw=()=>{document.updateSource({hidden:allowed?!allowed(point):false,...templateData(area),fillColor:color,borderColor:color,flags:{"pneuma-combattools":{areaShape:area}}} as never);preview.renderFlags.set({refresh:true});};
   try {await preview.draw();draw();}catch(error){preview.destroy();throw error;}
   const instructions=window.document.createElement("aside");instructions.className="pneuma-panel pneuma-area-placement";
   instructions.setAttribute("role","status");
@@ -80,8 +80,8 @@ export async function placeArea(make:(point:Point)=>Area, initial:Point, prompt:
       window.removeEventListener("keydown",key,true);Hooks.off("canvasTearDown",teardown);preview.destroy();resolve(value);};
     const move=(event:PointerEvent)=>{const r=view.getBoundingClientRect();
       const p=stage.worldTransform.applyInverse(new PIXI.Point((event.clientX-r.left)*canvas.app!.screen.width/r.width,(event.clientY-r.top)*canvas.app!.screen.height/r.height));
-      area=make(p);draw();};
-    const click=(event:PointerEvent)=>{event.preventDefault();event.stopImmediatePropagation();if(event.button!==2)finish(event.button===0?area:null);};
+      point=p;area=make(p);draw();};
+    const click=(event:PointerEvent)=>{event.preventDefault();event.stopImmediatePropagation();if(event.button===0){move(event);if(!allowed||allowed(point))finish(area);}else if(event.button!==2)finish(null);};
     const cancel=(event:Event)=>{event.preventDefault();event.stopImmediatePropagation();finish(null);};
     const key=(event:KeyboardEvent)=>{if(event.key==="Escape")cancel(event);};
     const teardown=Hooks.on("canvasTearDown",()=>finish(null));

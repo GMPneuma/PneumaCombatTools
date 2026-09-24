@@ -1,3 +1,4 @@
+import {prepareBowAttack} from "./bow-loading.js";
 import {tokenEncounter,resolveEncounter,encounterRef,type EncounterRef} from "./encounter.js";
 import {attackCrossesSmoke} from "./aoe/smoke-obscuration.js";
 import {evasionBlocked} from "./injury-rules.js";
@@ -32,7 +33,7 @@ export interface Exchange extends Partial<EncounterRef> {
   attacker: string; defender: string; defenderActor: string; attackerName: string; defenderName: string;
   ranged: boolean; category: string; title: string; dv?: number; total: number; html: string; dice: string[];
   rollMode: string; state: "waiting" | "applying" | "resolved" | "cancelled"; defense?: Defense;
-  combatId?: string | null; combatEpoch?: string; round?: string; hit?: boolean;
+  combatId?: string | null; combatEpoch?: string; round?: string; hit?: boolean; damageAllowedOnMiss?: boolean;
   coverUp?:boolean; weaponType?: string; damageFormula?: string; thrownSource?: object; improvised?: boolean; improvisedDice?: number; criticalMethod?: CriticalMethod; weaponId?: string; attackMode?: AttackMode; location?: string; unaware?: boolean; damage?: DamageState;
 }
 interface Request { id: string; user: string; message: string; action: "claim" | "release" | "decline" | "commit" | "resume" | "cancel" | DamageRequest["action"];
@@ -340,6 +341,8 @@ export async function startCombatExchange(attacker: Token, target: Token, itemId
   const type = String(foundry.utils.getProperty(item, "system.weaponType"));
   if (type.toLowerCase().includes("melee") || ["unarmed", "martialArts"].includes(type)) ranged = false;
   const category = ranged ? "Ranged" : ["unarmed", "martialArts"].includes(type) ? "Unarmed" : "Melee";
+  if (!thrown && !await prepareBowAttack(actor,item)) return;
+  currentCombat({combatId,combatEpoch} as Exchange);
   // Native createRoll displays its own out-of-bullets warning but does not abort.
   let roll = item.createRoll(mode, actor);
   if (ranged && item.hasAmmo && !item.hasAmmo(roll)) return;

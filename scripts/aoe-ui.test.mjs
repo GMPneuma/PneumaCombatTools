@@ -93,7 +93,7 @@ try {
   CONFIG.MeasuredTemplate={documentClass:Document,objectClass:Template};
   window.ui={notifications:{info(){}}};
   const {placeArea}=await import("/scripts/aoe/placement.js");
-  window.startPreview=()=>{window.previewResult="pending";window.previewPromise=placeArea(p=>({shape:"square",origin:p,direction:0,length:100,width:100}),{x:100,y:100},"Place the new blast center inside the gray square. Gray = inactive original aim.","#ef9b36").then(r=>previewResult=r)};
+  window.startPreview=()=>{window.previewResult="pending";window.previewPromise=placeArea(p=>({shape:"square",origin:p,direction:0,length:100,width:100}),{x:100,y:100},"Place the new blast center inside the gray square. Gray = inactive original aim.","#ef9b36",p=>p.x<200).then(r=>previewResult=r)};
   const highlight={visible:true};canvas.interface={grid:{getHighlightLayer:()=>highlight}};
   const template={document:{hidden:true,x:0,y:0,flags:{"pneuma-combattools":{areaShape:data.area}}},isVisible:true,hasPreview:false,visible:true,template:new Graphics(),highlightGrid(){}};
   for(const f of hooks.refreshMeasuredTemplate)f(template);
@@ -107,6 +107,12 @@ try {
  assert.match(await page.locator('.pneuma-area-placement').innerText(),/Right-click \/ Esc: cancel/);
  await page.locator('canvas').dispatchEvent('pointermove',{clientX:120,clientY:120});
  assert.equal(await page.evaluate(()=>previewDocument.fillColor),'#ef9b36');
+ await page.locator('canvas').dispatchEvent('pointermove',{clientX:300,clientY:120});
+ assert.equal(await page.evaluate(()=>previewDocument.hidden),true);
+ await page.locator('canvas').dispatchEvent('pointerdown',{clientX:300,clientY:120,button:0});
+ assert.equal(await page.evaluate(()=>previewResult),'pending');
+ await page.locator('canvas').dispatchEvent('pointermove',{clientX:120,clientY:120});
+ assert.equal(await page.evaluate(()=>previewDocument.hidden),false);
  await page.screenshot({path:process.env.TEMP+'/pct-aoe-placement.png'});
  await page.keyboard.press("Escape");
  assert.equal(await page.locator('.pneuma-area-placement').count(),0);
@@ -179,5 +185,12 @@ try {
   assert.match(await page.locator('[data-area-summary="shell"]').textContent(),/45° cone/);
   assert.equal(await page.locator('button[type="submit"]').isVisible(),true);
  }
+ await page.evaluate(async()=>{
+  game.user={id:'gm',isGM:true};game.users=[{id:'gm',active:true,isGM:true}];let deleted;
+  game.scenes={get:()=>({templates:{has:id=>['blast','aim'].includes(id)},deleteEmbeddedDocuments:async(_type,ids)=>{deleted=ids}})};
+  const msg={flags:{'pneuma-combattools':{aoe:{scene:'s',templateId:'blast',aimTemplateId:'aim'}}}};
+  for(const fn of hooks.deleteChatMessage??[])fn(msg);
+  await Promise.resolve();if(JSON.stringify(deleted)!==JSON.stringify(['blast','aim']))throw Error('Original aim marker not cleaned up');
+ });
  console.log("AoE browser checks passed: owner controls, Cover Up hiding, compact escaped markup, wall-polygon preview, place/cancel cleanup.");
 }finally{await browser.close();}

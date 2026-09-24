@@ -1,5 +1,25 @@
 # Combat Tools feature inventory
 
+Cover Up clarification (0.8.4): explicitly a no-roll alternative to Evasion, available without evasion eligibility. Settings separate its effects from Evasion roll rules; behavior is unchanged.
+
+## Area targeting (0.8.4)
+
+Initial AoE aim squares must have sight-wall line of sight from the attacker. Invalid squares hide the preview and cannot be placed; sight is rechecked before ammunition consumption. Explosives retain a labeled amber one-square original-target marker after GM scatter, sharing area visibility and chat-deletion cleanup. GM scatter remains manual.
+
+## Damage on misses (0.8.4)
+
+Missed attacks disable the damage drop. A GM-only Allow damage on miss button enables damage for that exchange without changing its miss outcome. The coordinator also rejects unapproved damage requests.
+
+## Bow loading (0.8.4)
+
+Targeted attacks with an empty native bow/crossbow prompt for compatible in-stock ammunition and quantity before the attack roll. The currently attached ammo is preselected while available. Native installation/reload handles inventory; loaded bows bypass selection, canceling selection does nothing, and canceling the subsequent attack retains the loaded arrow.
+
+## Grapple fixes (0.8.4)
+
+Grapple chat rendering ignores incomplete creation references until the full record is saved, preventing missing-token errors.
+
+Failed escape and third-party break attempts identify the attempted action instead of reporting Grab failed. Break/escape confirmation no longer uses Grab instructions.
+
 ## Settings defaults (0.8.3)
 
 Biomon defaults to top-left and Crew Tools integration defaults on, with standalone fallback when unavailable. Saved client preferences are preserved. The Homebrew settings button reserves its full label width beside the evasion dropdown.
@@ -102,3 +122,5 @@ Disabled cyberlimbs derive their state from combat/item disablement records. Onl
 AoE re-placement: missed aim templates are gray and inactive while waiting for the GM landing point. `.pneuma-aoe-reposition` explains the state and placement bounds; the existing scatter action now reads “Place landing point.” A pointer-transparent `.pneuma-area-placement` status panel keeps placement/cancel instructions visible. The moving preview retains its color; accepting replaces the original template at the actual landing point.
 
 Disablement audit fixes: active native leg-injury modifiers (including renamed native items) offset the cyberleg penalty; disabled/suppressed effects do not. Generic Disabled labels are display-only, including for evasion. Module-owned aggregate limb/frame penalties restore automatically while their item/combat causes remain active, including after manual effect deletion or disabling. Internal-frame policies derive from combat requests and item causes; legacy empty frame markers are removed. CPR modifier metadata repairs also cover Slow and Impair Movement.
+
+- EMP settings streamlined: grouped selection controls, collapsible protection and frame options (open when configured), and conditional numeric fields. Existing behavior and saved values retained.

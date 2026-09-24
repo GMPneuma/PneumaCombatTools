@@ -28,7 +28,7 @@ function fixture(kind="explosive",total=20){
  const token=(id,actor,x)=>{const document={id,uuid:"Scene.s.Token."+id,actor,name:id,texture:{src:"icon.png"},parent:{id:"s"}};docs.set(document.uuid,document);const token={id,document,actor,name:id,x,y:0,w:100,h:100,center:{x:x+50,y:50},checkCollision:()=>false};document.object=token;document.update=async change=>{token.x=change.x;token.y=change.y;token.center={x:change.x+50,y:change.y+50};Object.assign(document,change);};return token;};
  const source=token("a",a,0),target=token("b",b,400),third=token("c",c,500),outside=token("o",c,1000);
  const templates=collection([]);
- const scene={id:"s",grid:{size:100,distance:2,units:"m"},templates,async createEmbeddedDocuments(_type,rows){const t={...rows[0],id:"template",update:async data=>Object.assign(t,data)};templates.push(t);return [t]}};
+ const scene={id:"s",grid:{size:100,distance:2,units:"m"},templates,async createEmbeddedDocuments(_type,rows){const t={...rows[0],id:"template"+(++serial),update:async data=>Object.assign(t,data)};templates.push(t);return [t]}};
  game.scenes=collection([scene]);
  globalThis.canvas={scene,dimensions:{width:2000,height:1000},tokens:{placeables:[source,target,third,outside]},
  grid:{getCenterPoint:p=>({x:Math.floor(p.x/100)*100+50,y:Math.floor(p.y/100)*100+50}),measurePath:([a,b])=>({distance:Math.max(Math.abs(b.x-a.x),Math.abs(b.y-a.y))/50})}};
@@ -96,7 +96,7 @@ test("missed blast waits for GM placement and rejects scatter outside the intend
  await assert.rejects(f.request("scatter",{area:f.data().area}),/Only the GM/);
  await assert.rejects(f.request("scatter",{user:"gm",area:{...f.data().area,origin:{x:1000,y:1000}}}),/inside/);
  await f.request("scatter",{user:"gm",area:{...f.data().area,origin:{x:550,y:50}}});
- assert.equal(f.data().phase,"responses");assert.equal(f.scene.templates.length,1);assert.notEqual(f.scene.templates[0].fillColor,"#737980");assert.ok(f.data().rows.length>0);
+ assert.equal(f.data().phase,"responses");assert.equal(f.scene.templates.length,2);assert.notEqual(f.scene.templates[0].fillColor,"#737980");assert.ok(f.data().rows.length>0);
 });
 test("target response reservations reject competing users and explosive ties hit",async()=>{
  const f=fixture();await startAreaAttack(f.source,f.target,"w","attack");
@@ -328,3 +328,27 @@ test('AoE captures active scene encounter and follows it across tracker changes'
 test('ambiguous area encounters stop before ammunition or attack rolls',async()=>{const f=encounterFixture();game.combats.push({...f.combat,id:'second'});await assert.rejects(startAreaAttack(f.source,f.target,'w','attack'),/Multiple active/);assert.equal(f.weapon.system.magazine.value,20);assert.equal(f.messages.length,0);});
 test('area attack checks all covered token memberships before ammunition',async()=>{const f=encounterFixture();f.combat.combatants=f.combat.combatants.filter(c=>c.token.uuid!==f.target.document.uuid);await assert.rejects(startAreaAttack(f.source,f.target,'w','attack'),/participating tokens/);assert.equal(f.weapon.system.magazine.value,20);});
 test('reset area encounter rejects responses without adopting replacement',async()=>{const f=encounterFixture();await startAreaAttack(f.source,f.target,'w','attack');f.combat.flags={'pneuma-combattools':{evasionEpoch:'reset'}};await assert.rejects(f.request('decline'),/reset/);assert.equal(f.data().rows.find(r=>r.uuid===f.target.document.uuid).state,'waiting');});
+
+
+test('area attacks reject unseen aim squares before ammunition is consumed',async()=>{
+ const f=fixture();f.source.checkCollision=(_point,options)=>{assert.equal(options.type,'sight');return true};
+ await assert.rejects(startAreaAttack(f.source,f.target,'w','attack'),/line of sight/);assert.equal(f.weapon.system.magazine.value,20);assert.equal(f.messages.length,0);
+});
+
+test('original explosive target marker stays put after GM scatter and follows area visibility',async()=>{
+ const f=fixture('explosive',5);await startAreaAttack(f.source,f.target,'w','attack');
+ const original={...f.data().intended};await f.request('scatter',{user:'gm',area:{...f.data().area,origin:{x:original.x+100,y:original.y}}});
+ const marker=f.scene.templates.find(t=>t.flags[M].originalAim);assert.ok(marker);assert.deepEqual(marker.flags[M].areaShape.origin,original);
+ const blast=f.scene.templates.find(t=>!t.flags[M].originalAim);assert.equal(blast.flags[M].areaShape.origin.x,original.x+100);
+ assert.equal(marker.flags[M].areaShape.length,100);
+ await f.request("show",{user:"gm",hidden:true});assert.equal(marker.hidden,true);assert.equal(blast.hidden,true);
+ await f.request("show",{user:"gm",hidden:false});assert.equal(marker.hidden,false);assert.equal(f.scene.templates.length,2);
+});
+
+
+test('line of sight is rechecked after the native attack dialog before consuming ammo',async()=>{
+ const f=fixture();const create=f.weapon.createRoll.bind(f.weapon);let blocked=false;
+ f.source.checkCollision=()=>blocked;
+ f.weapon.createRoll=mode=>{const roll=create(mode);roll.handleRollDialog=async()=>{blocked=true;return true};return roll};
+ await assert.rejects(startAreaAttack(f.source,f.target,'w','attack'),/line of sight/);assert.equal(f.weapon.system.magazine.value,20);assert.equal(f.messages.length,0);
+});

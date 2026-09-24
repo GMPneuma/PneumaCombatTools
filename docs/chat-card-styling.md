@@ -74,3 +74,13 @@ Self-HUD menus (outside chat scope): `.pneuma-self-menu.pneuma-combat-menu` shar
 Self-CTH Close Combat and Thrown Weapons & Grenades flyouts now use the shared `.combat-heading` and list rows, with grapple icons, item artwork and the native improvised-weapon icon. Enabled CTH menu buttons share hover/focus background and inset outline tokens (`--pneuma-menu-hover-background`, `--pneuma-menu-hover-outline`) without changing layout; disabled actions remain dim. Existing action selectors are unchanged.
 
 AoE re-placement: missed aim templates are gray and inactive while waiting for the GM landing point. `.pneuma-aoe-reposition` explains the state and placement bounds; the existing scatter action now reads “Place landing point.” A pointer-transparent `.pneuma-area-placement` status panel keeps placement/cancel instructions visible. The moving preview retains its color; accepting replaces the original template at the actual landing point.
+
+## Miss damage override (unreleased)
+
+For resolved misses, `[data-action="pneumaRollDamage"]` carries `disabled` and `aria-disabled="true"` until GM approval. A native button labeled **Allow damage on miss** appears for GMs in `.pneuma-damage-recovery-controls`; granting it preserves the displayed miss and enables normal owner damage controls. Existing card scopes and native roll markup are retained.
+
+## Original explosive aim guidance (unreleased)
+
+The existing `.pneuma-aoe-reposition` text identifies the amber original-square marker separately from the inactive gray blast. No card selectors or controls changed. The marker is a native scene template with `flags.pneuma-combattools.originalAim`, independent of the relocated blast.
+
+Cover Up tooltip clarification (unreleased): the existing `[data-aoe-action="other"]` control explicitly states it replaces Evasion and requires no roll. No selectors or layout changed.
