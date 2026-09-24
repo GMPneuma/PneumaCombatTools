@@ -1,7 +1,7 @@
 import type {EmpMethod} from "./emp-behavior.js";
-import {effectDuration,durationExpired,type EffectDuration} from "./effect-duration.js";
+import {effectDuration,type EffectDuration} from "./effect-duration.js";
 import {registerNativeWrapper} from "./native-wrappers.js";
-import {EMP_MODULE as MODULE, empReferences, empDisabled, type EmpItem, type EmpPolicy, type EmpRandom, type DisableSource, timedDisables, activeDisables, disableLabel, empHardened, internalFrame, eligibleEmpItems, expandEmp, randomEmp} from "./emp-rules.js";
+import {EMP_MODULE as MODULE, empReferences, empDisabled, type EmpItem, type EmpPolicy, type EmpRandom, type DisableSource, timedDisables, activeDisables, disableExpired, disableLabel, empHardened, internalFrame, eligibleEmpItems, expandEmp, randomEmp} from "./emp-rules.js";
 export {empDisabled};
 export interface EmpRequest { id: string; actor: string; count: number; chooser: "gm" | "player" | "random"; mode: EmpRandom; policy: EmpPolicy; state: "pending" | "applied"; selected?: string[]; affectedNames?: string[]; message?: string; source?:DisableSource; sourceActor?:string; seconds?:number; duration?:EffectDuration; origin?:string; method?:EmpMethod; offered?:string[]; selectedNames?:string[]; resistedNames?:string[] }
 export interface EmpRecord {actor: string; items: string[]; timed?:boolean}
@@ -77,7 +77,10 @@ async function removeReferences(actor: Actor, combatId: string, ids?: string[]) 
 export async function finishEmp(combat: Combat, deleted = false) {
   for (const record of Object.values(empRecords(combat))) {
     const actor = await fromUuid(record.actor) as Actor | null;
-    if (actor&&!record.timed) await removeReferences(actor,combat.id!,record.items);
+    if (actor) {
+      if (!record.timed) await removeReferences(actor,combat.id!,record.items);
+      await expireDisablements(actor,combat.id!);
+    }
   }
   if (!deleted) await combat.update({[`${path}.empRecords`]:null,[`${path}.empRequests`]:null} as never);
 }
@@ -130,15 +133,15 @@ export async function syncDisabledLimbs(actor:Actor) {
   const data={name:"Disabled Cyberleg — MOVE penalty",img:"systems/cyberpunk-red-core/icons/compendium/status/broken_leg.svg",changes:[{key:"system.stats.move.value",mode:2,value:String(-amount),priority:20},{key:"system.stats.move.value",mode:4,value:"1",priority:21}],flags:{[MODULE]:{disabledLegPenalty:true}}};
   if(old){if(old.changes?.[0]?.value!==String(-amount))await old.update(data as never);}else await actor.createEmbeddedDocuments("ActiveEffect",[data] as never);
 }
-export async function expireDisablements(actor:Actor) {
+export async function expireDisablements(actor:Actor, endedCombat?:string) {
   for(const item of actor.items){
     const changes:Record<string,unknown>={};
-    for(const [id,effect] of Object.entries(timedDisables(item)))if(durationExpired(effect.duration))changes[path+".timedDisables.-="+id]=null;
+    for(const [id,effect] of Object.entries(timedDisables(item)))if(disableExpired(effect.duration)||endedCombat && (typeof effect.duration.combat==="string"?effect.duration.combat:effect.duration.combat?.id)===endedCombat)changes[path+".timedDisables.-="+id]=null;
     if(Object.keys(changes).length){await item.update(changes as never);await syncDisableMarker(item);}
   }
   const stale=actor.effects.filter(effect=>{
     const id=foundry.utils.getProperty(effect,path+".disableRequest"),itemId=foundry.utils.getProperty(effect,path+".empItem");
-    return typeof id==="string"&&!Array.from(actor.items).some(item=>item.id===itemId&&timedDisables(item)[id]&&!durationExpired(timedDisables(item)[id]!.duration));
+    return typeof id==="string"&&!Array.from(actor.items).some(item=>item.id===itemId&&timedDisables(item)[id]&&!disableExpired(timedDisables(item)[id]!.duration));
   });
   if(stale.length)await actor.deleteEmbeddedDocuments("ActiveEffect",stale.map(e=>e.id!));
   await syncDisabledLimbs(actor);

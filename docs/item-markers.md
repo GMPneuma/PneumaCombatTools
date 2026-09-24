@@ -1,5 +1,7 @@
 # Item markers
 
+Current implementation: Combat Tools 0.8.1; source-reviewed 2026-09-23.
+
 Visual annotations on native Item documents. The generic marker API performs no mechanical disabling, renaming, combat expiry, automatic removal, or cleanup. The separate [EMP workflow](emp.md) owns those operations for its `emp` marker; unrelated `disabled` markers remain untouched.
 
 Markers persist in flags.pneuma-combattools.itemMarkers, keyed by a stable caller-owned identifier. Reads use the existing in-memory Item document; no combat scans, UUID resolution, or network requests. Foundry synchronizes writes and refreshes actor sheets. The open CTH refreshes on marker updates.
@@ -29,4 +31,6 @@ Badges use .pneuma-item-markers and .pneuma-item-marker[data-item-marker="used"]
 
 Thrown attack creation sets the used marker instead of renaming the source item. Existing literal "(used)" names are left intact. Disabled is a reusable visual preset; no new cyberware attack mechanic or manual marker-management window is included.
 
-Expiry and combat association are deferred. Markers remain until explicitly cleared.
+Generic markers remain until explicitly cleared. EMP/timed disablement owns its own association and restoration; a generic marker does not inherit those mechanics.
+
+Implementation: [item-markers.ts](../src/scripts/item-markers.ts).

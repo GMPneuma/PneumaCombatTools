@@ -1,108 +1,179 @@
-# HUD messaging API (version 2)
+# Send messages to the Combat Tools HUD
 
-Available after Foundry's `ready` hook:
+Combat Tools 0.8.1 exposes **HUD API version 2**. Use it from a Foundry Script macro or another module after `ready`. It is an in-world JavaScript API, not an HTTP endpoint. No external service or API key is needed.
+
+## Quick start: message yourself
+
+Paste into a Script macro:
+
+```js
+const entry = game.modules.get("pneuma-combattools");
+const hud = entry?.active ? entry.api?.hud : undefined;
+if (!hud || hud.version < 2) {
+  ui.notifications.warn("Combat Tools HUD API v2 is unavailable.");
+  return;
+}
+hud.send({
+  source: "my-macros",
+  id: "reminder",
+  text: "Check your ammunition.",
+  mode: "queued"
+});
+```
+
+The queued message remains until dismissed/removed or the client reloads. Its animated arrival takes six seconds; that animation duration is not its lifetime. Status HUD must be enabled to see it. Implant ownership is not required for messages.
+
+## Choose a delivery mode
+
+| Mode | Presentation | Lifetime / inspection |
+| --- | --- | --- |
+| Omit `mode` | HUD row, with arrival animation when enabled | `duration` seconds, default 60; appears in `list()`. |
+| `"queued"` | Six-second dramatic arrival and dismissible HUD row | No timed expiry; `expires: 0`, `duration` does not expire it; appears in `list()`. |
+| `"flash"` | Center-screen message only | Four-second display; no queued row; excluded from `list()`. |
+
+Flash-only duration is fixed by the renderer; `duration` does not lengthen it. Device reduced motion or disabled animations substitutes immediate/static presentation. The GM may force player HUD animations, but device reduced motion still applies. Minimized HUD stays minimized; a disabled HUD stays hidden.
+
+## Send to players — run as GM
 
 ```js
 const hud = game.modules.get("pneuma-combattools")?.api?.hud;
-if (!hud) return; // Module absent, inactive, or unsupported game system.
-```
-
-Up to three notifications appear as text outside the HUD. Each has its own Clear control. Incoming attacks take priority, link to their chat card and remain until resolved or dismissed. Clear only dismisses the local notification. Legacy timed messages expire; explicitly queued messages wait for dismissal; there is no navigation or saved history. Viewing another character never replaces the viewer's messages.
-
-## Send on this client
-
-```js
-const id = hud.send({
-  source: "my-module",
-  id: "reactor-warning",
-  text: "Reactor temperature rising",
-  duration: 60
-});
-```
-
-`send(options): string` synchronously returns the message ID. Options:
-
-| Field | Meaning |
-| --- | --- |
-| source | Required module ID or namespace, 1–100 characters. |
-| id | Optional stable ID, 1–100 characters. Omit to generate one. |
-| text | Required plain text, 1–200 characters after trimming. HTML is displayed literally. |
-| mode | Optional `"flash"` (dramatic display only, four seconds) or `"queued"` (dramatic arrival plus a row retained until dismissed/removed). Omit for existing timed behavior. |
-| duration | Seconds; defaults to 60. Range 0–86400. Legacy zero now uses the 60-second default. |
-| recipients | Defaults to `"self"`. GM clients may also use `"players"` (all connected non-GMs), or an array of connected user IDs. |
-
-The pair `source` + `id` identifies a message. Sending that pair again updates its text and resets its expiry without adding a duplicate. If already cleared, sending it again creates a new notice. Other namespaces with the same ID do not collide. Updating recipients only sends to the newly specified audience; remove from an old audience explicitly if needed.
-
-## Send to players from a GM client
-
-```js
-const id = hud.send({
-  source: "my-module",
-  text: "Incoming transmission",
-  recipients: "players",
-  duration: 120
-});
-
-// Or a particular connected user:
+if (!hud || !game.user.isGM) {
+  ui.notifications.warn("Run this macro as a GM with Combat Tools enabled.");
+  return;
+}
+const recipients = game.users.filter(u => u.active && !u.isGM).map(u => u.id);
+if (!recipients.length) {
+  ui.notifications.info("No players are connected.");
+  return;
+}
 hud.send({
-  source: "my-module",
-  id: "incoming",
-  text: "Incoming transmission",
-  recipients: [playerUserId],
-  duration: 0
+  source: "my-macros",
+  id: "alarm",
+  text: "Security alarm triggered.",
+  recipients,
+  mode: "flash"
 });
 ```
 
-Call once from the client responsible for the event. Do not send from every client's event hook. Non-GMs can send locally; cross-client API calls throw on non-GM clients. Delivery uses Foundry's existing module socket and is best-effort to currently connected clients, without acknowledgments or offline replay. Messages are shown only to addressed viewers and never shared through Biomonitor hover. Socket delivery does not provide a separate encrypted communication channel.
+`recipients: "players"` is shorthand for currently connected non-GMs. An empty audience throws, so the example checks first. For one person use `recipients: [user.id]`, using a **User ID**, not an Actor or Token UUID. GM recipient arrays can include other connected GMs. Offline recipients are rejected; there is no queued offline delivery.
 
-## Clear, remove and inspect
-
-```js
-// Dismiss on this client, like the HUD's Clear button:
-hud.dismiss("my-module", "reactor-warning");
-
-// Remove on this client:
-hud.remove("my-module", "reactor-warning");
-
-// GM: remove on the specified connected clients:
-hud.remove("my-module", "incoming", [playerUserId]);
-
-// Copies of this client's active API messages:
-const messages = hud.list();
-// [{ source, id, text, expires, mode? }]
-```
-
-`remove(source, id, recipients = "self"): void` uses the same audience rules as send.
-`dismiss(source, id): void` always acts locally.
-`list(): HUDNotice[]` returns copies; `expires` is a Unix timestamp in milliseconds, for each message. Native attack notices and legacy world-setting messages are not part of this list.
-`version` is 2.
-
-## Behavior and limits
-
-- Messages are temporary client-session state; reloading clears them. There is no saved message history.
-- At most three legacy timed API messages are retained per client; inserting another drops the oldest timed message. Explicit queued messages are retained until dismissed; only three rows are visible at a time, with later messages revealed as earlier ones clear. Incoming attacks take priority within the three visible rows.
-- Expiry uses a one-shot timer, not polling.
-- A disabled HUD stays disabled; a minimized HUD remains minimized and highlights its notification icon when messages exist.
-- Implant ownership does not gate messages.
-- Clear on one client leaves other recipients' copies intact.
-- No arbitrary callbacks, macros, HTML, or actor changes execute through this API.
-- The GM HUD Send HUD Message control adds messages rather than replacing the previous message. The old single-message setting is read only for compatibility with already-sent messages.
-
-Browser fixtures verify message update, expiry, clearing, message capacity, recipient filtering and the non-GM cross-client restriction. Live multi-client Foundry verification remains outstanding.
-
-## HUD Alert Delivery
+## Send to the owners of a selected character — run as GM
 
 ```js
-hud.send({ source: "my-module", text: "Netrunner detected", mode: "flash" });
-hud.send({ source: "my-module", text: "Check your damaged cyberware", mode: "queued" });
+const hud = game.modules.get("pneuma-combattools")?.api?.hud;
+const actor = canvas.tokens.controlled[0]?.actor;
+if (!hud || !game.user.isGM || !actor) {
+  ui.notifications.warn("As GM, select a character token first.");
+  return;
+}
+const recipients = game.users
+  .filter(u => u.active && !u.isGM && actor.testUserPermission(u, "OWNER"))
+  .map(u => u.id);
+if (!recipients.length) {
+  ui.notifications.info("No connected player owns this character.");
+  return;
+}
+hud.send({
+  source: "my-macros",
+  id: `owner-notice-${actor.id}`,
+  text: "Your comms receive an encrypted transmission.",
+  recipients,
+  duration: 30
+});
 ```
 
-Flash only: center-screen scan, hold, collapse, then disappear after four seconds. No queued row or Clear button; excluded from `list()`. Reduced-motion preferences and the animation setting produce a static four-second message instead. The same source/ID replaces an active flash; dismiss/remove also removes it.
+Messages address **users**, not actors. This macro resolves owners once; it does not make the message follow token ownership or character changes later. Non-GMs may send locally with omitted recipients or `"self"`; they cannot use a recipient array, even one containing only themselves.
 
-Flash + queued: existing dramatic arrival and dismissible HUD row. `expires` is zero; `duration` does not expire this mode. Queued messages remain client-session state (reload clears them). Existing calls without `mode` retain their timed behavior. Disabling HUD hides both modes. No chat card is created. Recipient permissions are unchanged. Requires API version 2.
+## Method reference
 
-The GM may enforce HUD animations for players using "Force animated HUD messages for players". This hides and overrides the player animation setting for both delivery modes and effect arrivals. GMs retain their own preference. Device reduced-motion preferences still apply.
+```ts
+send(options): string
+remove(source: string, id: string, recipients = "self"): void
+dismiss(source: string, id: string): void
+list(): HUDNotice[]
+version: 2
+```
 
-## Optional screen-effect integration
+`send` returns the message ID synchronously. It can throw; it does not return a delivery acknowledgment or Promise. `remove` uses the same GM/audience rules as send. `dismiss` always clears locally. `list` returns copies of current local API notices, excluding flash-only, native incoming attacks and the legacy world-setting notice.
 
-`game.modules.get("pneuma-combattools").api.getNeuralIntrusionActor()` returns the focused owned actor UUID when a detected incoming connection exists, or undefined. `pneumaCombatToolsNeuralIntrusionChanged` publishes that value when it changes. Consumers should read the API at ready and listen for changes; they own their rendering and settings. Visual Tools uses this contract. Combat Tools has no screen glitch or fire renderer.
+| `send` field | Accepted value |
+| --- | --- |
+| `source` | Required string, 1–100 characters; caller-owned namespace. |
+| `id` | Optional string, 1–100 characters; generated if omitted. |
+| `text` | Required plain text, 1–200 characters after trimming. HTML displays literally. |
+| `mode` | Omitted, `"flash"` or `"queued"`. |
+| `duration` | Finite number from 0 to 86400 seconds; omitted defaults to 60; **0 also means 60**, not forever. Validated even when mode controls lifetime. |
+| `recipients` | Omitted/`"self"`; GM-only `"players"` or nonempty array of connected User IDs. |
+
+`HUDNotice` is `{ source, id, text, expires, mode? }`. Timed `expires` is Unix milliseconds; queued `expires` is zero.
+
+## Update, clear and inspect
+
+```js
+const hud = game.modules.get("pneuma-combattools").api.hud;
+const id = hud.send({source: "my-macros", id: "door", text: "Door locked.", mode: "queued"});
+// Same namespace and ID replaces the message rather than adding a second copy.
+hud.send({source: "my-macros", id, text: "Door unlocked.", mode: "queued"});
+console.log(hud.list());
+hud.dismiss("my-macros", id); // This client only.
+// Equivalent local removal:
+hud.remove("my-macros", id);
+// GM-only remote removal, with the same audience used for sending:
+// hud.remove("my-macros", id, [playerUserId]);
+```
+
+The identity is the pair `source` + `id`. Re-sending resets timed expiry, replaces active flashes, and can restore a dismissed notice. Other sources using the same ID do not collide. Changing recipients does not remove earlier recipients' copies; explicitly remove from the old audience if required. A local Clear button leaves everyone else's copy intact.
+
+## Delivery and capacity
+
+- API state is in client memory; reload clears it. No saved history, offline replay or acknowledgments.
+- Up to three **timed API** notices are retained; the oldest timed notice is evicted by a further timed notice. Explicit queued notices are not evicted that way.
+- Three rows are visible; incoming attacks take priority. Later queued rows appear as earlier ones clear.
+- The API creates no chat card, executes no HTML/macros/callbacks and changes no actor mechanics.
+- Remote delivery uses Foundry's `module.pneuma-combattools` socket. Use the public API, not fabricated socket packets.
+- Invoke once from the client responsible for the event. Sending from every client's hook causes duplicate deliveries. Use your module's existing authority/routing convention.
+- Messages are presentation for addressed viewers, not a separate encryption or anti-inspection protocol.
+
+## Module initialization example
+
+```js
+Hooks.once("ready", () => {
+  const entry = game.modules.get("pneuma-combattools");
+  const hud = entry?.active ? entry.api?.hud : undefined;
+  if (hud?.version >= 2) {
+    // Local readiness notice; no cross-client broadcast from every client.
+    hud.send({source: "my-module", id: "ready", text: "Connection ready.", duration: 10});
+  }
+});
+```
+
+## Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| API missing | Module active, supported system, run after ready. |
+| No visible message | Status HUD enabled; queued row may be behind higher-priority notices; correct recipient User IDs. |
+| Remote send throws | Run as GM, choose connected recipients, ensure current module socket metadata is loaded. |
+| Socket registration warning after update | Restart Foundry server, then reconnect clients; browser refresh alone may leave old server metadata. |
+| Message disappears on refresh | Expected session-only storage. Use a separate persistent record if your integration needs history. |
+| `duration: 0` still expires | Use `mode: "queued"` for dismissal-only messages. |
+| Animation preference ignored | GM player-animation enforcement may be on; device reduced motion still wins. |
+
+## Neural Intrusion integration — separate from messaging
+
+```js
+Hooks.once("ready", () => {
+  const entry = game.modules.get("pneuma-combattools");
+  if (!entry?.active) return;
+  const render = actorUuid => {
+    // Your module owns its renderer, cleanup and personal preference.
+    console.log("Detected incoming link on focused actor:", actorUuid);
+  };
+  render(entry.api?.getNeuralIntrusionActor?.());
+  Hooks.on("pneumaCombatToolsNeuralIntrusionChanged", render);
+});
+```
+
+The read-only getter returns the focused owned Actor UUID with a detected incoming connection, otherwise `undefined`. The hook supplies that value when it changes; consumers read initial state at ready. It is not a list/count of netrunners and does not itself send a HUD message. Visual Tools uses this contract; Combat Tools retains no glitch/fire-screen renderer.
+
+Implementation: [hud-messages.ts](../src/scripts/hud-messages.ts), [eye-hud.ts](../src/scripts/eye-hud.ts), [socket-health.ts](../src/scripts/socket-health.ts). Browser and unit fixtures cover routing, capacity, updates, modes and cleanup. Live multiplayer verification remains separate.

@@ -1,3 +1,4 @@
+import {attackCrossesSmoke} from "./smoke-obscuration.js";
 import {halfArmorSelected, interactArmorSelected} from "../half-armor.js";
 import {automaticNPCEvasion} from "../evasion-settings.js";
 import {evasionBlocked} from "../injury-rules.js";
@@ -12,7 +13,7 @@ import { areaKind, confirmAreaRoll, type AreaKind, type AreaWeapon } from "./wea
 import { evadeAllowed, winsAreaDefense, type Area, type Point } from "./geometry.js";
 import { placeArea, clippedPoints, templateData, areaCoverage } from "./placement.js";
 import { requireCombatSocket } from "../socket-health.js";
-import { diceJSON, nativeAPI, nativeCard, rollHidden, spendBonusLuck, type RollItem } from "../native-combat.js";
+import { smokeAttackDialog, diceJSON, nativeAPI, nativeCard, rollHidden, spendBonusLuck, type RollItem } from "../native-combat.js";
 import { thrownRollItem, improvisedSource } from "../thrown-weapons.js";
 import { getTable } from "../dv-hover.js";
 import { parseDV } from "../dv-data.js";
@@ -306,7 +307,7 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
       dv=parseDV((await getTable(String(foundry.utils.getProperty(item,"system.dvTable"))))?.getResultsForRoll(distance)[0]?.text);
       if(dv===undefined)throw Error("No native ranged DV table is available for this distance.");
     }
-    if(!await roll.handleRollDialog({ctrlKey:false,metaKey:false,type:"pneuma-area"},actor,item))return;
+    if(!await smokeAttackDialog(roll,actor,item,{ctrlKey:false,metaKey:false,type:"pneuma-area"},attackCrossesSmoke(source.center,kind==="explosive"?area.origin:target.center)))return;
     if(canvas.scene?.id!==scene||source.x!==sourcePosition.x||source.y!==sourcePosition.y||!owns(actor)||actor.items.get(itemId)!==original||areaKind(original,mode)!==kind||!ammoOK())throw Error("The weapon, scene, ownership or ammunition changed.");
     if(String(original.type)!=="ammo"&&grappleWeaponBlocked(actor,original))throw Error("Grappled characters cannot use weapons requiring two hands.");
     checkedLuck(Number(foundry.utils.getProperty(actor,"system.stats.luck.value")),0,roll.luck);

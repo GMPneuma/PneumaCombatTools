@@ -1,6 +1,6 @@
 # Foundry v13 migration checklist
 
-Status: needs verification. This inventories current v12/CPR integration dependencies; none is labelled confirmed incompatible. Do the actual migration against the chosen v13-compatible CPR release. Do not expand the v12 manifest until that combination passes validation.
+Current baseline: Combat Tools 0.8.0, reviewed 2026-09-23. Status: needs verification. This inventories current v12/CPR integration dependencies; none is labelled confirmed incompatible. Do the actual migration against the chosen v13-compatible CPR release. Do not expand the v12 manifest until that combination passes validation.
 
 | Check | File / entry point | Dependency and verification |
 | --- | --- | --- |
@@ -19,6 +19,16 @@ Status: needs verification. This inventories current v12/CPR integration depende
 | [ ] Forms and selectors | src/templates, settings forms, status-hud.ts, settings-layout.ts | Verify Application/FormApplication and native settings/HUD markup. Test native status handlers, keyboard controls and themes. |
 | [ ] Chat structure | src/scripts/card-structure.ts, resolution-scroll.ts, pending-card-refresh.ts, quickhack/integration.ts | Verify renderChatMessage payloads, visibility, updateMessage behavior, HTML selectors, native dice/undo nodes and observer cleanup. |
 | [ ] Multiplayer lifecycle | combat-resolution.ts, grapple/workflow.ts, aoe/workflow.ts, quickhack/connections.ts, emp.ts | Verify hooks and update options across clients, Combat flags, permission checks, socket registration, active GM changes, retries and encounter cleanup. |
+
+## Additional 0.8.0 integration surfaces
+
+- Combat bar docking/scrolling, native initiative context controls and PlayerList wrappers.
+- Manual CPR roll classes, native critical tables, group request cards and armor-control attributes.
+- HUD API socket registration, default synthetic-actor focus and Crew Tools shortcut contract.
+- Read-only Neural Intrusion getter/hook. Screen rendering belongs to Visual Tools and must be validated separately.
+- Injury native roll wrappers, prepared MOVE floor, contextual reminders and shared native damage capture.
+
+These are migration checkpoints, not claims of v13 incompatibility.
 
 ## Migration validation
 

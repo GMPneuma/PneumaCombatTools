@@ -66,6 +66,8 @@
   --pneuma-panel-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
   --pneuma-panel-padding: 8px;
   --pneuma-panel-font-size: 13px;
+  --pneuma-menu-hover-background: rgba(255, 255, 255, .16);
+  --pneuma-menu-hover-outline: rgba(255, 255, 255, .45);
 }
 .pneuma-panel,
 #token-hud .pneuma-combat-menu.pneuma-panel {
@@ -644,9 +646,14 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 #pneuma-combat-bar.is-minimized { width: max-content; min-width: 30px; }
 #pneuma-combat-bar.is-minimized.is-gm { width: max-content; min-width: 58px; }
 
-#token-hud .pneuma-self-thrown { position:absolute; left:calc(100% + 8px); top:0; width:240px; max-height:60vh; overflow:auto; padding:6px; pointer-events:all; }
-#token-hud .pneuma-self-thrown[hidden] { display:none; }
-#token-hud .pneuma-self-thrown button { display:block; width:100%; text-align:left; }
+/* Self actions are flyouts, never items in the native icon-column layout. */
+#token-hud .pneuma-self-menu { position:absolute; left:calc(100% + 8px); top:0; width:240px; box-sizing:border-box; max-height:60vh; overflow:auto; padding:6px; pointer-events:all; text-align:left; }
+#token-hud .pneuma-self-menu[hidden] { display:none; }
+#token-hud .pneuma-self-menu .combat-weapon-name { flex:0 0 auto; min-height:28px; font:inherit; line-height:1.3; white-space:nowrap; box-shadow:none; transform:none; }
+#token-hud .pneuma-combat-menu button:disabled { color:inherit; opacity:.45; cursor:not-allowed; }
+#token-hud .pneuma-combat-menu button:not(:disabled):is(:hover, :focus-visible) { background:var(--pneuma-menu-hover-background); box-shadow:inset 0 0 0 1px var(--pneuma-menu-hover-outline); transform:none; }
+#token-hud .pneuma-combat-menu button:focus-visible { outline:1px solid currentColor; outline-offset:-1px; }
+
 
 
 /* Third native Players state: retain the heading as the restore control. */

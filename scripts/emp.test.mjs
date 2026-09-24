@@ -130,17 +130,18 @@ test('Malfunction selection belongs to the attacker and expires independently of
  assert(!get(f.arm,key+'.timedDisables.r'));
  assert.equal(f.actor.effects.filter(e=>get(e,key+'.disableRequest')).length,0);
 });
-test('overlapping timed hits restore only after the last expiry, including combat deletion',async()=>{
+test('overlapping timed hits retain later causes until combat deletion',async()=>{
  const f=fixture();game.time={worldTime:100};game.combat=f.combat;Object.assign(f.combat,{round:1,turn:0,turns:[{}]});
  Object.assign(f.request,{source:'short-circuit',seconds:60,chooser:'gm',policy:{...f.policy,cascade:false}});
  await applyEmpSelection(f.combat,'r',['weapon'],f.gm);
  f.combat.round=6;game.time.worldTime=115;
  f.combat.flags[module].empRequests.second={...f.request,id:'second',state:'pending',selected:undefined,duration:undefined};
  await applyEmpSelection(f.combat,'second',['weapon'],f.gm);
- f.combat.started=false;await finishEmp(f.combat,true);game.combats=collection([]);
  const {expireDisablements}=await import('../dist/scripts/emp-state.js');
- game.time.worldTime=160;await expireDisablements(f.actor);assert(empDisabled(f.weapon));
- game.time.worldTime=175;await expireDisablements(f.actor);assert(!empDisabled(f.weapon));assert(!get(f.weapon,key+'.itemMarkers.cyberware'));
+ f.combat.round=21;await expireDisablements(f.actor);assert(empDisabled(f.weapon));
+ await finishEmp(f.combat,true);game.combats=collection([]);
+ assert(!empDisabled(f.weapon));assert(!get(f.weapon,key+'.itemMarkers.cyberware'));
+ assert.deepEqual(get(f.weapon,key+'.timedDisables'),{});
 });
 test('disabled cyberleg applies a temporary broken-limb penalty without permanent injury damage',async()=>{
  const f=fixture();game.time={worldTime:0};game.combat=f.combat;Object.assign(f.combat,{round:1,turn:0,turns:[{}]});
@@ -309,4 +310,30 @@ test('frame MOVE reduction uses strongest active value, yields to no-move and re
  f.combat.round=3;await expireDisablements(f.actor);
  assert(consequence().changes.some(c=>c.mode===2&&c.value==='-3'));
  f.combat.round=5;await expireDisablements(f.actor);assert(!consequence());
+});
+
+for(const end of ['reset','delete','reload'])test(`timed limb disablement clears on ${end} without advancing world time`,async()=>{
+ const f=fixture();game.time={worldTime:100};game.combat=f.combat;Object.assign(f.combat,{round:1,turn:0,turns:[{}]});
+ f.arm.system.type='cyberLeg';Object.assign(f.request,{source:'cyberware-malfunction',seconds:60});
+ await applyEmpSelection(f.combat,'r',['arm'],f.player);
+ assert(empDisabled(f.arm));assert(f.actor.effects.some(e=>get(e,key+'.disabledLegPenalty')));
+ if(end==='reset'){f.combat.started=false;await finishEmp(f.combat);}
+ else if(end==='delete'){await finishEmp(f.combat,true);game.combats=collection([]);}
+ else {game.combats=collection([]);await reconcileEmp();}
+ assert(!empDisabled(f.arm));assert(!empDisabled(f.weapon));
+ assert(!get(f.arm,key+'.itemMarkers.cyberware'));
+ assert.deepEqual(f.actor.effects.map(e=>e.id),['injury']);
+ assert.equal(game.time.worldTime,100);
+});
+
+test('ending one combat preserves a timed disablement from another ongoing combat',async()=>{
+ const f=fixture();game.time={worldTime:100};game.combat=f.combat;Object.assign(f.combat,{round:1,turn:0,turns:[{}]});
+ Object.assign(f.request,{source:'cyberware-malfunction',seconds:60});
+ await applyEmpSelection(f.combat,'r',['arm'],f.player);
+ const other={id:'other',started:true,round:1,turn:0,turns:[{}]};game.combats.push(other);
+ f.arm.flags[module].timedDisables.other={...structuredClone(f.arm.flags[module].timedDisables.r),duration:{rounds:20,startRound:1,startTurn:0,combat:'other',startTime:100}};
+ f.combat.started=false;await finishEmp(f.combat);
+ assert(empDisabled(f.arm));assert(!get(f.arm,key+'.timedDisables.r'));
+ assert(get(f.arm,key+'.timedDisables.other'));assert(get(f.arm,key+'.itemMarkers.cyberware'));
+ assert(!empDisabled(f.weapon));
 });

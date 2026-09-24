@@ -1,6 +1,8 @@
 # Chat button skin contract
 
-Scope: Combat Tools buttons inside chat messages, plus its Half Armor SP button on native damage cards. HUDs, dialogs, flyouts, native roll expansion/undo links and other modules are not restyled.
+Current implementation: Combat Tools 0.8.1; source-reviewed 2026-09-23.
+
+Scope: Combat Tools buttons inside chat messages, plus its Interact With Armor and Half Armor SP buttons on native damage cards. HUDs, dialogs, flyouts, native roll expansion/undo links and other modules are not restyled.
 
 ## Shared selectors
 
@@ -55,3 +57,5 @@ All button variables use the prefix `--pneuma-chat-button-`:
 Keep sizing variables constant between hover/focus/selected states. Shared metric rules use `!important` to counter ordinary theme hover rules that change padding, font weight, border width or transform. Colors, inset shadows and external focus outlines carry state changes without moving neighboring controls. Deliberately overriding these rules with stronger `!important` declarations or changing metric variables on hover can defeat that guarantee.
 
 Validation: browser fixtures cover every managed chat-control family, delayed insertion, off/on/busy/completed states, unchanged native controls, skin token overrides, and exact bounding-box equality during hover/focus/toggle/busy transitions. Live Foundry theme combinations remain to be verified.
+
+Implementation: [chat-buttons.ts](../src/scripts/chat-buttons.ts) and [module CSS](../src/styles/pneuma-combattools.css).

@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 const {chromium}=await import(process.env.PNEUMA_PLAYWRIGHT_MODULE);
 const browser=await chromium.launch({channel:'msedge',headless:true});
 try{
- const page=await browser.newPage();await page.setContent('<div id="token-hud" class="placeable-hud"><div class="col right"></div><button data-native>Native</button></div>');
+ const page=await browser.newPage();await page.setContent('<style>#token-hud{position:absolute;left:120px;top:100px;width:120px;height:120px}#token-hud .col{position:absolute;width:40px;height:100%;display:flex;flex-direction:column}#token-hud .col.right{right:-50px}#token-hud .control-icon{width:40px;height:40px}</style><div id="token-hud" class="placeable-hud"><div class="col right"></div><button data-native>Native</button></div>');
  await page.addScriptTag({content:await readFile(process.env.PNEUMA_JQUERY_SOURCE,'utf8')});await page.addScriptTag({content:await readFile(process.env.PNEUMA_HANDLEBARS_SOURCE,'utf8')});
  await page.evaluate(template=>{
   Handlebars.registerHelper('eq',(a,b)=>a===b);Handlebars.registerHelper('localize',s=>s);window.renderTemplate=async()=>Handlebars.compile(template)(window.renderData);
@@ -17,7 +17,7 @@ try{
  },await readFile('src/templates/combat-hud.hbs','utf8'));
  const main=(await readFile('dist/scripts/main.js','utf8')).replace(/^import .*;\s*/gm,'');
  const names=[...new Set([...main.matchAll(/^\s+(register\w+)\(\);/gm)].map(m=>m[1]))].filter(n=>n!=='registerSelfCTH');
- const stubs=names.map(name=>`const ${name}=()=>{};`).join('\n')+'\nconst registerQuickhack=()=>{},decorateItemList=()=>{},connectionFor=()=>undefined,quickhackEnabled=()=>false,forceOutEntries=()=>[],attackEntries=()=>[],thrownEntries=()=>[],grenadeEntries=()=>[],grappleMenu=()=>window.grappleActions??[],useGrapple=async(s,t,a)=>{window.grappleUsed=a;},trackingCombat=()=>undefined;';
+ const stubs=names.map(name=>`const ${name}=()=>{};`).join('\n')+'\nconst registerQuickhack=()=>{},decorateItemList=()=>{},connectionFor=()=>undefined,quickhackEnabled=()=>false,forceOutEntries=()=>[],attackEntries=()=>[],thrownEntries=()=>[],grenadeEntries=()=>window.grenades??[],grappleMenu=()=>window.grappleActions??[],useGrapple=async(s,t,a)=>{window.grappleUsed=a;},trackingCombat=()=>undefined;';
  const emp=(await readFile('dist/scripts/effect-duration.js','utf8'))+'\n'+(await readFile('dist/scripts/emp-rules.js','utf8')).replace(/^import .*;\s*/gm,''),self=(await readFile('dist/scripts/self-cth.js','utf8')).replace(/^import .*;\s*/gm,'');
  await page.addScriptTag({type:'module',content:emp+'\n'+self+'\n'+stubs+'\n'+main+'\nhooks.init.forEach(fn=>fn());window.loaded=true;'});await page.waitForFunction(()=>window.loaded);
  await page.evaluate(()=>{
@@ -55,5 +55,34 @@ try{
  await page.locator('[data-self-grapple]').click();assert.equal(await page.evaluate(()=>grappleUsed),'escape');
  await page.evaluate(()=>{window.grappleActions=[{action:"choke",label:"Choke — Defender",disabled:true}];return show(own);});
  assert.equal(await page.locator('[data-self-grapple]').isDisabled(),true);
+ // Reproduce a narrow native icon column: a self menu must not stretch it or its controls.
+ await page.addStyleTag({content:'#token-hud{position:absolute;left:120px;top:100px;width:120px;height:120px;background:#303b43}#token-hud .col{position:absolute;width:40px;height:100%;display:flex;flex-direction:column}#token-hud .col.right{right:-50px}#token-hud .control-icon{box-sizing:border-box;flex:0 0 40px;width:40px;height:40px;margin:4px 0;background:#222;color:white}#token-hud button{color:black;border:2px solid #888;line-height:32px}body{background:#17222c}'});
+ await page.evaluate(()=>{window.grappleActions=[{action:'choke',label:'Choke — Crick',title:'Already choked this round',disabled:true},{action:'throw',label:'Throw — Crick'},{action:'release',label:'Release — Crick'}];return show(own);});
+ const toggle=page.locator('[data-self-close-toggle]'),thrown=page.locator('[data-self-thrown-toggle]');
+ const before=await thrown.boundingBox();
+ await toggle.click();
+ assert.deepEqual(await thrown.boundingBox(),before,'Opening grapple actions never moves the icon column');
+ const menu=page.locator('[data-self-close-menu]'),button=page.locator('[data-self-grapple="throw"]');
+ assert.equal(await menu.evaluate(n=>getComputedStyle(n).position),'absolute');
+ assert.equal((await menu.boundingBox()).width,240);
+ assert.equal(await button.evaluate(n=>getComputedStyle(n).color),'rgb(238, 238, 238)');
+ assert.equal(await menu.locator(".combat-heading").innerText(),"Close Combat");
+ const background=await button.evaluate(n=>getComputedStyle(n).backgroundColor);
+ const rect=await button.boundingBox();assert.equal(rect.height,28);await button.hover();assert.deepEqual(await button.boundingBox(),rect);
+ assert.notEqual(await button.evaluate(n=>getComputedStyle(n).backgroundColor),background,'Hover visibly highlights the action');
+ assert.equal(await button.locator('i').count(),1);
+ assert.equal(await button.locator('span').evaluate(n=>n.scrollWidth<=n.clientWidth),true,'Action and target fit one line');
+ assert.equal(await page.locator('[data-self-grapple="choke"]').isDisabled(),true);
+ await page.screenshot({path:process.env.TEMP+'/pct-self-cth-fixed.png'});
+ await button.click();assert.equal(await page.evaluate(()=>grappleUsed),'throw');
+ await page.evaluate(()=>{window.grenades=[{id:'grenade',name:'Frag Grenade',img:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="gray"/></svg>'}];return show(own);});
+ await page.locator('[data-self-thrown-toggle]').click();
+ assert.equal(await page.locator('[data-self-thrown-menu] .combat-heading').innerText(),'Thrown Weapons & Grenades');
+ const grenade=page.locator('[data-self-throw="grenade"]');
+ assert.equal(await grenade.locator('img').count(),1);
+ assert.equal(await page.locator('[data-self-throw="__improvised"] img').count(),1);
+ const normal=await grenade.evaluate(n=>getComputedStyle(n).backgroundColor),bounds=await grenade.boundingBox();
+ await grenade.hover();assert.notEqual(await grenade.evaluate(n=>getComputedStyle(n).backgroundColor),normal);assert.deepEqual(await grenade.boundingBox(),bounds);
+ await page.screenshot({path:process.env.TEMP+'/pct-self-cth-grenades.png'});
  console.log('Self CTH browser checks passed: own-token replacement, native controls retained, setting toggle, Shift-right-click, D10 native reroll and target actions.');
 }finally{await browser.close();}

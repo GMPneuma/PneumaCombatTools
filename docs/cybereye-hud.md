@@ -1,54 +1,29 @@
-# Status HUD
+# Biomonitor and status HUD
 
-[Player guide](player-guide.md) · [All documentation](README.md)
+Current implementation: Combat Tools 0.8.1; source-reviewed 2026-09-23.
 
-The compact HUD shows your character's vitals and conditions beside Foundry's right sidebar. You do not need a Biomonitor to view your own HUD.
+## Character selection
 
-## Own and shared views
+A selected owned token is the focused character. With no single selected owned token, players use their assigned Character's unique owned scene token when available, otherwise the assigned world actor. With no assignment, one owned scene token can be the fallback; multiple candidates are not guessed. GMs remain selection-based.
 
-Select one owned token, or use your assigned player character when no token is selected. GMs select a token to choose the displayed character.
+The own-character display is not implant-gated. Shared viewing of another character uses Biomonitor eligibility and native visibility; private messages remain the viewer's own. Hover EKG is a separate feature with its own eligibility rules.
 
-Hover a visible token with an **installed Biomonitor** to view that character's stats. Carrying an uninstalled Biomonitor is insufficient. A blue edge and the character name below the HUD identify the shared view. Leaving the token returns to your own display. Sharing stats does not grant permission to open or edit the other character's sheet.
+## Display
 
-**Orange notifications always belong to you**, even while another character's stats are displayed.
+Vitals combine current/max HP, EKG health state and prominent active condition icons. Medical guidance covers injuries; drug/pharma lights require recognized active effects, not merely inventory ownership. Implant integrity lists disabled cyberware. Situational states include Prone, grapple relationships and netrunning connections.
 
-## Read the display
+HP numbers can be hidden until EKG hover/focus. Minimized mode retains EKG/name and notifications. The alert shortcut is a broken-heart/bell composite with state colors. When integrated with Crew Tools, its shortcut replaces the duplicate local icon; it does not remove the EKG or private messages.
 
-| Area | Contents |
-| --- | --- |
-| Vitals | HP and EKG, with the health label directly below the trace. |
-| Drug/pharma row | Active lasting effects only, filling from the left beneath the EKG. Red icons are drugs; green icons are pharmaceuticals. Hover for names. |
-| Exposure lights | Poison, Radiation, Biotoxin, On fire, Addict, Jacked In and Unconscious. |
-| Biological Scan | Critical injuries and medical conditions. |
-| Implant Integrity | Disabled cyberware and EMP information. Owners can open the corresponding native item sheet. |
-| Yellow rectangles | Situational states, grapple/choke details and tracked movement, floating inside the lower-right without enlarging the HUD. |
+On Fire offers right-click Extinguish. Neural Intrusion offers right-click Eject Netrunner for each detected incoming link. Menus float outside the HUD without changing its layout. Jacked In uses a diagonal neural-jack icon. Screen glitches belong to Visual Tools; there is no Combat Tools fire-screen renderer.
 
-The health label is a visual summary, not an additional rules effect. Any addiction can light Addict. Jacked In reflects an active outgoing Combat Tools character connection in combat; NET Architecture connections are not represented yet.
+## Placement and notifications
 
-Supported drug indicators are **Black Lace, Blue Glass, Boost, Smash, Synthcoke, Berserker, Prime Time, Sixgun and Timewarp**. Pharma indicators are **Antibiotics, Stim, Surge, Quick Fix, Sedative and Veritas**. Instant treatments such as Speed Heal, Rapiddetox and Radaway do not need lasting-effect lights.
+Personal left/right docking works with or without Crew Tools. Left placement is below navigation/visible Crew HUD and to the right of canvas widgets. Top-right combat-bar placement temporarily forces left without overwriting your saved preference. Notifications sit below the HUD/EKG and can extend beyond the minimized EKG width.
 
-An icon reflects a recognized active, unsuppressed effect or status. Owning or consuming an item without activating its effect does not light it. Addiction-only effects light Addict rather than the primary drug light. Recognition by the HUD does not imply complete duration, addiction or mechanical automation.
+Incoming attacks take priority among three visible rows and open their chat card. Dismiss only clears the local notification, not the pending attack. Timed notices expire; explicit queued notices persist until removed/dismissed. Reload clears API message queues.
 
-Confirmed supported native poison/biotoxin damage can trigger an exposure warning. During combat, those Vitals reports clear when the round changes; clearing the report does not delete a native condition. Native incendiary damage can ignite a target after armor penetration. Arbitrary HP-only macros need explicit integration to identify the exposure source. See [Native effects](native-effects.md).
+Queued/timed message arrival uses a six-second animation with a fast 0.42-second initial reveal and longer center hold. Flash-only API alerts use a separate four-second presentation. Effect-icon arrivals have their own animation. Per-client animation preferences and device reduced motion apply; GM enforcement can override the player setting but not device reduced motion.
 
-## Notifications and animations
+The API is documented in [HUD messaging](hud-api.md). Disable the Status HUD to hide it; the self-HUD toggle can restore it. No status-preview/test setting remains.
 
-Up to three orange notifications appear below the HUD, each with a clear control. Incoming attack notices take priority and open their chat cards. Dismissing a notice does not resolve the attack. Ordinary messages expire instead of accumulating in a navigable history.
-
-New messages use an orange scanline reveal at screen center before appearing below the HUD. Newly activated drug/pharma and exposure symbols scan in large, blink three times, then light their dashboard indicator. Existing conditions do not replay merely because the HUD refreshes or changes viewed character.
-
-Turn off **Animate HUD messages and effect icons** in module settings to disable arrival animations for your client. Reduced-motion preferences also skip them. Conditions and messages still appear immediately.
-
-The GM can use **Send HUD Message** to choose recipients and duration. Notifications remain available when the HUD is minimized, but disappear when it is disabled.
-
-## Position and controls
-
-The HUD is pinned 8px from the top and 8px left of Foundry's right sidebar, including when that sidebar is collapsed. It follows window and sidebar resizing. Dragging is currently inactive.
-
-The minimize button sits beside **Implant Integrity**. The displayed character name stays below the relevant expanded or minimized view. Use **Status HUD** in settings, or the bell on your own token's HUD, to toggle the display.
-
-HUD size, HP display and other presentation preferences are available in module settings.
-
-## Verification
-
-Browser fixtures cover classification, active effects, sharing, private notifications, docking and animations. Live Foundry and multi-client verification remain separate. Developer message integrations are documented in the [HUD API](hud-api.md).
+Implementation: [eye-hud.ts](../src/scripts/eye-hud.ts), [hud-messages.ts](../src/scripts/hud-messages.ts), [hud-conditions.ts](../src/scripts/hud-conditions.ts), [biomonitor.ts](../src/scripts/biomonitor.ts), [neural-intrusion.ts](../src/scripts/neural-intrusion.ts).

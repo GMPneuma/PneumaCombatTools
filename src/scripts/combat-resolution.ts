@@ -1,3 +1,4 @@
+import {attackCrossesSmoke} from "./aoe/smoke-obscuration.js";
 import {evasionBlocked} from "./injury-rules.js";
 import { empDisabled, isMicrowaver } from "./emp-rules.js";
 import { requireCombatSocket } from "./socket-health.js";
@@ -362,7 +363,7 @@ export async function startCombatExchange(attacker: Token, target: Token, itemId
     dv = parseDV((await getTable(tableName))?.getResultsForRoll(distance)[0]?.text);
     if (dv === undefined) throw new Error("No ranged DV is available for this weapon and distance.");
   }
-  const choice = await attackDialog(roll, actor, item, event, !!thrown?.improvised);
+  const choice = await attackDialog(roll, actor, item, event, !!thrown?.improvised, attackCrossesSmoke(attacker.center,target.center));
   if (!choice.confirmed) return;
   if (!thrown && grappleWeaponBlocked(actor, item)) throw new Error("Grappled characters cannot use weapons requiring two hands.");
   if (ranged && item.hasAmmo && !item.hasAmmo(roll)) {

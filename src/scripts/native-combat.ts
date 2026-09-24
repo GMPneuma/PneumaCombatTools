@@ -4,6 +4,7 @@ export interface NativeRoll {
   mods: { id?: string; value: number; source: string }[];
   entityData?: { actor: string; token: string; item: string; tokens: string[] };
   criticalCard?: boolean; location?: string; isAimed?: boolean; isAutofire?: boolean; autofireMultiplier?: number; autofireMultiplierMax?: number; _roll?: Roll; _critRoll?: Roll;
+  removeMod(id: string): void;
   addMod(mods: { id?: string; value: number; source: string }[]): void;
   handleRollDialog(event: unknown, actor: Actor, item: Item): Promise<boolean>;
   roll(): Promise<void>; wasCritical(): boolean;
@@ -80,6 +81,16 @@ export async function spendBonusLuck(actor: Actor, bonus: number): Promise<void>
   const remaining = checkedLuck(current, 0, bonus);
   if (bonus) await actor.update({ "system.stats.luck.value": remaining } as Parameters<Actor["update"]>[0]);
 }
+// Reuse CPR's obscured-task ID so its own situational toggle cannot stack the same penalty.
+const smokeModId="heavilyObscured-coreBook";
+const smokeRolls=new WeakSet<NativeRoll>();
+export async function smokeAttackDialog(roll:NativeRoll,actor:Actor,item:Item,event:unknown,obscured:boolean):Promise<boolean> {
+  if(!obscured)return roll.handleRollDialog(event,actor,item);
+  if(!roll.mods.some(mod=>mod.id===smokeModId))roll.addMod([{id:smokeModId,source:"Smoke",value:-4}]);
+  smokeRolls.add(roll);
+  try{return await roll.handleRollDialog({type:"pneuma-smoke",ctrlKey:false,metaKey:false},actor,item);}
+  finally{smokeRolls.delete(roll);}
+}
 interface AttackChoice { unaware: boolean; improvised: boolean; improvisedDice?: number }
 const attackChoices = new WeakMap<NativeRoll, AttackChoice>();
 /** Keep native form inputs/listeners and footer; only split scrolling from actions. */
@@ -117,6 +128,22 @@ export function layoutAttackDialog(app: FormApplication, root?: HTMLElement): vo
 }
 export function registerAttackDialog(): void {
   Hooks.on("renderCPRRollDialog", (app: FormApplication & { rollData?: NativeRoll }, html: JQuery) => {
+    if(app.rollData&&smokeRolls.has(app.rollData)){
+      const roll=app.rollData;
+      html.find(".pneuma-smoke-choice").remove();
+      const row=document.createElement("li");row.className="dialog-item flexrow pneuma-smoke-choice";
+      const label=document.createElement("label"),input=document.createElement("input");
+      input.type="checkbox";input.checked=!roll.mods.some(mod=>mod.id===smokeModId);
+      input.addEventListener("change",()=>{
+        if(input.checked){if(roll.mods.some(mod=>mod.id===smokeModId))roll.removeMod(smokeModId);}
+        else if(!roll.mods.some(mod=>mod.id===smokeModId))roll.addMod([{id:smokeModId,source:"Smoke",value:-4}]);
+        app.render();
+      });
+      label.append(input,document.createTextNode(" Ignore smoke penalty (−4) — equipment / GM ruling"));
+      row.append(label);row.title="Smoke crosses this attack: −4 unless ignored.";
+      html.find(".total-mods").first().before(row);
+      layoutAttackDialog(app,html[0]);
+    }
     const choice = app.rollData && attackChoices.get(app.rollData);
     if (!choice) return;
     html.find(".pneuma-unaware-choice, .pneuma-improvised-damage-choice").remove();
@@ -151,12 +178,12 @@ export function registerAttackDialog(): void {
     row.append(label); html.find(".total-mods").first().before(row);
   });
 }
-export async function attackDialog(roll: NativeRoll, actor: Actor, item: Item, event: unknown, improvised = false) {
+export async function attackDialog(roll: NativeRoll, actor: Actor, item: Item, event: unknown, improvised = false, obscured = false) {
   const choice: AttackChoice = { unaware: false, improvised };
   if (game.user?.isGM || improvised) attackChoices.set(roll, choice);
   try {
-    const confirmed = await roll.handleRollDialog(game.user?.isGM || improvised
-      ? { type: "pneuma-attack", ctrlKey: false, metaKey: false } : event, actor, item);
+    const confirmed = await smokeAttackDialog(roll, actor, item, game.user?.isGM || improvised
+      ? { type: "pneuma-attack", ctrlKey: false, metaKey: false } : event, obscured);
     if (confirmed && improvised && choice.improvisedDice === undefined)
       throw new Error("Choose improvised damage from 1d6 to 6d6 before attacking.");
     return { confirmed, unaware: !!game.user?.isGM && choice.unaware,

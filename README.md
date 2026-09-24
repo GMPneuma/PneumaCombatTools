@@ -1,46 +1,39 @@
 # Pneuma's Combat Tools
 
-Combat workflows and a character status HUD for Cyberpunk RED in Foundry VTT. Combat Tools connects attacks, defender responses, damage and conditions while reusing the system's native rolls and character data.
+Combat workflows for **Foundry VTT v12** and **Cyberpunk RED Core**. Current release: **0.8.1**. Requires **libWrapper** and an active GM for coordinated workflows.
 
 ## Features
 
-- **Combat resolution:** target-based weapon attacks, Evasion, damage and critical injuries in coordinated chat cards.
-- **Area attacks:** grenades, rockets, shotgun shells and suppressive fire, with placement and individual target responses.
-- **Instant effects:** reusable ammunition and condition resolutions, including poison, EMP, fire and smoke.
-- **Grappling:** opposed grabs, holds, escapes, choking and throws.
-- **QuickHack:** Jack-In, encounter connections, hacking and detection/ejection workflows.
-- **Character HUD:** vitals, medical conditions, drugs, cyberware and private notifications, with Biomonitor sharing.
-- **Native conditions:** synchronized status markers, injury items and supported Active Effects.
-- **Movement and injury support:** movement counters, optional evasion movement costs and selected injury mechanics.
-- **Combat bar:** compact actor portraits, personal layouts, turn controls and GM movement modes.
-- **GM configuration:** rules options, permissions and visibility controls, with player-specific display settings.
+- Target-aware native attacks, defense choices, shared damage controls and critical injuries.
+- Grenades, rockets, shotgun shells and suppressive fire with individual responses.
+- Grapples, QuickHacks, configurable EMP disablement and supported instant effects.
+- Combat bar, movement counters, injury reminders, Biomonitor and private HUD messages.
+- Manual damage, critical injury, Cyberpunk/custom dice, STAT rolls and GM group checks.
+- Optional homebrew rules and per-user presentation settings.
 
-See the [feature overview](IMPLEMENTED_FEATURES.md) for scope and the [documentation index](docs/README.md) for detailed guides.
+See the [complete inventory](IMPLEMENTED_FEATURES.md), [posting-ready feature list](docs/feature-list-for-posting.md), and [documentation index](docs/README.md).
 
 ## Install
 
-Requires **Foundry VTT v12**, **Cyberpunk RED Core** (`cyberpunk-red-core`) and **libWrapper**.
-
-In Foundry's Add-on Modules screen, choose **Install Module** and use this manifest:
+Use this manifest in Foundry's Install Module dialog:
 
 ```text
 https://github.com/GMPneuma/PneumaCombatTools/releases/latest/download/module.json
 ```
 
-Enable Combat Tools and libWrapper in your world. Keep an active GM connected for shared combat resolution. After replacing installed code or styling, refresh each client. If module.json changes, fully restart Foundry to reliably reload its package metadata.
+Enable libWrapper and Combat Tools in a Cyberpunk RED Core world. Restart the Foundry server after an update if its loaded module metadata does not include the socket registration, then reconnect clients. Configure campaign rules before starting an encounter. Visual Tools is optional and separately distributed; Combat Tools no longer renders screen glitches or fire overlays.
 
 ## Start here
 
-- **Players:** [Player guide](docs/player-guide.md) — attack, defend, apply damage and read your HUD.
-- **GMs:** [GM guide](docs/gm-guide.md) — setup, rules choices, encounter management and limitations.
-- **All guides:** [Documentation index](docs/README.md).
-- **Planned work:** [Backlog](BACKLOG.md). [Changelog](CHANGELOG.md) records releases.
-
-The 0.8.0 release passed build, regression and browser-fixture checks. Live Foundry multiplayer verification remains separate. Some effects still require GM adjudication; the guides distinguish those from automated behavior.
+- [Player guide](docs/player-guide.md) and [GM guide](docs/gm-guide.md).
+- [Settings reference](docs/settings-reference.md).
+- [Workflow diagrams and state storage](docs/flow-map.md).
+- [Send HUD messages from macros or modules](docs/hud-api.md).
+- [Remaining work and verification](BACKLOG.md).
 
 ## Development
 
-Use Node.js 22+ and pnpm 11.19.0:
+Source is strict TypeScript under `src/`; do not edit generated `dist/` files.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -48,7 +41,9 @@ pnpm check
 pnpm build
 ```
 
-Source is in `src/`; `dist/` contains the installable module. For manual installation, copy the contents of `dist/` into `Data/modules/pneuma-combattools/`. See the [developer references](docs/README.md#developer-references) for card styling and integration APIs.
+Package the contents of `dist/` at the ZIP root. The build does not create the ZIP. Browser fixtures require Playwright and, for some tests, local jQuery, Handlebars or PIXI paths; see [verification](docs/verification.md).
+
+The 0.8.1 release passed 334 automated checks, with four native-Foundry checks skipped and no failures. Live multiplayer verification remains separate.
 
 ## Unofficial content
 

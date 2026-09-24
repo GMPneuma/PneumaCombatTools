@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.1 - 2026-09-23
+
+- Apply a native −4 smoke modifier to attacks crossing active module smoke, with a per-roll override.
+
+- Clear timed cyberware disablements when their combat ends, resets or is deleted; repair stranded causes on startup.
+
+- Regenerate the current guides, complete feature inventory and consolidated backlog against 0.8.0 source; retain earlier records in a labeled archive.
+- Add a posting-ready major/minor feature list, settings inventory and expanded HUD messaging API examples.
+- Refresh all twelve current Mermaid workflow diagrams and provide a standalone rendered version.
+- Fix self-HUD Close Combat and thrown menus: compact flyouts, readable inherited text, one-line labels, matching headers and icons, shared hover highlighting and stable icon-column layout.
+
 ## 0.8.0 - 2026-09-23
 
 - Keep player HUD vitals, incoming attacks and Neural Intrusion active without token selection: use the assigned character's unique scene token, or the single owned scene token when no Character is assigned.

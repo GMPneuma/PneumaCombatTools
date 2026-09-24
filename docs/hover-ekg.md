@@ -1,17 +1,13 @@
 # Hover EKG
 
-Hover over a visible token to show its EKG below the token/nameplate. It reuses the Biomonitor waveform, colors and animation speed for normal, wounded, seriously wounded, critical and flatline states. Unknown HP shows an unanimated line. Numeric HP is not displayed.
+Current implementation: Combat Tools 0.8.1; source-reviewed 2026-09-23.
 
-The EKG is visible only when:
+A visible hovered token can display an EKG beneath its nameplate. No numeric HP is exposed. Eligibility is **any one** of: viewer is a selected owned Medtech (or assigned Medtech with no selection); target has an installed Biomonitor; GM Always show EKG world option is on. GMs follow the same rule.
 
-- The viewer has one owned Medtech character selected; or, with no token selected, their assigned character is a Medtech.
-- The hovered target has an installed Biomonitor; anyone may view its EKG.
-- **Always show EKG** is enabled by the GM under **Configure Settings → Combat Tools → Token HUD & Targeting**. This world setting defaults off and allows all viewers to see hovered EKGs.
+Medtech recognition uses a native role item with positive rank. Selecting a non-Medtech does not borrow the assigned character's role. This hover eligibility is separate from the main Biomonitor's default-focus resolver.
 
-Medtech requires a native role item with positive rank, identified by its Medtech name, role name or native compendium source. Selecting a non-Medtech does not borrow the assigned character role. GMs follow the same Medtech, target Biomonitor or world override rule.
+The trace reuses normal/wounded/serious/critical/flatline states; unavailable HP gives a static line. Visibility, hover exit, blur, deletion and scene teardown remove the panel. Relevant HP/role/implant changes refresh it; pan/zoom repositions it without restarting an unchanged waveform.
 
-This feature is independent of the hover-DV toggle, weapon selection, combat state. It respects native token visibility and does not expose hidden tokens. The display disappears on hover exit, scene teardown, token deletion or browser blur. HP, role and hovered-target Biomonitor installation/removal changes refresh it. Pan/zoom repositions the panel while the animation remains stable when the health state is unchanged.
+Styling root: `.pneuma-hover-ekg`; shared children `.pneuma-eye-vitals[data-state]` and `.pneuma-eye-ekg`. The overlay is noninteractive and independent of ranged-DV hover.
 
-Styling: `.pneuma-hover-ekg` contains `.pneuma-eye-vitals[data-state]` and the shared `.pneuma-eye-ekg` SVG/trace classes. It is a noninteractive 140×40px overlay. Existing Biomonitor selectors, pause controls and HP display behavior are retained; shared trace/color selectors also scope to the hover panel. Example: `.pneuma-hover-ekg .pneuma-eye-trace-glow { opacity: 1; }`.
-
-Browser fixtures cover role/setting gates, health states, placement, hidden tokens, selection changes, hover cleanup and stable animation. Existing Biomonitor browser checks also pass. Live Foundry multiplayer verification remains outstanding.
+Implementation: [ekg-hover.ts](../src/scripts/ekg-hover.ts), [biomonitor.ts](../src/scripts/biomonitor.ts).

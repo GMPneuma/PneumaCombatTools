@@ -16,7 +16,13 @@ export interface TimedDisable {source:DisableSource;label:string;duration:Effect
 export function timedDisables(item:{flags?:unknown}):Record<string,TimedDisable> {
   return (item.flags as {"pneuma-combattools"?:{timedDisables?:Record<string,TimedDisable>}}|undefined)?.[EMP_MODULE]?.timedDisables??{};
 }
-export function activeDisables(item:{flags?:unknown}):TimedDisable[] {return Object.values(timedDisables(item)).filter(value=>!durationExpired(value.duration));}
+/** Combat-bound disablements end with their encounter, even if world time stops. */
+export function disableExpired(duration:EffectDuration):boolean {
+  const combat=duration.combat;
+  if(combat && !(typeof combat==="string"?game.combats?.get(combat):combat)?.started) return true;
+  return durationExpired(duration);
+}
+export function activeDisables(item:{flags?:unknown}):TimedDisable[] {return Object.values(timedDisables(item)).filter(value=>!disableExpired(value.duration));}
 export function empDisabled(item: {flags?: unknown}): boolean {
   return empReferences(item).some(id => game.combats?.get(id)?.started)||activeDisables(item).length>0;
 }
