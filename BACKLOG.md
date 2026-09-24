@@ -1,5 +1,9 @@
 # Combat Tools roadmap and backlog
 
+## Authorized encounter consistency — implemented locally, 2026-09-24
+
+Use one active, started encounter per action scene; require participating tokens; retain the selected encounter through responses, movement and effects; reject ambiguous selection and invalidated actions. Clean environment assumed. Shared lookup and regression coverage implemented; live multiplayer verification remains open. See [encounter selection](docs/encounters.md).
+
 Current source: 0.8.0, reviewed 2026-09-23. This is a status record, not authorization to implement new work. The [complete former roadmap](docs/history/pre-0.8.0-refresh/BACKLOG.md) preserves original wording, intermediate decisions and dated investigations. This document supersedes its conflicting status labels.
 
 ## Original requests: current disposition
@@ -67,3 +71,11 @@ Combat-bound cyberware disablements now clear on combat end/reset/deletion, incl
 Self-CTH Close Combat and Thrown Weapons & Grenades flyouts now use the shared `.combat-heading` and list rows, with grapple icons, item artwork and the native improvised-weapon icon. Enabled CTH menu buttons share hover/focus background and inset outline tokens (`--pneuma-menu-hover-background`, `--pneuma-menu-hover-outline`) without changing layout; disabled actions remain dim. Existing action selectors are unchanged.
 
 Automatic smoke obscuration: Combat Tools attacks check the attacker-center to target-center line against active saved smoke footprints; blast attacks use the chosen impact point. Crossing smoke adds the native −4 obscured-task modifier once. The attack dialog offers “Ignore smoke” for equipment or GM rulings, and native roll details retain the modifier. This runs at attack preparation, not continuously; it does not infer vision-equipment capabilities or vertical smoke volume.
+
+Unreleased fix: cyberleg/internal-frame and QuickHack movement penalties now include native CPR per-change metadata; existing module penalty effects repair during reconciliation. This prevents the native modifier reader from failing on missing `changes` flags. Live affected-character verification pending.
+
+Disabled cyberlimbs derive their state from combat/item disablement records. Only the mechanical MOVE penalty appears as an actor effect; redundant no-modifier limb effects from older versions are removed during reconciliation without clearing item causes or unrelated effects.
+
+AoE re-placement: missed aim templates are gray and inactive while waiting for the GM landing point. `.pneuma-aoe-reposition` explains the state and placement bounds; the existing scatter action now reads “Place landing point.” A pointer-transparent `.pneuma-area-placement` status panel keeps placement/cancel instructions visible. The moving preview retains its color; accepting replaces the original template at the actual landing point.
+
+Disablement audit fixes: active native leg-injury modifiers (including renamed native items) offset the cyberleg penalty; disabled/suppressed effects do not. Generic Disabled labels are display-only, including for evasion. Module-owned aggregate limb/frame penalties restore automatically while their item/combat causes remain active, including after manual effect deletion or disabling. Internal-frame policies derive from combat requests and item causes; legacy empty frame markers are removed. CPR modifier metadata repairs also cover Slow and Impair Movement.

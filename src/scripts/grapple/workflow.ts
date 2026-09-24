@@ -1,3 +1,4 @@
+import {tokenEncounter,encounterRef,resolveEncounter,requireParticipants,type EncounterRef} from "../encounter.js";
 import {updateTouchesPath} from "../update-path.js";
 import { requireCombatSocket } from "../socket-health.js";
 import { rollOutcomeClass, styleOpposedRolls } from "../card-structure.js";
@@ -12,6 +13,7 @@ const gm = () => game.users?.filter(u => u.active && u.isGM).sort((a,b) => a.id.
 const owns = (actor: Actor, user: User) => user.isGM || actor.testUserPermission(user, "OWNER");
 const report = (error: unknown) => { console.error(MODULE, error); ui.notifications!.error(String((error as Error).message ?? error)); };
 export interface GrappleRequest {
+  encounter?:EncounterRef;
   grappleType: "request"; request: string; user: string; scene: string; id: string; revision: number;
   action: string; rollMode?: string; source?: string; target?: string; result?: SkillResult; claim?: string;
 }
@@ -118,17 +120,8 @@ async function end(scene: Scene, g: Grapple, note: string, endedBy?: string) {
   const ended: Grapple = {...g,state:"ended",note,revision:g.revision+1,...(endedBy ? {endedBy} : {})}; delete ended.choke; delete ended.operation;
   await save(scene,ended);
 }
-function activeCombat(scene: Scene, g: Grapple): Combat | undefined {
-  if (g.combat) {
-    const combat = game.combats?.get(g.combat) as Combat | undefined;
-    if (!combat?.started) throw new Error("The originating combat ended or was reset.");
-    return combat;
-  }
-  const matches = game.combats?.filter(c => c.started && c.scene?.id === scene.id && [g.source.token,g.target.token].every(uuid => c.combatants.some(p => p.token?.uuid === uuid))) ?? [];
-  const selected = matches.find(c => c.id === game.combat?.id);
-  if (selected) return selected;
-  if (matches.length > 1) throw new Error("Select the combat containing these characters.");
-  return matches[0];
+function activeCombat(scene:Scene,g:Grapple):Combat|undefined {
+  return g.combatId!==undefined?resolveEncounter(g):tokenEncounter(scene.id,[g.source.token,g.target.token]);
 }
 function otherActive(actor: Actor, id: string) { return Array.from(game.scenes ?? []).flatMap(scene => grapples(scene)).some(g => g.id !== id && (g.state === "active" || g.operation?.action === "hold") && [g.source.actor,g.target.actor].includes(actor.uuid)); }
 
@@ -148,7 +141,9 @@ export async function handleGrappleRequest(r: GrappleRequest): Promise<string | 
     if (r.action === "start" && (actorGrapples(source.actor!).length || actorGrapples(target.actor!).length)) throw new Error("A character is already grappling. Resolve that grapple first.");
     g = {id:r.id,revision:0,scene:r.scene,source:participant(source),target:participant(target),purpose:r.action === "start" ? "grab" : "break",
       ...(broken && r.action === "startBreak" ? {breaks:broken.id} : {}),state:"waiting",attack:checkedResult(r.result),note:"Waiting for opposed Brawling."};
-    const combat = activeCombat(scene,g);
+    const combat = r.encounter?resolveEncounter(r.encounter):activeCombat(scene,g);
+    if(combat)requireParticipants(combat,[g.source.token,g.target.token]);
+    Object.assign(g,encounterRef(combat,scene.id,[g.source.token,g.target.token]));
     if (combat) g.combat = combat.id!;
     const messageData = {user:r.user,content:grappleContent(g),speaker:ChatMessage.getSpeaker({actor:source.actor!,token:source}),
       flags:{[String(MODULE)]:{grapple:{scene:r.scene,id:r.id}}}} as Parameters<typeof ChatMessage.applyRollMode>[0];
@@ -164,6 +159,7 @@ export async function handleGrappleRequest(r: GrappleRequest): Promise<string | 
   if (r.revision !== g.revision) throw new Error("This card changed. Use its current controls.");
   const key = scene.id + ":" + g.id;
   if (r.action === "cancel" && user.isGM) { claims.delete(key); await end(scene,g,"Ended by GM."); return; }
+  resolveEncounter(g);
   const source = tokenFor(scene,g.source.token), target = tokenFor(scene,g.target.token);
   if (g.operation && (g.operation.action !== r.action || g.operation.user !== user.id && !user.isGM))
     throw new Error("Finish the pending grapple action first; the GM can retry it.");
@@ -276,9 +272,11 @@ export async function useGrapple(source: Token, target: Token, action: string) {
     if (action === "grab" || action === "escape" || action === "break") {
       const opponent = action === "escape" && own ? tokenFor(scene,own.source.token) : target.document;
       validatePair(scene,source.document,opponent);
+      const encounter=encounterRef(tokenEncounter(scene.id,[source.document.uuid,opponent.uuid]),scene.id,[source.document.uuid,opponent.uuid]);
       if (!await Dialog.confirm({title:action === "grab" ? "Grab" : "Break Grapple",content:"<p>This costs an Action. Confirm you have a free hand to attempt this Grab.</p>"})) return;
       const result = await brawling(source.actor); if (!result) return;
-      await request({scene:scene.id!,id:foundry.utils.randomID(),revision:0,action:action === "grab" ? "start" : "startBreak",source:source.document.uuid,target:opponent.uuid,result,rollMode:game.settings!.get("core","rollMode") ?? "roll"});
+      resolveEncounter(encounter);
+      await request({encounter,scene:scene.id!,id:foundry.utils.randomID(),revision:0,action:action === "grab" ? "start" : "startBreak",source:source.document.uuid,target:opponent.uuid,result,rollMode:game.settings!.get("core","rollMode") ?? "roll"});
     } else {
       if (!own || own.source.token !== source.document.uuid) throw new Error("Only the attacker can Choke, Throw, or Release.");
       await request({scene:scene.id!,id:own.id,revision:own.revision,action});

@@ -24,7 +24,9 @@ try {
   const {postResult}=await import('/scripts/quickhack/messages.js');
   const {registerQuickhack}=await import('/scripts/quickhack/integration.js');registerQuickhack();
   window.message=await postResult({name:'<script>unsafe()</script>',actor:{hasPlayerOwner:true},document:{}},{name:'Target & friend',actor:{},document:{}},
-   {type:'quickhack',sourceActorUuid:'Actor.a',targetActorUuid:'Actor.b',quickhackId:'synapse-burnout',success:true,alerted:true,audience:'public',revealAttacker:true},'Synapse Burnout','SUCCESS','<p>Interface 17 vs. DV 15</p>', '<div class="rollcard"><div class="rollcard-top">Duplicate title</div><div class="rollcard-bottom"><div class="cpr-block"><div class="d10-number-div"><span data-action="toggleVisibility">17</span></div></div></div></div>');
+   {combatId:'c',combatEpoch:'',connectionId:'connection',type:'quickhack',sourceActorUuid:'Actor.a',targetActorUuid:'Actor.b',quickhackId:'synapse-burnout',success:true,alerted:true,audience:'public',revealAttacker:true},'Synapse Burnout','SUCCESS','<p>Interface 17 vs. DV 15</p>', '<div class="rollcard"><div class="rollcard-top">Duplicate title</div><div class="rollcard-bottom"><div class="cpr-block"><div class="d10-number-div"><span data-action="toggleVisibility">17</span></div></div></div></div>');
+  const key=encodeURIComponent('Actor.a|Actor.b').replaceAll('.','%2E');
+  game.combats=new Map([['c',{id:'c',started:true,flags:{'pneuma-combattools':{quickhackConnections:{[key]:{id:'connection',state:'active'}}}},combatants:[]}]]);
   const root=document.querySelector('#card');root.innerHTML=message.content;
   window.wrap=root=>({0:root,find:selector=>({remove:()=>root.querySelectorAll(selector).forEach(node=>node.remove())})});
   for(const callback of hooks.renderChatMessage)await callback(message,wrap(root));

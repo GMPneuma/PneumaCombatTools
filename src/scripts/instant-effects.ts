@@ -1,3 +1,4 @@
+import {actorEncounter,encounterRef,resolveEncounter,type EncounterRef} from "./encounter.js";
 import {reportExposure,registerEffectEvents} from "./effect-events.js";
 import {createSmoke} from "./aoe/smoke.js";
 import {instantEffects,instantId,type InstantId,escapeInstant as esc} from "./instant-catalog.js";
@@ -10,11 +11,12 @@ import {requireCombatSocket} from "./socket-health.js";
 import {canRenderCombatCard} from "./card-structure.js";
 const M="pneuma-combattools";
 export interface InstantState {
+  encounter?:EncounterRef;
   id:InstantId; actor:string; name:string; state:"pending"|"rolling"|"failed"|"resisted"|"applying"|"applied"|"skipped"|"review";
   nonce?:string;user?:string;total?:number;html?:string;damage?:number;damageHTML?:string;summary?:string;
 }
 export interface InstantRequest {action:string;nonce?:string;total?:number;html?:string}
-export function newInstant(id:InstantId,actor:string,name:string):InstantState {return {id,actor,name,state:instantEffects[id].skill?"pending":"failed"};}
+export function newInstant(id:InstantId,actor:string,name:string,encounter:EncounterRef={combatId:null}):InstantState {return {id,actor,name,encounter,state:instantEffects[id].skill?"pending":"failed"};}
 export const instantDone=(s:InstantState)=>["resisted","applied","skipped"].includes(s.state);
 export function instantContent(s:InstantState,scope="") {
   const e=instantEffects[s.id],button=(a:string,label:string)=>'<button type="button" data-instant-action="'+a+'" data-instant-scope="'+esc(scope)+'">'+label+'</button>';
@@ -35,6 +37,7 @@ async function resolveInstant(s:InstantState,req:InstantRequest,user:User,save:(
   if(game.user?.id!==empGM()?.id)throw Error("An active GM is required.");
   const actor=await fromUuid(s.actor) as Actor|null;
   if(!actor||!user.isGM&&!actor.testUserPermission(user,"OWNER"))throw Error("Only the target owner or GM can resolve this effect.");
+  const combat=resolveEncounter(s.encounter??{combatId:null});
   const e=instantEffects[s.id];
   if(req.action==="wake"||req.action==="extinguish") {
     if(s.state!=="applied"||req.action==="wake"&&s.id!=="sleep"||req.action==="extinguish"&&s.id!=="incendiary")throw Error("Condition action unavailable.");
@@ -59,7 +62,7 @@ async function resolveInstant(s:InstantState,req:InstantRequest,user:User,save:(
     delete s.nonce;delete s.user;await save();return;
   }
   if(req.action!=="apply"||s.state!=="failed")throw Error("Resolve the resistance check first.");
-  if((s.id==="emp"||s.id==="microwaver")&&!game.combat?.started)throw Error("Start combat before applying "+instantEffects[s.id].name+".");
+  if((s.id==="emp"||s.id==="microwaver")&&!combat?.started)throw Error("Start combat before applying "+instantEffects[s.id].name+".");
   if(e.damage&&s.damage===undefined) {
     const roll=await new Roll(e.damage).evaluate();s.damage=roll.total!;s.damageHTML=await roll.render();await save();
     const {Dice}=await nativeAPI();await Dice.handle3dDice(roll,rollMode);
@@ -67,15 +70,17 @@ async function resolveInstant(s:InstantState,req:InstantRequest,user:User,save:(
   s.state="applying";await save();
   try {
     if(e.damage){const hp=Number(foundry.utils.getProperty(actor,"system.derivedStats.hp.value"));if(!Number.isFinite(hp))throw Error("Target HP unavailable.");await actor.update({"system.derivedStats.hp.value":hp-s.damage!} as never);s.summary=s.damage+" direct HP damage; armor unchanged";reportExposure(actor,s.id);}
-    else if(s.id==="emp"||s.id==="microwaver") {const selection=await createEmp(actor,{...(s.id==="microwaver"?{source:"microwaver",seconds:60}:{}),count:2,chooser:"gm",mode:"equal",policy:{foundational:true,cascade:true,electronics:true,immune:game.settings!.get(M,"empImmunity").split(/[\n,;]/)}});s.summary=!selection?"No eligible cyberware or carried electronics":s.id==="microwaver"?"Microwaver selection created — two items; 60 seconds":"EMP selection created — two items; until combat ends";}
-    else if(s.id==="flashbang"||s.id==="teargas") {await temporaryInjury(actor,"Damaged Eye");if(s.id==="flashbang")await temporaryInjury(actor,"Damaged Ear");s.summary="Temporary native injury effects: 1 minute; no bonus damage";}
+    else if(s.id==="emp"||s.id==="microwaver") {const selection=await createEmp(actor,{...(s.id==="microwaver"?{source:"microwaver",seconds:60}:{}),count:2,chooser:"gm",mode:"equal",policy:{foundational:true,cascade:true,electronics:true,immune:game.settings!.get(M,"empImmunity").split(/[\n,;]/)}},s.encounter);s.summary=!selection?"No eligible cyberware or carried electronics":s.id==="microwaver"?"Microwaver selection created — two items; 60 seconds":"EMP selection created — two items; until combat ends";}
+    else if(s.id==="flashbang"||s.id==="teargas") {await temporaryInjury(actor,"Damaged Eye",combat??null);if(s.id==="flashbang")await temporaryInjury(actor,"Damaged Ear",combat??null);s.summary="Temporary native injury effects: 1 minute; no bonus damage";}
     else if(s.id==="smoke") {
-      const token=canvas.tokens?.placeables.find(t=>t.actor?.uuid===actor.uuid);if(!token||!canvas.scene)throw Error("Open the target scene to place smoke.");
+      if(s.encounter?.combatScene&&canvas.scene?.id!==s.encounter.combatScene)throw Error("Open the target scene to place smoke.");
+      const tokens=canvas.tokens?.placeables.filter(t=>t.actor?.uuid===actor.uuid&&(!s.encounter?.combatTokens?.length||s.encounter.combatTokens.includes(t.document.uuid)))??[];
+      if(tokens.length!==1||!canvas.scene)throw Error("Open the target scene with one matching target token to place smoke.");const token=tokens[0]!;
       const grid=canvas.scene.grid,feet=["ft","feet","foot"].includes(String(grid.units).toLowerCase()),size=10*Number(grid.size)/(Number(grid.distance)*(feet?0.3048:1));
-      await createSmoke(canvas.scene,{shape:"square",origin:canvas.grid!.getCenterPoint(token.center),direction:0,length:size,width:size},"instant:"+actor.uuid+":"+foundry.utils.randomID());s.summary="Smoke area created: 1 minute";
+      await createSmoke(canvas.scene,{shape:"square",origin:canvas.grid!.getCenterPoint(token.center),direction:0,length:size,width:size},"instant:"+actor.uuid+":"+foundry.utils.randomID(),combat??null);s.summary="Smoke area created: 1 minute";
     }
-    else if(s.id==="sleep"){await sleepTarget(actor);s.summary="Prone and Unconscious: 1 minute, damage, or a touching Action";}
-    else if(s.id==="incendiary"){await igniteTarget(actor);s.summary="On fire: 2 HP at turn end; nonstacking; Action to extinguish";}
+    else if(s.id==="sleep"){await sleepTarget(actor,combat??null);s.summary="Prone and Unconscious: 1 minute, damage, or a touching Action";}
+    else if(s.id==="incendiary"){await igniteTarget(actor,combat??null);s.summary="On fire: 2 HP at turn end; nonstacking; Action to extinguish";}
     s.state="applied";await save();
   }catch(error){s.state="review";await save();throw error;}
 }
@@ -107,8 +112,8 @@ export async function bindInstantControls(root:HTMLElement,state:(scope:string)=
   }
 }
 interface EffectCard {effect:InstantState;rollMode:string}
-export async function createInstantCard(actor:Actor,id:InstantId,source?:ChatMessage) {
-  const data:EffectCard={effect:newInstant(id,actor.uuid,actor.name??""),rollMode:source?.blind?"blindroll":source?.whisper.length?"gmroll":"roll"};
+export async function createInstantCard(actor:Actor,id:InstantId,source?:ChatMessage,encounter=encounterRef(actorEncounter(actor),actor.isToken?actor.token?.parent?.id:canvas.scene?.id)) {
+  const data:EffectCard={effect:newInstant(id,actor.uuid,actor.name??"",encounter),rollMode:source?.blind?"blindroll":source?.whisper.length?"gmroll":"roll"};
   return ChatMessage.create({content:'<section class="rollcard pneuma-instant-card"><h3>'+esc(actor.name)+'</h3>'+instantContent(data.effect)+'</section>',speaker:ChatMessage.getSpeaker({actor}),whisper:source?.whisper??[],blind:source?.blind??false,flags:{[M]:{instant:data}}} as never);
 }
 interface Wire {instantType:"request"|"reply";id:string;message:string;user:string;request:InstantRequest;gm?:string;error?:string}
@@ -128,14 +133,14 @@ function send(message:string,request:InstantRequest) {
 /** Persist the claim before creating a resistance card; never duplicate it on later chat updates. */
 const microwavePending=new Set<string>();
 export async function dispatchMicrowaver(message:ChatMessage) {
-  const data=foundry.utils.getProperty(message,"flags."+M+".exchange") as {disableSource?:string;state?:string;hit?:boolean;defenderActor?:string}|undefined;
+  const data=foundry.utils.getProperty(message,"flags."+M+".exchange") as Partial<EncounterRef>&{disableSource?:string;state?:string;hit?:boolean;defenderActor?:string}|undefined;
   if(game.user?.id!==empGM()?.id||data?.disableSource!=="microwaver"||data.state!=="resolved"||!data.hit||microwavePending.has(message.id!)||foundry.utils.getProperty(message,"flags."+M+".microwaverClaim"))return;
   microwavePending.add(message.id!);
   try {
     const actor=data.defenderActor?await fromUuid(data.defenderActor) as Actor|null:null;
     if(!actor)throw Error("Microwaver target is unavailable.");
     await message.update({["flags."+M+".microwaverClaim"]:true});
-    await createInstantCard(actor,"microwaver",message);
+    await createInstantCard(actor,"microwaver",message,encounterRef(resolveEncounter(data),data.combatScene,data.combatTokens));
   } catch(error) {ui.notifications!.error("Microwaver resistance card interrupted. Use Add effects > Microwaver to resolve manually. "+String(error));}
   finally {microwavePending.delete(message.id!);}
 }

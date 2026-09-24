@@ -1,5 +1,7 @@
 # Combat Tools — flow and chat-card map
 
+Encounter selection now follows the [shared active-scene policy](encounters.md); saved actions and effect clocks remain tied to their originating encounter.
+
 Current source: Combat Tools 0.8.0, reviewed 2026-09-23. Code inspection and diagram-render validation are distinct from live multiplayer certification.
 
 **M** below means **flags.pneuma-combattools**. For example, ChatMessage M.exchange means ChatMessage.flags.pneuma-combattools.exchange. **Transient** means dialog/client/GM memory, not durable document storage. Diagram IDs correspond to table rows. Native CPR dialogs may offer additional version-dependent controls. Every control remains subject to ownership, GM authority, settings and current state.
@@ -154,8 +156,8 @@ flowchart LR
 | E2 | Choose affected items; chooser dialog Cancel. | Pending request retained; closing does not redraw shortlist. Players see only offered items in shortlist mode. |
 | E3 | Item checkboxes; Disable selected. | Current eligible pool/saved offer validated. Counts normally EMP/Microwaver 2, Short Circuit 3, Malfunction 1. |
 | E4 | Draw and disable. | GM samples; selected IDs saved before item writes. Hardened consume policy spends pick with no disablement/reroll. |
-| E5 | Disabled names and hardened/unaffected outcome. Retry pending request after interruption. | Combat M.empRecords; Item M.empCombats or timedDisables, itemMarkers; actor effects with empItem/empCombat/disableRequest and limb/frame flags. |
-| E6 | No ordinary restoration button. | EMP clears on combat end; timed causes expire independently. Native effects resume; limb/frame consequences track remaining active causes. |
+| E5 | Disabled names and hardened/unaffected outcome. Retry pending request after interruption. | Combat M.empRecords; Item M.empCombats or timedDisables, itemMarkers; only aggregate mechanical actor effects with disabledLegPenalty/frameConsequences flags; frame settings come from the saved Combat request. |
+| E6 | No ordinary restoration button. | EMP clears on combat end; timed causes expire independently or when their combat ends. Native effects resume; limb/frame consequences track remaining active causes. |
 
 World empBehavior controls eligibility/weight/chooser behavior. New requests snapshot policy; changing settings does not reinterpret existing requests.
 

@@ -1,3 +1,4 @@
+import {actorEncounter} from "./encounter.js";
 import {updateTouchesPath} from "./update-path.js";
 import {effectDuration} from "./effect-duration.js";
 import { masterStatuses, type StatusDefinition } from "./status-catalog.js";
@@ -41,7 +42,7 @@ async function sourceItem(status: Bound): Promise<Item> {
   }
   return promise;
 }
-async function changeSource(actor: Actor, status: Bound, active: boolean): Promise<void> {
+async function changeSource(actor: Actor, status: Bound, active: boolean,combat?:Combat|null): Promise<void> {
   let items = matchingItems(actor, status);
   if (!active) {
     if (status.binding.kind === "injury") {
@@ -68,7 +69,7 @@ async function changeSource(actor: Actor, status: Bound, active: boolean): Promi
     const effect = sourceEffects(item, status)[0];
     if (!effect) throw new Error("Native " + status.name + " effect is unavailable.");
     const seconds=effect.duration?.seconds??(effect.duration?.rounds?effect.duration.rounds*3:undefined);
-    await item.updateEmbeddedDocuments("ActiveEffect", [{ _id: effect.id!, disabled: false, ...(typeof seconds==="number"&&seconds>0?{duration:effectDuration(seconds)}:{}) }] as never, options);
+    await item.updateEmbeddedDocuments("ActiveEffect", [{ _id: effect.id!, disabled: false, ...(typeof seconds==="number"&&seconds>0?{duration:effectDuration(seconds,combat===undefined?actorEncounter(actor):combat)}:{}) }] as never, options);
   }
 }
 async function refreshMarkers(actor: Actor): Promise<void> {
@@ -93,15 +94,15 @@ export function statusAuthority(actor: Actor): boolean {
   return users[0]?.id === game.user?.id;
 }
 const refreshRequests = new Map<string, Promise<void>>();
-export function syncActorStatuses(actor: Actor, changedIds: string[] = [], initialize = false, requestedActive?: boolean): Promise<void> {
+export function syncActorStatuses(actor: Actor, changedIds: string[] = [], initialize = false, requestedActive?: boolean,combat?:Combat|null): Promise<void> {
   // Only passive refreshes are merged. Explicit status toggles retain their order.
-  if (changedIds.length || requestedActive !== undefined) return syncStatuses(actor, changedIds, initialize, requestedActive);
+  if (changedIds.length || requestedActive !== undefined) return syncStatuses(actor, changedIds, initialize, requestedActive,combat);
   const key = actor.uuid + ":" + initialize;
   const existing = refreshRequests.get(key); if (existing) return existing;
   const next = Promise.resolve().then(() => { refreshRequests.delete(key); return syncStatuses(actor, [], initialize); });
   refreshRequests.set(key, next); return next;
 }
-function syncStatuses(actor: Actor, changedIds: string[], initialize: boolean, requestedActive?: boolean): Promise<void> {
+function syncStatuses(actor: Actor, changedIds: string[], initialize: boolean, requestedActive?: boolean,combat?:Combat|null): Promise<void> {
   if (!["character", "mook"].includes(String(actor.type))) return Promise.resolve();
   const previous = queues.get(actor.uuid) ?? Promise.resolve();
   const next = previous.catch(() => {}).then(async () => {
@@ -110,7 +111,7 @@ function syncStatuses(actor: Actor, changedIds: string[], initialize: boolean, r
       const status = bound.find(status => status.id === id);
       if (!status) continue;
       const active = requestedActive ?? markers(actor, id).some(live);
-      try { await changeSource(actor, status, active); }
+      try { await changeSource(actor, status, active,combat); }
       catch (error) {
         // Restore icons from the actual item state if importing/removing the source failed.
         await refreshMarkers(actor);
@@ -124,9 +125,18 @@ function syncStatuses(actor: Actor, changedIds: string[], initialize: boolean, r
   return next;
 }
 /** Damage-card application awaits native mechanics before reporting completion. */
-export async function applyCombatStatus(actor: Actor, id: string): Promise<void> {
-  if (bound.some(status => status.id === id)) await syncActorStatuses(actor, [id], false, true);
+export async function applyCombatStatus(actor: Actor, id: string,combat?:Combat|null, endWithCombat=false): Promise<void> {
+  const effects=()=>Array.from(actor.allApplicableEffects?.()??actor.effects??[]);
+  const existing=new Set(effects().filter(live));
+  if (bound.some(status => status.id === id)) await syncActorStatuses(actor, [id], false, true,combat);
   else await actor.toggleStatusEffect(id, { active: true });
+  const definition=masterStatuses.find(s=>s.id===id);
+  if(endWithCombat&&combat&&definition?.binding?.kind!=="injury"&&definition?.name!=="Dead") {
+    const binding=bound.find(s=>s.id===id);
+    const native=new Set(binding?matchingItems(actor,binding).flatMap(item=>sourceEffects(item,binding)):[]);
+    for(const effect of effects().filter(e=>live(e)&&!existing.has(e)&&(e.statuses.has(id)||native.has(e))))
+      await effect.update({["flags."+MODULE+".endWithCombat"]:combat.id} as never);
+  }
 }
 export function registerStatusSync(): void {
   const previousStatuses = new WeakMap<ActiveEffect, string[]>();

@@ -1,3 +1,4 @@
+import {actorEncounter,encounterRef,resolveEncounter,type EncounterRef} from "./encounter.js";
 import {registerEmpSettings} from "./emp-settings.js";
 import {applyEmpBehavior,empBehavior} from "./emp-behavior.js";
 import {EMP_MODULE as MODULE, eligibleEmpItems, empGroup, empWeight, type EmpItem, type EmpPolicy, type EmpRandom, randomEmp, disableLabel} from "./emp-rules.js";
@@ -47,14 +48,14 @@ export async function chooseEmp(combat:Combat,request:EmpRequest) {
   }},cancel:{label:"Cancel"}},default:"cancel"},{width:460});
   dialog.render(true);
 }
-export async function createEmp(actor:Actor,options:Pick<EmpRequest,"count"|"chooser"|"mode"|"policy"> & Partial<Pick<EmpRequest,"source"|"sourceActor"|"seconds"|"origin">>) {
-  const combat=game.combat;
+export async function createEmp(actor:Actor,options:Pick<EmpRequest,"count"|"chooser"|"mode"|"policy"> & Partial<Pick<EmpRequest,"source"|"sourceActor"|"seconds"|"origin">>, encounter?:Partial<EncounterRef>) {
+  const combat=encounter?resolveEncounter(encounter):actorEncounter(actor);
   if (!game.user!.isGM||!combat?.started) throw Error("A GM must start combat before creating an EMP effect.");
   if (!Number.isInteger(options.count)||options.count<1||options.count>50) throw Error("EMP count must be between 1 and 50.");
   if(options.seconds!==undefined&&(!Number.isFinite(options.seconds)||options.seconds<=0))throw Error("Disablement duration must be positive.");
   const prior=options.origin?Object.values(empRequests(combat)).find(r=>r.origin===options.origin&&r.actor===actor.uuid):undefined;
   if(prior){if(prior.state==="pending"&&prior.chooser!=="player")await chooseEmp(combat,prior);return prior;}
-  const request:EmpRequest={...applyEmpBehavior(options,empBehavior()),id:foundry.utils.randomID(),actor:actor.uuid,state:"pending"};
+  const request:EmpRequest={encounter:encounterRef(combat,encounter?.combatScene??combat.scene?.id,encounter?.combatTokens),...applyEmpBehavior(options,empBehavior()),id:foundry.utils.randomID(),actor:actor.uuid,state:"pending"};
   if(!eligibleEmpItems(Array.from(actor.items) as unknown as EmpItem[],request.policy,request.source).length){ui.notifications!.info("No eligible cyberware or electronics for "+disableLabel(request.source)+".");return;}
   if(request.method==="shortlist"){
     const all=Array.from(actor.items) as unknown as EmpItem[];
@@ -69,12 +70,13 @@ export async function createEmp(actor:Actor,options:Pick<EmpRequest,"count"|"cho
   return request;
 }
 export function configureEmp(actor:Actor) {
+  const encounter=encounterRef(actorEncounter(actor));
   new Dialog({title:`EMP — ${actor.name}`,content:`<form><div class="form-group"><label>Items to disable</label><input name="count" type="number" min="1" max="50" value="2"></div><div class="form-group"><label>Selection</label><select name="chooser"><option value="gm">GM chooses</option><option value="player">Player chooses</option><option value="random">Random</option></select></div><div class="form-group"><label>Random method</label><select name="mode"><option value="equal">True random (equal odds)</option><option value="foundation-more">Foundational more likely (2×)</option><option value="foundation-less">Foundational less likely (½×)</option><option value="system">System first</option></select></div><div class="form-group"><label>Allow foundational cyberware</label><input name="foundational" type="checkbox" checked></div><div class="form-group"><label>Disable installed options with their host</label><input name="cascade" type="checkbox" checked></div><div class="form-group"><label>Include carried electronics</label><input name="electronics" type="checkbox" checked></div><p>Use after resolving the source's resistance check. The GM immunity list applies to direct selection. Lasts until this combat ends.</p></form>`,buttons:{create:{label:"Create EMP selection",callback:html=>{
     const root=(html as JQuery)[0]!;
     const value=(name:string)=>(root.querySelector(`[name="${name}"]`) as HTMLInputElement).value;
     const checked=(name:string)=>(root.querySelector(`[name="${name}"]`) as HTMLInputElement).checked;
     const policy:EmpPolicy={foundational:checked("foundational"),cascade:checked("cascade"),electronics:checked("electronics"),immune:game.settings!.get(MODULE,"empImmunity").split(/[\n,;]/)};
-    void createEmp(actor,{count:Number(value("count")),chooser:value("chooser") as EmpRequest["chooser"],mode:value("mode") as EmpRandom,policy}).catch(report);
+    void createEmp(actor,{count:Number(value("count")),chooser:value("chooser") as EmpRequest["chooser"],mode:value("mode") as EmpRandom,policy},encounter).catch(report);
   }},cancel:{label:"Cancel"}},default:"cancel"},{width:440}).render(true);
 }
 export function registerEmp() {
@@ -84,6 +86,13 @@ export function registerEmp() {
   });
   for(const hook of ["createItem","updateItem","deleteItem"])Hooks.on(hook,(item:Item)=>{
     if(item.parent instanceof Actor&&empGM()?.id===game.user?.id)void empWork(()=>syncDisabledLimbs(item.parent as Actor)).catch(report);
+  });
+  // Native injury toggles and edits must immediately recalculate the residual MOVE penalty.
+  for(const hook of ["createActiveEffect","updateActiveEffect","deleteActiveEffect"])Hooks.on(hook,(effect:ActiveEffect)=>{
+    const parent=effect.parent;
+    if(parent instanceof Actor&&!foundry.utils.getProperty(effect,`flags.${MODULE}.disabledLegPenalty`)&&!foundry.utils.getProperty(effect,`flags.${MODULE}.frameConsequences`))return;
+    const actor=parent instanceof Actor?parent:parent instanceof Item&&String(parent.type)==="criticalInjury"?parent.parent:undefined;
+    if(actor instanceof Actor&&empGM()?.id===game.user?.id)void empWork(()=>syncDisabledLimbs(actor)).catch(report);
   });
   for(const hook of ["updateWorldTime","updateCombat","canvasReady"])Hooks.on(hook,()=>{if(empGM()?.id===game.user?.id)void empWork(sweepDisablements).catch(report);});
   game.settings!.register(MODULE,"empImmunity",{name:"EMP: immune items",hint:"GM-maintained list of exact item names or compendium source UUIDs, separated by semicolons. Excludes direct selection; installed options still lose power if their host is disabled.",scope:"world",config:false,type:String,default:""});
@@ -107,8 +116,8 @@ export function registerEmp() {
       const actors=new Map<string,Actor>();
       for(const actor of game.actors??[])actors.set(actor.uuid,actor);
       for(const scene of game.scenes??[])for(const token of scene.tokens)if(token.actor)actors.set(token.actor.uuid,token.actor);
-      for(const actor of actors.values())if(actor.items.some(item=>!!foundry.utils.getProperty(item,"flags.pneuma-combattools.timedDisables")||foundry.utils.getProperty(item,`flags.${MODULE}.empCombats`)))actor.prepareData();
       if(empGM()?.id===game.user?.id)await empWork(reconcileEmp);
+      for(const actor of actors.values())if(actor.items.some(item=>!!foundry.utils.getProperty(item,"flags.pneuma-combattools.timedDisables")||foundry.utils.getProperty(item,`flags.${MODULE}.empCombats`)))actor.prepareData();
     }).catch(report);
   });
   Hooks.on("renderChatMessage",(message:ChatMessage,html:JQuery)=>{

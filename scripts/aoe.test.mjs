@@ -92,10 +92,11 @@ test("suppression uses native suppressive mode and requires ten bullets",async()
 test("missed blast waits for GM placement and rejects scatter outside the intended square",async()=>{
  const f=fixture("explosive",13);await startAreaAttack(f.source,f.target,"w","attack");
  assert.equal(f.data().phase,"scatter");assert.equal(f.data().rows.length,0);
+ assert.match(f.messages[0].content,/gray area.*inactive/);
  await assert.rejects(f.request("scatter",{area:f.data().area}),/Only the GM/);
  await assert.rejects(f.request("scatter",{user:"gm",area:{...f.data().area,origin:{x:1000,y:1000}}}),/inside/);
  await f.request("scatter",{user:"gm",area:{...f.data().area,origin:{x:550,y:50}}});
- assert.equal(f.data().phase,"responses");assert.equal(f.scene.templates.length,1);assert.ok(f.data().rows.length>0);
+ assert.equal(f.data().phase,"responses");assert.equal(f.scene.templates.length,1);assert.notEqual(f.scene.templates[0].fillColor,"#737980");assert.ok(f.data().rows.length>0);
 });
 test("target response reservations reject competing users and explosive ties hit",async()=>{
  const f=fixture();await startAreaAttack(f.source,f.target,"w","attack");
@@ -321,3 +322,9 @@ test('homebrew area defense settings and player ownership prevent NPC automation
   const message=game.messages[0];await automateArea(message);assert(message.flags[M].aoe.rows.every(r=>r.state==='waiting'));
  }
 });
+
+function encounterFixture(){const f=fixture();const combat={id:'c',scene:f.scene,active:true,started:true,flags:{},combatants:[f.source,f.target,f.third,f.outside].map(t=>({token:t.document,actor:t.actor}))};game.combats=collection([combat]);game.combat={id:'preview',started:true,round:99};return {...f,combat};}
+test('AoE captures active scene encounter and follows it across tracker changes',async()=>{const f=encounterFixture();await startAreaAttack(f.source,f.target,'w','attack');assert.equal(f.data().exchange.combatId,'c');f.combat.active=false;game.combat={id:'elsewhere'};await f.request('decline');assert.equal(f.data().rows.find(r=>r.uuid===f.target.document.uuid).state,'hit');});
+test('ambiguous area encounters stop before ammunition or attack rolls',async()=>{const f=encounterFixture();game.combats.push({...f.combat,id:'second'});await assert.rejects(startAreaAttack(f.source,f.target,'w','attack'),/Multiple active/);assert.equal(f.weapon.system.magazine.value,20);assert.equal(f.messages.length,0);});
+test('area attack checks all covered token memberships before ammunition',async()=>{const f=encounterFixture();f.combat.combatants=f.combat.combatants.filter(c=>c.token.uuid!==f.target.document.uuid);await assert.rejects(startAreaAttack(f.source,f.target,'w','attack'),/participating tokens/);assert.equal(f.weapon.system.magazine.value,20);});
+test('reset area encounter rejects responses without adopting replacement',async()=>{const f=encounterFixture();await startAreaAttack(f.source,f.target,'w','attack');f.combat.flags={'pneuma-combattools':{evasionEpoch:'reset'}};await assert.rejects(f.request('decline'),/reset/);assert.equal(f.data().rows.find(r=>r.uuid===f.target.document.uuid).state,'waiting');});

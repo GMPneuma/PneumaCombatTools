@@ -17,7 +17,8 @@ const {temporaryInjury,expireInstantActor,sleepTarget,clearInstantCondition,igni
 const {damageStatusChoices,validateDamageStatuses}=await import('../dist/scripts/damage-status.js');
 function setup(){
  const gm={id:'gm',isGM:true,active:true},owner={id:'owner',isGM:false,active:true},actor=new Actor();
- globalThis.game={user:gm,users:new Collection([[gm.id,gm],[owner.id,owner]]),time:{worldTime:100},settings:{get:()=>''},i18n:{localize:s=>s},actors:[actor],scenes:[],combats:new Map(),packs:{get:pack=>({getDocument:async id=>{const s=masterStatuses.find(s=>s.binding?.pack===pack&&s.binding.itemId===id);return {toObject:()=>({_id:id,name:s.name,type:'criticalInjury',effects:[],system:{}})}}})}};
+ globalThis.canvas={scene:{id:'s'}};
+ globalThis.game={user:gm,users:new Collection([[gm.id,gm],[owner.id,owner]]),time:{worldTime:100},settings:{get:()=>''},i18n:{localize:s=>s},actors:[actor],scenes:[],combats:new Collection(),packs:{get:pack=>({getDocument:async id=>{const s=masterStatuses.find(s=>s.binding?.pack===pack&&s.binding.itemId===id);return {type:'criticalInjury',toObject:()=>({_id:id,name:s.name,type:'criticalInjury',effects:[],system:{}})}}})}};
  globalThis.fromUuid=async uuid=>uuid===actor.uuid?actor:null;globalThis.CONFIG={statusEffects:[{id:'prone',name:'Prone'}]};globalThis.diceModes=[];
  globalThis.Roll=class {constructor(formula){this.formula=formula}async evaluate(){this.total=this.formula==='3d6'?12:8;return this}async render(){return '<div>'+this.total+'</div>'}};
  globalThis.ui={notifications:{error:m=>{throw Error(m)}}};globalThis.hooks={};globalThis.Hooks={on:(n,f)=>{(hooks[n]??=[]).push(f)},once:(n,f)=>{(hooks[n]??=[]).push(f)}};
@@ -52,7 +53,7 @@ test('native fire status severity, suppression, and nonstacking work without lif
  await clearInstantCondition(f.actor,'fire');await burnTurn(f.actor,'native:3');assert.equal(f.actor.system.derivedStats.hp.value,34);
 });
 test('one minute expires after twenty rounds at the application turn, not world-time drift',async()=>{
- const f=setup();const c={id:'clock',started:true,round:4,turn:1,turns:[{},{}]};game.combat=c;game.combats.set(c.id,c);
+ const f=setup();const c={id:'clock',scene:canvas.scene,active:true,combatants:[{actor:f.actor}],started:true,round:4,turn:1,turns:[{},{}]};game.combat=c;game.combats.set(c.id,c);
  await sleepTarget(f.actor);await temporaryInjury(f.actor,'Damaged Eye');
  const sleep=[...f.actor.effects].find(e=>e.name==='Sleep');assert.equal(sleep.duration.rounds,20);assert.equal(sleep.duration.seconds,null);assert.equal(sleep.duration.combat,'clock');
  c.round=23;game.time.worldTime=10000;await expireInstantActor(f.actor);assert.equal(f.actor.items.size,1);assert.ok(f.actor.effects.has(sleep.id));
@@ -107,7 +108,7 @@ test('Microwaver has native Cybertech resistance and creates a timed two-item GM
  game.combats.set('c',game.combat);
  await f.actor.createEmbeddedDocuments('Item',[{name:'Cyberarm',type:'cyberware',system:{isInstalledInActor:true,isFoundational:true},flags:{}}]);
  globalThis.ChatMessage={create:async()=>({id:'card'})};globalThis.Dialog=class{render(){}};
- const s=await resist(f,'microwaver',15);
+ const s=await resist(f,'microwaver',15);s.encounter={combatId:'c',combatEpoch:''};
  assert.equal(s.state,'failed','DV ties fail');
  await handleInstant(s,{action:'apply'},f.gm,f.save);
  const request=Object.values(game.combat.flags['pneuma-combattools'].empRequests)[0];
@@ -118,7 +119,7 @@ test('Microwaver has native Cybertech resistance and creates a timed two-item GM
 test('Microwaver dispatches once after a hit, preserves privacy, and skips misses',async()=>{
  const f=setup(),made=[];globalThis.ChatMessage={create:async data=>{made.push(data);return {id:'child'}},getSpeaker:()=>({})};
  const {dispatchMicrowaver}=await import('../dist/scripts/instant-effects.js');
- const m={id:'attack',whisper:['gm'],blind:true,flags:{'pneuma-combattools':{exchange:{disableSource:'microwaver',state:'waiting',hit:false,defenderActor:f.actor.uuid}}},async update(data){for(const [k,v]of Object.entries(data))set(this,k,v)}};
+ const m={id:'attack',whisper:['gm'],blind:true,flags:{'pneuma-combattools':{exchange:{combatId:null,disableSource:'microwaver',state:'waiting',hit:false,defenderActor:f.actor.uuid}}},async update(data){for(const [k,v]of Object.entries(data))set(this,k,v)}};
  await dispatchMicrowaver(m);assert.equal(made.length,0);
  Object.assign(m.flags['pneuma-combattools'].exchange,{state:'resolved',hit:false});await dispatchMicrowaver(m);assert.equal(made.length,0);
  m.flags['pneuma-combattools'].exchange.hit=true;
@@ -136,4 +137,68 @@ test('expiration checks departing actor, round participants and out-of-combat ti
  hooks.updateWorldTime[0]();await flush();assert.equal(outside.effects.size,0);assert.equal(second.effects.size,1);assert.equal(f.actor.effects.size,1);
  combat.turn=1;combat.combatant={actor:second};hooks.updateCombat[0](combat);await flush();assert.equal(f.actor.effects.size,0);assert.equal(second.effects.size,1);
  combat.round=2;combat.turn=0;combat.combatant={actor:f.actor};hooks.updateCombat[0](combat);await flush();assert.equal(second.effects.size,0);
+});
+
+test('saved outside-combat Sleep retains world time when a combat starts before application',async()=>{const f=setup(),s=newInstant('sleep',f.actor.uuid,'Target',{combatId:null});s.state='failed';game.combat={id:'new',active:true,started:true,scene:canvas.scene,round:1,turn:0,combatants:[{actor:f.actor}]};game.combats.set('new',game.combat);await handleInstant(s,{action:'apply'},f.owner,f.save);const sleep=f.actor.effects.find(e=>e.name==='Sleep');assert.equal(sleep.duration.seconds,60);assert.equal(sleep.duration.combat,null);});
+test('saved instant effect refuses a reset encounter before HP writes',async()=>{const f=setup(),s=newInstant('poison',f.actor.uuid,'Target',{combatId:'c',combatEpoch:'before'});s.state='failed';s.damage=8;game.combats.set('c',{id:'c',started:true,flags:{'pneuma-combattools':{evasionEpoch:'after'}}});await assert.rejects(handleInstant(s,{action:'apply'},f.owner,f.save),/reset/);assert.equal(f.actor.system.derivedStats.hp.value,40);});
+
+
+test('damage statuses without durations clear only with their originating encounter',async()=>{
+ const {applyCombatStatus}=await import('../dist/scripts/status-sync.js');const f=setup();
+ const c={id:'damage-combat',combatants:[{actor:f.actor}]},other={id:'other',combatants:[{actor:f.actor}]};
+ const prone=masterStatuses.find(s=>s.name==='Prone').id;
+ await applyCombatStatus(f.actor,prone,c,true);
+ const effect=f.actor.effects.find(e=>e.statuses.has(prone));
+ assert.equal(get(effect,'flags.pneuma-combattools.endWithCombat'),c.id);
+ await applyCombatStatus(f.actor,prone,other,true);
+ assert.equal(get(effect,'flags.pneuma-combattools.endWithCombat'),c.id,'reapplication retains original ownership');
+ await finishTimedEffects(other);assert.ok(f.actor.effects.has(effect.id));
+ c.combatants=[];await finishTimedEffects(c);assert.equal(f.actor.effects.has(effect.id),false,'cleanup also reaches removed participants');
+});
+
+test('damage cleanup preserves preexisting statuses, outside-combat statuses, death and injuries',async()=>{
+ const {applyCombatStatus}=await import('../dist/scripts/status-sync.js');const f=setup(),c={id:'damage-combat',combatants:[{actor:f.actor}]};
+ const prone=masterStatuses.find(s=>s.name==='Prone').id,dead=masterStatuses.find(s=>s.name==='Dead').id;
+ await applyCombatStatus(f.actor,prone,null,true);await applyCombatStatus(f.actor,prone,c,true);
+ await applyCombatStatus(f.actor,dead,c,true);
+ await applyCombatStatus(f.actor,masterStatuses.find(s=>s.name==='Broken Leg').id,c,true);
+ await finishTimedEffects(c);
+ assert.ok(f.actor.effects.some(e=>e.statuses.has(prone)));assert.ok(f.actor.effects.some(e=>e.statuses.has(dead)));assert.equal(f.actor.items.size,1);
+});
+
+test('damage statuses clear through both delete and reset combat hooks',async()=>{
+ const {applyCombatStatus}=await import('../dist/scripts/status-sync.js');
+ for(const action of ['deleteCombat','updateCombat']) {
+  const f=setup(),c={id:'damage-combat',started:true,round:1,turn:0,combatants:[{actor:f.actor}]};game.combats.set(c.id,c);
+  await applyCombatStatus(f.actor,masterStatuses.find(s=>s.name==='Prone').id,c,true);
+  registerInstantLifetimes();for(const hook of hooks.createCombat??[])hook(c);
+  c.started=false;for(const hook of hooks[action]??[])hook(c);
+  await new Promise(r=>setTimeout(r,0));assert.equal(f.actor.effects.size,0,action);
+ }
+});
+
+
+test('incendiary damage followup and sleep prone clear at the saved encounter end',async()=>{
+ const f=setup(),c={id:'fire-combat',started:true,combatants:[]};game.combats.set(c.id,c);
+ const state=newInstant('incendiary',f.actor.uuid,f.actor.name,{combatId:c.id,combatEpoch:''});
+ await handleInstant(state,{action:'apply'},f.owner,f.save);
+ assert.equal(f.actor.effects.size,1);assert.equal(get([...f.actor.effects][0],'flags.pneuma-combattools.endWithCombat'),c.id);
+ await sleepTarget(f.actor,c);await finishTimedEffects({id:'other',combatants:[{actor:f.actor}]});assert.equal(f.actor.effects.size,3);
+ await finishTimedEffects(c);assert.equal(f.actor.effects.size,0);
+});
+
+
+test('damage cleanup disables native drug effects without deleting inventory or tagging unrelated markers',async()=>{
+ const {applyCombatStatus}=await import('../dist/scripts/status-sync.js');const f=setup(),c={id:'drug-combat',combatants:[{actor:f.actor}]};
+ const stim=masterStatuses.find(s=>s.name==='Stim');
+ const [drug]=await f.actor.createEmbeddedDocuments('Item',[{name:stim.binding.itemName,type:'drug'}]);
+ const native=new Doc({name:stim.binding.effectNames[0],disabled:true},drug);drug.effects.set(native.id,native);
+ drug.updateEmbeddedDocuments=async (_type,rows)=>{for(const row of rows)await drug.effects.get(row._id).update(row)};
+ f.actor.allApplicableEffects=function*(){yield* this.effects;yield* drug.effects};
+ await f.actor.createEmbeddedDocuments('Item',[{name:'Broken Leg',type:'criticalInjury'}]);
+ await applyCombatStatus(f.actor,stim.id,c,true);
+ assert.equal(native.disabled,false);assert.equal(get(native,'flags.pneuma-combattools.endWithCombat'),c.id);
+ const injury=f.actor.effects.find(e=>e.statuses.has(masterStatuses.find(s=>s.name==='Broken Leg').id));
+ assert.equal(get(injury,'flags.pneuma-combattools.endWithCombat'),undefined);
+ await finishTimedEffects(c);assert.equal(native.disabled,true);assert.equal(f.actor.items.size,2);assert.equal(f.actor.effects.some(e=>e.statuses.has(stim.id)),false);
 });

@@ -1,3 +1,4 @@
+import {displayedEncounter} from "./encounter.js";
 import {bindStatusActions, closeStatusActions} from "./neural-intrusion.js";
 import {forceOutEntries} from "./quickhack/force-out.js";
 import {injuryGuidance} from "./injury-notices.js";
@@ -336,7 +337,7 @@ function updateEffectArrivals(actor: Actor | undefined, data: HUDConditions) {
   const active: EffectArrival[] = lastingDrugs.filter(drug => (data?.drugs ?? []).includes(drug.name))
     .map(drug => ({key: "drug:" + drug.name, name: drug.name, icon: drug.icon, color: drug.kind === "drug" ? "#ff666b" : "#65e9a0"}));
   const colors = { poison: "#76ef69", radiation: "#ffe16b", biotoxin: "#d892ff", fire: "#ff853e", addict: "#ff666b", jacked: "#64f1df", intrusion: "#e1a0ff", unconscious: "#ead56c" };
-  if (identity) for (const lamp of indicatorState(identity, data?.exposures ?? [], game.settings!.get(MODULE, "biomonitorFlashSeconds"), !!game.combat?.started)) {
+  if (identity) for (const lamp of indicatorState(identity, data?.exposures ?? [], game.settings!.get(MODULE, "biomonitorFlashSeconds"), !!displayedEncounter())) {
     if (lamp.on) active.push({ key: "exposure:" + lamp.id, name: lamp.name, icon: lamp.icon, color: colors[lamp.id] });
   }
   const current = new Set(active.map(effect => effect.key));
@@ -582,7 +583,7 @@ function render() {
       .filter(item => String(item.type) === "cyberware" && (!!getItemMarkers(item).disabled || !!getItemMarkers(item).emp || !!getItemMarkers(item).cyberware))
       .map(item => ({ name: item.name ?? "Cyberware", detail: [getItemMarkers(item).emp?.label,getItemMarkers(item).cyberware?.label,getItemMarkers(item).disabled?.description].filter(Boolean).join("; ") || "Disabled", item }));
     const lampStates = monitor ? indicatorState(actor!.uuid, data.exposures,
-      game.settings!.get(MODULE, "biomonitorFlashSeconds"), !!game.combat?.started) : [];
+      game.settings!.get(MODULE, "biomonitorFlashSeconds"), !!displayedEncounter()) : [];
     const grappleRows = actor ? [...grappleHUD(actor),...movementHUD(actor)] : [];
     const nextMedical = JSON.stringify([monitor, actor?.uuid, actor?.isOwner, grappleRows, data,
       actor && foundry.utils.getProperty(actor, "system.derivedStats.hp"), rows,
@@ -682,7 +683,7 @@ export function registerEyeHUD() {
   game.settings!.register(MODULE, "eyeHUDMinimized", { scope: "client", config: false, type: Boolean, default: false, onChange: schedule });
   game.settings!.register(MODULE, "biomonitorFlashSeconds", { name: "Biomonitor indicator flash duration", hint: "Seconds to flash a newly detected effect; ongoing conditions remain lit afterward. Zero disables flashing.", scope: "client", config: true, type: Number, default: 8, range: { min: 0, max: 60, step: 1 } });
   Hooks.on("pneumaCombatToolsExposure", (uuid: string, kind: LampId) => {
-    signalExposure(uuid, kind, game.settings!.get(MODULE, "biomonitorFlashSeconds"), !!game.combat?.started);
+    signalExposure(uuid, kind, game.settings!.get(MODULE, "biomonitorFlashSeconds"), !!displayedEncounter());
     if(effectActor===uuid){const key="exposure:"+kind;previousEffects.delete(key);const arrival=effectArrivals.get(key);arrival?.animation.cancel();arrival?.node.remove();effectArrivals.delete(key);}
     schedule();
   });
@@ -702,7 +703,7 @@ export function registerEyeHUD() {
   });
   Hooks.on("canvasTearDown", () => { hoveredHUDToken = undefined; schedule(); });
   Hooks.on("updateCombat", (combat: Combat, change: {round?: number}) => {
-    if (combat?.id === game.combat?.id && change?.round !== undefined) { clearRoundExposures(); schedule(); }
+    if (combat?.id === displayedEncounter()?.id && change?.round !== undefined) { clearRoundExposures(); schedule(); }
   });
   for (const hook of ["updateCombatant", "updateScene", "updateCombat", "deleteCombat", "deleteScene"]) Hooks.on(hook, schedule);
   for (const hook of ["createItem", "updateItem", "deleteItem", "createActiveEffect", "updateActiveEffect", "deleteActiveEffect", "updateActor"]) {

@@ -8,7 +8,7 @@ QuickHack integrates target-aware native netrunning rolls and encounter connecti
 
 Choose availability: RAW catalog, Must Buy QuickHack, or loaded in an equipped cyberdeck. Native installed-program lists govern loading; REZ is not loading. Missing module programs/launcher can be created without rewriting existing inventory. No broad conversion or repair migration is performed.
 
-Start the intended combat and select the netrunner. Jack-In/QuickHack checks use 25 grid squares and wall sight to sampled target points. Losing sight blocks actions but does not disconnect; restoring sight permits them again. Interface resolves Jack-In/QuickHack; Netrunners detect automatically, other targets oppose detection with WILL. Detection ties favor detection; QuickHack must beat its DV.
+Start and activate the intended scene encounter, add both tokens, and select the netrunner. Combat Tracker viewing does not choose the encounter. Pending actions keep their originating encounter and reject resets; see [encounter selection](encounters.md). Jack-In/QuickHack checks use 25 grid squares and wall sight to sampled target points. Losing sight blocks actions but does not disconnect; restoring sight permits them again. Interface resolves Jack-In/QuickHack; Netrunners detect automatically, other targets oppose detection with WILL. Detection ties favor detection; QuickHack must beat its DV.
 
 A detected link becomes Neural Intrusion. Successful noisy hacks reveal awareness; Lure retains its silent-success exception. Detection/audience/identity live on the Combat connection, not reconstructed from chat history. Deleted chat cards do not erase a connection. Multiple detected runners produce separate Eject choices.
 

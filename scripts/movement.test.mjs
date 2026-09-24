@@ -31,7 +31,7 @@ function fixture(){
  const scene={id:'scene',grid:{units:'m',distance:2},tokens:[],flags:{}};
  const doc={id:'t',uuid:'Scene.scene.Token.t',x:0,y:0,elevation:5,_source:{x:0,y:0,elevation:5},parent:scene,flags:{}};
  const token={document:doc,isOwner:true,getCenterPoint:p=>({x:p.x+50,y:p.y+50}),checkCollision:()=>false};doc.object=token;scene.tokens.push(doc);
- const participant={id:'p',tokenId:'t'};const combat={id:'c',scene,active:true,started:true,round:1,turn:0,combatants:[participant],turns:[participant]};
+ const participant={id:'p',tokenId:'t',token:doc};const combat={id:'c',scene,active:true,started:true,round:1,turn:0,combatants:[participant],turns:[participant]};
  globalThis.canvas={grid:{size:100,type:1},scene};globalThis.CONST={GRID_TYPES:{SQUARE:1}};
  globalThis.game={combat,combats:Object.assign(new Map([['c',combat]]),{find(fn){return [...this.values()].find(fn);}}),user:{id:'gm'},users:[{id:'gm',active:true,isGM:true}],settings:{register(){},get:()=>true}};
  registerMovement();

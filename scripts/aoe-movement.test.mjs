@@ -6,11 +6,11 @@ const get=(o,p)=>p.split('.').reduce((v,k)=>v?.[k],o);
 function fixture(){
  globalThis.foundry={utils:{getProperty:get}};const flags={};
  const actor={uuid:"a",system:{derivedStats:{walk:{value:12}}}};
- const document={uuid:"t",actor,flags:{},async update(data){Object.assign(this.flags,{'pneuma-combattools':{aoeEscape:data['flags.pneuma-combattools.aoeEscape']}});token.center={x:data.x+50,y:data.y+50}}};
+ const document={uuid:"t",parent:{id:"s"},actor,flags:{},async update(data){Object.assign(this.flags,{'pneuma-combattools':{aoeEscape:data['flags.pneuma-combattools.aoeEscape']}});token.center={x:data.x+50,y:data.y+50}}};
  const participant={id:"c",actor,token:document,flags,async update(data){flags['pneuma-combattools']={aoeMovement:structuredClone(data['flags.pneuma-combattools.aoeMovement'])}}};
  const token={document,w:100,h:100,center:{x:50,y:50}};document.object=token;
- const combat={started:true,round:1,turn:0,turns:[participant],combatants:[participant],combatant:participant};
- globalThis.game={user:{id:"gm"},users:[{id:"gm",active:true,isGM:true}],combat,settings:{get:()=>({evadeMove:true})}};
+ const combat={id:"combat",scene:{id:"s"},active:true,started:true,round:1,turn:0,turns:[participant],combatants:[participant],combatant:participant};
+ globalThis.game={user:{id:"gm"},users:[{id:"gm",active:true,isGM:true}],combat,combats:Object.assign([combat],{get:id=>id===combat.id?combat:undefined}),settings:{get:()=>({evadeMove:true})}};
  globalThis.canvas={scene:{grid:{units:"m"}},grid:{measurePath:([a,b])=>({distance:Math.hypot(b.x-a.x,b.y-a.y)/50})}};
  return {token,participant,combat};
 }
@@ -29,7 +29,7 @@ test("evasion cost is recorded once and debt reduces the next turn",async()=>{
  f.combat.round=3;assert.equal(movementEntry(f.token.document).remaining,12);
 });
 test("RAW relocation costs nothing; homebrew requires combat",async()=>{
- const f=fixture();game.combat=null;
+ const f=fixture();game.combat=null;game.combats=[];
  await moveEvader(f.token,{x:1050,y:50},false,false,"raw");
  await assert.rejects(moveEvader(f.token,{x:1150,y:50},true,false,"cost"),/combat/);
 });
@@ -47,3 +47,6 @@ test("interrupted token move reuses its reserved MOVE charge",async()=>{
  assert.equal(movementEntry(f.token.document).remaining,8);
  await moveEvader(f.token,{x:250,y:50},true,false,"retry");assert.equal(movementEntry(f.token.document).remaining,8);
 });
+
+test('saved evasion encounter survives a different GM scene and viewed encounter',async()=>{const f=fixture();const ref={combatId:'combat',combatEpoch:'',combatScene:'s',combatTokens:['t']};game.combat={id:'wrong',started:true};canvas.scene={id:'other',grid:{units:'m'}};await moveEvader(f.token,{x:250,y:50},true,false,'saved',ref);assert.equal(f.participant.flags['pneuma-combattools'].aoeMovement.spent,4);});
+test('movement reset epoch rejects an evasion before reserving MOVE',async()=>{const f=fixture();f.combat.flags={'pneuma-combattools':{evasionEpoch:'new'}};await assert.rejects(moveEvader(f.token,{x:250,y:50},true,false,'saved',{combatId:'combat',combatEpoch:''}),/reset/);assert.equal(f.participant.flags['pneuma-combattools'],undefined);});

@@ -87,13 +87,13 @@ try {
   canvas.scene={grid:{size:100,distance:2}};canvas.templates={preview:{addChild(){}}};
   class Document {constructor(data){Object.assign(this,data)}updateSource(data){Object.assign(this,data)}}
   class Template {
-   constructor(document){this.document=document;this.template=new Graphics();this.isVisible=true;this.hasPreview=false;this.renderFlags={set:()=>{for(const f of hooks.refreshMeasuredTemplate)f(this)}}}
+   constructor(document){window.previewDocument=document;this.document=document;this.template=new Graphics();this.isVisible=true;this.hasPreview=false;this.renderFlags={set:()=>{for(const f of hooks.refreshMeasuredTemplate)f(this)}}}
    async draw(){this.renderFlags.set({});return this}highlightGrid(){}destroy(){destroyed++}
   }
   CONFIG.MeasuredTemplate={documentClass:Document,objectClass:Template};
   window.ui={notifications:{info(){}}};
   const {placeArea}=await import("/scripts/aoe/placement.js");
-  window.startPreview=()=>{window.previewResult="pending";window.previewPromise=placeArea(p=>({shape:"square",origin:p,direction:0,length:100,width:100}),{x:100,y:100},"Place").then(r=>previewResult=r)};
+  window.startPreview=()=>{window.previewResult="pending";window.previewPromise=placeArea(p=>({shape:"square",origin:p,direction:0,length:100,width:100}),{x:100,y:100},"Place the new blast center inside the gray square. Gray = inactive original aim.","#ef9b36").then(r=>previewResult=r)};
   const highlight={visible:true};canvas.interface={grid:{getHighlightLayer:()=>highlight}};
   const template={document:{hidden:true,x:0,y:0,flags:{"pneuma-combattools":{areaShape:data.area}}},isVisible:true,hasPreview:false,visible:true,template:new Graphics(),highlightGrid(){}};
   for(const f of hooks.refreshMeasuredTemplate)f(template);
@@ -103,7 +103,13 @@ try {
   if(!template.visible||!highlight.visible)throw Error("Revealed area stayed hidden");
   startPreview();
  });
+ assert.equal(await page.locator('.pneuma-area-placement').count(),1);
+ assert.match(await page.locator('.pneuma-area-placement').innerText(),/Right-click \/ Esc: cancel/);
+ await page.locator('canvas').dispatchEvent('pointermove',{clientX:120,clientY:120});
+ assert.equal(await page.evaluate(()=>previewDocument.fillColor),'#ef9b36');
+ await page.screenshot({path:process.env.TEMP+'/pct-aoe-placement.png'});
  await page.keyboard.press("Escape");
+ assert.equal(await page.locator('.pneuma-area-placement').count(),0);
  assert.equal(await page.evaluate(()=>previewResult),null);
  assert.equal(await page.evaluate(()=>destroyed),1);
  await page.evaluate(()=>startPreview());

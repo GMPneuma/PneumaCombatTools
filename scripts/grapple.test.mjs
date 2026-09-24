@@ -20,7 +20,7 @@ function setup(){
  const tokens=actors.map((actor,i)=>({id:actor.id,uuid:'Scene.scene.Token.'+actor.id,actor,name:actor.name,parent:scene,x:i===2?0:i*100,y:i===2?100:0,width:1,height:1,elevation:0,texture:{scaleX:1,scaleY:1},async update(c){update(this,c);}}));
  scene.tokens=collection(tokens);tokens.forEach(t=>t.object={document:t,actor:t.actor,isVisible:true,name:t.name});
  const gm={id:'gm',active:true,isGM:true};const users=collection([gm,...actors.map(a=>({id:a.id,actor:a.id,active:true,isGM:false}))]);
- const combat={id:'combat',scene,flags:{},async update(c){update(this,c);},started:true,round:1,combatants:collection(tokens.map(t=>({id:t.id,token:t})))};
+ const combat={id:'combat',active:true,scene,flags:{},async update(c){update(this,c);},started:true,round:1,combatants:collection(tokens.map(t=>({id:t.id,token:t})))};
  const messages=collection();const hooks={};const replies=[];
  globalThis.CONST={ACTIVE_EFFECT_MODES:{ADD:2}};
  globalThis.foundry={utils:{getProperty:get,randomID:()=>String(++uid)}};
@@ -231,3 +231,6 @@ test('establishment locks attacker actions until next source turn; self escape n
  assert.equal(f.messages.size,2);assert([...f.messages.values()].some(m=>m!==original&&m.content.includes('Choke:')));
  await assert.rejects(f.request('choke'));
 });
+
+test('client-captured grapple encounter survives GM scene and active encounter changes',async()=>{const f=setup(),encounter={combatId:f.combat.id,combatEpoch:'',combatScene:f.scene.id,combatTokens:f.tokens.slice(0,2).map(t=>t.uuid)};f.combat.active=false;const other={...f.combat,id:'other',active:true,flags:{}};game.combats.set('other',other);game.combat=other;canvas.scene={id:'elsewhere'};await f.request('start','g',{encounter,source:f.tokens[0].uuid,target:f.tokens[1].uuid,result:f.result(15)});assert.equal(f.read().combat,'combat');assert.equal(get(other,'flags.'+M+'.grapples'),undefined);});
+test('client-captured grapple refuses a reset before card creation',async()=>{const f=setup();f.combat.flags={[M]:{evasionEpoch:'new'}};await assert.rejects(f.request('start','g',{encounter:{combatId:f.combat.id,combatEpoch:''},source:f.tokens[0].uuid,target:f.tokens[1].uuid,result:f.result(15)}),/reset/);assert.equal(f.messages.size,0);});

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.2 - 2026-09-24
+
+- Keep area-placement instructions visible until placement/cancel and preserve the preview color.
+
+- Clear newly applied damage statuses, incendiary fire, and sleep Prone when their originating encounter ends or resets; preserve preexisting conditions, critical injuries, Dead, and other encounters.
+
+- Use active scene encounters consistently; preserve originating encounter context across responses and GM requests, reject ambiguity/reset contexts, and bind effect durations to the correct clock. Add shared and workflow regression coverage plus CI test execution.
+
+- Fix active leg-injury overlap, display-only Disabled labels, derived penalty synchronization and redundant frame markers; retain native CPR metadata repairs.
+
+- Remove redundant disabled-limb tracking effects, retain item/combat tracking and the single MOVE penalty, and clean up legacy markers.
+
+- Include and repair native CPR metadata on disabled cyberleg, internal-frame and QuickHack movement penalty effects to prevent sheet/skill modifier errors.
+
 ## 0.8.1 - 2026-09-23
 
 - Apply a native −4 smoke modifier to attacks crossing active module smoke, with a per-roll override.

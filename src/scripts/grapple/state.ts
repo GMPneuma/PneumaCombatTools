@@ -1,8 +1,9 @@
+import type {EncounterRef} from "../encounter.js";
 import { visibleChoke, type ChokeSequence } from "./rules.js";
 export const MODULE = "pneuma-combattools";
 export interface Participant { token: string; actor: string; name: string }
 export interface SkillResult { total: number; html: string }
-export interface Grapple {
+export interface Grapple extends Partial<EncounterRef> {
   id: string; revision: number; scene: string; combat?: string; message?: string;
   source: Participant; target: Participant;
   state: "waiting" | "choice" | "active" | "ended";

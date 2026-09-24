@@ -1,3 +1,4 @@
+import {sceneEncounter} from "../encounter.js";
 import {effectDuration,durationExpired,type EffectDuration} from "../effect-duration.js";
 import {areaCells,templateData} from "./placement.js";
 import type {Area} from "./geometry.js";
@@ -6,11 +7,11 @@ const M="pneuma-combattools";
 export interface SmokeArea {duration?:EffectDuration;cells:number[][];expires:number;source:string;created:number}
 const smoke=(d:object)=>foundry.utils.getProperty(d,"flags."+M+".smoke") as SmokeArea|undefined;
 /** Scene-owned footprint stays independent of the attack card and later wall changes. */
-export async function createSmoke(scene:Scene,area:Area,source:string):Promise<string> {
+export async function createSmoke(scene:Scene,area:Area,source:string,combat:Combat|null|undefined=sceneEncounter(scene.id)):Promise<string> {
   const old=scene.templates.find(d=>smoke(d)?.source===source);if(old)return old.id!;
   if(canvas.scene?.id!==scene.id)throw Error("Open the impact scene to create smoke.");
   const cells=areaCells(area),created=game.time!.worldTime;
-  const docs=await scene.createEmbeddedDocuments("MeasuredTemplate",[{...templateData(area,scene),fillColor:"#a7afb7",borderColor:"#a7afb7",flags:{[M]:{smoke:{cells,created,expires:created+60,source,duration:effectDuration(60)}}}} as never]);
+  const docs=await scene.createEmbeddedDocuments("MeasuredTemplate",[{...templateData(area,scene),fillColor:"#a7afb7",borderColor:"#a7afb7",flags:{[M]:{smoke:{cells,created,expires:created+60,source,duration:effectDuration(60,combat)}}}} as never]);
   if(!docs?.[0])throw Error("Could not create smoke area.");return docs[0].id!;
 }
 const drawings=new Map<string,{container:PIXI.Container;tick:(delta:number)=>void}>();

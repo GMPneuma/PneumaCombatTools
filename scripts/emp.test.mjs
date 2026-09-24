@@ -48,8 +48,8 @@ test('apply stores combat references and preserves existing effect and installat
  await applyEmpSelection(f.combat,'r',['arm'],f.player);
  assert(empDisabled(f.arm));assert(empDisabled(f.weapon));assert.equal(get(f.combat,`${key}.empRecords.r`).items.length,3);
  assert.deepEqual(f.arm.system,prior);assert.deepEqual(f.arm.effects,effects);
- assert.equal(f.actor.effects.length,2);assert.deepEqual(f.actor.effects[1].changes,[]);
- await applyEmpSelection(f.combat,'r',['arm'],f.player);assert.equal(f.actor.effects.length,2);
+ assert.deepEqual(f.actor.effects.map(e=>e.id),["injury"]);
+ await applyEmpSelection(f.combat,'r',['arm'],f.player);assert.equal(f.actor.effects.length,1);
  f.combat.started=false;assert(!empDisabled(f.arm));await finishEmp(f.combat);
  assert.deepEqual(empReferences(f.arm),[]);assert(get(f.arm,`${key}.itemMarkers.disabled`));assert(!get(f.arm,`${key}.itemMarkers.emp`));
  assert.deepEqual(f.arm.effects,effects);assert.deepEqual(f.actor.effects.map(e=>e.id),['injury']);
@@ -121,7 +121,7 @@ test('Malfunction selection belongs to the attacker and expires independently of
  await applyEmpSelection(f.combat,'r',['arm'],{id:'runner'});
  assert(empDisabled(f.arm));assert(empDisabled(f.weapon));
  assert.equal(get(f.arm,key+'.timedDisables.r.duration').rounds,20);
- assert.equal(f.actor.effects.filter(e=>get(e,key+'.disableRequest')).length,1);
+ assert.equal(f.actor.effects.filter(e=>get(e,key+'.disableRequest')).length,0);
  f.arm.flags[module].empCombats=['c'];
  f.combat.round=21;
  const {expireDisablements}=await import('../dist/scripts/emp-state.js');
@@ -337,3 +337,93 @@ test('ending one combat preserves a timed disablement from another ongoing comba
  assert(get(f.arm,key+'.timedDisables.other'));assert(get(f.arm,key+'.itemMarkers.cyberware'));
  assert(!empDisabled(f.weapon));
 });
+
+test('cyberleg and frame penalties supply native CPR metadata and repair existing effects',async()=>{
+ const {syncDisabledLimbs}=await import('../dist/scripts/emp-state.js');
+ const f=fixture();f.arm.system.type='cyberLeg';
+ await applyEmpSelection(f.combat,'r',['arm'],f.player);
+ const effect=f.actor.effects.find(e=>get(e,key+'.disabledLegPenalty'));
+ const assertNative=e=>e.changes.forEach((change,index)=>{
+  const flags=e.flags['cyberpunk-red-core'].changes;
+  assert(flags.cats[index]);assert.equal(flags.situational[index].isSituational,false);
+ });
+ assertNative(effect);delete effect.flags['cyberpunk-red-core'];
+ await syncDisabledLimbs(f.actor);assertNative(effect);
+ f.eye.name='Implanted Linear Frame';f.eye.flags={'pneuma-combattools':{empCombats:['c']}};
+ f.combat.flags[module].empRecords.frame={actor:f.actor.uuid,items:['eye']};
+ f.combat.flags[module].empRequests.frame={id:'frame',policy:{framePenalty:2,frameMoveReduction:2}};
+ f.actor.effects.push({id:'frameMarker',flags:{[module]:{frameRequest:'frame',empItem:'eye',empCombat:'c'}},changes:[],statuses:new Set()});
+ await syncDisabledLimbs(f.actor);
+ const frame=f.actor.effects.find(e=>get(e,key+'.frameConsequences'));assertNative(frame);
+ delete frame.flags['cyberpunk-red-core'];await syncDisabledLimbs(f.actor);assertNative(frame);
+});
+
+test('startup repairs existing QuickHack movement metadata without removing the effect',async()=>{
+ const f=fixture();game.time={worldTime:100};
+ const effect={id:'slow',name:'Slow',changes:[{key:'system.stats.move.value',mode:2,value:'-2'}],flags:{[module]:{quickhackEffect:'slow'}},statuses:new Set(),update};f.actor.effects.push(effect);
+ await reconcileEmp();
+ assert.equal(effect.flags['cyberpunk-red-core'].changes.cats[0],'stat');
+ assert.equal(effect.flags['cyberpunk-red-core'].changes.situational[0].isSituational,false);
+ assert(f.actor.effects.includes(effect));assert.equal(effect.changes[0].value,'-2');
+});
+
+test('legacy limb marker is removed without losing item causes, MOVE penalty or unrelated effects',async()=>{
+ const f=fixture();f.arm.system.type='cyberLeg';
+ await applyEmpSelection(f.combat,'r',['arm'],f.player);
+ const penalty=f.actor.effects.find(e=>get(e,key+'.disabledLegPenalty'));
+ assert(penalty);assert.equal(f.actor.effects.length,2);
+ f.actor.effects.push({id:'legacy',name:'Microwaver: Cyberleg Disabled',statuses:new Set(['pneuma-emp-limb']),changes:[],flags:{[module]:{empItem:'arm',empCombat:'c'}}});
+ f.actor.effects.push({id:'unrelated',name:'Other',statuses:new Set(['pneuma-emp-limb']),changes:[],flags:{}});
+ await reconcileEmp();
+ assert(!f.actor.effects.some(e=>e.id==='legacy'));
+ assert(f.actor.effects.some(e=>e.id==='unrelated'));
+ assert(f.actor.effects.includes(penalty));assert(empDisabled(f.arm));
+ assert.deepEqual(empReferences(f.arm),['c']);assert.equal(penalty.changes[0].value,'-6');
+ await reconcileEmp();assert.equal(f.actor.effects.filter(e=>get(e,key+'.disabledLegPenalty')).length,1);
+ f.combat.started=false;await finishEmp(f.combat);
+ assert(!f.actor.effects.some(e=>get(e,key+'.disabledLegPenalty')));
+ assert(f.actor.effects.some(e=>e.id==='injury'));
+});
+
+test('injury overlap uses enabled native MOVE changes regardless of item name',async()=>{
+ const {syncDisabledLimbs}=await import('../dist/scripts/emp-state.js');
+ const f=fixture();f.arm.system.type='cyberLeg';
+ const effect={disabled:true,changes:[{key:'system.stats.move.value',mode:2,value:'-4'}]};
+ const {masterStatuses}=await import('../dist/scripts/status-catalog.js');
+ const leg=masterStatuses.find(s=>s.name==='Broken Leg');
+ f.actor.items.push({id:'broken',name:'Renamed injury',type:'criticalInjury',system:{},effects:[effect],_stats:{compendiumSource:'Compendium.test.Item.'+leg.binding.itemId}});
+ f.actor.items.push({id:'lung',name:'Collapsed Lung',type:'criticalInjury',system:{},effects:[{disabled:false,changes:[{key:'system.stats.move.value',mode:2,value:'-2'}]}]});
+ await applyEmpSelection(f.combat,'r',['arm'],f.player);
+ const penalty=()=>f.actor.effects.find(e=>get(e,key+'.disabledLegPenalty'));
+ assert.equal(penalty().changes[0].value,'-6');
+ effect.disabled=false;await syncDisabledLimbs(f.actor);assert.equal(penalty().changes[0].value,'-2');
+ effect.isSuppressed=true;await syncDisabledLimbs(f.actor);assert.equal(penalty().changes[0].value,'-6');
+ effect.isSuppressed=false;effect.changes[0].value='-6';await syncDisabledLimbs(f.actor);assert(!penalty());
+ effect.disabled=true;await syncDisabledLimbs(f.actor);assert.equal(penalty().changes[0].value,'-6');
+ penalty().disabled=true;await syncDisabledLimbs(f.actor);assert.equal(penalty().disabled,false);
+});
+test('generic Disabled labels do not enforce cyberware or evasion mechanics',async()=>{
+ const f=fixture();f.arm.system.type='cyberLeg';f.arm.flags={[module]:{itemMarkers:{disabled:{label:'Disabled'}}}};
+ const {evasionBlocked}=await import('../dist/scripts/injury-rules.js');
+ const {syncDisabledLimbs}=await import('../dist/scripts/emp-state.js');await syncDisabledLimbs(f.actor);
+ assert(!empDisabled(f.arm));assert.equal(evasionBlocked(f.actor),undefined);assert.equal(f.actor.effects.length,1);
+});
+test('frame consequences derive from request records and remove legacy tracking effects',async()=>{
+ const f=fixture();f.eye.name='Implanted Linear Frame';f.request.policy={...f.policy,framePenalty:2,frameMoveReduction:3};
+ await applyEmpSelection(f.combat,'r',['eye'],f.player);
+ assert(!f.actor.effects.some(e=>get(e,key+'.frameRequest')));
+ const consequence=f.actor.effects.find(e=>get(e,key+'.frameConsequences'));assert(consequence);
+ f.actor.effects.push({id:'legacyframe',statuses:new Set(),changes:[],flags:{[module]:{frameRequest:'r',empItem:'eye',empCombat:'c'}}});
+ consequence.disabled=true;await reconcileEmp();assert.equal(consequence.disabled,false);
+ assert(!f.actor.effects.some(e=>e.id==='legacyframe'));assert(empDisabled(f.eye));
+ f.combat.started=false;await finishEmp(f.combat);assert(!f.actor.effects.some(e=>get(e,key+'.frameConsequences')));
+});
+
+test('EMP application uses its saved encounter clock while GM views another scene',async()=>{
+ const f=fixture();game.time={worldTime:100};Object.assign(f.combat,{round:3,turn:1,turns:[{},{}]});Object.assign(f.request,{source:'microwaver',seconds:60});
+ game.combat={id:'other',started:true,round:90,turn:0};globalThis.canvas={scene:{id:'other'}};
+ await applyEmpSelection(f.combat,'r',['arm'],f.player);
+ const d=get(f.arm,key+'.timedDisables.r.duration');assert.equal(d.combat,'c');assert.equal(d.startRound,3);assert.equal(d.startTurn,1);
+});
+
+test('pending EMP selection cannot cross an encounter reset',async()=>{const f=fixture();f.request.encounter={combatId:'c',combatEpoch:'old'};f.combat.flags[module].evasionEpoch='new';await assert.rejects(applyEmpSelection(f.combat,'r',['arm'],f.player),/reset/);assert.equal(empDisabled(f.arm),false);});

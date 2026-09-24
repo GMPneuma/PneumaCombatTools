@@ -1,3 +1,4 @@
+import {resolveEncounter,encounterRef} from "../encounter.js";
 import { requireCombatSocket } from "../socket-health.js";
 import { resolutionSection, rollOutcomeClass } from "../card-structure.js";
 import type { RollItem } from "../native-combat.js";
@@ -23,9 +24,10 @@ function connectionRevealed(connection: Connection, source: Actor, target: Actor
 async function contextFor(id: string) {
   const message = game.messages?.get(id) as ChatMessage | undefined;
   const saved = message && resultFlag(message);
-  const connection = combatConnections().find(c=>c.id === id || saved && saved.combatUuid === trackingCombat()?.uuid && c.id === (saved.type === "jackIn" ? id : saved.connectionId));
+  const combat=saved?resolveEncounter(saved):game.combats?.find(c=>c.started&&combatConnections(c).some(link=>link.id===id));
+  const connection = combat?combatConnections(combat).find(c=>c.id===id||c.id===saved?.connectionId):undefined;
   const result: QuickhackResult | undefined = connection ? {
-    type:"quickhack",combatUuid:trackingCombat()?.uuid,sourceActorUuid:connection.sourceActorUuid,targetActorUuid:connection.targetActorUuid,
+    ...connection,type:"quickhack",combatUuid:combat?.uuid,sourceActorUuid:connection.sourceActorUuid,targetActorUuid:connection.targetActorUuid,
     sourceTokenUuid:connection.sourceTokenUuid,targetTokenUuid:connection.targetTokenUuid,connectionId:connection.id,
     alerted:!!connection.awareness?.alerted,revealAttacker:!!connection.awareness?.revealAttacker,audience:connection.awareness?.audience??"gm",success:true
   } : saved;
@@ -67,7 +69,7 @@ async function postForceOut(request: Request, interfaceTotal: number, interfaceC
   const context = await contextFor(request.messageId);
   if (!enabled() || !context || context.connectionId !== request.connectionId) return;
   const ejected = isNetrunnerEjected(request.total, interfaceTotal);
-  if (ejected && context.result.combatUuid && (!context.connectionId || !await ejectConnection(context.source, context.target.uuid, context.connectionId))) return;
+  if (ejected && context.result.combatUuid && (!context.connectionId || !await ejectConnection(context.source, context.target.uuid, context.connectionId,context.result))) return;
   const rollSection = (name: string, html: string, won: boolean) => html
     ? `<div class="pneuma-quickhack-roll ${rollOutcomeClass(won)}" data-quickhack-section="roll"><h4>${escapeHTML(name)}</h4>${html}</div>` : "";
   // Hidden Netrunner identity must not leak through the native role-roll heading or breakdown.

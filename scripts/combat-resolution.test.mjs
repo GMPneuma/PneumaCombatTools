@@ -67,10 +67,10 @@ function setup() {
   const users=[{id:"gm",isGM:true,active:true},{id:"owner",isGM:false,active:true},{id:"stranger",active:true}];
   messages=new Map();
   combats=new Map();
-  for(const id of ["combat","other"]) combats.set(id,{id,started:true,round:1,flags:{},combatants:[],
+  for(const id of ["combat","other"]) combats.set(id,{id,started:true,round:1,flags:{},combatants:["Token.a","Token.d","Token.selected"].map(uuid=>({token:{uuid}})),
     async update(changes){if(failCombat){failCombat=false;throw new Error("injected combat failure");}
       for(const [path,value] of Object.entries(changes))set(this,path,value);}});
-  globalThis.game={users:{get:id=>users.find(u=>u.id===id)},combat:combats.get("combat"),combats:{get:id=>combats.get(id),filter:fn=>[...combats.values()].filter(fn)},
+  globalThis.game={users:{get:id=>users.find(u=>u.id===id)},combat:combats.get("combat"),combats:{values:()=>combats.values(),get:id=>combats.get(id),filter:fn=>[...combats.values()].filter(fn)},
     settings:{get:(_module,key)=>key==="evasionEligibility"?"custom":key==="evasionHomebrew"?config:undefined},
     i18n:{localize:k=>k},messages:{get:id=>messages.get(id),find:fn=>[...messages.values()].find(fn)}};
   globalThis.fromUuid=async()=>({actor});
@@ -184,15 +184,13 @@ test("failed Combat write resumes without charging twice or double-counting",asy
   assert.equal(get(combats.get("combat"),"flags.pneuma-combattools.evasionUsage."+defenderKey(actor)+".used"),1);
   assert.equal(get(actor,"flags.pneuma-combattools.evasionPayment"),undefined);
 });
-test("combat selection at attack start uses participating tokens and rejects ambiguity",()=>{
-  setup();
-  const attacker={document:{uuid:"Scene.s.Token.a"}},target={document:{uuid:"Scene.s.Token.d"}};
-  for(const combat of combats.values())combat.combatants=[{token:{uuid:attacker.document.uuid}},{token:{uuid:target.document.uuid}}];
-  assert.equal(combatForAttack(attacker,target).id,"combat");
-  game.combat=undefined;
-  assert.throws(()=>combatForAttack(attacker,target),/Select the intended combat/);
-  combats.delete("other");assert.equal(combatForAttack(attacker,target).id,"combat");
+test("combat selection uses the active scene encounter, never tracker preference",()=>{
+ setup();const scene={id:"s"},attacker={document:{parent:scene,uuid:"Scene.s.Token.a"}},target={document:{parent:scene,uuid:"Scene.s.Token.d"}};
+ for(const combat of combats.values())Object.assign(combat,{scene,active:true,combatants:[{token:attacker.document},{token:target.document}]});
+ assert.throws(()=>combatForAttack(attacker,target),/Multiple active/);
+ combats.get("other").active=false;game.combat=combats.get("other");assert.equal(combatForAttack(attacker,target).id,"combat");
 });
+
 test("reset clears only this Combat, invalidates old cards, and deselection does not reset",async()=>{
   setup();message("a");const claim=await request("a","claim");
   const changes={round:0};resetCombatTracking(combats.get("combat"),changes);
@@ -240,7 +238,7 @@ test("migration preserves a charged legacy interrupted payment receipt",async()=
 });
 test("older pending cards with no originating combat are never assigned to the current combat",async()=>{
   setup();const msg=message("old");delete get(msg,"flags.pneuma-combattools.exchange").combatId;
-  await assert.rejects(request("old","claim"),/older attack/);
+  await assert.rejects(request("old","claim"),/originating encounter/);
   await serialized({id:"cancel",user:"gm",message:"old",action:"cancel"});
 });
 const {configureDamage}=await import("../dist/scripts/damage-flow.js");
@@ -496,4 +494,11 @@ test("armor interaction off bypasses SP and ablation without changing stored rol
  await request("damage","damageApply",{options:damageOptions,interactArmor:false,halfArmor:true});
  assert.equal(calls[0][3],0);assert.equal(calls[0][5],100);
  assert.equal(msg.flags["pneuma-combattools"].exchange.damage.result.values.ablation,2);
+});
+
+test("selected damage rejects a recipient removed before GM processing without changing HP",async()=>{
+ setup();const msg=await rolled();let calls=0;actor._applyDamage=async()=>calls++;
+ combats.get("combat").combatants=combats.get("combat").combatants.filter(p=>p.token.uuid!=="Token.selected");
+ await assert.rejects(request("damage","damageApply",{application:"selected",targetUuid:"Token.selected",options:damageOptions}),/participating tokens/);
+ assert.equal(calls,0);assert.equal(get(msg,"flags.pneuma-combattools.exchange.damage.status"),"rolled");
 });

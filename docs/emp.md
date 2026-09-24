@@ -1,5 +1,7 @@
 # EMP and cyberware disablement
 
+Encounter selection now follows the [shared active-scene policy](encounters.md); saved actions and effect clocks remain tied to their originating encounter.
+
 Current implementation: Combat Tools 0.8.1; source-reviewed 2026-09-23.
 
 A GM must start the intended combat before creating a disablement request. Ordinary EMP uses the combat-end lifetime; Microwaver, Short Circuit and Cyberware Malfunction use timed requests. Requests snapshot method, count, eligibility and policies so later settings changes do not redraw existing choices.
@@ -32,10 +34,16 @@ Overlapping causes are recorded independently; ending one does not restore an it
 
 ## Stored state and recovery
 
-Combat `empRequests` owns policy, offered/selected IDs and progress; `empRecords`, item `empCombats`/`timedDisables`, markers and actor effects track applied consequences. Selection is saved before item writes; retries reuse it. A generic Disabled item marker alone does not mechanically disable cyberware.
+Combat `empRequests` owns policy, offered/selected IDs and progress; `empRecords`, item `empCombats`/`timedDisables`, item badges and aggregate mechanical actor effects show applied consequences. Frame policies remain in the saved combat requests. Selection is saved before item writes; retries reuse it. A generic Disabled item marker alone does not mechanically disable cyberware.
 
 See [flow map](flow-map.md) and [backlog](../BACKLOG.md). General out-of-combat EMP and a new exact-time policy for ordinary EMP remain outside current behavior.
 
 Implementation: [emp.ts](../src/scripts/emp.ts), [emp-state.ts](../src/scripts/emp-state.ts), [emp-rules.ts](../src/scripts/emp-rules.ts), [emp-behavior.ts](../src/scripts/emp-behavior.ts), [emp-settings.ts](../src/scripts/emp-settings.ts).
 
 Combat-bound cyberware disablements now clear on combat end/reset/deletion, including timed Microwaver and QuickHack causes. Startup cleanup removes stranded causes from ended/deleted encounters. Other ongoing combat causes and native disabled states are preserved. Automated regression coverage; live Foundry verification pending.
+
+Disabled cyberlimbs derive their state from combat/item disablement records. Only the mechanical MOVE penalty appears as an actor effect; redundant no-modifier limb effects from older versions are removed during reconciliation without clearing item causes or unrelated effects.
+
+Disablement audit fixes: active native leg-injury modifiers (including renamed native items) offset the cyberleg penalty; disabled/suppressed effects do not. Generic Disabled labels are display-only, including for evasion. Module-owned aggregate limb/frame penalties restore automatically while their item/combat causes remain active, including after manual effect deletion or disabling. Internal-frame policies derive from combat requests and item causes; legacy empty frame markers are removed. CPR modifier metadata repairs also cover Slow and Impair Movement.
+
+Validation for the unreleased audit fixes: build and full suite passed (340 passed, 4 skipped). The native CPR modifier constructor also accepted generated cyberleg, frame and Impair Movement penalties. Live world repair and multiplayer verification remain pending.

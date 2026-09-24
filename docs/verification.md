@@ -1,6 +1,6 @@
 # Verification and maintenance
 
-Release: Combat Tools 0.8.1, reviewed 2026-09-23. Includes the documentation refresh, Self-CTH menus, combat-end cyberware cleanup and automatic smoke attack modifiers.
+Release: Combat Tools 0.8.2, reviewed 2026-09-24. Includes consistent encounter ownership, damage-status cleanup, injury/EMP corrections and persistent area-placement instructions.
 
 ## Evidence levels
 
@@ -13,8 +13,7 @@ Release: Combat Tools 0.8.1, reviewed 2026-09-23. Includes the documentation ref
 
 ```sh
 pnpm check
-pnpm build
-node --test --test-concurrency=1 scripts/*.test.mjs
+pnpm test
 ```
 
 Browser tests need `PNEUMA_PLAYWRIGHT_MODULE` pointing to the installed Playwright ESM entry and an available Edge browser for fixtures using `channel: "msedge"`. Some fixtures need `PNEUMA_JQUERY_SOURCE`, `PNEUMA_HANDLEBARS_SOURCE` and `PNEUMA_PIXI_SOURCE` paths. Native Foundry fixture tests have additional opt-in environment requirements in their source. Missing test dependencies are not evidence of a gameplay failure.
@@ -35,3 +34,17 @@ All 12 current Mermaid diagrams parsed and rendered with Mermaid 11.12.0; repres
 ## 0.8.1 release validation
 
 Production build and full automated suite passed: 334 passed, 4 native-Foundry checks skipped, 0 failures. Includes smoke geometry and override browser tests, cyberware cleanup regressions and Self-CTH browser checks. Live multiplayer remains unverified.
+
+## 0.8.2 encounter consistency validation (2026-09-24)
+
+`pnpm check` and `pnpm test` passed: 351 tests, 347 passed, four optional native-Foundry fixture tests skipped, zero failures. Browser regressions passed for AoE, quickhacks, the combat bar, and damage flow. AoE and damage flow were rerun after the final production changes.
+
+Encounter regressions cover ambiguous active encounters, exact token membership, inactive duplicate membership, tracker and GM scene changes, reset/deletion/end invalidation, preserved outside-combat actions, saved effect clocks, and selected damage targets removed before GM processing. The test command builds before running non-browser fixtures and runs in CI. Live Foundry multiplayer and performance benchmarking were not performed. No encounter migration was added; the change targets a clean environment.
+
+## Damage status cleanup regression (2026-09-24)
+
+Fixed newly damage-applied statuses without durations being skipped at encounter end. Encounter ownership covers ordinary statuses, native drug effects, incendiary fire and sleep Prone. Tests cover delete/reset hooks, different encounters, removed participants, repeated application, existing conditions, permanent injury/death preservation, and inventory retention. Final build and non-browser suite: 352 passed, four optional native-Foundry fixtures skipped, zero failures. Typecheck passed; live Foundry verification remains outstanding.
+
+## 0.8.2 release validation
+
+Final 0.8.2 typecheck/build and automated suite passed: 352 passed, four optional native-Foundry fixtures skipped, zero failures. AoE, QuickHack, combat-bar and damage-flow browser suites passed against the release build. The AoE placement instruction screenshot was inspected. These fixtures do not establish live multiplayer behavior.

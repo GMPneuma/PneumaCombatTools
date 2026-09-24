@@ -1,3 +1,4 @@
+import {requireParticipants,resolveEncounter,encounterRef,tokenEncounter,type EncounterRef} from "./encounter.js";
 import {interactArmorSelected, halfArmorSelected, halfArmorControl, armorIgnorePercent} from "./half-armor.js";
 import {reportExposure} from "./effect-events.js";
 import {igniteTarget} from "./instant-lifetime.js";
@@ -24,6 +25,7 @@ export interface DamageState {
 }
 export interface DamageOptions { useShield: boolean; damageReductionRole: boolean; damageReductionAE: boolean; brainDamageReduction: boolean }
 export interface DamageRequest {
+  encounter?:EncounterRef;
   action: "damageClaim" | "damageRelease" | "damageCommit" | "damageApply" | "damageReset" | "damageResolved" | "damageStatuses";
   interactArmor?: boolean; halfArmor?: boolean; statusEffects?: string[]; nonce?: string; damage?: DamageResult; options?: DamageOptions; targetUuid?: string; application?: "recorded" | "selected"; applicationId?: string;
 }
@@ -106,6 +108,8 @@ export function recordedDamageApplied(data: Exchange): boolean {
 /** Called only by the existing serialized GM coordinator. */
 export async function handleDamage(request: DamageRequest, user: User, data: Exchange,
   save: () => Promise<void>): Promise<void> {
+  if(data.combatId===undefined&&request.encounter)Object.assign(data,request.encounter);
+  if(data.combatId!==undefined)resolveEncounter(data);
   if (data.state !== "resolved") throw new Error("Damage requires a resolved attack.");
 
   if (request.action === "damageStatuses") {
@@ -122,6 +126,7 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
   const application = request.application ?? (request.targetUuid && request.targetUuid !== data.defender ? "selected" : "recorded");
   const destination = request.action === "damageApply" && application === "selected" ? request.targetUuid : data.defender;
   if (!destination) throw new Error("Select exactly one token to apply damage.");
+  if(request.action === "damageApply" && data.combatId)requireParticipants(resolveEncounter(data)!,[destination]);
   const actor = await damageActor(applying ? destination : data.attacker);
   if (!user.isGM && !actor.testUserPermission(user, "OWNER")) throw new Error("Only this actor's owner or GM can continue.");
   const damage = data.damage;
@@ -196,8 +201,8 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
       const instant=id.startsWith("instant:")?id.slice(8):"";
       if(instantId(instant)) {
         const visibility={blind:data.rollMode==="blindroll",whisper:["gmroll","blindroll"].includes(data.rollMode??"")?game.users!.filter(u=>u.isGM).map(u=>u.id!):data.rollMode==="selfroll"?[user.id!]:[]} as ChatMessage;
-        await createInstantCard(actor,instant,visibility);
-      } else await applyCombatStatus(actor, id);
+        await createInstantCard(actor,instant,visibility,data.combatId!==undefined?encounterRef(resolveEncounter(data),data.combatScene,data.combatTokens):undefined);
+      } else await applyCombatStatus(actor, id,data.combatId!==undefined?resolveEncounter(data)??null:undefined,true);
     }
   } catch (error) {
     damage.status = "review"; await save();
@@ -246,6 +251,9 @@ export function selectedDamageTarget(): string {
   return token.document.uuid;
 }
 export async function applyFromCard(data: Exchange, send: Send, shiftKey: boolean, targetUuid = data.defender, application: "recorded" | "selected" = "recorded", halfArmor?: boolean, interactArmor?: boolean): Promise<void> {
+  const token=await fromUuid(targetUuid) as TokenDocument|null;
+  const encounter=data.combatId!==undefined?encounterRef(resolveEncounter(data),data.combatScene,[...(data.combatTokens??[]),targetUuid]):encounterRef(tokenEncounter(token?.parent?.id,[targetUuid]),token?.parent?.id,[targetUuid]);
+  resolveEncounter(encounter);
   const actor = await damageActor(targetUuid);
   if (!actor.isOwner) throw new Error("Only the selected actor’s owner or GM can apply damage.");
   let options: DamageOptions = { useShield: true, damageReductionRole: true, damageReductionAE: true, brainDamageReduction: true };
@@ -263,7 +271,7 @@ export async function applyFromCard(data: Exchange, send: Send, shiftKey: boolea
     options = { useShield: !!chosen.useShield, damageReductionRole: !!chosen.damageReductionRole,
       damageReductionAE: !!chosen.damageReductionAE, brainDamageReduction: !!chosen.brainDamageReduction };
   }
-  await send("damageApply", { halfArmor, interactArmor, targetUuid, application, applicationId: foundry.utils.randomID(), options,
+  await send("damageApply", { encounter, halfArmor, interactArmor, targetUuid, application, applicationId: foundry.utils.randomID(), options,
     statusEffects: (data.damage?.statusEffects ?? []).slice(0, 3) });
 }
 export async function renderDamage(message: ChatMessage, data: Exchange, html: JQuery, send: Send, manual?: {canEditEffects: boolean}): Promise<void> {

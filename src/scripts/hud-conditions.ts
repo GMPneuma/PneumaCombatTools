@@ -1,3 +1,4 @@
+import {displayedEncounter} from "./encounter.js";
 import {forceOutEntries} from "./quickhack/force-out.js";
 import { masterStatuses } from "./status-catalog.js";
 const normalize = (name: string) => name.trim().toLowerCase();
@@ -61,8 +62,9 @@ export function collectHUDConditions(actor: Actor) {
     // Addiction alone lights Addict, not a primary drug icon.
     if (foundry.utils.getProperty(effect,"flags.pneuma-combattools.quickhackEffect") || ids.length || nativeDrug || addiction && lastingDrugFor(addiction[1]!)) add(name, effect.img, false, ids);
   }
-  if (game.combat?.started) {
-    const connections = foundry.utils.getProperty(game.combat, "flags.pneuma-combattools.quickhackConnections") as Record<string, {state?: string; sourceActorUuid?: string}> | undefined;
+  const combat=displayedEncounter();
+  if (combat) {
+    const connections = foundry.utils.getProperty(combat, "flags.pneuma-combattools.quickhackConnections") as Record<string, {state?: string; sourceActorUuid?: string}> | undefined;
     if (Object.values(connections ?? {}).some(connection => connection.state === "active" && connection.sourceActorUuid === actor.uuid)) exposures.add("Jacked In");
   }
   const incoming=forceOutEntries(actor);

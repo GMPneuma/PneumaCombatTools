@@ -64,12 +64,12 @@ function fixture({combat=true,mode="raw"}={}) {
  const role={id:"role",type:"role",name:"Netrunner",system:{rank:4},createRoll(){return {rollTitle:"",rollCard:"native",resultTotal:state.total,async handleRollDialog(){await state.onDialog();return true;},async roll(){state.rolls++;},wasCritical:()=>false};},async confirmRoll(roll){return roll;}};
  const source={id:"source",uuid:"Actor.source",name:"Source",hasPlayerOwner:true,items:collection([role]),flags:{},testUserPermission:()=>true};
  const target={id:"target",uuid:"Actor.target",name:"Target",hasPlayerOwner:true,items:collection([]),system:{stats:{will:{value:5}}},flags:{},testUserPermission:()=>true};
- const token=(id,actor)=>({id,name:id,actor,isVisible:true,w:100,h:100,center:{x:0,y:0},document:{id,uuid:`Scene.scene.Token.${id}`}});
+ const token=(id,actor)=>({id,name:id,actor,isVisible:true,w:100,h:100,center:{x:0,y:0},document:{id,parent:{id:"scene"},uuid:`Scene.scene.Token.${id}`}});
  const a=token("a",source),b=token("b",target);
  docs.set(source.uuid,source);docs.set(target.uuid,target);docs.set(a.document.uuid,{...a.document,actor:source});docs.set(b.document.uuid,{...b.document,actor:target});
- const encounter={id:"combat",uuid:"Combat.combat",started:true,flags:{},async update(changes){state.writes++;for(const [key,value] of Object.entries(changes))put(this,key,value);}};
- globalThis.canvas={tokens:Object.assign(new Map([[a.id,a],[b.id,b]]),{controlled:[a]}),scene:{grid:{distance:2}},grid:{measurePath:()=>({distance:20})}};
- game.combat=combat?encounter:undefined;game.actors.push(source,target);
+ const encounter={id:"combat",uuid:"Combat.combat",scene:{id:"scene"},active:true,combatants:[{token:a.document,actor:source},{token:b.document,actor:target}],started:true,flags:{},async update(changes){state.writes++;for(const [key,value] of Object.entries(changes))put(this,key,value);}};
+ globalThis.canvas={tokens:Object.assign(new Map([[a.id,a],[b.id,b]]),{controlled:[a]}),scene:{id:"scene",grid:{distance:2}},grid:{measurePath:()=>({distance:20})}};
+ game.combats=collection(combat?[encounter]:[]);game.combat=combat?encounter:undefined;game.actors.push(source,target);
  return {state,source,target,a,b,role,encounter,cards,notices,docs};
 }
 
@@ -111,19 +111,19 @@ test("combat Jack-In persists on Combat; multiple targets and Netrunners remain 
 test("no connection rejects QuickHack, ejection persists across rounds/reloads and blocks re-Jack-In",async()=>{
  const f=fixture();await executeQuickhack(f.a,f.b,"overheat");assert.equal(f.state.rolls,0);
  await executeQuickhack(f.a,f.b,"jack-in");const c=connectionFor(f.source,f.target.uuid);
- assert.equal(await ejectConnection(f.source,f.target.uuid,c.id),true);
+ assert.equal(await ejectConnection(f.source,f.target.uuid,c.id,c),true);
  game.combat.flags=JSON.parse(JSON.stringify(game.combat.flags));game.combat.round=50;game.time.worldTime=10000;
  await executeQuickhack(f.a,f.b,"jack-in");await executeQuickhack(f.a,f.b,"overheat");assert.equal(f.state.rolls,1);
  assert.equal(connectionFor(f.source,f.target.uuid).state,"ejected");
  await assert.rejects(establishConnection(f.cards[0]),/Ejected/);
- game.combat={...f.encounter,uuid:"Combat.new",flags:{}};assert.equal(connectionFor(f.source,f.target.uuid),undefined);
+ f.encounter.started=false;game.combat={...f.encounter,id:"new",uuid:"Combat.new",started:true,flags:{}};game.combats.splice(0,game.combats.length,game.combat);assert.equal(connectionFor(f.source,f.target.uuid),undefined);
 });
 test("a stale result cannot eject a new encounter and old cards cannot regain a connection",async()=>{
  const f=fixture();await executeQuickhack(f.a,f.b,"jack-in");const old=f.cards[0];
- game.combat={...f.encounter,uuid:"Combat.new",flags:{}};
- await assert.rejects(establishConnection(old),/Start combat/);
+ f.encounter.started=false;game.combat={...f.encounter,id:"new",uuid:"Combat.new",started:true,flags:{}};game.combats.splice(0,game.combats.length,game.combat);
+ await assert.rejects(establishConnection(old),/originating encounter/);
  await executeQuickhack(f.a,f.b,"jack-in");const current=connectionFor(f.source,f.target.uuid);
- assert.equal(await ejectConnection(f.source,f.target.uuid,old.id),false);
+ await assert.rejects(ejectConnection(f.source,f.target.uuid,old.id,old.flags[MODULE].quickhack),/originating encounter/);
  assert.equal(activeConnection(f.source,f.target.uuid,current.id).id,current.id);
 });
 test("master off blocks HUD availability, direct execution, force-out and content initialization",async()=>{
@@ -151,7 +151,7 @@ test("RAW connected QuickHack works without items; forged IDs and invalid modes 
 });
 test("changing encounter or ejecting during a dialog blocks stale pending hacks",async()=>{
  const f=fixture();await executeQuickhack(f.a,f.b,"jack-in");const c=connectionFor(f.source,f.target.uuid);
- f.state.onDialog=()=>ejectConnection(f.source,f.target.uuid,c.id);
+ f.state.onDialog=()=>ejectConnection(f.source,f.target.uuid,c.id,c);
  await executeQuickhack(f.a,f.b,"overheat");assert.equal(f.state.rolls,1);
  assert.equal(resultConnectionValid(f.source,{combatUuid:f.encounter.uuid,targetActorUuid:f.target.uuid,connectionId:c.id}),false);
 });
@@ -169,8 +169,8 @@ test("outside-combat Force Out remains a chat contest and writes no tracking sta
  await beginForceOut(f.cards[0]);assert.equal(f.state.writes,0);assert.equal(f.cards.at(-1).flags[MODULE].quickhack.ejected,true);
 });
 test("ending/starting combat during untracked Jack-In cannot redirect it into another encounter",async()=>{
- const f=fixture({combat:false});f.state.onDialog=()=>{game.combat=f.encounter;};await executeQuickhack(f.a,f.b,"jack-in");
- assert.equal(f.state.rolls,0);assert.equal(f.state.writes,0);
+ const f=fixture({combat:false});f.state.onDialog=()=>{game.combat=f.encounter;game.combats.push(f.encounter);};await executeQuickhack(f.a,f.b,"jack-in");
+ assert.equal(f.state.rolls,1);assert.equal(f.state.writes,0);assert.equal(f.cards[0].flags[MODULE].quickhack.combatId,null);
 });
 
 
@@ -241,7 +241,7 @@ test("CTH eject menu needs awareness, current active connection and target owner
  const result=connectionFor(f.source,f.target.uuid).awareness;result.alerted=false;
  assert.equal(forceOutEntries(f.target).length,0);
  result.alerted=true;f.state.enabled=false;assert.equal(forceOutEntries(f.target).length,0);
- f.state.enabled=true;await ejectConnection(f.source,f.target.uuid,f.cards[0].id);
+ f.state.enabled=true;await ejectConnection(f.source,f.target.uuid,f.cards[0].id,f.cards[0].flags[MODULE].quickhack);
  assert.equal(forceOutEntries(f.target).length,0);
 });
 test("CTH lists each detected runner once, masks identity and excludes other encounters", async () => {
@@ -257,7 +257,7 @@ test("CTH lists each detected runner once, masks identity and excludes other enc
  assert.equal(rows[0].messageId,first.id);
  assert.ok(rows.every(row=>!row.label.includes("Source")&&!row.label.includes("Secret")));
  game.combat={...f.encounter,uuid:"Combat.other",flags:{}};
- assert.equal(forceOutEntries(f.target).length,0);
+ assert.equal(forceOutEntries(f.target).length,2);canvas.scene={id:"other",grid:{distance:2}};assert.equal(forceOutEntries(f.target).length,0);
 });
 test("CTH detects later noisy QuickHacks after undetected Jack-In and deduplicates them", async () => {
  const f=fixture();f.state.total=30;await executeQuickhack(f.a,f.b,"jack-in");
@@ -328,7 +328,7 @@ test("voluntary Jack Out needs no roll, invalidates old cards, and permits fresh
  await establishConnection(old);assert.equal(connectionFor(f.source,f.target.uuid).state,"disconnected");
  await executeQuickhack(f.a,f.b,"jack-in");assert.equal(f.state.rolls,2);
  const current=connectionFor(f.source,f.target.uuid);assert.equal(current.state,"active");assert.notEqual(current.id,old.id);
- await ejectConnection(f.source,f.target.uuid,current.id);await jackOut(f.source,f.target.uuid);
+ await ejectConnection(f.source,f.target.uuid,current.id,current);await jackOut(f.source,f.target.uuid);
  assert.equal(connectionFor(f.source,f.target.uuid).state,"ejected");
 });
 test("Jack Out respects ownership and feature enablement",async()=>{
@@ -394,3 +394,13 @@ test('native quickhack roll retains checks at input and outcome boundaries witho
  await nativeQuickhackRoll(f.source,f.role,'Test',{blind:false,whisper:[]},()=>{checks++;return true;},undefined,false);
  assert.equal(checks,3);assert.equal(f.state.rolls,1);
 });
+
+test('QuickHack follows active scene encounter when player and GM view unrelated trackers',async()=>{
+ const f=fixture();game.combat={id:'preview',uuid:'Combat.preview',started:true};await executeQuickhack(f.a,f.b,'jack-in');const saved=f.cards[0].flags[MODULE].quickhack;
+ assert.equal(saved.combatId,'combat');assert.equal(connectionFor(f.source,f.target.uuid).state,'active');
+ canvas.scene={id:'gm-other',grid:{distance:2}};assert.equal(resultConnectionValid(f.source,{...saved,connectionId:f.cards[0].id}),true);
+ assert.equal(await ejectConnection(f.source,f.target.uuid,f.cards[0].id,saved),true);
+});
+test('ambiguous QuickHack encounters stop before rolling',async()=>{const f=fixture();game.combats.push({...f.encounter,id:'second'});await executeQuickhack(f.a,f.b,'jack-in');assert.equal(f.state.rolls,0);assert.match(f.notices.at(-1),/Multiple active/);});
+test('QuickHack cannot use another token of the same actor as membership',async()=>{const f=fixture();f.encounter.combatants[1].token={...f.b.document,uuid:'Scene.scene.Token.copy'};await executeQuickhack(f.a,f.b,'jack-in');assert.equal(f.state.rolls,0);assert.match(f.notices.at(-1),/participating tokens/);});
+test('QuickHack result rejects reset epoch even if connection flags remain',async()=>{const f=fixture();await executeQuickhack(f.a,f.b,'jack-in');const saved=f.cards[0].flags[MODULE].quickhack;f.encounter.flags[MODULE].evasionEpoch='reset';assert.equal(resultConnectionValid(f.source,{...saved,connectionId:f.cards[0].id}),false);await assert.rejects(establishConnection(f.cards[0]),/reset/);});

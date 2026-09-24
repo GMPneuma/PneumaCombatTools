@@ -1,3 +1,4 @@
+import {tokenEncounter,encounterRef,resolveEncounter} from "../encounter.js";
 import { requireCombatSocket } from "../socket-health.js";
 import { availableQuickhacks, quickhackId, MODULE, type QuickhackItem } from "./availability.js";
 import { getQuickhack } from "./catalog.js";
@@ -36,26 +37,29 @@ export async function executeQuickhack(source: Token, target: Token, id: string)
   if (!hasQuickhackSight(source, target)) { ui.notifications!.warn("Line of sight to this target is required for Jack-In and QuickHack."); return; }
   const actor = source.actor!;
   if (pending.has(actor.uuid)) return;
-  const connection = activeConnection(actor, target.actor!.uuid);
-  if (id === "jack-in" && isEjected(actor, target.actor!.uuid)) { ui.notifications!.warn("Ejected: cannot Jack In to this target again during this encounter."); return; }
+  let combat:Combat|undefined;
+  try{combat=tokenEncounter(source.document.parent?.id,[source.document.uuid,target.document.uuid]);}catch(error){ui.notifications!.error((error as Error).message);return;}
+  const encounter=encounterRef(combat,source.document.parent?.id,[source.document.uuid,target.document.uuid]);
+  const connection = activeConnection(actor, target.actor!.uuid,undefined,combat);
+  if (id === "jack-in" && isEjected(actor, target.actor!.uuid,combat)) { ui.notifications!.warn("Ejected: cannot Jack In to this target again during this encounter."); return; }
   if (id !== "jack-in" && !connection) { ui.notifications!.warn("An active Jack-In connection to this target is required. Start combat to track connections."); return; }
   if (id === "jack-in" && connection) { ui.notifications!.info("Already jacked into this target."); return; }
-  if (trackingCombat() && id === "jack-in" && !game.users!.some(user => user.isGM && user.active)) { ui.notifications!.warn("An active GM is required to track Jack-In connections."); return; }
+  if (combat && id === "jack-in" && !game.users!.some(user => user.isGM && user.active)) { ui.notifications!.warn("An active GM is required to track Jack-In connections."); return; }
   const hack = getQuickhack(id);
   if (id !== "jack-in" && (!hack || !actorQuickhacks(actor).some(entry => entry.id === id))) {
     ui.notifications!.warn("This QuickHack is unavailable under the current rules mode."); return;
   }
   pending.add(actor.uuid);
   try {
-    const combatUuid = trackingCombat()?.uuid;
-    const valid = () => trackingCombat()?.uuid === combatUuid && validTokens(source, target) && hasQuickhackSight(source, target) && (id === "jack-in" ? !isEjected(actor, target.actor!.uuid) : !!activeConnection(actor, target.actor!.uuid, connection!.id) && actorQuickhacks(actor).some(entry => entry.id === id));
+    const combatUuid = combat?.uuid;
+    const valid = () => resolveEncounter(encounter)?.uuid === combatUuid && validTokens(source, target) && hasQuickhackSight(source, target) && (id === "jack-in" ? !isEjected(actor, target.actor!.uuid,combat) : !!activeConnection(actor, target.actor!.uuid, connection!.id,combat) && actorQuickhacks(actor).some(entry => entry.id === id));
     const role = roleFor(actor)!;
     if (!Number.isFinite(Number(foundry.utils.getProperty(role, "system.rank")))) throw new Error(label("Error.InterfaceUnreadable", { actor: actor.name! }));
     const roll = await nativeQuickhackRoll(actor, role, hack ? `${hack.name} · DV${hack.dv}` : label("Roll.JackInCardTitle"),
       actor.hasPlayerOwner ? publicAudience() : gmAudience(), valid, source, false);
     if (!roll || !valid()) return;
     const scenario = { sourceIsPlayer: actor.hasPlayerOwner, targetIsPlayer: target.actor!.hasPlayerOwner };
-    const base = { combatUuid, sourceActorUuid: actor.uuid, targetActorUuid: target.actor!.uuid,
+    const base = { ...encounter, combatUuid, sourceActorUuid: actor.uuid, targetActorUuid: target.actor!.uuid,
       sourceTokenUuid: source.document.uuid, targetTokenUuid: target.document.uuid };
     if (hack) {
       const success = isQuickhackSuccessful(roll.total, hack.dv);

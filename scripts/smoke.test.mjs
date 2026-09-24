@@ -7,7 +7,7 @@ test('smoke expiry preserves unrelated templates and has one GM writer',async()=
 test('smoke requires its scene and survives independent attack-template removal',async()=>{const scene=setup();canvas.scene={id:'other'};await assert.rejects(createSmoke(scene,{},'message'),/impact scene/);canvas.scene=scene;await createSmoke(scene,{},'message');scene.templates.push({id:'attack'});await scene.deleteEmbeddedDocuments('MeasuredTemplate',['attack']);assert.equal(scene.templates.length,1);assert.ok(scene.templates[0].flags[M].smoke)});
 
 test('combat smoke uses twenty rounds, ignoring world-time drift until its end turn',async()=>{
- const scene=setup();const c={id:'combat',started:true,round:2,turn:1,turns:[{},{}]};game.combat=c;game.combats=new Map([[c.id,c]]);
+ const scene=setup();const c={id:'combat',scene,active:true,started:true,round:2,turn:1,turns:[{},{}]};game.combat=c;game.combats=new Map([[c.id,c]]);
  await createSmoke(scene,{},'timed');assert.equal(scene.templates[0].flags[M].smoke.duration.rounds,20);
  game.time.worldTime=1000;c.round=22;c.turn=0;await expireSmoke();assert.equal(scene.templates.length,1);
  c.turn=1;await expireSmoke();assert.equal(scene.templates.length,0);

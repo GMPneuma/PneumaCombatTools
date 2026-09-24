@@ -1,3 +1,4 @@
+import {tokenEncounter,encounterRef,resolveEncounter,requireParticipants,type EncounterRef} from "../encounter.js";
 import {attackCrossesSmoke} from "./smoke-obscuration.js";
 import {halfArmorSelected, interactArmorSelected} from "../half-armor.js";
 import {automaticNPCEvasion} from "../evasion-settings.js";
@@ -77,12 +78,13 @@ function targets(data:AreaAttack):TargetRow[] {
     && (data.kind==="explosive"||t.document.uuid!==data.exchange.attacker)
     && covered({x:t.x,y:t.y,width:t.w,height:t.h})
     ).map(t=>({
-      ...(instantId(data.ammoType)&&data.ammoType!=="incendiary"?{instant:newInstant(data.ammoType,t.actor!.uuid,t.name??"")} : {}),
+      ...(instantId(data.ammoType)&&data.ammoType!=="incendiary"?{instant:newInstant(data.ammoType,t.actor!.uuid,t.name??"",rowEncounter(data,t.document.uuid))} : {}),
       uuid:t.document.uuid,actor:t.actor!.uuid,name:t.name??"",img:t.document.texture.src??"",
       eligible:!evasionBlocked(t.actor!)&&evadeAllowed(Number(foundry.utils.getProperty(t.actor!,"system.stats.ref.value")),data.settings.evade),
       state:data.kind==="shell" && data.exchange.total<=13?"miss":"waiting",
     }));
 }
+function rowEncounter(data:AreaAttack,uuid:string):EncounterRef {return encounterRef(resolveEncounter(data.exchange),data.scene,[data.exchange.attacker,uuid]);}
 const btn=(action:string,icon:string,title:string,target="")=>`<button type="button" data-aoe-action="${action}" data-aoe-target="${esc(target)}" title="${esc(title)}" aria-label="${esc(title)}"><i class="fas ${icon}" aria-hidden="true"></i></button>`;
 const awaitingResponses=(data:AreaAttack)=>data.phase==="scatter"||data.rows.some(r=>["waiting","rolling"].includes(r.state));
 export function areaContent(data:AreaAttack):string {
@@ -112,7 +114,7 @@ export function areaContent(data:AreaAttack):string {
   const applications=data.rows.flatMap(r=>r.damage?.applications??[]).join("");
   return `<section class="rollcard pneuma-aoe-card" data-state="${data.phase==="scatter"?"scatter":waiting?"waiting":"resolved"}"><div class="rollcard-top"><div class="cpr-block"><h3>${esc(data.exchange.title)}${profile?" · "+esc(profile.name):""}</h3></div></div>
     ${resolutionSection("attack",attack)}
-    ${resolutionSection("result",data.phase==="scatter"?"<p>Missed intended point. GM: choose where it landed within the intended blast square.</p>"+btn("scatter","fa-crosshairs","GM: place actual blast"): `<div role="list" class="pneuma-aoe-targets">${rows||"<p>No tokens in the area.</p>"}</div>`)}
+    ${resolutionSection("result",data.phase==="scatter"?"<div class='pneuma-aoe-reposition'><strong>Missed — choose the landing point</strong><p>The gray area marks the original aim and is inactive.</p><p>GM: place the new blast center inside that square. Targets are determined after placement.</p></div>"+btn("scatter","fa-crosshairs","Place landing point"): `<div role="list" class="pneuma-aoe-targets">${rows||"<p>No tokens in the area.</p>"}</div>`)}
     <div class="pneuma-aoe-actions">${btn("show",data.areaHidden?"fa-eye":"fa-eye-slash",data.areaHidden?"Show attack area":"Hide attack area")}${data.phase==="responses"?btn("add","fa-user-plus","GM: add selected token (manual coverage override)"):""}
     ${data.kind!=="suppression"&&data.phase!=="scatter"&&!data.special&&!data.exchange.damage?btn("damage","fa-droplet","Roll shared damage"):""}
     ${data.exchange.damage?.status==="rolling"?btn("damageReset","fa-unlock","GM: release unfinished damage roll"):""}</div>
@@ -137,7 +139,7 @@ function complete(data:AreaAttack):boolean {
 async function save(message:ChatMessage,data:AreaAttack) {
   if(data.ammoType==="smoke"&&data.phase==="responses"&&!data.smokeId) {
     const scene=game.scenes!.get(data.scene) as Scene|undefined;if(!scene)throw Error("Smoke scene unavailable.");
-    data.smokeId=await createSmoke(scene,data.area,message.id!);
+    data.smokeId=await createSmoke(scene,data.area,message.id!,resolveEncounter(data.exchange)??null);
   }
   const reveal=data.attackDiceRevealed===false&&!awaitingResponses(data);
   if(reveal)data.attackDiceRevealed=true;
@@ -161,6 +163,8 @@ export async function handleAreaRequest(req:Request) {
   const saved=message&&flag(message);
   if(!message||!saved||!user)throw Error("Area attack is unavailable.");
   const data=foundry.utils.deepClone(saved);
+  const combat=resolveEncounter(data.exchange);
+  if(combat&&req.target)requireParticipants(combat,[req.target]);
   const row=data.rows.find(r=>r.uuid===req.target);
   if(req.action==="instant") {
     if(!row?.instant||row.state!=="hit"||!req.instantRequest||data.phase!=="responses")throw Error("Instant effect unavailable.");
@@ -189,7 +193,7 @@ export async function handleAreaRequest(req:Request) {
     if(!token?.actor||token.parent?.id!==data.scene)throw Error("Select a token in the attack scene.");
     if(row)return;
     data.effectsResolved=false;
-    data.rows.push({...(instantId(data.ammoType)&&data.ammoType!=="incendiary"?{instant:newInstant(data.ammoType,token.actor.uuid,token.name??"")} : {}),uuid:token.uuid,actor:token.actor.uuid,name:token.name??"",img:token.texture.src??"",eligible:!evasionBlocked(token.actor)&&evadeAllowed(Number(foundry.utils.getProperty(token.actor,"system.stats.ref.value")),data.settings.evade),state:"waiting"});
+    data.rows.push({...(instantId(data.ammoType)&&data.ammoType!=="incendiary"?{instant:newInstant(data.ammoType,token.actor.uuid,token.name??"",rowEncounter(data,token.uuid))} : {}),uuid:token.uuid,actor:token.actor.uuid,name:token.name??"",img:token.texture.src??"",eligible:!evasionBlocked(token.actor)&&evadeAllowed(Number(foundry.utils.getProperty(token.actor,"system.stats.ref.value")),data.settings.evade),state:"waiting"});
     await save(message,data);return;
   }
   if(req.action==="scatter"){
@@ -206,7 +210,7 @@ export async function handleAreaRequest(req:Request) {
       const exchange=rowExchange(data,row);
       await handleDamage(req.damageRequest,user,exchange,async()=>{row.damage=exchange.damage;
         if(data.ammoType==="incendiary"&&row.damage?.recordedApplied&&!row.instant) {
-          row.instant=newInstant("incendiary",row.actor,row.name);
+          row.instant=newInstant("incendiary",row.actor,row.name,rowEncounter(data,row.uuid));
           if(!row.damage.penetrated){row.instant.state="skipped";row.instant.summary="No penetrating damage";}
         }
         await save(message,data);});
@@ -229,7 +233,7 @@ export async function handleAreaRequest(req:Request) {
     const point=canvas.grid!.getCenterPoint(req.point);
     if(areaCoverage(data.area)({x:point.x-token.w/2,y:point.y-token.h/2,width:token.w,height:token.h}))throw Error("Move completely outside the affected area.");
     if(token.checkCollision(point,{origin:token.center,type:"move",mode:"any"}))throw Error("That move crosses a blocking wall.");
-    row.moveCost=await moveEvader(token,point,!!data.settings.evadeMove,!!data.settings.evadeBorrow,message.id!+":"+row.uuid);
+    row.moveCost=await moveEvader(token,point,!!data.settings.evadeMove,!!data.settings.evadeBorrow,message.id!+":"+row.uuid,rowEncounter(data,row.uuid));
     row.moved=true;await save(message,data);return;
   }
   if(req.action==="forcehit"){if(!user.isGM||row.state!=="miss"||row.damage||row.instant&&row.instant.state!=="pending")throw Error("GM only.");row.state="hit";data.effectsResolved=false;
@@ -286,10 +290,14 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
   starting.add(actor.uuid);
   try {
     const scene=canvas.scene!.id!,s=areaSettings();
+    const combat=tokenEncounter(scene,[source.document.uuid]);
+    const encounter=encounterRef(combat,scene,[source.document.uuid]);
     const sourcePosition={x:source.x,y:source.y};
     const area=await placeArea(p=>makeArea(kind,source,p,ammoType==="smoke"?{...s,blastShape:"square",blastSize:10}:s),target.center,
       kind==="shell"?"Aim the shell area in front of the attacker.":kind==="suppression"?"Aim suppressive fire.":"Place the blast center.",profile?.color);
     if(!area||canvas.scene?.id!==scene)return;
+    const validate=()=>{const current=resolveEncounter(encounter);if(current&&ammoType!=="smoke")requireParticipants(current,(canvas.tokens?.placeables??[]).filter(t=>t.actor&&!['container','blackIce','demon'].includes(String(t.actor.type))&&areaCoverage(area)({x:t.x,y:t.y,width:t.w,height:t.h})).map(t=>t.document.uuid));};
+    validate();
     let item:RollItem=original, thrownSource:object|undefined;
     if(String(original.type)==="ammo"){
       const snapshot=await improvisedSource() as {name:string;system:Record<string,unknown>};
@@ -314,6 +322,7 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
     const currentAmmo=String(String(original.type)==="ammo"?foundry.utils.getProperty(original,"system.type")??"":original._getLoadedAmmoProp?.("type")??"");
     if(currentAmmo!==ammoType)throw Error("Ammunition changed during targeting. Start the attack again.");
     const blastFormula=kind==="explosive"?item.createRoll("damage",actor,{damageType:"attack"}).formula:undefined;
+    validate();
     roll=await confirmAreaRoll(item,roll);await spendBonusLuck(actor,roll.luck);
     if(String(original.type)==="ammo")await original.update({"system.amount":Number(foundry.utils.getProperty(original,"system.amount"))-1} as Parameters<Item["update"]>[0]);
     await rollHidden(roll);roll.entityData={actor:actor.id!,token:source.id!,item:itemId,tokens:[]};
@@ -331,7 +340,7 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
     }
     const title=(game.settings!.get(MODULE,"hideAttackWeapon")?"Area attack":original.name??"Area attack")+(kind==="suppression"?" — Suppressive Fire":kind==="shell"?" — Shells":" — Blast");
     roll.rollTitle=title;
-    const exchange:Exchange={attacker:source.document.uuid,attackerName:source.name??"",defender:source.document.uuid,defenderActor:actor.uuid,defenderName:source.name??"",
+    const exchange:Exchange={...encounter,attacker:source.document.uuid,attackerName:source.name??"",defender:source.document.uuid,defenderActor:actor.uuid,defenderName:source.name??"",
       ranged:true,category:"Ranged",title,total:roll.resultTotal,html:(firstAttackHTML?"<div class=\"pneuma-smart-first\">"+firstAttackHTML+"</div>":"")+await nativeCard(roll),dice:[...firstAttackDice,...diceJSON(roll)],dv,
       state:"resolved",hit:true,weaponId:itemId,attackMode:"attack",weaponType:String(foundry.utils.getProperty(original,"system.weaponType")),
       criticalMethod:kind==="explosive"?(String(original.type)!=="ammo"&&foundry.utils.getProperty(original,"system.weaponType")==="rocketLauncher"?"Rocket":"Grenade"): "Ranged",
@@ -377,7 +386,7 @@ async function moveOutside(message:ChatMessage,data:AreaAttack,row:TargetRow) {
 
 async function syncTemplate(message:ChatMessage,data:AreaAttack) {
   const scene=game.scenes!.get(data.scene) as Scene|undefined;if(!scene)return;
-  const values={...templateData(data.area,scene),fillColor:ammoProfile(data.ammoType)?.color??"#d44a40",borderColor:ammoProfile(data.ammoType)?.color??"#ffffff",hidden:!!data.areaHidden,user:message.author?.id??game.user!.id,
+  const values={...templateData(data.area,scene),fillColor:data.phase==="scatter"?"#737980":ammoProfile(data.ammoType)?.color??"#d44a40",borderColor:data.phase==="scatter"?"#737980":ammoProfile(data.ammoType)?.color??"#ffffff",hidden:!!data.areaHidden,user:message.author?.id??game.user!.id,
     flags:{[MODULE]:{areaMessage:message.id,areaShape:data.area}}};
   const old=data.templateId?scene.templates.get(data.templateId):undefined;
   if(old)await old.update(values as Parameters<MeasuredTemplateDocument["update"]>[0]);
@@ -481,7 +490,7 @@ export function registerAreaAttacks() {
           if(action==="show")await send(message.id!,"show",{hidden:!data.areaHidden});
           else if(action==="scatter"){
             if(canvas.scene?.id!==data.scene)throw Error("Open the attack scene first.");
-            const area=await placeArea(p=>({...data.area,origin:canvas.grid!.getCenterPoint(p)}),data.intended,"Place actual blast center within the intended square.",ammoProfile(data.ammoType)?.color);
+            const area=await placeArea(p=>({...data.area,origin:canvas.grid!.getCenterPoint(p),wallOrigin:canvas.grid!.getCenterPoint(p)}),data.intended,"Place the new blast center inside the gray square. Gray = inactive original aim.",ammoProfile(data.ammoType)?.color);
             if(area)await send(message.id!,"scatter",{area});
           } else if(action==="add") {const selected=canvas.tokens?.controlled??[];if(selected.length!==1)throw Error("Select exactly one token to add.");await send(message.id!,"add",{target:selected[0]!.document.uuid});}
           else if(action==="roll"&&row)await respond(message,data,row);

@@ -65,6 +65,7 @@ try {
  const armor=await readFile(new URL('../dist/scripts/half-armor.js',import.meta.url),'utf8');
  await page.addScriptTag({type:'module',content:armor+'\nObject.assign(window,{halfArmorSelected,interactArmorSelected,halfArmorControl,armorIgnorePercent});'});
  await page.waitForFunction(()=>!!window.halfArmorControl);
+ await page.addScriptTag({type:'module',content:(await readFile('dist/scripts/encounter.js','utf8'))+'\nObject.assign(window,{resolveEncounter,encounterRef,tokenEncounter});'});
  const damage=(await readFile(new URL('../dist/scripts/damage-flow.js',import.meta.url),'utf8')).replace(/^import .*$/gm,'');
  await page.addScriptTag({type:'module',content:damage.replace('import(path)', 'Promise.resolve({default:window.nativeDamageDialog})')+'\nObject.assign(window,{damageValues,damageContent,renderDamage,rollDamage});'});
  const combat=(await readFile(new URL('../dist/scripts/combat-resolution.js',import.meta.url),'utf8')).replace(/^import .*$/gm,'');

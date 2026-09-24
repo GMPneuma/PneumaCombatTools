@@ -4,9 +4,9 @@ import {isSelfCTH,hasSpeedware,selfInitiativeControl,rerollSelfInitiative,regist
 function fixture(){
  globalThis.foundry={utils:{getProperty:(o,p)=>p.split('.').reduce((v,k)=>v?.[k],o)}};
  const item={type:'cyberware',name:'Sandevistan',system:{isInstalledInActor:true},flags:{}};
- const token={isOwner:true,document:{uuid:'Scene.s.Token.t'},actor:{items:[item]}};
+ const token={isOwner:true,document:{uuid:'Scene.s.Token.t',parent:{id:'s'}},actor:{items:[item]}};
  const combatant={id:'ct',initiative:12,token:token.document};const calls=[];
- const combat={uuid:'Combat.c',started:true,combatants:[combatant],rollInitiative:async(...args)=>{calls.push(args);}};
+ const combat={id:'c',scene:{id:'s'},active:true,uuid:'Combat.c',started:true,combatants:[combatant],rollInitiative:async(...args)=>{calls.push(args);}};
  globalThis.game={user:{isGM:false},combat,combats:new Map([['c',combat]]),settings:{get:()=>true}};
  return {item,token,combatant,combat,calls};
 }
@@ -41,3 +41,5 @@ test('NPC automation requires opt-in and RAW, never player-owned actors',async()
  assert(automaticNPCEvasion({hasPlayerOwner:false}));assert(!automaticNPCEvasion({hasPlayerOwner:true}));
  for(mode of ['custom','none'])assert(!automaticNPCEvasion({hasPlayerOwner:false}));mode='raw';on=false;assert(!automaticNPCEvasion({hasPlayerOwner:false}));
 });
+
+test('nonparticipant HUD remains usable but reroll fails clearly',async()=>{const f=fixture();f.combat.combatants=[];assert.equal(selfInitiativeControl(f.token).disabled,true);await assert.rejects(rerollSelfInitiative(f.token),/participating tokens/);});

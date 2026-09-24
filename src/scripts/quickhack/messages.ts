@@ -1,9 +1,10 @@
+import type {EncounterRef} from "../encounter.js";
 import { resolutionSection, rollOutcomeClass } from "../card-structure.js";
 import { MODULE } from "./availability.js";
 import { enabled, label } from "./settings.js";
 import { gmAudience, type Audience } from "./rolls.js";
 
-export interface QuickhackResult {
+export interface QuickhackResult extends Partial<EncounterRef> {
   type: "jackIn" | "quickhack";
   combatUuid?: string;
   sourceActorUuid: string; targetActorUuid: string; sourceTokenUuid: string; targetTokenUuid: string;

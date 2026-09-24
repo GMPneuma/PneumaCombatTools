@@ -1,3 +1,4 @@
+import {displayedEncounter,sceneEncounter} from "./encounter.js";
 const MODULE = "pneuma-combattools";
 export const MOVEMENT_MODES = {
   default: "Default", none: "No Movement", combat: "Combat Move", free: "Free-Move",
@@ -23,7 +24,7 @@ export function validMode(value: unknown): MovementMode {
 
 /** Follow the scene's active encounter, not whichever encounter a GM previews in the sidebar. */
 export function barCombat(sceneId: string | null | undefined = canvas.scene?.id): Combat | undefined {
-  return game.combats?.find(combat => combat.active && combat.started && (!combat.scene || combat.scene.id === sceneId));
+  return displayedEncounter(sceneId);
 }
 
 export function movementMode(): MovementMode {
@@ -73,7 +74,8 @@ export function canEndTurn(combat: Combat | undefined): boolean {
 export function movementBlocked(doc: TokenDocument, changes: Record<string, unknown>, userId: string): boolean {
   if (game.users?.get(userId)?.isGM) return false;
   if (!["x", "y", "elevation"].some(key => key in changes && changes[key] !== foundry.utils.getProperty(doc._source, key))) return false;
-  const combat = barCombat(doc.parent?.id);
+  let combat:Combat|undefined;
+  try{combat=sceneEncounter(doc.parent?.id);}catch(error){ui.notifications!.warn((error as Error).message);return true;}
   const mode = movementMode();
   if (mode === "none") return true;
   if (mode !== "combat") return false;

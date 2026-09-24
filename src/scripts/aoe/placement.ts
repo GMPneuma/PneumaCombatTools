@@ -64,12 +64,18 @@ export async function placeArea(make:(point:Point)=>Area, initial:Point, prompt:
   const document=new CONFIG.MeasuredTemplate.documentClass({...templateData(area),fillColor:color,borderColor:color,flags:{"pneuma-combattools":{areaShape:area}}} as never,{parent:canvas.scene!} as never);
   const preview=new CONFIG.MeasuredTemplate.objectClass(document);
   canvas.templates!.preview!.addChild(preview);
-  const draw=()=>{document.updateSource({...templateData(area),flags:{"pneuma-combattools":{areaShape:area}}} as never);preview.renderFlags.set({refresh:true});};
+  const draw=()=>{document.updateSource({...templateData(area),fillColor:color,borderColor:color,flags:{"pneuma-combattools":{areaShape:area}}} as never);preview.renderFlags.set({refresh:true});};
   try {await preview.draw();draw();}catch(error){preview.destroy();throw error;}
-  ui.notifications!.info(prompt+" Left-click to place; right-click or Escape to cancel.");
+  const instructions=window.document.createElement("aside");instructions.className="pneuma-panel pneuma-area-placement";
+  instructions.setAttribute("role","status");
+  const heading=window.document.createElement("strong");heading.textContent="Place area";
+  const detail=window.document.createElement("p");detail.textContent=prompt;
+  const controls=window.document.createElement("p");controls.className="pneuma-area-placement-controls";
+  controls.textContent="Left-click: place • Right-click / Esc: cancel";
+  instructions.append(heading,detail,controls);window.document.body.append(instructions);
   return new Promise(resolve=>{
     let done=false;
-    const finish=(value:Area|null)=>{if(done)return;done=true;view.removeEventListener("pointermove",move,true);
+    const finish=(value:Area|null)=>{if(done)return;done=true;instructions.remove();view.removeEventListener("pointermove",move,true);
       view.removeEventListener("pointerdown",click,true);view.removeEventListener("contextmenu",cancel,true);
       window.removeEventListener("keydown",key,true);Hooks.off("canvasTearDown",teardown);preview.destroy();resolve(value);};
     const move=(event:PointerEvent)=>{const r=view.getBoundingClientRect();

@@ -1,3 +1,4 @@
+import {tokenEncounter,resolveEncounter,encounterRef,type EncounterRef} from "./encounter.js";
 import {attackCrossesSmoke} from "./aoe/smoke-obscuration.js";
 import {evasionBlocked} from "./injury-rules.js";
 import { empDisabled, isMicrowaver } from "./emp-rules.js";
@@ -25,7 +26,7 @@ declare global {
 }
 interface Usage { round: string; used: number; lastPayment?: string }
 interface Defense { total: number; html: string; dice: string[]; bonus: number; fee: number; penalty: number }
-export interface Exchange {
+export interface Exchange extends Partial<EncounterRef> {
   disableSource?: "microwaver";
   areaAmmo?: {type:string;variety:string};
   attacker: string; defender: string; defenderActor: string; attackerName: string; defenderName: string;
@@ -63,23 +64,10 @@ function roundKey(combat?: Combat): string {
 function claimKey(data: Exchange, actor: Actor): string {
   return String(exchangeCombatId(data)) + ":" + actor.uuid;
 }
-function currentCombat(data: Exchange): Combat | undefined {
-  const id = exchangeCombatId(data);
-  if (id === undefined) throw new Error("This older attack has no combat reference. Cancel it and start a new attack.");
-  if (id === null) return;
-  const combat = exchangeCombat(data);
-  if (!combat?.started || (flag<string>(combat, "evasionEpoch") ?? "") !== (data.combatEpoch ?? ""))
-    throw new Error("The originating combat ended or was reset. Cancel this attack and start a new one.");
-  return combat;
-}
-export function combatForAttack(attacker: Token, defender: Token): Combat | undefined {
-  const matches = (combat: Combat) => combat.started && [attacker, defender].every(token =>
-    combat.combatants.some(combatant => combatant.token?.uuid === token.document.uuid));
-  const combats = game.combats?.filter(matches) ?? [];
-  const selected = combats.find(combat => combat.id === game.combat?.id);
-  if (selected) return selected;
-  if (combats.length > 1) throw new Error("Select the intended combat in the combat tracker before attacking.");
-  return combats[0];
+function currentCombat(data: Exchange): Combat | undefined {return resolveEncounter(data);}
+export function combatForAttack(attacker:Token,defender:Token):Combat|undefined {
+  if(attacker.document.parent?.id!==defender.document.parent?.id)throw Error("Both tokens must be in the same scene.");
+  return tokenEncounter(attacker.document.parent?.id,[attacker.document.uuid,defender.document.uuid]);
 }
 async function tokenActor(uuid: string): Promise<Actor> {
   const token = await fromUuid(uuid) as TokenDocument | null;
@@ -379,7 +367,7 @@ export async function startCombatExchange(attacker: Token, target: Token, itemId
   if (mode === "aimed") await actor.update({ "flags.cyberpunk-red-core.aimedLocation": roll.location } as Parameters<Actor["update"]>[0]);
   const title = game.settings!.get(MODULE, "hideAttackWeapon") ? category : item.name ?? category;
   roll.rollTitle = title;
-  const data: Exchange = { ...(!thrown&&isMicrowaver(item)?{disableSource:"microwaver" as const}:{}), weaponType: type, ...(thrown ? { thrownSource: thrown.source, improvised: thrown.improvised, improvisedDice: choice.improvisedDice } : {}), criticalMethod: type === "grenadeLauncher" ? "Grenade" : type === "rocketLauncher" ? "Rocket" : undefined, weaponId: itemId, attackMode: mode, location: roll.location, unaware: choice.unaware, combatId, combatEpoch, attacker: attacker.document.uuid, defender: target.document.uuid, defenderActor: target.actor!.uuid,
+  const data: Exchange = { ...encounterRef(combat,attacker.document.parent?.id,[attacker.document.uuid,target.document.uuid]), ...(!thrown&&isMicrowaver(item)?{disableSource:"microwaver" as const}:{}), weaponType: type, ...(thrown ? { thrownSource: thrown.source, improvised: thrown.improvised, improvisedDice: choice.improvisedDice } : {}), criticalMethod: type === "grenadeLauncher" ? "Grenade" : type === "rocketLauncher" ? "Rocket" : undefined, weaponId: itemId, attackMode: mode, location: roll.location, unaware: choice.unaware, combatId, combatEpoch, attacker: attacker.document.uuid, defender: target.document.uuid, defenderActor: target.actor!.uuid,
     attackerName: attacker.name ?? "", defenderName: target.name ?? "", ranged, category, title, dv,
     total: roll.resultTotal, html: await nativeCard(roll), dice: diceJSON(roll),
     rollMode: game.settings!.get("core", "rollMode") ?? "roll", state: "waiting" };
@@ -398,6 +386,7 @@ export async function startCombatExchange(attacker: Token, target: Token, itemId
 export function resetCombatTracking(_combat: Combat, changes: Record<string, unknown>): void {
   if (changes.round === undefined || Number(changes.round) !== 0) return;
   changes["flags." + MODULE + ".-=evasionUsage"] = null;
+  changes["flags." + MODULE + ".-=quickhackConnections"] = null;
   changes["flags." + MODULE + ".evasionEpoch"] = foundry.utils.randomID();
 }
 /** Move the first test version's counters to their recorded Combat without choosing a current combat. */

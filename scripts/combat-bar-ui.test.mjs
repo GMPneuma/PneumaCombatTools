@@ -77,7 +77,7 @@ try {
   window.renderTemplate=async(_path,data)=>(data.user.isGM?'<nav>'+[['rollAll','fas fa-users'],['rollNPC','fas fa-users-cog'],['resetAll','fas fa-undo']].map(([action,icon])=>`<a class="combat-control" data-control="${action}"><i class="${icon}"></i></a>`).join('')+'</nav>':'')+'<ol>'+data.combat.turns.filter(c=>c.visible).map(c=>`<li class="combatant" data-combatant-id="${c.id}">${(data.user.isGM?['toggleHidden','toggleDefeated','rollInitiative','pingCombatant','panToCombatant']:['pingCombatant','panToCombatant']).map(action=>`<a class="combatant-control" data-control="${action}" title="${action}"><i class="fas fa-eye"></i></a>`).join('')}</li>`).join('')+'</ol>';
   window.MouseInteractionManager={LONG_PRESS_DURATION_MS:500};
  });
- const state=await readFile(output+'/scripts/combat-bar-state.js','utf8');
+ const state=(await readFile(output+'/scripts/encounter.js','utf8'))+'\n'+(await readFile(output+'/scripts/combat-bar-state.js','utf8')).replace(/^import .*;\s*/gm,'');
  const source=(await readFile(output+'/scripts/combat-bar.js','utf8')).replace(/^import .*;\s*/gm,'').replace('const MODULE = "pneuma-combattools";','');
  const flyouts=(await readFile(output+'/scripts/combat-bar-flyout.js','utf8')).replace(/^import .*;\s*/gm,'');
  await page.addScriptTag({type:'module',content:state+'\n'+flyouts+'\nconst registerBarTurns=()=>{};const requestEndTurn=async combat=>{calls.gmRequests=(calls.gmRequests??0)+1;return combat.nextTurn();};\n'+source+'\nregisterCombatBar();emit("canvasReady");'});

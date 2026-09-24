@@ -1,3 +1,4 @@
+import {tokenEncounter,displayedEncounter} from "./encounter.js";
 import {empDisabled} from "./emp-rules.js";
 const MODULE="pneuma-combattools";
 declare global {interface SettingConfig {"pneuma-combattools.pneumaHomebrew":boolean}}
@@ -13,8 +14,7 @@ export function hasSpeedware(actor:Actor|undefined):boolean {
       ||["sandevistan","kerenzikov"].some(name=>(item.name??"").toLowerCase().includes(name));
   });
 }
-function participant(token:Token){
-  const combat=game.combat;
+function participant(token:Token,combat=displayedEncounter(token.document.parent?.id)){
   if(!combat?.started)return;
   const combatant=combat.combatants.find(entry=>entry.token?.uuid===token.document.uuid);
   return combatant&&combatant.initiative!==null&&combatant.initiative!==undefined?{combat,combatant}:undefined;
@@ -27,7 +27,7 @@ export function selfInitiativeControl(token:Token){
 const pending=new Set<string>();
 export async function rerollSelfInitiative(token:Token){
   if(!selfInitiativeControl(token).show)throw Error("Initiative reroll requires Pneuma HomeBrew, token ownership and installed functional speedware.");
-  const entry=participant(token);if(!entry)throw Error("Start combat and roll initiative before using the speedware reroll.");
+  const entry=participant(token,tokenEncounter(token.document.parent?.id,[token.document.uuid]));if(!entry)throw Error("Start combat and roll initiative before using the speedware reroll.");
   const key=entry.combat.uuid+":"+entry.combatant.id;
   if(pending.has(key))return;
   pending.add(key);

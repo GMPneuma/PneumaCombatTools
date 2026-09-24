@@ -1,5 +1,7 @@
 # Area attacks and suppressive fire
 
+Encounter selection now follows the [shared active-scene policy](encounters.md); saved actions and effect clocks remain tied to their originating encounter.
+
 Current implementation: Combat Tools 0.8.1; source-reviewed 2026-09-23.
 
 ## Placement and recipients
@@ -29,3 +31,5 @@ An active GM coordinates templates and cross-owner updates; players need not rec
 Implementation: [aoe/workflow.ts](../src/scripts/aoe/workflow.ts), [aoe/settings.ts](../src/scripts/aoe/settings.ts), [aoe/geometry.ts](../src/scripts/aoe/geometry.ts), [aoe/movement.ts](../src/scripts/aoe/movement.ts), [aoe/smoke.ts](../src/scripts/aoe/smoke.ts).
 
 Automatic smoke obscuration: Combat Tools attacks check the attacker-center to target-center line against active saved smoke footprints; blast attacks use the chosen impact point. Crossing smoke adds the native −4 obscured-task modifier once. The attack dialog offers “Ignore smoke” for equipment or GM rulings, and native roll details retain the modifier. This runs at attack preparation, not continuously; it does not infer vision-equipment capabilities or vertical smoke volume.
+
+AoE re-placement: missed aim templates are gray and inactive while waiting for the GM landing point. `.pneuma-aoe-reposition` explains the state and placement bounds; the existing scatter action now reads “Place landing point.” A pointer-transparent `.pneuma-area-placement` status panel keeps placement/cancel instructions visible. The moving preview retains its color; accepting replaces the original template at the actual landing point.

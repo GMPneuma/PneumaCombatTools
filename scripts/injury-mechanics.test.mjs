@@ -26,7 +26,7 @@ test("native injury sources, live markers, and installed disabled Cyberlegs bloc
  f.actor.effects[0].disabled=false;assert.match(evasionBlocked(f.actor),/Dismembered/);f.actor.effects[0].system={isSuppressed:true};assert.equal(evasionBlocked(f.actor),undefined);
  f.actor.effects=[];const leg=f.cyber();assert.match(evasionBlocked(f.actor),/Cyberleg/);
  leg.system.isInstalledInActor=false;assert.equal(evasionBlocked(f.actor),undefined);leg.system.isInstalledInActor=true;f.combat.started=false;assert.equal(evasionBlocked(f.actor),undefined);
- leg.flags[M].itemMarkers={disabled:{label:"Disabled"}};assert.match(evasionBlocked(f.actor),/Cyberleg/);
+ leg.flags[M].itemMarkers={disabled:{label:"Disabled"}};assert.equal(evasionBlocked(f.actor),undefined);
  leg.system.type="cyberArm";assert.equal(evasionBlocked(f.actor),undefined);leg.system.type="cyberLeg";leg.system.isFoundational=false;assert.equal(evasionBlocked(f.actor),undefined);
 });
 test("threshold is strictly over 4; one owner-private card per turn, no automatic damage",async()=>{

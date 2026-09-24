@@ -1,3 +1,4 @@
+import {resolveEncounter} from "../encounter.js";
 import {createEmp} from "../emp.js";
 import {applyQuickhackCondition} from "./conditions.js";
 import { requireCombatSocket } from "../socket-health.js";
@@ -60,10 +61,10 @@ export async function resolveEffect(messageId: string, requesterId: string) {
     let key = "Effect.Summary." + hack.id;
     const details: Record<string, string | number> = { target: escapeHTML(target.name) };
     if(hack.id==="short-circuit"||hack.id==="cyberware-malfunction") {
-      const request = await createEmp(target,{source:hack.id,sourceActor:source.uuid,origin:message.uuid??message.id!,seconds:60,count:hack.id==="short-circuit"?3:1,chooser:hack.id==="short-circuit"?"gm":"player",mode:"equal",policy:{foundational:true,cascade:hack.id==="cyberware-malfunction",electronics:false,immune:[]}});
+      const request = await createEmp(target,{source:hack.id,sourceActor:source.uuid,origin:message.uuid??message.id!,seconds:60,count:hack.id==="short-circuit"?3:1,chooser:hack.id==="short-circuit"?"gm":"player",mode:"equal",policy:{foundational:true,cascade:hack.id==="cyberware-malfunction",electronics:false,immune:[]}},result);
       if (!request) {await effectSummary(message, "No eligible cyberware to disable.");return;}
     }
-    const amount=await applyQuickhackCondition(target,hack.id,message.blind?"blindroll":message.whisper.length?"gmroll":"roll");
+    const amount=await applyQuickhackCondition(target,hack.id,message.blind?"blindroll":message.whisper.length?"gmroll":"roll",resolveEncounter(result));
     if(amount!==undefined)details.amount=amount;
     await effectSummary(message, label(key, details));
   } catch (error) {
