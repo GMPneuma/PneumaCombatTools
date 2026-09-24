@@ -1,12 +1,16 @@
 # Combat Tools feature inventory
 
+## Settings defaults (0.8.3)
+
+Biomon defaults to top-left and Crew Tools integration defaults on, with standalone fallback when unavailable. Saved client preferences are preserved. The Homebrew settings button reserves its full label width beside the evasion dropdown.
+
 ## Encounter consistency (0.8.2)
 
 Damage-applied conditions without timers now carry encounter cleanup ownership. End/reset removes only newly activated conditions from that encounter, including incendiary fire and sleep Prone. Existing conditions, critical injuries and Dead remain.
 
 Active scene encounter selection is shared across attacks, grapples, QuickHack, movement, EMP and effect durations. Saved actions retain their original encounter across tracker/scene changes; ambiguous encounters and reset contexts fail clearly. Clean-environment implementation; no new card migration. See [encounter selection](docs/encounters.md).
 
-Current source: release 0.8.2, reviewed 2026-09-24. “Implemented” means present in source and covered to varying degrees by automated checks; it does not imply live multiplayer certification. Historical drafts are in [the archive](docs/history/pre-0.8.0-refresh/IMPLEMENTED_FEATURES.md).
+Current source: release 0.8.3, reviewed 2026-09-24. “Implemented” means present in source and covered to varying degrees by automated checks; it does not imply live multiplayer certification. Historical drafts are in [the archive](docs/history/pre-0.8.0-refresh/IMPLEMENTED_FEATURES.md).
 
 ## Combat and damage
 

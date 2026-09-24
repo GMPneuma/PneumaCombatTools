@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.3 - 2026-09-24
+
+- Fix the compressed Homebrew settings button. Default Biomon to top-left and enable Crew Tools integration by default while retaining saved preferences and standalone fallback.
+
 ## 0.8.2 - 2026-09-24
 
 - Keep area-placement instructions visible until placement/cancel and preserve the preview color.

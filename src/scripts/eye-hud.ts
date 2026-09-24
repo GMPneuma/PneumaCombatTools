@@ -661,8 +661,8 @@ export function registerEyeHUD() {
   const module = game.modules!.get(MODULE) as unknown as {api?: Record<string, unknown>};
   module.api = {...module.api, getNeuralIntrusionActor: neuralIntrusionActor};
   const crewActive = !!game.modules?.get("pneuma-crewtools")?.active;
-  game.settings!.register(MODULE, "crewHUDIntegration", { name: "Integrate with Pneuma’s Crew Tools HUD", hint: "Minimize Biomon into Crew Tools’ HUD. Falls back to the normal control when that HUD is unavailable.", scope: "client", config: crewActive, type: Boolean, default: false, onChange: schedule });
-  game.settings!.register(MODULE, "eyeHUDDock", { name: "Biomon position", hint: "Choose the top-left or top-right position. Top left sits diagonally below Crew Tools when its HUD is visible, otherwise below navigation and beside canvas tools. Integration does not change placement. Combat bar Top right overrides this choice to Top left until that dock is changed.", scope: "client", config: true, type: String, choices: { right: "Top right", left: "Top left" }, default: "right", onChange: schedule });
+  game.settings!.register(MODULE, "crewHUDIntegration", { name: "Integrate with Pneuma’s Crew Tools HUD", hint: "Minimize Biomon into Crew Tools’ HUD. Falls back to the normal control when that HUD is unavailable.", scope: "client", config: crewActive, type: Boolean, default: true, onChange: schedule });
+  game.settings!.register(MODULE, "eyeHUDDock", { name: "Biomon position", hint: "Choose the top-left or top-right position. Top left sits diagonally below Crew Tools when its HUD is visible, otherwise below navigation and beside canvas tools. Integration does not change placement. Combat bar Top right overrides this choice to Top left until that dock is changed.", scope: "client", config: true, type: String, choices: { right: "Top right", left: "Top left" }, default: "left", onChange: schedule });
   Hooks.once("ready", () => {
     const entry = game.modules?.get("pneuma-crewtools");
     const api = (entry as unknown as { api?: { hudShortcuts?: CrewShortcutAPI } } | undefined)?.api?.hudShortcuts;

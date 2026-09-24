@@ -31,8 +31,8 @@ Module Settings groups: Attack & Damage Cards; Evasion & Area Attacks; Movement 
 | `npcAutoEvasion` | Automatic NPC evasion (RAW only) | world | false | [evasion-settings.ts:115](../src/scripts/evasion-settings.ts) |
 | `evasionEligibility` | Ranged Evasion | world | raw | [evasion-settings.ts:116](../src/scripts/evasion-settings.ts) |
 | `configureEvasion` | Configure homebrew | GM menu | Homebrew | [evasion-settings.ts:126](../src/scripts/evasion-settings.ts) |
-| `crewHUDIntegration` | Integrate with Pneuma’s Crew Tools HUD | client | false | [eye-hud.ts:663](../src/scripts/eye-hud.ts) |
-| `eyeHUDDock` | Biomon position | client | right | [eye-hud.ts:664](../src/scripts/eye-hud.ts) |
+| `crewHUDIntegration` | Integrate with Pneuma’s Crew Tools HUD | client | true | [eye-hud.ts:663](../src/scripts/eye-hud.ts) |
+| `eyeHUDDock` | Biomon position | client | left | [eye-hud.ts:664](../src/scripts/eye-hud.ts) |
 | `biomonitorShowHP` | Show Biomonitor HP numbers | client | true | [eye-hud.ts:674](../src/scripts/eye-hud.ts) |
 | `forcePlayerHUDAnimations` | Force animated HUD messages for players | world | false | [eye-hud.ts:675](../src/scripts/eye-hud.ts) |
 | `eyeHUDAnimateMessages` | Animate HUD messages and effect icons | client | true | [eye-hud.ts:677](../src/scripts/eye-hud.ts) |

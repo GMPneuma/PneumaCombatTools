@@ -916,7 +916,8 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 /* Native submenu actions reserve their text width rather than wrapping into tall buttons. */
 .pneuma-combat-settings button[data-key] { display: inline-flex; align-items: center; justify-content: center; gap: 5px; width: auto; min-width: 180px; height: 28px; margin: 0; padding: 0 8px; white-space: nowrap; line-height: normal; }
 .pneuma-combat-settings button[data-key] i { flex: 0 0 auto; margin: 0; }
-.pneuma-combat-settings .pneuma-evasion-controls > button[data-key] { min-width: 0; }
+.pneuma-combat-settings .pneuma-evasion-controls > button[data-key] { flex: 0 0 auto; min-width: max-content; width: max-content; }
+.pneuma-combat-settings .pneuma-evasion-controls > select { flex: 1 1 auto; min-width: 80px; width: auto; }
 
 
 /* Audio-style neural connector shares the indicator and arrival-animation color. */

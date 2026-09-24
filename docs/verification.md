@@ -1,6 +1,6 @@
 # Verification and maintenance
 
-Release: Combat Tools 0.8.2, reviewed 2026-09-24. Includes consistent encounter ownership, damage-status cleanup, injury/EMP corrections and persistent area-placement instructions.
+Release: Combat Tools 0.8.3, reviewed 2026-09-24. Includes consistent encounter ownership, damage-status cleanup, injury/EMP corrections and persistent area-placement instructions.
 
 ## Evidence levels
 
@@ -48,3 +48,7 @@ Fixed newly damage-applied statuses without durations being skipped at encounter
 ## 0.8.2 release validation
 
 Final 0.8.2 typecheck/build and automated suite passed: 352 passed, four optional native-Foundry fixtures skipped, zero failures. AoE, QuickHack, combat-bar and damage-flow browser suites passed against the release build. The AoE placement instruction screenshot was inspected. These fixtures do not establish live multiplayer behavior.
+
+## 0.8.3 release validation
+
+Typecheck/build passed; 352 automated tests passed, four optional native-Foundry fixtures skipped. Settings browser regression passed at three widths, including button click, readable dropdown, Crew integration defaults with/without availability, and preservation of saved preferences. Live Foundry verification remains separate.
