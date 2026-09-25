@@ -1,4 +1,5 @@
 import { areaKind } from "./aoe/weapon.js";
+import { gunAmmo, ammoBlocks } from "./weapon-ammo.js";
 import { grappleWeaponBlocked } from "./grapple/state.js";
 import { improvisedSource, thrownRollItem } from "./thrown-weapons.js";
 import { isQuickhackLauncher } from "./quickhack/availability.js";
@@ -22,6 +23,7 @@ export function attackEntries(items: MenuWeapon[]) {
       category: ["unarmed", "martialArts"].includes(item.system.weaponType ?? "") ? "brawling"
         : (item.system.weaponType ?? "").toLowerCase().includes("melee") ? "melee" : "attack",
       deferred: false, area: !!areaKind(item,"attack"),
+      gunAmmo: !!gunAmmo(item),
       brawling: ["unarmed", "martialArts"].includes(item.system.weaponType ?? ""),
       autofire: !!item.system.isRanged && (!!item.system.fireModes?.suppressiveFire
         || ["smg", "heavySmg", "assaultRifle"].includes(item.system.weaponType ?? "")),
@@ -49,6 +51,7 @@ export async function attackFromHUD(attacker: Token, target: Token, itemId: stri
     {id:"__improvised",category:"thrown",autofire:false,deferred:false}].find(row => row.id === itemId);
   if ((!item && !grenadeEntries(items).some(row=>row.id===itemId)) || (["autofire","suppressive"].includes(mode) && !item?.autofire)) return;
   const originalItem = items.find(entry => entry.id === itemId);
+  if (originalItem && ammoBlocks(originalItem, mode)) return;
   if (originalItem && item?.category !== "thrown" && grappleWeaponBlocked(actor, originalItem))
     throw new Error("Grappled characters cannot use weapons requiring two hands.");
   const nativeItem = originalItem;

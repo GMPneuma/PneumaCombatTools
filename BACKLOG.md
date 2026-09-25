@@ -85,3 +85,9 @@ Disablement audit fixes: active native leg-injury modifiers (including renamed n
 Approved target-aware bow ammunition prompt, native loading and remembered attached ammo selection implemented with regression coverage. No separate Fire last type button. Covers native bow/crossbow weapon type. Live verification pending.
 
 - EMP settings streamlined: grouped selection controls, collapsible protection and frame options (open when configured), and conditional numeric fields. Existing behavior and saved values retained.
+
+## Weapon ammunition controls — included in 0.8.5
+
+Combat-only player reload/ammo-change chat reporting implemented through native CPR methods, including sheet and CTH actions. GM world toggle enabled by default; bows and characters without player owners excluded; GM actions for player-owned characters included. Cancelled/no-op actions remain silent and nested reloads do not duplicate messages. Live verification pending.
+
+Approved targeted-weapon reload UI: disable Autofire/Suppressive below 10 rounds; empty guns replace attack icons with native Reload/Change Ammo icons and disable attacks; right-click weapon names toggles these icon sets in the same row on loaded guns. This supersedes the extra row of text buttons. Preserve bow loading. Exotic burst costs defer to core support. Automated and rendered fixture verification do not establish live multiplayer verification.

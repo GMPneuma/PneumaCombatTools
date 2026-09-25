@@ -1,5 +1,9 @@
 # Combat Tools chat-card styling contract
 
+Ammunition notices use native ChatMessage rendering with a single plain `<p>`: `Character reloads Weapon` or `Character changes ammo in Weapon`. Character and weapon names are HTML-escaped. No custom card root, buttons, styling, or state selectors are added. Visibility is ordinary public chat, limited to successful gun actions for player-owned characters in combat (including actions performed by the GM) when the GM's world setting is enabled; bows are excluded.
+
+Targeted weapon HUD ammunition controls (outside chat scope): `#token-hud .pneuma-combat-menu [data-weapon-ammo]` retains existing weapon names and mode buttons. `.combat-ammo-menu` occupies icon columns 2–4 on row 1, replacing the three attack-mode icons with two 24px native icon buttons `[data-ammo-action="reload"]` and `[data-ammo-action="change"]`. `[hidden]` swaps attack-mode and ammo buttons on right-click or Shift+F10; empty guns always show ammo buttons. Reload uses a circular arrow; Change Ammo uses opposing arrows. Both have titles and accessible labels. The row height and weapon-name width remain unchanged. Attack buttons use `aria-disabled="true"` and mode buttons additionally use native `disabled`; weapon names remain focusable for the context action. No existing selectors are removed.
+
 Current implementation: 0.8.0, reviewed 2026-09-23. This contract covers emitted selectors and visible state, not permissions or mechanics. It replaces the accumulated design notes in [the archive](history/pre-0.8.0-refresh/chat-card-styling.md). No runtime selectors are changed by this documentation refresh.
 
 ## Scope and visibility

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.5 - 2026-09-25
+
+- Right-click a gun name in the targeted combat HUD to swap attack-mode icons for native Reload and Change Ammo controls. Empty guns show ammunition controls automatically; loaded guns can toggle back to attack icons.
+- Disable Autofire and Suppressive Fire below 10 rounds and prevent empty-gun attacks. Preserve the existing bow loading workflow.
+- Add the GM world setting **Report player weapon reloads**, enabled by default. During active combat, successful reloads and ammunition changes for player-owned characters post a plain chat message, including when the GM performs the action.
+- Observe native CPR reload/load methods so character-sheet, CTH and native-method macro actions are covered. Exclude bows, characters without player owners, cancelled/no-op actions and manual ammo edits; nested ammo-change/reload calls report once.
+
+Validation: production build, automated regressions and targeted browser fixture. Live Foundry multiplayer verification remains pending.
+
 ## 0.8.4 - 2026-09-24
 
 - Fix grapple chat rendering before the full record is saved, preventing missing-token errors.

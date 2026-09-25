@@ -15,6 +15,7 @@ export interface EquipmentItem {
     weaponType?: string;
     variety?: string;
     amount?: number;
+    magazine?: { value: number; max: number };
     fireModes?: { suppressiveFire?: boolean };
     upgrades?: { _id: string }[];
   };

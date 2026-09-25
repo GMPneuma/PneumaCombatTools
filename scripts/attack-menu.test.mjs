@@ -30,6 +30,17 @@ function setup(handler) {
  globalThis.canvas={tokens:new Map([[attacker.id,attacker],[target.id,target]])};
  return {actor,sheet,attacker,target};
 }
+test("rechecks current magazine before routing stale HUD attacks",async()=>{
+ let calls=0;const f=setup(async()=>{calls++;});
+ f.actor.items[0].system.magazine={value:9,max:30};
+ await attackFromHUD(f.attacker,f.target,"SMG","autofire",{});
+ await attackFromHUD(f.attacker,f.target,"SMG","suppressive",{});
+ assert.equal(calls,0);
+ await attackFromHUD(f.attacker,f.target,"SMG","attack",{});assert.equal(calls,1);
+ f.actor.items[0].system.magazine.value=0;
+ await attackFromHUD(f.attacker,f.target,"SMG","attack",{});
+ await attackFromHUD(f.attacker,f.target,"SMG","aimed",{});assert.equal(calls,1);
+});
 test("combat exchange receives exact tokens, item, mode and event despite legacy false setting",async()=>{
  const event={currentTarget:{dataset:{itemId:"SMG"}},ctrlKey:true};
  for(const mode of ["attack","aimed","autofire"]){

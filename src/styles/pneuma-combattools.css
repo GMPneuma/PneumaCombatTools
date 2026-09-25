@@ -118,6 +118,9 @@
   display: flex; align-items: center; justify-content: center;
   box-sizing: border-box; width: 24px; height: 28px; padding: 0; line-height: 1;
 }
+#token-hud .pneuma-combat-menu button[aria-disabled="true"] { opacity: 0.4; cursor: default; }
+#token-hud .pneuma-combat-menu .combat-ammo-menu:not([hidden]) { grid-column: 2 / -1; grid-row: 1; display: flex; gap: 6px; }
+#token-hud .pneuma-combat-menu .combat-weapon-mode[hidden] { display: none; }
 #token-hud .combat-weapon-mode > i {
   display: flex; align-items: center; justify-content: center;
   width: 22px; height: 22px; margin: 0; font-size: 18px; line-height: 1;

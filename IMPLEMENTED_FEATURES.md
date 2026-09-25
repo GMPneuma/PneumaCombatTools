@@ -1,5 +1,11 @@
 # Combat Tools feature inventory
 
+## Weapon ammunition controls (0.8.5)
+
+The GM world setting **Report player weapon reloads** (on by default, under Attack & Damage Cards) reports successful player-owned character gun reloads and ammunition changes during the acting character's active scene encounter. Plain chat text uses the character's name and weapon name, including when the GM performs the action. Eligibility uses native actor.hasPlayerOwner. Native sheet, CTH and macro calls to CPR's reload/load methods are covered; bows, characters without player owners, cancelled/no-op actions and manual ammunition edits are excluded. Nested ammo-change/reload calls produce one message. Automated coverage is not live Foundry verification.
+
+Targeted weapon rows disable Autofire and Suppressive Fire below 10 rounds, and all gun attacks when empty. Empty guns automatically replace the three attack-mode icons with Reload (circular arrow) and Change Ammo (opposing arrows) in the same row. Right-click the weapon name (or Shift+F10) toggles these icon sets on loaded guns; finishing an ammo action restores attack icons if ammunition is loaded. Reload uses CPR's native reload, Change Ammo uses its native selector, and full magazines or depleted selected-ammo reserves disable Reload with an explanation. Item updates refresh ammunition availability. Reloading does not start an attack. Bows retain their existing loading workflow; exotic burst costs remain deferred to the core system.
+
 Cover Up clarification (0.8.4): explicitly a no-roll alternative to Evasion, available without evasion eligibility. Settings separate its effects from Evasion roll rules; behavior is unchanged.
 
 ## Area targeting (0.8.4)

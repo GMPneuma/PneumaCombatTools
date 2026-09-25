@@ -40,7 +40,7 @@
   <div class="combat-weapons" hidden>
     <ul>
       {{#each weapons}}
-      <li data-attack-category="{{category}}">
+      <li data-attack-category="{{category}}" {{#if gunAmmo}}data-weapon-ammo="{{id}}"{{/if}}>
         <button type="button" {{#if deferred}}disabled{{/if}} class="combat-weapon-name" data-item-id="{{id}}" data-roll-type="attack" data-attack-mode="attack" title="{{localize 'PNEUMA_COMBAT_TOOLS.AttackAction'}}: {{name}}">
           {{#if img}}<img src="{{img}}" alt="" width="24" height="24">{{/if}}<span>{{name}}</span>
         </button>
@@ -50,6 +50,12 @@
         <button type="button" class="combat-weapon-mode pneuma-suppressive" data-item-id="{{id}}" data-attack-mode="suppressive" title="Suppressive Fire: {{name}}" aria-label="Suppressive Fire: {{name}}"><i class="fas fa-bars-staggered" aria-hidden="true"></i></button>
         {{/if}}
         {{/unless}}
+        {{#if gunAmmo}}
+        <div class="combat-ammo-menu" hidden role="group" aria-label="Ammunition controls">
+          <button type="button" class="combat-weapon-mode" data-ammo-action="reload" title="Reload current ammunition" aria-label="Reload"><i class="fas fa-rotate-right" aria-hidden="true"></i></button>
+          <button type="button" class="combat-weapon-mode" data-ammo-action="change" title="Change ammunition" aria-label="Change Ammo"><i class="fas fa-exchange-alt" aria-hidden="true"></i></button>
+        </div>
+        {{/if}}
       </li>
       {{/each}}
       {{#each grappleActions}}

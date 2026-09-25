@@ -10,6 +10,8 @@ import {registerInstantEffects} from "./instant-effects.js";
 import { registerSelfCTH, isSelfCTH, selfInitiativeControl, rerollSelfInitiative } from "./self-cth.js";
 import { registerHoverEKG } from "./ekg-hover.js";
 import { registerMovement } from "./movement.js";
+import { bindWeaponAmmo, refreshWeaponAmmo } from "./weapon-ammo.js";
+import { registerAmmoChat } from "./ammo-chat.js";
 import { registerEmp } from "./emp.js";
 import { registerAreaAttacks } from "./aoe/workflow.js";
 import { registerSocketHealth } from "./socket-health.js";
@@ -57,6 +59,7 @@ const selectedAttacker = () => {
 Hooks.once("init", () => {
   if (game.system!.id !== "cyberpunk-red-core") return;
   registerSocketHealth();
+  registerAmmoChat();
   registerManualRolls();
   registerHalfArmor();
   registerChatButtons();
@@ -266,6 +269,7 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
     return;
   }
   const attacker = selection?.target === token ? selection.attacker : selectedAttacker();
+  if (attacker?.actor && html[0]) bindWeaponAmmo(html[0], attacker.actor);
   if (attacker?.actor && html[0]) decorateItemList(html[0], attacker.actor);
   html.find<HTMLButtonElement>("[data-grapple-action]").on("click", async event => {
     event.preventDefault(); event.stopPropagation();
@@ -297,6 +301,7 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
     event.stopPropagation();
     if (!attacker) return ui.notifications!.warn(label("SelectAttacker"));
     const button = event.currentTarget;
+    if (button.disabled || button.getAttribute("aria-disabled") === "true") return;
     try {
       await attackFromHUD(attacker, token, button.dataset.itemId!, button.dataset.attackMode as AttackMode, event);
     } catch (error) {
@@ -332,6 +337,13 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
 
 Hooks.on("canvasTearDown", () => {
   selection = undefined;
+});
+
+for (const hook of ["createItem", "updateItem", "deleteItem"]) Hooks.on(hook, (item: Item) => {
+  const hud = canvas.tokens?.hud, token = hud?.object;
+  const attacker = selection?.target === token ? selection?.attacker : selectedAttacker();
+  if (attacker?.actor && item.parent?.uuid === attacker.actor.uuid && hud?.element[0])
+    refreshWeaponAmmo(hud.element[0], attacker.actor);
 });
 
 // Reposition only the open HUD; no token redraws or canvas-wide work on zoom.

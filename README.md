@@ -1,6 +1,6 @@
 # Pneuma's Combat Tools
 
-Combat workflows for **Foundry VTT v12** and **Cyberpunk RED Core**. Current release: **0.8.4**. Requires **libWrapper** and an active GM for coordinated workflows.
+Combat workflows for **Foundry VTT v12** and **Cyberpunk RED Core**. Current release: **0.8.5**. Requires **libWrapper** and an active GM for coordinated workflows.
 
 ## Features
 
@@ -41,7 +41,7 @@ pnpm check
 pnpm build
 ```
 
-Package the contents of `dist/` at the ZIP root. The build does not create the ZIP. Browser fixtures require Playwright and, for some tests, local jQuery, Handlebars or PIXI paths; see [verification](docs/verification.md).
+Package the contents of `dist/` at the ZIP root. The build does not create the release ZIP. Browser fixtures require Playwright and, for some tests, local jQuery, Handlebars or PIXI paths; see [verification](docs/verification.md).
 
 Release validation includes the production build, automated regressions, and targeted browser fixtures. Live multiplayer verification remains separate.
 

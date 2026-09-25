@@ -2,7 +2,7 @@ const MODULE = "pneuma-combattools";
 export const COMBAT_BAR_SETTING_KEYS = ["combatBar", "combatBarDock", "combatBarSize", "combatBarOrientation", "combatBarNameOnly", "combatBarDefaultMovement"] as const;
 /** Order existing native rows; settings remain registered under their original keys/scopes. */
 const groups = [
-  { id: "combat", title: "Attack & Damage Cards", keys: ["hideAttackWeapon", "showArmorControls", "maNoAblation"] },
+  { id: "combat", title: "Attack & Damage Cards", keys: ["hideAttackWeapon", "showArmorControls", "maNoAblation", "reportWeaponReloads"] },
   { id: "evasion", title: "Evasion & Area Attacks", keys: ["evasionEligibility", "configureEvasion", "npcAutoEvasion", "areaSettingsMenu"] },
   { id: "movement", title: "Movement & Initiative", keys: ["movementTracking", "pneumaHomebrew"] },
   { id: "injuries", title: "Injuries & Effects", keys: ["criticalInjuries", "injuryTurnEndReminder", "empBehaviorMenu", "customStatusesMenu"] },
