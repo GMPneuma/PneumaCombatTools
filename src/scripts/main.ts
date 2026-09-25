@@ -12,6 +12,7 @@ import { registerHoverEKG } from "./ekg-hover.js";
 import { registerMovement } from "./movement.js";
 import { bindWeaponAmmo, refreshWeaponAmmo } from "./weapon-ammo.js";
 import { registerAmmoChat } from "./ammo-chat.js";
+import { DEFAULT_ICON_COLOR, installIconColorNormalization } from "./icon-color.js";
 import { registerEmp } from "./emp.js";
 import { registerAreaAttacks } from "./aoe/workflow.js";
 import { registerSocketHealth } from "./socket-health.js";
@@ -101,12 +102,13 @@ Hooks.once("init", () => {
   });
   game.settings!.register(MODULE_ID, "iconColor", {
     name: "PNEUMA_COMBAT_TOOLS.IconColorName", hint: "PNEUMA_COMBAT_TOOLS.IconColorHint",
-    scope: "world", config: true, default: null,
+    scope: "world", config: true, default: DEFAULT_ICON_COLOR,
     // Foundry v12 accepts DataField instances; the pinned settings typings omit this overload.
     // @ts-expect-error Native ColorField provides validation and the settings color picker.
     type: new foundry.data.fields.ColorField(),
     onChange: refreshHUDPosition,
   });
+  Hooks.once("setup", () => installIconColorNormalization(game.settings!));
   for (const key of ["hudScale", "statusIconScale"] as const) {
     game.settings!.register(MODULE_ID, key, {
       name: `PNEUMA_COMBAT_TOOLS.${key}Name`, hint: `PNEUMA_COMBAT_TOOLS.${key}Hint`,
@@ -173,7 +175,7 @@ Hooks.once("init", () => {
       this.element.css({
         width: 100, height: 100, left: anchor.x - 50 * scale, top: anchor.y - 50 * scale,
         transform: `scale(${scale})`,
-        "--pneuma-cth-icon-color": game.settings!.get(MODULE_ID, "iconColor") || "#ffffff",
+        "--pneuma-cth-icon-color": game.settings!.get(MODULE_ID, "iconColor") || DEFAULT_ICON_COLOR,
         "--pneuma-status-icon-size": `${36 * game.settings!.get(MODULE_ID, "statusIconScale")}px`,
       }).removeClass("large").addClass("pneuma-readable-hud")
         .toggleClass("pneuma-tight-hud", game.settings!.get(MODULE_ID, "tightHUD"));

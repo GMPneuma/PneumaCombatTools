@@ -1,5 +1,9 @@
 # Combat Tools roadmap and backlog
 
+## Blank icon color — included in 0.8.6
+
+Address the GM settings-save validation failure: normalize blank icon color to amber (`#ffc36a`) before native validation and use an amber default for both the picker and HUD, including existing null values, without overwriting chosen colors. Preserve existing valid colors and other settings. Automated regression coverage passes; live verification pending.
+
 ## Authorized encounter consistency — included in 0.8.4, 2026-09-24
 
 Use one active, started encounter per action scene; require participating tokens; retain the selected encounter through responses, movement and effects; reject ambiguous selection and invalidated actions. Clean environment assumed. Shared lookup and regression coverage implemented; live multiplayer verification remains open. See [encounter selection](docs/encounters.md).

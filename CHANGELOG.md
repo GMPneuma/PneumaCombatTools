@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.6 - 2026-09-25
+
+- Default the HUD icon color to amber (`#ffc36a`) and normalize cleared color values before native validation, preventing blank color input from interrupting GM settings saves.
+
 ## 0.8.5 - 2026-09-25
 
 - Right-click a gun name in the targeted combat HUD to swap attack-mode icons for native Reload and Change Ammo controls. Empty guns show ammunition controls automatically; loaded guns can toggle back to attack icons.

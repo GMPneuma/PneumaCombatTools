@@ -1,5 +1,9 @@
 # Combat Tools feature inventory
 
+## Blank icon color save fix (0.8.6)
+
+The world icon-color setting defaults to amber (`#ffc36a`). Saving null, empty or whitespace-only values normalizes to `#ffc36a` before Foundry v12 validates the ColorField, preventing a cleared color textbox from interrupting the GM's settings save. Valid custom colors and unrelated settings retain native behavior. Regression tests cover normalization and subsequent Autofire/HP preference saves; live Foundry confirmation remains pending.
+
 ## Weapon ammunition controls (0.8.5)
 
 The GM world setting **Report player weapon reloads** (on by default, under Attack & Damage Cards) reports successful player-owned character gun reloads and ammunition changes during the acting character's active scene encounter. Plain chat text uses the character's name and weapon name, including when the GM performs the action. Eligibility uses native actor.hasPlayerOwner. Native sheet, CTH and macro calls to CPR's reload/load methods are covered; bows, characters without player owners, cancelled/no-op actions and manual ammunition edits are excluded. Nested ammo-change/reload calls produce one message. Automated coverage is not live Foundry verification.
