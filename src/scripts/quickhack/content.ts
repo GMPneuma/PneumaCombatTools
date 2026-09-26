@@ -1,3 +1,4 @@
+import { primaryGM as electedGM } from "../shared.js";
 import { MODULE, quickhackId, isQuickhackLauncher, type QuickhackItem } from "./availability.js";
 import { QUICKHACKS, type Quickhack } from "./catalog.js";
 import { enabled, label } from "./settings.js";
@@ -13,8 +14,7 @@ export function programData(hack: Quickhack) {
     flags: { [String(MODULE)]: { quickhackId: hack.id } },
   };
 }
-export const primaryGM = () => game.users!.filter(user => user.active && user.isGM)
-  .sort((a, b) => a.id.localeCompare(b.id))[0]?.id === game.user!.id;
+export const primaryGM = () => electedGM()?.id === game.user!.id;
 
 let initialization: Promise<void> | undefined;
 export function initializeQuickhackContent(): Promise<void> {

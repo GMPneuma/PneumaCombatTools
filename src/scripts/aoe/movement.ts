@@ -1,3 +1,4 @@
+import { primaryGM as electedGM } from "../shared.js";
 import {tokenEncounter,displayedEncounter,encounterRef,type EncounterRef,resolveEncounter} from "../encounter.js";
 import {areaSettings,MODULE} from "./settings.js";
 import type {Point} from "./geometry.js";
@@ -5,7 +6,7 @@ interface Movement {turn:string;spent:number;debt:number;escape?:{id:string;cost
 const key="aoeMovement";
 let queue:Promise<unknown>=Promise.resolve();
 export function movementWork<T>(work:()=>Promise<T>):Promise<T>{const next=queue.catch(()=>{}).then(work);queue=next;return next;}
-const authority=()=>game.users?.filter(u=>u.active&&u.isGM).sort((a,b)=>a.id.localeCompare(b.id))[0]?.id===game.user?.id;
+const authority=()=>electedGM()?.id===game.user?.id;
 export function movementEntry(token:TokenDocument, combat:Combat|null|undefined=tokenEncounter(token.parent?.id,[token.uuid])) {
   if(!combat?.started)return;
   const participant=combat.combatants.find(c=>c.token?.uuid===token.uuid);

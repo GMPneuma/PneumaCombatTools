@@ -1,3 +1,4 @@
+import { primaryGM as electedGM } from "./shared.js";
 import { masterStatuses, type StatusDefinition } from "./status-catalog.js";
 import { groupStatusHUD } from "./status-hud.js";
 import { registerStatusSync } from "./status-sync.js";
@@ -83,7 +84,7 @@ export function registerCyberpunkStatuses(): void {
     icon: "fas fa-list", type: CustomStatusForm, restricted: true,
   });
   Hooks.once("ready", async () => {
-    const gm = game.users?.filter(user => user.active && user.isGM).sort((a,b) => a.id!.localeCompare(b.id!))[0];
+    const gm = electedGM();
     if (gm?.id === game.user?.id && game.settings!.get(MODULE, "customStatuses") === null)
       await game.settings!.set(MODULE, "customStatuses", customStatuses());
     installStatusList();

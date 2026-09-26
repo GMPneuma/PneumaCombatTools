@@ -1,3 +1,4 @@
+import { primaryGM as electedGM } from "./shared.js";
 const M="pneuma-combattools";
 interface Expiry {combat:string;combatant:string;round:number}
 /** The current turn does not count as the next turn if suppression lands mid-turn. */
@@ -8,7 +9,7 @@ export function suppressionExpiry(combat:Combat|undefined,token:string):Expiry|u
   return {combat:combat.id!,combatant:combat.turns[index]!.id!,round:Number(combat.round)+(index>Number(combat.turn)?0:1)};
 }
 export async function expireSuppression(){
-  const gm=game.users?.filter(u=>u.active&&u.isGM).sort((a,b)=>a.id.localeCompare(b.id))[0];
+  const gm=electedGM();
   if(!gm||gm.id!==game.user?.id)return;
   const actors=new Map<string,Actor>();
   for(const actor of game.actors??[])actors.set(actor.uuid,actor);

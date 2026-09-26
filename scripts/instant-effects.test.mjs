@@ -202,3 +202,35 @@ test('damage cleanup disables native drug effects without deleting inventory or 
  assert.equal(get(injury,'flags.pneuma-combattools.endWithCombat'),undefined);
  await finishTimedEffects(c);assert.equal(native.disabled,true);assert.equal(f.actor.items.size,2);assert.equal(f.actor.effects.some(e=>e.statuses.has(stim.id)),false);
 });
+
+test('temporary eye and ear statuses appear in the affected Biomonitor and clear at combat end',async()=>{
+ const {collectHUDConditions}=await import('../dist/scripts/hud-conditions.js');
+ for(const names of [['Damaged Eye'],['Damaged Eye','Damaged Ear'],['Damaged Ear']]){
+  const f=setup(),c={id:'temporary',started:true,round:1,turn:0,turns:[{},{}],combatants:[{actor:f.actor}]};game.combats.set(c.id,c);
+  f.actor.allApplicableEffects=function*(){yield* this.effects;};
+  await f.actor.createEmbeddedDocuments('Item',[{name:'Broken Arm',type:'criticalInjury'}]);
+  for(const name of names)await temporaryInjury(f.actor,name,c);
+  for(const name of names){const status=masterStatuses.find(s=>s.name===name);assert(f.actor.effects.some(e=>e.statuses.has(status.id)));assert(collectHUDConditions(f.actor).medical.some(r=>r.title===name));}
+  await finishTimedEffects({id:'another',combatants:[{actor:f.actor}]});assert.equal(f.actor.items.size,names.length+1);
+  await finishTimedEffects(c);assert.deepEqual([...f.actor.items].map(i=>i.name),['Broken Arm']);
+  for(const name of names)assert(!collectHUDConditions(f.actor).medical.some(r=>r.title===name));
+ }
+});
+test('permanent eye injury remains permanent after tear gas and combat cleanup',async()=>{
+ const f=setup(),c={id:'temporary',started:true,round:1,turn:0,combatants:[{actor:f.actor}]};
+ await f.actor.createEmbeddedDocuments('Item',[{name:'Damaged Eye',type:'criticalInjury'}]);
+ await temporaryInjury(f.actor,'Damaged Eye',c);const id=masterStatuses.find(s=>s.name==='Damaged Eye').id;
+ assert(f.actor.effects.some(e=>e.statuses.has(id)));await finishTimedEffects(c);assert.equal(f.actor.items.size,1);assert(f.actor.effects.some(e=>e.statuses.has(id)));
+});
+
+test('wake and extinguish reject stale followups and never reapply conditions',async()=>{
+ const {hasInstantCondition}=await import('../dist/scripts/instant-lifetime.js');
+ for(const [id,kind,action] of [['sleep','sleep','wake'],['incendiary','fire','extinguish']]){
+  const f=setup(),s={...newInstant(id,f.actor.uuid,'Target'),state:'applied'};
+  await assert.rejects(handleInstant(s,{action},f.owner,f.save),/no longer active/);
+  if(kind==='sleep')await sleepTarget(f.actor,null);else await igniteTarget(f.actor,null);
+  assert(hasInstantCondition(f.actor,kind));await handleInstant(s,{action},f.owner,f.save);
+  assert(!hasInstantCondition(f.actor,kind));assert.equal(s.state,'applied');
+  await assert.rejects(handleInstant(s,{action},f.owner,f.save),/no longer active/);
+ }
+});

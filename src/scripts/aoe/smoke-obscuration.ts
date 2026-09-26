@@ -26,7 +26,7 @@ export function lineCrossesSmokeCell(a:Point,b:Point,cell:number[]):boolean {
 export function attackCrossesSmoke(a:Point,b:Point,scene:Scene|null|undefined=canvas.scene):boolean {
   return !!scene?.templates.some(template=>{
     const smoke=foundry.utils.getProperty(template,"flags.pneuma-combattools.smoke") as SmokeArea|undefined;
-    if(!smoke||(smoke.duration?durationExpired(smoke.duration):smoke.expires<=game.time!.worldTime))return false;
+    if(template.hidden||!smoke||(smoke.duration?durationExpired(smoke.duration):smoke.expires<=game.time!.worldTime))return false;
     return smoke.cells.some(cell=>lineCrossesSmokeCell(a,b,cell));
   });
 }

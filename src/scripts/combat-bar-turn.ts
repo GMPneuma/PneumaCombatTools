@@ -1,8 +1,8 @@
+import { primaryGM as gm } from "./shared.js";
 import {requireCombatSocket} from "./socket-health.js";
 const channel = "module.pneuma-combattools";
 interface TurnRequest {barTurn: "request"; id: string; user: string; combat: string; round: number | null; turn: number | null; combatant: string}
 interface TurnResult {barTurn: "result"; id: string; user: string; gm: string; error?: string}
-const gm = () => game.users?.filter(user => user.active && user.isGM).sort((a,b) => a.id!.localeCompare(b.id!))[0];
 const pending = new Map<string,{gm: string; resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout>}>();
 let queue: Promise<unknown> = Promise.resolve();
 

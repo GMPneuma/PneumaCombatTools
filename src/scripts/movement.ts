@@ -1,3 +1,4 @@
+import { primaryGM as electedGM } from "./shared.js";
 import {recordStep,type MoveRecord,type MovePoint} from "./movement-rules.js";
 import {grappleFor} from "./grapple/state.js";
 import {movementEntry} from "./aoe/movement.js";
@@ -147,7 +148,7 @@ export function registerMovement(){
   Hooks.on("destroyToken",(token:Token)=>{queued.delete(token);clear(token);});
   Hooks.on("canvasTearDown",()=>{queued.clear();turns.clear();for(const token of displays.keys())clear(token);});
   Hooks.on("canvasReady",()=>refreshTurns(true));
-  Hooks.on("updateCombat",(combat:Combat,changes:Record<string,unknown>)=>{
+  Hooks.on("updateCombat",(_combat:Combat,changes:Record<string,unknown>)=>{
     if(["round","turn","active","scene"].some(key=>key in changes))refreshTurns();
   });
   Hooks.on("deleteCombat",()=>refreshTurns(true));
@@ -157,7 +158,7 @@ export function registerMovement(){
     const token=participant.token?.object;if(token)enqueue(token);
   });
   const clearCombat=(combat:Combat)=>{
-    const gm=game.users?.filter(user=>user.active&&user.isGM).sort((a,b)=>a.id!.localeCompare(b.id!))[0];
+    const gm=electedGM();
     if(gm?.id!==game.user?.id)return;
     for(const doc of combat.scene?.tokens??[])if((foundry.utils.getProperty(doc,flag) as MoveRecord|undefined)?.combat===combat.id)void doc.update({[flag]:null} as never).catch(error=>ui.notifications!.error(String(error)));
   };

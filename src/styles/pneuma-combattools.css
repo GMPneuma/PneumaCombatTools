@@ -391,7 +391,7 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 
 
 :is(#pneuma-eye-hud, .pneuma-hover-ekg) .pneuma-eye-ekg { cursor:pointer; }
-#pneuma-eye-hud .pneuma-eye-ekg.is-paused .pneuma-eye-trace path { animation-play-state:paused; }
+:is(#pneuma-eye-hud, .pneuma-hover-ekg) .pneuma-eye-ekg.is-paused .pneuma-eye-trace path { animation-play-state:paused; }
 
 #pneuma-eye-hud.is-minimized.has-mini-vitals { width:164px; }
 #pneuma-eye-hud .pneuma-eye-mini-vitals { width:110px; flex:0 0 110px; padding:0; border:0; }
@@ -961,3 +961,45 @@ i.pneuma-neural-plug::before { content: ""; display: inline-block; width: 1em; h
 #pneuma-turn-marker-settings fieldset { margin:10px 0; padding:8px; }
 #pneuma-turn-marker-settings .form-fields { min-width:0; }
 #pneuma-turn-marker-settings input[type="color"] { flex:0 0 32px; }
+
+/* One role treatment for every GM-only chat action and override. */
+:root {
+  --pneuma-chat-button-gm-background: var(--pneuma-chat-button-background);
+  --pneuma-chat-button-gm-color: #111111;
+  --pneuma-chat-button-gm-hover-background: #292929;
+  --pneuma-chat-button-gm-hover-color: #eeeeee;
+  --pneuma-chat-button-gm-border: #c43b3b;
+}
+.pneuma-chat-button.pneuma-chat-button[data-chat-role="gm"] {
+  --pct-button-bg: var(--pneuma-chat-button-gm-background);
+  --pct-button-ink: var(--pneuma-chat-button-gm-color);
+  --pct-button-border: var(--pneuma-chat-button-gm-border);
+}
+.pneuma-chat-button.pneuma-chat-button[data-chat-role="gm"]:hover:not(:disabled):not([aria-disabled="true"]),
+.pneuma-chat-button.pneuma-chat-button[data-chat-role="gm"]:focus-visible {
+  --pct-button-bg: var(--pneuma-chat-button-gm-hover-background);
+  --pct-button-ink: var(--pneuma-chat-button-gm-hover-color);
+}
+.pneuma-chat-button[data-chat-role="gm"]::before {
+  color:var(--pneuma-chat-button-gm-border);
+  content:"GM"; font-size:9px; font-weight:700; line-height:14px;
+  border:1px solid currentColor; border-radius:2px; padding:0 2px; flex:0 0 auto;
+}
+.pneuma-chat-button.pneuma-chat-icon[data-chat-role="gm"] {
+  width:auto !important; flex:0 0 auto !important; padding:4px 6px !important;
+}
+.pneuma-chat-button[data-chat-role="gm"].pneuma-chat-busy::before { visibility:hidden; }
+
+#token-hud .control-icon[data-wake-action] { width:max-content; max-width:220px; display:flex; align-items:center; gap:6px; padding:6px 8px; font-size:13px; line-height:18px; }
+#token-hud [data-wake-action] > i { font-size:16px; }
+
+/* Per-target rolls stay inline until their numeric summary is opened. */
+.pneuma-inline-roll { display:inline-block; vertical-align:baseline; margin:0 3px; min-width:0; }
+.pneuma-inline-roll > summary { display:inline; cursor:pointer; font-weight:bold; text-decoration:underline dotted; list-style:none; }
+.pneuma-inline-roll > summary::-webkit-details-marker { display:none; }
+.pneuma-inline-roll > summary:focus-visible { outline:1px solid currentColor; outline-offset:2px; }
+.pneuma-inline-roll[open] { display:block; flex:1 0 100%; max-width:100%; }
+.pneuma-inline-roll-details { min-width:0; margin:4px 0; }
+
+.pneuma-instant-effect { --pneuma-chat-button-padding:2px 4px; --pneuma-chat-button-gap:3px; --pneuma-chat-button-margin:1px; --pneuma-chat-button-state-icon-size:12px; --pneuma-chat-button-font-size:12px; }
+.pneuma-instant-effect .pneuma-chat-button { vertical-align:middle; }

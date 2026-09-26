@@ -1,8 +1,10 @@
+import {registerConditionCardRefresh} from "./pending-card-refresh.js";
+import {inlineRoll} from "./inline-roll.js";
 import {actorEncounter,encounterRef,resolveEncounter,type EncounterRef} from "./encounter.js";
 import {reportExposure,registerEffectEvents} from "./effect-events.js";
 import {createSmoke} from "./aoe/smoke.js";
 import {instantEffects,instantId,type InstantId,escapeInstant as esc} from "./instant-catalog.js";
-import {temporaryInjury,sleepTarget,igniteTarget,clearInstantCondition,registerInstantLifetimes} from "./instant-lifetime.js";
+import {hasInstantCondition,temporaryInjury,sleepTarget,igniteTarget,clearInstantCondition,registerInstantLifetimes} from "./instant-lifetime.js";
 import {empGM} from "./emp-state.js";
 import {createEmp} from "./emp.js";
 import {nativeCard,rollHidden,nativeAPI,diceJSON,spendBonusLuck,type RollItem} from "./native-combat.js";
@@ -20,12 +22,12 @@ export function newInstant(id:InstantId,actor:string,name:string,encounter:Encou
 export const instantDone=(s:InstantState)=>["resisted","applied","skipped"].includes(s.state);
 export function instantContent(s:InstantState,scope="") {
   const e=instantEffects[s.id],button=(a:string,label:string)=>'<button type="button" data-instant-action="'+a+'" data-instant-scope="'+esc(scope)+'">'+label+'</button>';
-  const action=s.state==="pending"?button("roll","Resist DV"+e.dv):s.state==="failed"?button("apply","Apply "+esc(e.name)):s.state==="rolling"?button("reset","GM: release roll"):s.state==="review"||s.state==="applying"?button("review","GM: mark resolved after checking target"):"";
-  const label={pending:e.eligibility,rolling:"Rolling…",failed:"Effect ready",resisted:"Resisted",applying:"Applying — do not repeat",applied:s.summary??"Applied",skipped:"Unaffected (GM)",review:"Interrupted — GM review required"}[s.state];
-  return '<div class="pneuma-instant-effect" data-effect="'+s.id+'" data-state="'+s.state+'" style="--pneuma-ammo-color:'+e.color+'"><strong>'+esc(e.name)+'</strong> <span>'+esc(label)+'</span> '+action
-    +(['pending','failed'].includes(s.state)?button("skip","GM: unaffected"):"")
+  const action=s.state==="pending"?button("roll",'<i class="fas fa-shield-halved" aria-hidden="true"></i> Resist'):s.state==="failed"?button("apply","Apply"):s.state==="rolling"?button("reset","Release roll"):s.state==="review"||s.state==="applying"?button("review","Mark resolved"):"";
+  const label={pending:"",rolling:"Rolling…",failed:"",resisted:"Resisted",applying:"Applying — do not repeat",applied:s.summary??"Applied",skipped:"Unaffected (GM)",review:"Interrupted — GM review required"}[s.state];
+  return '<div class="pneuma-instant-effect" data-effect="'+s.id+'" data-state="'+s.state+'" style="--pneuma-ammo-color:'+e.color+'"><strong>'+esc(e.name)+(e.skill?' DV'+e.dv:'')+'</strong> '+inlineRoll(s.total,s.html,e.skill)+' '+(label?'<span>'+esc(label)+'</span> ':'')+action
+    +(['pending','failed'].includes(s.state)?button("skip","Unaffected"):"")
     +(s.state==="applied"&&s.id==="sleep"?button("wake","Wake (touching Action)"):s.state==="applied"&&s.id==="incendiary"?button("extinguish","Extinguish (Action)"):"")
-    +(s.html?'<div class="pneuma-instant-roll">'+s.html+'</div>':"")+(s.damageHTML?'<div class="pneuma-instant-damage">'+s.damageHTML+'</div>':"")+'</div>';
+    +(s.damageHTML?' <span>Damage</span> '+inlineRoll(s.damage,s.damageHTML,'Damage roll'):'')+'</div>';
 }
 /** Same serialized GM path for area rows and ad-hoc effect cards. */
 const actorWork=new Map<string,Promise<unknown>>();
@@ -37,12 +39,14 @@ async function resolveInstant(s:InstantState,req:InstantRequest,user:User,save:(
   if(game.user?.id!==empGM()?.id)throw Error("An active GM is required.");
   const actor=await fromUuid(s.actor) as Actor|null;
   if(!actor||!user.isGM&&!actor.testUserPermission(user,"OWNER"))throw Error("Only the target owner or GM can resolve this effect.");
-  const combat=resolveEncounter(s.encounter??{combatId:null});
+
   const e=instantEffects[s.id];
   if(req.action==="wake"||req.action==="extinguish") {
     if(s.state!=="applied"||req.action==="wake"&&s.id!=="sleep"||req.action==="extinguish"&&s.id!=="incendiary")throw Error("Condition action unavailable.");
+    if(!hasInstantCondition(actor,s.id==="sleep"?"sleep":"fire"))throw Error("This condition is no longer active.");
     await clearInstantCondition(actor,s.id==="sleep"?"sleep":"fire");s.summary=s.id==="sleep"?"Awakened; remains Prone":"Extinguished";await save();return;
   }
+  const combat=resolveEncounter(s.encounter??{combatId:null});
   if(instantDone(s))return;
   if(req.action==="skip"||req.action==="review"||req.action==="reset") {
     if(!user.isGM)throw Error("GM only.");
@@ -105,6 +109,7 @@ export async function bindInstantControls(root:HTMLElement,state:(scope:string)=
     const scope=b.dataset.instantScope??"",s=state(scope),a=b.dataset.instantAction!;
     const actor=s?await fromUuid(s.actor) as Actor|null:null;
     if(!s||!actor||!game.user!.isGM&&(!actor.isOwner||["skip","reset","review"].includes(a))){b.remove();continue;}
+    if((a==="wake"||a==="extinguish")&&!hasInstantCondition(actor,a==="wake"?"sleep":"fire")){b.remove();continue;}
     b.addEventListener("click",async event=>{event.preventDefault();event.stopPropagation();if(b.disabled)return;b.disabled=true;
       try {if(a==="roll")await rollInstant(s,req=>send(scope,req),rollMode);else await send(scope,{action:a});}
       catch(e){ui.notifications!.error((e as Error).message);}finally{b.disabled=false;}
@@ -145,6 +150,12 @@ export async function dispatchMicrowaver(message:ChatMessage) {
   finally {microwavePending.delete(message.id!);}
 }
 export function registerInstantEffects() {
+  registerConditionCardRefresh(message=>{
+    const flags=foundry.utils.getProperty(message,"flags."+M) as {instant?:EffectCard;aoe?:{rows:{instant?:InstantState}[]}}|undefined;
+    const states=flags?.instant?[flags.instant.effect]:flags?.aoe?.rows.map(row=>row.instant).filter((s):s is InstantState=>!!s)??[];
+    const relevant=states.filter(s=>s.state==="applied"&&(s.id==="sleep"||s.id==="incendiary"));
+    return relevant.length?{actors:relevant.map(s=>s.actor),combat:relevant[0]?.encounter?.combatId}:undefined;
+  });
   for(const hook of ["createChatMessage","updateChatMessage"])Hooks.on(hook,(message:ChatMessage)=>{void dispatchMicrowaver(message);});
   registerEffectEvents();
   registerInstantLifetimes();

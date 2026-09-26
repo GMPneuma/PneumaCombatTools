@@ -34,11 +34,13 @@ try {
   window.damageValues=()=>({total:12,bonus:0,location:'body',ignorePercent:lastRoll.rollCardExtraArgs.ignoreArmorPercent,ablation:lastRoll.rollCardExtraArgs.ablationValue});
   window.damageSixes=roll=>roll.faces.filter(n=>n===6).length;
  });
+ const shared=await readFile('dist/scripts/shared.js','utf8');
+ await page.addScriptTag({type:'module',content:shared+'\nObject.assign(window,{manualEscape:escapeHTML,authority:primaryGM});'});
  const nativeRoot=process.env.TEMP+'/crewtools-cpr-native/fvtt-cyberpunk-red-core-v0.92.4-75b8c9d7cb76ed1ea2797a3404ce77172d424b6b/src';
  const native=await readFile(process.env.PNEUMA_CPR_ROLLS || nativeRoot+'/modules/rolls/cpr-rolls.js','utf8');
  await page.addScriptTag({type:'module',content:native.replace(/^import .*$/gm,'')+'\nwindow.manualNativeClasses={CPRRoll,CPRDamageRoll,CPRTableRoll};'});
  for(const [file,names] of [['half-armor','armorIgnorePercent,halfArmorControl,halfArmorSelected,interactArmorSelected,bindHalfArmor,registerHalfArmor'],['manual-roll-state','MANUAL_MODULE,manualEscape,manualNumber,groupOutcome,groupContent']]) {
-  const code=await readFile('dist/scripts/'+file+'.js','utf8');await page.addScriptTag({type:'module',content:code+'\nObject.assign(window,{'+names+'});'});
+  const code=(await readFile('dist/scripts/'+file+'.js','utf8')).replace(/^import .*$/gm,'').replace(/^export \{ escapeHTML as manualEscape \} from .*;$/gm,'');await page.addScriptTag({type:'module',content:code+'\nObject.assign(window,{'+names+'});'});
  }
  await page.waitForFunction(()=>window.groupContent&&window.manualNativeClasses);
  const sharedDamage=await readFile('dist/scripts/damage-flow.js','utf8');

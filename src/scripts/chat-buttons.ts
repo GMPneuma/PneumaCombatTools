@@ -11,6 +11,10 @@ const disabled=(node:HTMLElement)=>node.matches(":disabled,[aria-disabled=\"true
 function decorate(node:HTMLElement):void {
   node.classList.add("pneuma-chat-button");
   const text=node.textContent?.trim()??"",action=node.dataset.aoeAction??node.dataset.instantAction??node.dataset.quickhackAction??"";
+  const gmOnly=node.dataset.gmOnly==="true"
+    || !!node.dataset.aoeAction && ["show","removeSmoke","scatter","hit","miss","exclude","forcehit","add","reset","damageReset","damageResolved","effectsResolved"].includes(action)
+    || !!node.dataset.instantAction && ["skip","reset","review"].includes(action);
+  node.dataset.chatRole=gmOnly?"gm":"player";
   const iconOnly=!text || node.classList.contains("pneuma-damage-status-slot");
   node.classList.toggle("pneuma-chat-icon",iconOnly);
   const recovery=["reset","damageReset","damageResolved","effectsResolved","review","forcehit","exclude","skip"].includes(action)
@@ -19,7 +23,7 @@ function decorate(node:HTMLElement):void {
   node.dataset.chatKind=node.matches(".pneuma-half-armor, .pneuma-interact-armor")?"toggle":cancel?"cancel":recovery?"recovery":"action";
   if(!iconOnly&&node.dataset.chatKind!=="toggle"&&!node.querySelector("i,img,svg")) {
     const icon=document.createElement("i");icon.setAttribute("aria-hidden","true");
-    const name=cancel?"fa-xmark":recovery?"fa-wrench":/evade/i.test(text)?"fa-person-running":/apply.*damage|apply to/i.test(text)?"fa-bolt":/damage/i.test(text)?"fa-droplet":/roll|resist/i.test(text)?"fa-dice":/injury/i.test(text)?"fa-heart-crack":/choose/i.test(text)?"fa-list-check":"fa-arrow-right";
+    const name=cancel?"fa-xmark":recovery?"fa-wrench":/evade/i.test(text)?"fa-person-running":/apply.*damage|apply to/i.test(text)?"fa-bolt":/damage/i.test(text)?"fa-droplet":/resist/i.test(text)?"fa-shield-halved":/roll/i.test(text)?"fa-dice":/injury/i.test(text)?"fa-heart-crack":/choose/i.test(text)?"fa-list-check":"fa-arrow-right";
     icon.className="fas "+name+" pneuma-chat-action-icon";node.prepend(icon);
   }
   const busy=clicked.has(node)&&disabled(node);
@@ -36,7 +40,7 @@ export function styleChatButtons(root:HTMLElement):void {
   refresh();if(observed.has(root))return;observed.add(root);
   // Some workflows append their permission-specific controls after awaiting actor lookup.
   const observer=new MutationObserver(()=>{observer.disconnect();refresh();watch();});
-  const watch=()=>observer.observe(root,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:["disabled","aria-disabled","aria-pressed","title"]});
+  const watch=()=>observer.observe(root,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:["disabled","aria-disabled","aria-pressed","title","data-gm-only"]});
   root.addEventListener("click",event=>{
     const node=(event.target as Element).closest<HTMLElement>(controls);
     if(node&&!disabled(node)){clicked.add(node);setTimeout(()=>{observer.disconnect();decorate(node);watch();},0);}

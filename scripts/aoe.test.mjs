@@ -1,3 +1,4 @@
+import { overlaps } from "./aoe-geometry-fixture.mjs";
 import assert from "node:assert/strict";
 import {test} from "node:test";
 import {registerHooks} from "node:module";
@@ -9,7 +10,7 @@ registerHooks({resolve(specifier,context,next){
  if(specifier==="./damage-application.js"&&context.parentURL?.endsWith("/damage-flow.js"))return {shortCircuit:true,url:"data:text/javascript,"+encodeURIComponent('export async function captureDamageApplication(actor,n,l,id,apply){await apply(actor);arguments[6]?.({rawDamageDealt:globalThis.testPenetrated?5:0,hpReduction:globalThis.testPenetrated?5:0});return ["<div>applied</div>"]}')};
  return next(specifier,context);
 }});
-const {overlaps,evadeAllowed,winsAreaDefense}=await import("../dist/scripts/aoe/geometry.js");
+const {evadeAllowed,winsAreaDefense}=await import("../dist/scripts/aoe/geometry.js");
 globalThis.testCoverage=(area,box)=>area.shape==="circle"?Math.max(Math.abs(box.x+box.width/2-area.origin.x),Math.abs(box.y+box.height/2-area.origin.y))<=area.length:overlaps(area,box);
 const {areaKind}=await import("../dist/scripts/aoe/weapon.js");
 const {defaults,normalizeArea}=await import("../dist/scripts/aoe/settings.js");
@@ -92,7 +93,7 @@ test("suppression uses native suppressive mode and requires ten bullets",async()
 test("missed blast waits for GM placement and rejects scatter outside the intended square",async()=>{
  const f=fixture("explosive",13);await startAreaAttack(f.source,f.target,"w","attack");
  assert.equal(f.data().phase,"scatter");assert.equal(f.data().rows.length,0);
- assert.match(f.messages[0].content,/gray area.*inactive/);
+ assert.match(f.messages[0].content,/GM: choose a new center inside the gray area/);
  await assert.rejects(f.request("scatter",{area:f.data().area}),/Only the GM/);
  await assert.rejects(f.request("scatter",{user:"gm",area:{...f.data().area,origin:{x:1000,y:1000}}}),/inside/);
  await f.request("scatter",{user:"gm",area:{...f.data().area,origin:{x:550,y:50}}});
@@ -365,4 +366,41 @@ test('line of sight is rechecked after the native attack dialog before consuming
  f.source.checkCollision=()=>blocked;
  f.weapon.createRoll=mode=>{const roll=create(mode);roll.handleRollDialog=async()=>{blocked=true;return true};return roll};
  await assert.rejects(startAreaAttack(f.source,f.target,'w','attack'),/line of sight/);assert.equal(f.weapon.system.magazine.value,20);assert.equal(f.messages.length,0);
+});
+
+test('AoE item changes refresh indexed pending cards without scanning chat history',async()=>{
+ fixture();const hooks={};globalThis.Hooks={on:(n,fn)=>(hooks[n]??=[]).push(fn),once:(n,fn)=>(hooks[n]??=[]).push(fn)};
+ globalThis.Actor=class{};globalThis.Item=class{};foundry.data={fields:{ObjectField:class{}}};game.settings.register=()=>{};game.settings.registerMenu=()=>{};game.socket={on(){}};
+ const actor=Object.assign(new Actor(),{uuid:'Actor.pending'}),item=Object.assign(new Item(),{parent:actor});
+ const card={id:'pending',visible:true,flags:{[M]:{aoe:{phase:'responses',rows:[{actor:actor.uuid,state:'waiting'}],exchange:{combatId:'c'}}}}};
+ const frames=[],changed=[];let scans=0;globalThis.requestAnimationFrame=fn=>(frames.push(fn),frames.length);ui.chat={updateMessage:m=>changed.push(m.id)};
+ game.messages={ [Symbol.iterator](){scans++;return [card][Symbol.iterator]();} };
+ const {registerAreaAttacks}=await import('../dist/scripts/aoe/workflow.js');registerAreaAttacks();
+ for(const fn of hooks.ready)fn();assert.equal(scans,1);
+ const fire=(n,...args)=>{for(const fn of hooks[n]??[])fn(...args);},flush=()=>{for(const fn of frames.splice(0))fn();};
+ fire('updateItem',item);fire('updateItem',item);flush();assert.deepEqual(changed.splice(0),['pending']);assert.equal(scans,1);
+ card.flags[M].aoe.phase='resolved';fire('updateChatMessage',card);fire('updateItem',item);flush();assert.deepEqual(changed,[]);
+ card.flags[M].aoe.phase='responses';fire('createChatMessage',card);fire('updateItem',item);fire('deleteChatMessage',card);flush();assert.deepEqual(changed,[]);assert.equal(scans,1);
+});
+
+test('GM-scattered blast and aim marker both hide when the card completes',async()=>{
+ const f=fixture('explosive',5);await startAreaAttack(f.source,f.target,'w','attack');
+ await f.request('scatter',{user:'gm',area:{...f.data().area,origin:{x:f.data().intended.x+100,y:f.data().intended.y}}});
+ for(const row of [...f.data().rows])await f.request('exclude',{user:'gm',target:row.uuid});
+ assert.equal(f.data().resolutionComplete,true);assert.equal(f.scene.templates.length,2);
+ assert(f.scene.templates.every(t=>t.hidden));
+ await f.request('show',{user:'gm',hidden:false});assert(f.scene.templates.every(t=>!t.hidden));
+});
+
+test('GM smoke removal is reversible and does not delete its footprint or reset expiry',async()=>{
+ const f=fixture();await startAreaAttack(f.source,f.target,'w','attack');
+ const data=f.data(),template={id:'smoke',hidden:false,async update(changes){Object.assign(this,changes)}};f.scene.templates.push(template);data.ammoType='smoke';data.smokeId=template.id;
+ template.flags={'pneuma-combattools':{smoke:{cells:[[0,0,100,0,100,100,0,100]],expires:160,source:f.messages[0].id}}};
+ const before=structuredClone(template.flags);
+ await assert.rejects(f.request('removeSmoke',{hidden:true}),/GM only/);
+ await f.request('removeSmoke',{user:'gm',hidden:true});assert.equal(template.hidden,true);
+ await f.request('removeSmoke',{user:'gm',hidden:false});assert.equal(template.hidden,false);
+ assert.deepEqual(template.flags,before);assert(f.scene.templates.has(template.id));
+ await assert.rejects(f.request('removeSmoke',{user:'gm'}),/Choose whether/);
+ f.scene.templates.splice(0);await assert.rejects(f.request('removeSmoke',{user:'gm',hidden:false}),/expired or was deleted/);
 });

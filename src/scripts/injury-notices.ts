@@ -1,3 +1,4 @@
+import { primaryGM as electedGM } from "./shared.js";
 import {hasInjury} from "./injury-rules.js";
 import {postHUDMessage} from "./hud-messages.js";
 import {registerNativeWrapper} from "./native-wrappers.js";
@@ -19,7 +20,7 @@ export const injuryGuidance:Record<string,string>={
  "Foreign Object (Body)":"Over 4 m/yd on foot: apply the injury's 5 damage at turn end.",
  "Foreign Object (Head)":"Over 4 m/yd on foot: apply the injury's 5 damage at turn end.",
 };
-const primary=()=>game.users?.filter(u=>u.active&&u.isGM).sort((a,b)=>a.id!.localeCompare(b.id!))[0]?.id===game.user?.id;
+const primary=()=>electedGM()?.id===game.user?.id;
 type Reminder={combat:string;round:number;turn:number;injury:string;movementTurn?:string;delivered?:boolean};
 const reminders=(actor:Actor)=>foundry.utils.getProperty(actor,path) as Reminder[]|undefined??[];
 function alert(actor:Actor,text:string,id?:string){

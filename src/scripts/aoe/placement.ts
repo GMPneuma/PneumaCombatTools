@@ -59,6 +59,7 @@ export function areaCoverage(area:Area) {
 /** Local preview only: players do not need permission to create scene templates. */
 export async function placeArea(make:(point:Point)=>Area, initial:Point, prompt:string,color="#d44a40",allowed?:(point:Point)=>boolean):Promise<Area|null> {
   if(!canvas.stage || !canvas.app) throw new Error("Open the attack scene first.");
+  canvas.hud?.token?.clear();
   const stage=canvas.stage, view=canvas.app.view as HTMLCanvasElement;
   let point=initial, area=make(initial);
   const document=new CONFIG.MeasuredTemplate.documentClass({hidden:allowed?!allowed(point):false,...templateData(area),fillColor:color,borderColor:color,flags:{"pneuma-combattools":{areaShape:area}}} as never,{parent:canvas.scene!} as never);

@@ -4,11 +4,11 @@ import { availableQuickhacks, quickhackId, MODULE, type QuickhackItem } from "./
 import { getQuickhack } from "./catalog.js";
 import { enabled, label, mode, routing } from "./settings.js";
 import { roleFor, canOperate, criticalD10, gmAudience, nativeQuickhackRoll, publicAudience } from "./rolls.js";
-import { escapeHTML, postResult, resultFlag, type QuickhackResult } from "./messages.js";
+import { escapeHTML, postResult, type QuickhackResult } from "./messages.js";
 import { isQuickhackSuccessful, isQuickhackTargetAlerted, isTargetAware, isWithinJackInRange } from "./rules.js";
 import { resolveJackInRouting, resolveQuickhackRouting } from "./routing-config.js";
 import { requestEffect } from "./effects.js";
-import { activeConnection, establishConnection, isEjected, trackingCombat } from "./connections.js";
+import { activeConnection, establishConnection, isEjected } from "./connections.js";
 import { hasQuickhackSight } from "./sight.js";
 
 export const actorQuickhacks = (actor: Actor) => {

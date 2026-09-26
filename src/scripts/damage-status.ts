@@ -1,3 +1,4 @@
+import { escapeHTML as escape } from "./shared.js";
 import {instantEffects} from "./instant-catalog.js";
 import {masterStatuses} from "./status-catalog.js";
 const effectGroups = {instant:"Instant Effects",body:"Body Crits",head:"Head Crits",drugs:"Drugs",pharma:"Pharma",misc:"Misc"} as const;
@@ -22,7 +23,7 @@ export function validateDamageStatuses(value: unknown): string[] {
     throw new Error("A selected status effect is duplicated or no longer available.");
   return [...value];
 }
-const escape = (text: string) => text.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+
 
 
 export async function chooseDamageStatuses(selected: string[], slot = selected.length): Promise<string[] | null> {

@@ -25,7 +25,7 @@ async function effectSummary(message: ChatMessage, text: string, failed = false)
   if (!enabled()) return;
   const wrapper = document.createElement("div"); wrapper.innerHTML = message.content ?? "";
   const slot = wrapper.querySelector(".pneuma-quickhack-effect");
-  if (slot) { slot.textContent = text; slot.classList.toggle("failure", failed); }
+  if (slot) { slot.textContent = text; slot.classList.toggle("failure", failed); slot.classList.toggle("pneuma-quickhack-effect-failed", failed); slot.setAttribute("data-effect-state",failed?"failed":"resolved"); }
   await message.update({ content: wrapper.innerHTML, ["flags." + MODULE + ".quickhack.effectResolved"]: true,
     ["flags." + MODULE + ".quickhack.effectFailed"]: failed });
 }

@@ -1,3 +1,6 @@
+import {inlineRoll} from "../inline-roll.js";
+import { primaryGM as gm, escapeHTML as esc } from "../shared.js";
+import { PendingCardRefresh } from "../pending-card-refresh.js";
 import {tokenEncounter,encounterRef,resolveEncounter,requireParticipants,type EncounterRef} from "../encounter.js";
 import {suppressionExpiry} from "../suppression.js";
 import {attackCrossesSmoke} from "./smoke-obscuration.js";
@@ -40,9 +43,8 @@ interface Request {
 }
 interface Reply {aoeType:"reply";id:string;user:string;gm:string;error?:string}
 const flag=(message:ChatMessage)=>foundry.utils.getProperty(message,`flags.${MODULE}.aoe`) as AreaAttack|undefined;
-const gm=()=>game.users?.filter(u=>u.active&&u.isGM).sort((a,b)=>a.id.localeCompare(b.id))[0];
 const owns=(actor:Actor,user:User=game.user!)=>user.isGM||actor.testUserPermission(user,"OWNER");
-const esc=(s:unknown)=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]!);
+
 const errors=(e:unknown)=>{console.error(MODULE,e);ui.notifications!.error((e as Error).message);};
 async function actorAt(uuid:string) {const doc=await fromUuid(uuid) as TokenDocument|null;if(!doc?.actor)throw Error("Area attack token is unavailable.");return doc.actor;}
 export function pixelsPerUnit() {
@@ -86,7 +88,7 @@ function targets(data:AreaAttack):TargetRow[] {
     }));
 }
 function rowEncounter(data:AreaAttack,uuid:string):EncounterRef {return encounterRef(resolveEncounter(data.exchange),data.scene,[data.exchange.attacker,uuid]);}
-const btn=(action:string,icon:string,title:string,target="")=>`<button type="button" data-aoe-action="${action}" data-aoe-target="${esc(target)}" title="${esc(title)}" aria-label="${esc(title)}"><i class="fas ${icon}" aria-hidden="true"></i></button>`;
+const btn=(action:string,icon:string,title:string,target="",label="")=>`<button type="button" data-aoe-action="${action}" data-aoe-target="${esc(target)}" title="${esc(title)}" aria-label="${esc(title)}"><i class="fas ${icon}" aria-hidden="true"></i>${label?" "+esc(label):""}</button>`;
 const awaitingResponses=(data:AreaAttack)=>data.phase==="scatter"||data.rows.some(r=>["waiting","rolling"].includes(r.state));
 export function areaContent(data:AreaAttack):string {
   const waiting=awaitingResponses(data),profile=ammoProfile(data.ammoType);
@@ -98,7 +100,8 @@ export function areaContent(data:AreaAttack):string {
   }
   const attack=waiting?"<p>Attack rolled — awaiting responses.</p>":`<div class="pneuma-aoe-attack">${attackHTML}</div>`;
   const rows=data.rows.map(r=>`<div role="listitem" class="pneuma-aoe-target" data-aoe-row="${esc(r.uuid)}" data-state="${r.state}" style="--pneuma-ammo-color:${profile?.color??"#d44a40"}">
-    <img src="${esc(r.img)}" alt="" width="24" height="24"><span class="pneuma-aoe-name">${esc(r.name)}</span><span class="pneuma-aoe-response">
+    <img src="${esc(r.img)}" alt="" width="24" height="24"><span class="pneuma-aoe-name">${esc(r.name)}</span><div class="pneuma-aoe-response">
+    ${inlineRoll(r.total,r.html?`<div class="pneuma-aoe-defense ${rollOutcomeClass(r.state==="miss")}">${r.html}</div>`:undefined,data.kind==="suppression"?"Concentration":"Evasion")}
     ${r.state==="waiting" ? (data.kind==="suppression"?btn("roll","fa-brain","Concentration",r.uuid):btn("roll","fa-person-running","Evade",r.uuid))
       +(data.settings.coverUp&&data.kind!=="suppression"?btn("other","fa-shield","Cover Up instead of Evasion: no roll; Prone, double SP and ablation",r.uuid):"")+(data.kind==="suppression"?"":btn("decline","fa-xmark","Don't Evade",r.uuid))
       : esc(r.state==="hit"?(data.kind==="suppression"?"Suppressed: Move to cover; Run if needed":r.coverUp?"Cover Up · Prone · SP ×2 / ablation ×2":"Hit"):r.state==="miss"?"Avoided":r.state==="rolling"?"Rolling…":"Cover Up — GM review")}
@@ -109,20 +112,20 @@ export function areaContent(data:AreaAttack):string {
     ${r.state==="miss"&&data.kind!=="suppression"&&r.total!==undefined&&!r.moved?btn("move","fa-person-walking","Move outside AoE",r.uuid):""}
     ${r.state==="hit"&&data.exchange.damage?.result ? btn("apply","fa-bolt",r.damage?.recordedApplied?"Damage applied":"Apply shared damage (Shift: options)",r.uuid):""}
     ${r.damage&&["review","applying"].includes(r.damage.status)?btn("damageResolved","fa-check-double","GM: mark resolved after checking damage",r.uuid):""}
-    ${r.moved&&r.moveCost?`<span>Move: ${r.moveCost.toFixed(1)}m</span>`:""}</span></div>${r.html?`<div class="pneuma-aoe-defense ${rollOutcomeClass(r.state==="miss")}">${r.html}</div>`:""}
+    ${r.moved&&r.moveCost?`<span>Move: ${r.moveCost.toFixed(1)}m</span>`:""}</div></div>
     ${r.state==="hit"&&r.instant?instantContent(r.instant,r.uuid):""}
     `).join("");
   const applications=data.rows.flatMap(r=>r.damage?.applications??[]).join("");
   return `<section class="rollcard pneuma-aoe-card" data-state="${data.phase==="scatter"?"scatter":waiting?"waiting":"resolved"}"><div class="rollcard-top"><div class="cpr-block"><h3>${esc(data.exchange.title)}${profile?" · "+esc(profile.name):""}</h3></div></div>
     ${resolutionSection("attack",attack)}
-    ${resolutionSection("result",data.phase==="scatter"?"<div class='pneuma-aoe-reposition'><strong>Missed — choose the landing point</strong><p>The amber square marks the original target. The gray area is the inactive original blast.</p><p>GM: place the new blast center inside the original blast square. Targets are determined after placement.</p></div>"+btn("scatter","fa-crosshairs","Place landing point"): `<div role="list" class="pneuma-aoe-targets">${rows||"<p>No tokens in the area.</p>"}</div>`)}
+    ${resolutionSection("result",data.phase==="scatter"?"<div class='pneuma-aoe-reposition'><strong>Missed</strong><p>GM: choose a new center inside the gray area.</p></div>"+btn("scatter","fa-crosshairs","Place New Target Center","","Place New Target Center"): `<div role="list" class="pneuma-aoe-targets">${rows||"<p>No tokens in the area.</p>"}</div>`)}
     <div class="pneuma-aoe-actions">${btn("show",data.areaHidden?"fa-eye":"fa-eye-slash",data.areaHidden?"Show attack area":"Hide attack area")}${data.phase==="responses"?btn("add","fa-user-plus","GM: add selected token (manual coverage override)"):""}
     ${data.kind!=="suppression"&&data.phase!=="scatter"&&!data.special&&!data.exchange.damage?btn("damage","fa-droplet","Roll shared damage"):""}
     ${data.exchange.damage?.status==="rolling"?btn("damageReset","fa-unlock","GM: release unfinished damage roll"):""}</div>
     ${data.special&&!profile&&!data.effectsResolved?btn("effectsResolved","fa-check-double","GM: mark manual effects resolved"):""}
     ${data.special&&!profile?"<p>Special ammunition: resolve its effects manually. Grenade-specific effects are not automated yet.</p>":""}
     ${data.ammoType==="smoke"?"<p>Smoke: 1 minute.</p>"+(data.smokeId?btn("removeSmoke","fa-cloud","GM: remove smoke"):""):""}
-    ${data.kind==="explosive"?"<p>Cover and terrain: GM resolves durability. GM: exclude targets protected by cover that survives the damage.</p>":""}
+    ${data.kind==="explosive"?"<p>GM resolves all aspects of cover and terrain.</p>":""}
     ${data.exchange.damage?damageContent(data.exchange,"roll"):""}
     ${applications?`<div class="pneuma-damage-applications pneuma-aoe-applications">${applications}</div>`:""}</section>`;
 }
@@ -174,7 +177,10 @@ export async function handleAreaRequest(req:Request) {
   if(req.action==="removeSmoke") {
     if(!user.isGM||data.ammoType!=="smoke")throw Error("GM only.");
     const scene=game.scenes!.get(data.scene) as Scene|undefined;
-    if(data.smokeId&&scene?.templates.has(data.smokeId))await scene.deleteEmbeddedDocuments("MeasuredTemplate",[data.smokeId]);return;
+    const template=data.smokeId?scene?.templates.get(data.smokeId):undefined;
+    if(!template)throw Error("Smoke has expired or was deleted.");
+    if(typeof req.hidden!=="boolean")throw Error("Choose whether to remove or restore smoke.");
+    await template.update({hidden:req.hidden});return;
   }
   if(req.action==="show") {
     if(!user.isGM)throw Error("Only the GM can show or hide the attack area.");
@@ -419,6 +425,14 @@ function automaticArea(actor:Actor,data:AreaAttack) {
   const s=data.settings;
   return automaticNPCEvasion(actor)&&data.kind!=="suppression"&&s.evade==="raw"&&!s.evadePenalty&&!s.evadeMove&&!s.evadeBorrow&&!s.coverUp;
 }
+function syncAreaVisibility(template: MeasuredTemplate): void {
+  if (!foundry.utils.getProperty(template.document, `flags.${MODULE}.areaShape`)) return;
+  // Native GM visibility may be restored by refreshState after a hidden update.
+  template.renderable = !template.document.hidden;
+  template.visible = template.renderable && template.isVisible && !template.hasPreview;
+  const highlight = canvas.interface?.grid.getHighlightLayer(template.highlightId);
+  if (highlight) { highlight.renderable = template.renderable; highlight.visible = template.visible; }
+}
 const autoRows=new Set<string>();
 export async function automateArea(message:ChatMessage) {
   const data=flag(message);if(!data||data.phase!=="responses"||game.user?.id!==gm()?.id||autoRows.has(message.id!))return;
@@ -435,23 +449,23 @@ export async function automateArea(message:ChatMessage) {
 export function registerAreaAttacks() {
   Hooks.on("updateChatMessage",(message:ChatMessage)=>{void automateArea(message).catch(errors);});
   registerAreaSettings();registerAreaMovement();registerSmoke();
-  const refreshActors=new Set<string>();let refreshQueued=false;
+  const pendingCards = new PendingCardRefresh(message => { void ui.chat?.updateMessage(message); }, message => {
+    const data = flag(message);
+    if (data?.phase !== "responses") return;
+    const actors = data.rows.filter(row => ["waiting", "rolling"].includes(row.state)).map(row => row.actor);
+    return actors.length ? { actors, combat: data.exchange.combatId } : undefined;
+  });
+  Hooks.once("ready", () => { for (const message of game.messages ?? []) pendingCards.remember(message); });
+  for (const hook of ["createChatMessage", "updateChatMessage"]) Hooks.on(hook, (message: ChatMessage) => pendingCards.remember(message));
+  Hooks.on("deleteChatMessage", (message: ChatMessage) => pendingCards.forget(message.id!));
   for(const hook of ["createItem","updateItem","deleteItem","createActiveEffect","updateActiveEffect","deleteActiveEffect"])Hooks.on(hook,(doc:Item|ActiveEffect)=>{
     const parent=doc.parent,actor=parent instanceof Actor?parent:parent?.parent instanceof Actor?parent.parent:undefined;
-    if(!actor)return;refreshActors.add(actor.uuid);if(refreshQueued)return;refreshQueued=true;
-    requestAnimationFrame(()=>{
-      refreshQueued=false;
-      for(const message of game.messages??[]){const data=flag(message);if(message.visible&&(!message.blind||game.user?.isGM)&&data?.phase==="responses"&&data.rows.some(r=>refreshActors.has(r.actor)&&["waiting","rolling"].includes(r.state)))ui.chat?.updateMessage(message);}
-      refreshActors.clear();
-    });
+    if(actor)pendingCards.refresh(actor.uuid);
   });
   Hooks.on("refreshMeasuredTemplate",(template:MeasuredTemplate)=>{
     const area=foundry.utils.getProperty(template.document,`flags.${MODULE}.areaShape`) as Area|undefined;
     if(!area||!template.template)return;
-    // Native hidden templates remain visible to GMs; hide the whole area for everyone.
-    template.visible=!template.document.hidden&&template.isVisible&&!template.hasPreview;
-    const highlight=canvas.interface?.grid.getHighlightLayer(template.highlightId);
-    if(highlight)highlight.visible=template.visible;
+    syncAreaVisibility(template);
     if(!template.visible)return;
     const originalAim=!!foundry.utils.getProperty(template.document,`flags.${MODULE}.originalAim`);
     if(originalAim&&template.ruler)template.ruler.text="Original target";
@@ -459,6 +473,10 @@ export function registerAreaAttacks() {
     template.shape=new PIXI.Polygon(points);
     template.template.clear().lineStyle(2,Number(template.document.borderColor),0.8).beginFill(Number(template.document.fillColor),0).drawPolygon(points).endFill();
     template.highlightGrid();
+    syncAreaVisibility(template);
+  });
+  Hooks.on("updateMeasuredTemplate", (document: MeasuredTemplateDocument) => {
+    if (document.object) syncAreaVisibility(document.object);
   });
   Hooks.on("createChatMessage",(message:ChatMessage)=>{
     const data=flag(message);if(!data||game.user?.id!==gm()?.id)return;
@@ -496,6 +514,12 @@ export function registerAreaAttacks() {
         button.title=label;button.setAttribute("aria-label",label);
         button.innerHTML='<i class="fas '+(data.areaHidden?"fa-eye":"fa-eye-slash")+'" aria-hidden="true"></i>';
       }
+      if(action==="removeSmoke") {
+        const template=data.smokeId?game.scenes?.get(data.scene)?.templates.get(data.smokeId):undefined;
+        const label=!template?"Smoke expired":template.hidden?"Restore smoke":"Remove smoke";
+        button.disabled=!template;button.title=label;button.setAttribute("aria-label",label);
+        button.innerHTML='<i class="fas fa-cloud" aria-hidden="true"></i> '+label;
+      }
       if(action==="other"&&!areaSettings().coverUp){button.remove();continue;}
       const actor=await actorAt(row?.uuid??data.exchange.attacker).catch(()=>null);
       const gmOnly=["removeSmoke","scatter","hit","miss","exclude","forcehit","add","reset","damageReset","damageResolved","effectsResolved"].includes(action);
@@ -510,9 +534,14 @@ export function registerAreaAttacks() {
         event.preventDefault();event.stopPropagation();if(button.disabled)return;button.disabled=true;
         try {
           if(action==="show")await send(message.id!,"show",{hidden:!data.areaHidden});
+          else if(action==="removeSmoke") {
+            const template=data.smokeId?game.scenes?.get(data.scene)?.templates.get(data.smokeId):undefined;
+            if(!template)throw Error("Smoke has expired or was deleted.");
+            await send(message.id!,"removeSmoke",{hidden:!template.hidden});
+          }
           else if(action==="scatter"){
             if(canvas.scene?.id!==data.scene)throw Error("Open the attack scene first.");
-            const area=await placeArea(p=>({...data.area,origin:canvas.grid!.getCenterPoint(p),wallOrigin:canvas.grid!.getCenterPoint(p)}),data.intended,"Place the new blast center inside the gray square. Gray = inactive original aim.",ammoProfile(data.ammoType)?.color);
+            const area=await placeArea(p=>({...data.area,origin:canvas.grid!.getCenterPoint(p),wallOrigin:canvas.grid!.getCenterPoint(p)}),data.intended,"Choose a new center inside the gray area.",ammoProfile(data.ammoType)?.color);
             if(area)await send(message.id!,"scatter",{area});
           } else if(action==="add") {const selected=canvas.tokens?.controlled??[];if(selected.length!==1)throw Error("Select exactly one token to add.");await send(message.id!,"add",{target:selected[0]!.document.uuid});}
           else if(action==="roll"&&row)await respond(message,data,row);

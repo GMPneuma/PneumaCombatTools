@@ -17,15 +17,23 @@ try{
  });
  const biomonitor=await readFile(output+'/scripts/biomonitor.js','utf8'),hover=(await readFile(output+'/scripts/ekg-hover.js','utf8')).replace(/^import .*;\s*/gm,'');
  const helper=(await readFile(output+'/scripts/eye-hud.js','utf8')).match(/export function hasBiomonitor[\s\S]*?\n}/)[0];
- await page.addScriptTag({type:'module',content:helper+'\n'+biomonitor+'\n'+hover+'\nregisterHoverEKG();window.loaded=true;'});await page.waitForFunction(()=>window.loaded);
+ await page.addScriptTag({type:'module',content:helper+'\n'+biomonitor+'\n'+hover+'\nregisterHoverEKG();window.setEKGPaused=setEKGPaused;window.loaded=true;'});await page.waitForFunction(()=>window.loaded);
  await page.evaluate(()=>hooks.hoverToken.forEach(fn=>fn(target,true)));
  const panel=page.locator('.pneuma-hover-ekg'),state=page.locator('.pneuma-hover-ekg .pneuma-eye-vitals');
  await panel.waitFor();assert.equal(await state.getAttribute('data-state'),'normal');
  assert((await panel.boundingBox()).y>=300);assert.equal(await panel.innerText(),'');
  assert.equal(await page.locator('.pneuma-hover-ekg .pneuma-eye-trace-dot').evaluate(n=>getComputedStyle(n).animationName),'pneuma-ekg');
+ await page.evaluate(()=>setEKGPaused(true));
+ const traceDot=page.locator('.pneuma-hover-ekg .pneuma-eye-trace-dot');
+ assert.equal(await traceDot.evaluate(n=>getComputedStyle(n).animationPlayState),'paused');
+ await page.evaluate(()=>{hooks.hoverToken.forEach(fn=>fn(target,false));hooks.hoverToken.forEach(fn=>fn(target,true));});
+ assert.equal(await traceDot.evaluate(n=>getComputedStyle(n).animationPlayState),'paused','New hover traces inherit pause');
  for(const [hp,expected]of [[30,'wounded'],[15,'serious'],[5,'critical'],[0,'flatline']]){
   await page.evaluate(hp=>{target.actor.system.derivedStats.hp.value=hp;hooks.updateActor.forEach(fn=>fn(target.actor));},hp);assert.equal(await state.getAttribute('data-state'),expected);
  }
+ assert.equal(await traceDot.evaluate(n=>getComputedStyle(n).animationPlayState),'paused','Health changes retain pause');
+ await page.evaluate(()=>setEKGPaused(false));
+ assert.equal(await traceDot.evaluate(n=>getComputedStyle(n).animationPlayState),'running');
  await page.evaluate(()=>{window.trace= document.querySelector('.pneuma-hover-ekg svg');hooks.refreshToken.forEach(fn=>fn(target));});assert.equal(await page.evaluate(()=>trace===document.querySelector('.pneuma-hover-ekg svg')),true);
  await page.evaluate(()=>{viewer.items[0].system.rank=0;hooks.updateItem.forEach(fn=>fn({parent:viewer}));});assert.equal(await panel.count(),0);
  await page.evaluate(()=>{game.user.isGM=true;hooks.updateUser.forEach(fn=>fn(game.user));});assert.equal(await panel.count(),0,'GM still needs role or world override');

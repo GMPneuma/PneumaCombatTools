@@ -1,3 +1,4 @@
+import { escapeHTML } from "../shared.js";
 import type {EncounterRef} from "../encounter.js";
 import { resolutionSection, rollOutcomeClass } from "../card-structure.js";
 import { MODULE } from "./availability.js";
@@ -12,8 +13,7 @@ export interface QuickhackResult extends Partial<EncounterRef> {
   effectResolved?: boolean; effectFailed?: boolean;
   connectionId?: string;
 }
-export const escapeHTML = (value: unknown) => String(value ?? "").replace(/[&<>"']/g,
-  char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
+export { escapeHTML } from "../shared.js";
 export function delivery(audience: string, source: Actor, target: Actor): Audience {
   if (audience === "public") return { whisper: [], blind: false };
   const gm = gmAudience();

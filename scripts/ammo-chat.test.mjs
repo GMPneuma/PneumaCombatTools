@@ -13,7 +13,7 @@ function fixture(){
  return {item,messages,actor,setAmmo:a=>ammo=a};
 }
 test('native reload posts character and escaped weapon names; nested ammo reload posts only once',async()=>{
- const f=fixture();assert.equal(await f.item.reload(),'done');assert.equal(f.messages[0].content,'<p>Character &amp; One reloads SMG &lt;test&gt;</p>');
+ const f=fixture();assert.equal(await f.item.reload(),'done');assert.equal(f.messages[0].content,'<p class="pneuma-ammo-notice" data-ammo-action="reload">Character &amp; One reloads SMG &lt;test&gt;</p>');
  await f.item.load();assert.equal(f.messages.length,2);assert.match(f.messages[1].content,/changes ammo in/);
  await f.item.reload();assert.equal(f.messages.length,2);
 });
@@ -27,7 +27,7 @@ test('player ownership controls reporting regardless of who performs the action'
  for(const isGM of [false,true])for(const hasPlayerOwner of [false,true]){
   const f=fixture();game.user.isGM=isGM;game.user.name=isGM?'GM':'Player';f.actor.hasPlayerOwner=hasPlayerOwner;
   await f.item.reload();await f.item.load();assert.equal(f.messages.length,hasPlayerOwner?2:0);
-  if(hasPlayerOwner)assert.ok(f.messages.every(m=>m.content.startsWith('<p>Character &amp; One ')));
+  if(hasPlayerOwner)assert.ok(f.messages.every(m=>/class="pneuma-ammo-notice" data-ammo-action="(reload|change)">Character &amp; One /.test(m.content)));
  }
 });
 test('cancel, failure, bows, and method recreation do not produce extra reports',async()=>{

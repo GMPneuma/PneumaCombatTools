@@ -1,3 +1,4 @@
+import { escapeHTML as escape } from "./shared.js";
 import type {RollItem} from "./native-combat.js";
 interface BowItem extends RollItem {
   getInstalledItems(type:string):Item[];
@@ -7,7 +8,7 @@ interface BowItem extends RollItem {
 }
 const value=(item:Item,path:string)=>foundry.utils.getProperty(item,"system."+path);
 const loaded=(item:Item)=>Number(value(item,"magazine.value"))>0;
-const escape=(text:unknown)=>String(text??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]!);
+
 function available(actor:Actor,bow:Item):Item[] {
   const varieties=value(bow,"ammoVariety");
   return Array.from(actor.items).filter(i=>String(i.type)==="ammo"&&Number(value(i,"amount"))>0&&Array.isArray(varieties)&&varieties.includes(value(i,"variety")));

@@ -1,11 +1,14 @@
+import { allActors, escapeHTML as esc } from "./shared.js";
+import { registerEmpRefresh } from "./emp-refresh.js";
+import { updateTouchesPath } from "./update-path.js";
 import {actorEncounter,encounterRef,resolveEncounter,type EncounterRef} from "./encounter.js";
 import {registerEmpSettings} from "./emp-settings.js";
 import {applyEmpBehavior,empBehavior} from "./emp-behavior.js";
-import {EMP_MODULE as MODULE, eligibleEmpItems, empGroup, empWeight, type EmpItem, type EmpPolicy, type EmpRandom, randomEmp, disableLabel} from "./emp-rules.js";
-import {frameMovementBlocked, empGM, empRequests, empRandomSelection, empSelectionPool, empWork, applyEmpSelection, finishEmp, reconcileEmp, installEmpNativeGuards, syncDisabledLimbs, sweepDisablements, type EmpRequest} from "./emp-state.js";
+import {EMP_MODULE as MODULE, eligibleEmpItems, empGroup, empWeight, type EmpItem, randomEmp, disableLabel} from "./emp-rules.js";
+import {frameMovementBlocked, empGM, empRequests, empRandomSelection, empSelectionPool, empWork, applyEmpSelection, finishEmp, reconcileEmp, installEmpNativeGuards, type EmpRequest} from "./emp-state.js";
 import {requireCombatSocket} from "./socket-health.js";
 declare global {interface SettingConfig {"pneuma-combattools.empImmunity":string}}
-const esc = (value: unknown) => String(value ?? "").replace(/[&<>"']/g,c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]!));
+
 const report = (error:unknown) => ui.notifications!.error(error instanceof Error ? error.message : String(error));
 let nativeReady: Promise<void> = Promise.resolve();
 const pending = new Map<string,{resolve:()=>void;reject:(error:Error)=>void;timer:ReturnType<typeof setTimeout>}>();
@@ -69,32 +72,12 @@ export async function createEmp(actor:Actor,options:Pick<EmpRequest,"count"|"cho
   if(request.chooser!=="player")await chooseEmp(combat,request);
   return request;
 }
-export function configureEmp(actor:Actor) {
-  const encounter=encounterRef(actorEncounter(actor));
-  new Dialog({title:`EMP — ${actor.name}`,content:`<form><div class="form-group"><label>Items to disable</label><input name="count" type="number" min="1" max="50" value="2"></div><div class="form-group"><label>Selection</label><select name="chooser"><option value="gm">GM chooses</option><option value="player">Player chooses</option><option value="random">Random</option></select></div><div class="form-group"><label>Random method</label><select name="mode"><option value="equal">True random (equal odds)</option><option value="foundation-more">Foundational more likely (2×)</option><option value="foundation-less">Foundational less likely (½×)</option><option value="system">System first</option></select></div><div class="form-group"><label>Allow foundational cyberware</label><input name="foundational" type="checkbox" checked></div><div class="form-group"><label>Disable installed options with their host</label><input name="cascade" type="checkbox" checked></div><div class="form-group"><label>Include carried electronics</label><input name="electronics" type="checkbox" checked></div><p>Use after resolving the source's resistance check. The GM immunity list applies to direct selection. Lasts until this combat ends.</p></form>`,buttons:{create:{label:"Create EMP selection",callback:html=>{
-    const root=(html as JQuery)[0]!;
-    const value=(name:string)=>(root.querySelector(`[name="${name}"]`) as HTMLInputElement).value;
-    const checked=(name:string)=>(root.querySelector(`[name="${name}"]`) as HTMLInputElement).checked;
-    const policy:EmpPolicy={foundational:checked("foundational"),cascade:checked("cascade"),electronics:checked("electronics"),immune:game.settings!.get(MODULE,"empImmunity").split(/[\n,;]/)};
-    void createEmp(actor,{count:Number(value("count")),chooser:value("chooser") as EmpRequest["chooser"],mode:value("mode") as EmpRandom,policy},encounter).catch(report);
-  }},cancel:{label:"Cancel"}},default:"cancel"},{width:440}).render(true);
-}
 export function registerEmp() {
   registerEmpSettings();
   Hooks.on("preUpdateToken",(doc:TokenDocument,changes:Record<string,unknown>,_options:unknown,userId:string)=>{
     if(frameMovementBlocked(doc.actor,changes,!!game.users?.get(userId)?.isGM)){ui.notifications!.warn("Cannot move: Internal Frame disabled.");return false;}
   });
-  for(const hook of ["createItem","updateItem","deleteItem"])Hooks.on(hook,(item:Item)=>{
-    if(item.parent instanceof Actor&&empGM()?.id===game.user?.id)void empWork(()=>syncDisabledLimbs(item.parent as Actor)).catch(report);
-  });
-  // Native injury toggles and edits must immediately recalculate the residual MOVE penalty.
-  for(const hook of ["createActiveEffect","updateActiveEffect","deleteActiveEffect"])Hooks.on(hook,(effect:ActiveEffect)=>{
-    const parent=effect.parent;
-    if(parent instanceof Actor&&!foundry.utils.getProperty(effect,`flags.${MODULE}.disabledLegPenalty`)&&!foundry.utils.getProperty(effect,`flags.${MODULE}.frameConsequences`))return;
-    const actor=parent instanceof Actor?parent:parent instanceof Item&&String(parent.type)==="criticalInjury"?parent.parent:undefined;
-    if(actor instanceof Actor&&empGM()?.id===game.user?.id)void empWork(()=>syncDisabledLimbs(actor)).catch(report);
-  });
-  for(const hook of ["updateWorldTime","updateCombat","canvasReady"])Hooks.on(hook,()=>{if(empGM()?.id===game.user?.id)void empWork(sweepDisablements).catch(report);});
+  registerEmpRefresh(report);
   game.settings!.register(MODULE,"empImmunity",{name:"EMP: immune items",hint:"GM-maintained list of exact item names or compendium source UUIDs, separated by semicolons. Excludes direct selection; installed options still lose power if their host is disabled.",scope:"world",config:false,type:String,default:""});
   Hooks.once("setup",()=>{nativeReady=installEmpNativeGuards();void nativeReady.catch(report);});
   Hooks.once("ready",()=>{
@@ -113,11 +96,8 @@ export function registerEmp() {
       }
     });
     void nativeReady.then(async()=> {
-      const actors=new Map<string,Actor>();
-      for(const actor of game.actors??[])actors.set(actor.uuid,actor);
-      for(const scene of game.scenes??[])for(const token of scene.tokens)if(token.actor)actors.set(token.actor.uuid,token.actor);
       if(empGM()?.id===game.user?.id)await empWork(reconcileEmp);
-      for(const actor of actors.values())if(actor.items.some(item=>!!foundry.utils.getProperty(item,"flags.pneuma-combattools.timedDisables")||foundry.utils.getProperty(item,`flags.${MODULE}.empCombats`)))actor.prepareData();
+      for(const actor of allActors())if(actor.items.some(item=>!!foundry.utils.getProperty(item,"flags.pneuma-combattools.timedDisables")||foundry.utils.getProperty(item,`flags.${MODULE}.empCombats`)))actor.prepareData();
     }).catch(report);
   });
   Hooks.on("renderChatMessage",(message:ChatMessage,html:JQuery)=>{
@@ -125,6 +105,7 @@ export function registerEmp() {
     if(!ref)return;
     const combat=game.combats?.get(ref.combat) as Combat|undefined,request=combat&&empRequests(combat)[ref.request];
     const button=html[0]?.querySelector<HTMLButtonElement>("[data-emp-select]");if(!button)return;
+    button.dataset.gmOnly=String(request?.chooser!=="player");
     button.disabled=!combat?.started||!request||request.state!=="pending";
     html[0]?.querySelectorAll(".pneuma-emp-result").forEach(el=>el.remove());
     const names=request?.method==="shortlist"&&!game.user?.isGM?request.selectedNames:request?.affectedNames;
@@ -134,12 +115,30 @@ export function registerEmp() {
     if(button.disabled)button.textContent=combat?.started&&request?.state==="applied"?disableLabel(request.source)+" applied":"Combat ended";
     button.addEventListener("click",()=>{if(combat&&request)void chooseEmp(combat,request);});
   });
+  const cardStates = new Map<string, Map<string, { message?: string; signature: string }>>();
+  const snapshot = (combat: Combat) => new Map(Object.values(empRequests(combat)).map(request =>
+    [request.id, { message: request.message, signature: JSON.stringify([combat.started, request]) }]));
+  Hooks.once("ready", () => { for (const combat of game.combats ?? []) cardStates.set(combat.id!, snapshot(combat)); });
+  Hooks.on("createCombat", (combat: Combat) => { cardStates.set(combat.id!, snapshot(combat)); });
+  const refreshCards = (combat: Combat, deleted = false) => {
+    const prior = cardStates.get(combat.id!) ?? new Map();
+    const next = deleted ? new Map() : snapshot(combat);
+    const messages = new Set<string>();
+    for (const id of new Set([...prior.keys(), ...next.keys()])) {
+      const old = prior.get(id), current = next.get(id);
+      if (old?.signature === current?.signature) continue;
+      if (old?.message) messages.add(old.message);
+      if (current?.message) messages.add(current.message);
+    }
+    if (deleted) cardStates.delete(combat.id!); else cardStates.set(combat.id!, next);
+    for (const id of messages) { const message = game.messages?.get(id); if (message) void ui.chat?.updateMessage(message as ChatMessage, false); }
+  };
   Hooks.on("updateCombat",(combat:Combat,changes:Record<string,unknown>)=>{
-    for(const request of Object.values(empRequests(combat))){const message=game.messages?.get(request.message??"");if(message)void ui.chat?.updateMessage(message as ChatMessage,false);}
+    if (["round", "turn", "flags."+MODULE+".empRequests"].some(path => updateTouchesPath(changes,path))) refreshCards(combat);
     if(("round" in changes)&&!combat.started&&empGM()?.id===game.user?.id)void empWork(()=>finishEmp(combat)).catch(report);
   });
   Hooks.on("deleteCombat",(combat:Combat)=>{
     if(empGM()?.id===game.user?.id)void empWork(()=>finishEmp(combat,true)).catch(report);
-    for(const request of Object.values(empRequests(combat))){const message=game.messages?.get(request.message??"");if(message)void ui.chat?.updateMessage(message as ChatMessage,false);}
+    refreshCards(combat,true);
   });
 }

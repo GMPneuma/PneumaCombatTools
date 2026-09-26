@@ -79,6 +79,14 @@ try {
  assert.equal(await page.locator('.pneuma-damage-result + .pneuma-aoe-applications .pneuma-damage-applied').count(),1);
  assert.equal(await page.locator('.pneuma-aoe-targets .pneuma-damage-applied').count(),0);
  await page.evaluate(async()=>{
+  const {areaContent}=await import('/scripts/aoe/workflow.js');
+  document.querySelector('#card').innerHTML=areaContent({...data,phase:'scatter',rows:[],exchange:{...data.exchange,damage:undefined}});
+  const {styleChatButtons}=await import('/scripts/chat-buttons.js');styleChatButtons(document.querySelector('#card'));
+ });
+ assert.equal(await page.locator('[data-aoe-action="scatter"]').innerText(),'Place New Target Center');
+ assert.equal(await page.locator('[data-aoe-action="scatter"]').evaluate(el=>el.classList.contains('pneuma-chat-icon')),false);
+ await page.screenshot({path:process.env.TEMP+'/pct-aoe-scatter.png'});
+ await page.evaluate(async()=>{
   window.draws=0;window.destroyed=0;window.clipCalls=0;
   class Graphics {clear(){return this}lineStyle(){return this}beginFill(){return this}drawPolygon(){draws++;return this}endFill(){return this}destroy(){destroyed++}}
   window.PIXI={Graphics,Point:class {constructor(x,y){this.x=x;this.y=y}},Polygon:class{constructor(points){this.points=points}},Circle:class{}};
@@ -93,7 +101,7 @@ try {
   CONFIG.MeasuredTemplate={documentClass:Document,objectClass:Template};
   window.ui={notifications:{info(){}}};
   const {placeArea}=await import("/scripts/aoe/placement.js");
-  window.startPreview=()=>{window.previewResult="pending";window.previewPromise=placeArea(p=>({shape:"square",origin:p,direction:0,length:100,width:100}),{x:100,y:100},"Place the new blast center inside the gray square. Gray = inactive original aim.","#ef9b36",p=>p.x<200).then(r=>previewResult=r)};
+  window.startPreview=()=>{window.previewResult="pending";window.previewPromise=placeArea(p=>({shape:"square",origin:p,direction:0,length:100,width:100}),{x:100,y:100},"Choose a new center inside the gray area.","#ef9b36",p=>p.x<200).then(r=>previewResult=r)};
   const highlight={visible:true};canvas.interface={grid:{getHighlightLayer:()=>highlight}};
   const template={document:{hidden:true,x:0,y:0,flags:{"pneuma-combattools":{areaShape:data.area}}},isVisible:true,hasPreview:false,visible:true,template:new Graphics(),highlightGrid(){}};
   for(const f of hooks.refreshMeasuredTemplate)f(template);
@@ -101,9 +109,19 @@ try {
   template.document.hidden=false;
   for(const f of hooks.refreshMeasuredTemplate)f(template);
   if(!template.visible||!highlight.visible)throw Error("Revealed area stayed hidden");
+  template.document.object=template;template.document.hidden=true;
+  for(const f of hooks.updateMeasuredTemplate)f(template.document);
+  // Native GM refreshState can restore visible; renderable must still block it.
+  template.visible=true;highlight.visible=true;
+  if(template.renderable||highlight.renderable)throw Error("Hidden GM blast can render after state refresh");
+  template.document.hidden=false;
+  for(const f of hooks.updateMeasuredTemplate)f(template.document);
+  if(!template.renderable||!highlight.renderable)throw Error("Manual reveal failed");
+  window.hudCleared=0;canvas.hud={token:{clear(){hudCleared++;}}};
   startPreview();
  });
  assert.equal(await page.locator('.pneuma-area-placement').count(),1);
+ assert.equal(await page.evaluate(()=>hudCleared),1);
  assert.match(await page.locator('.pneuma-area-placement').innerText(),/Right-click \/ Esc: cancel/);
  await page.locator('canvas').dispatchEvent('pointermove',{clientX:120,clientY:120});
  assert.equal(await page.evaluate(()=>previewDocument.fillColor),'#ef9b36');

@@ -1,3 +1,4 @@
+import { allActors as actors } from "./shared.js";
 import {actorEncounter,encounterEpoch} from "./encounter.js";
 import {effectDuration,durationExpired,hasDuration} from "./effect-duration.js";
 import {masterStatuses} from "./status-catalog.js";
@@ -17,7 +18,7 @@ const timedMarker=(actor:Actor,item:Item)=>String(item.type)==="criticalInjury"?
 export async function temporaryInjury(actor:Actor,name:string,combat:Combat|null|undefined=actorEncounter(actor)) {
   const s=status(name),b=s.binding!;
   const matches=actor.items.filter(i=>String(i.type)==="criticalInjury"&&(i.name===b.itemName||foundry.utils.getProperty(i,"flags."+M+".statusId")===s.id||String(foundry.utils.getProperty(i,"_stats.compendiumSource")??foundry.utils.getProperty(i,"flags.core.sourceId")??"").endsWith("."+b.itemId)));
-  if(matches.some(i=>!life(i)&&!timedMarker(actor,i)))return;
+  if(matches.some(i=>!life(i)&&!timedMarker(actor,i))){await syncActorStatuses(actor);return;}
   const duration=effectDuration(60,combat);
   if(matches.length){for(const i of matches){const marker=timedMarker(actor,i);if(marker)await marker.update({duration} as never);else await i.update({[key]:{kind:"injury",expires:game.time!.worldTime+60}} as never);}return;}
   const source=await game.packs!.get(b.pack)?.getDocument(b.itemId) as Item|undefined;
@@ -67,6 +68,9 @@ export async function igniteTarget(actor:Actor,combat?:Combat|null) {
   const s=status("On Fire (Mild)");
   await actor.createEmbeddedDocuments("ActiveEffect",[{name:s.name,img:s.img,statuses:[s.id],changes:[],...(combat?{flags:{[M]:{endWithCombat:combat.id}}}:{})}] as never);
 }
+export function hasInstantCondition(actor:Actor,kind:"sleep"|"fire"):boolean {
+  return allEffects(actor).some(e=>active(e)&&(kind==="fire"?fireDamage(e)>0:sleepEffect(e)));
+}
 export async function clearInstantCondition(actor:Actor,kind:"sleep"|"fire") {
   for(const effect of allEffects(actor).filter(e=>kind==="fire"?fireDamage(e)>0:sleepEffect(e))) {
     if(effect.parent===actor)await actor.deleteEmbeddedDocuments("ActiveEffect",[effect.id!]);
@@ -90,6 +94,17 @@ export async function expireInstantActor(actor:Actor,now=game.time!.worldTime) {
 export async function finishTimedEffects(combat:Combat) {
   const participants=new Set(Array.from(combat.combatants??[]).map(c=>c.actor?.uuid));
   for(const actor of actors()) {
+    const belongs=(effect:ActiveEffect)=>{
+      const linked=foundry.utils.getProperty(effect,"flags."+M+".endWithCombat") as string|undefined ?? effect.duration?.combat;
+      const id=typeof linked==="string"?linked:linked?.id;
+      return id?id===combat.id:participants.has(actor.uuid);
+    };
+    // Only an injury with a timed marker linked to its item is temporary.
+    const temporary=actor.items.filter(item=>{
+      const marker=timedMarker(actor,item);
+      return marker?belongs(marker):life(item)?.kind==="injury"&&participants.has(actor.uuid);
+    }).map(item=>item.id!);
+    if(temporary.length){await actor.deleteEmbeddedDocuments("Item",temporary,{pneumaStatusSync:true} as never);await syncActorStatuses(actor);}
     let changed=false;
     for(const effect of allEffects(actor)) {
       const injury=String((effect.parent as Item)?.type)==="criticalInjury"||masterStatuses.some(s=>s.binding?.kind==="injury"&&effect.statuses.has(s.id));
@@ -106,12 +121,6 @@ export async function finishTimedEffects(combat:Combat) {
   }
 }
 
-function actors():Actor[] {
-  const all=new Map<string,Actor>();
-  for(const a of game.actors??[])all.set(a.uuid,a);
-  for(const s of game.scenes??[])for(const t of s.tokens)if(t.actor)all.set(t.actor.uuid,t.actor);
-  return [...all.values()];
-}
 let work:Promise<unknown>=Promise.resolve();
 const enqueue=(run:()=>Promise<unknown>)=>{if(game.user?.id!==empGM()?.id)return;work=work.catch(()=>{}).then(run);void work.catch(e=>ui.notifications!.error("Instant effects: "+(e as Error).message));};
 export async function burnTurn(actor:Actor,turn:string) {

@@ -1,18 +1,20 @@
+import {registerConditionCardRefresh} from "./pending-card-refresh.js";
+import { primaryGM as gm, escapeHTML as escape } from "./shared.js";
 import {evasionBlocked,hasInjury} from "./injury-rules.js";
 import {registerNativeWrapper} from "./native-wrappers.js";
 import {requireCombatSocket} from "./socket-health.js";
 import type {MoveRecord} from "./movement-rules.js";
 const MODULE="pneuma-combattools",path=`flags.${MODULE}.brokenRibs`,channel=`module.${MODULE}`;
-const gm=()=>game.users?.filter(u=>u.active&&u.isGM).sort((a,b)=>a.id.localeCompare(b.id))[0];
 const get=<T>(doc:object,key=path)=>foundry.utils.getProperty(doc,key) as T|undefined;
-const escape=(s:string)=>s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]!);
+
 let queue:Promise<unknown>=Promise.resolve();
 function work<T>(fn:()=>Promise<T>):Promise<T>{const next=queue.catch(()=>{}).then(fn);queue=next;return next;}
 const movementInjuries=["Broken Ribs","Foreign Object (Body)","Foreign Object (Head)"] as const;
 interface RibsCard {injury?:string;actor:string;token:string;name:string;combat:string;turn:string;epoch:string;distance:number;applied?:boolean}
+const injuryId=(data:RibsCard)=>data.injury==="Foreign Object (Body)"?"foreign-object-body":data.injury==="Foreign Object (Head)"?"foreign-object-head":"broken-ribs";
 export function ribsContent(data:RibsCard):string {
   const eligible=data.distance>4;
-  return `<div class="pneuma-injury-card rollcard" data-injury="broken-ribs" data-state="${data.applied?"applied":eligible?"pending":"withdrawn"}"><div class="rollcard-top"><div class="cpr-block">${escape(data.name)} &mdash; ${escape(data.injury??"Broken Ribs")}</div></div><div class="rollcard-bottom"><p>${data.applied?"5 damage applied directly to HP.":eligible?`Moved ${Number(data.distance.toFixed(2))}m/yd on foot. At the end of this turn: 5 damage directly to HP.`:"Movement reset to 4m/yd or less; no damage due."}</p>${!data.applied&&eligible?'<button type="button" data-ribs-apply>Apply 5 damage</button>':""}</div></div>`;
+  return `<div class="pneuma-injury-card rollcard" data-injury="${injuryId(data)}" data-state="${data.applied?"applied":eligible?"pending":"withdrawn"}"><div class="rollcard-top"><div class="cpr-block">${escape(data.name)} &mdash; ${escape(data.injury??"Broken Ribs")}</div></div><div class="rollcard-bottom"><p class="pneuma-injury-summary">${data.applied?"5 damage applied directly to HP.":eligible?`Moved ${Number(data.distance.toFixed(2))}m/yd on foot. At the end of this turn: 5 damage directly to HP.`:"Movement reset to 4m/yd or less; no damage due."}</p>${!data.applied&&eligible?'<button type="button" data-ribs-apply>Apply 5 damage</button>':""}</div></div>`;
 }
 /** Runs after accepted movement only. The saved movement snapshot avoids animation/preview and rapid-move races. */
 export async function warnBrokenRibs(doc:TokenDocument,record:MoveRecord):Promise<void> {
@@ -81,12 +83,19 @@ export function registerInjuryMechanics():void {
     const record=get<MoveRecord>(changes,`flags.${MODULE}.movement`)??changes[`flags.${MODULE}.movement`] as MoveRecord|undefined;
     if(record)void warnBrokenRibs(doc,foundry.utils.deepClone({...get<MoveRecord>(doc,`flags.${MODULE}.movement`),...record})).catch(e=>ui.notifications!.error(String(e)));
   });
+  registerConditionCardRefresh(message=>{const data=get<RibsCard>(message);return data&&!data.applied?{actors:[data.actor],combat:data.combat}:undefined;});
   Hooks.on("renderChatMessage",async(message:ChatMessage,html:JQuery)=>{
     const data=get<RibsCard>(message);if(!data)return;
     const actor=await fromUuid(data.actor) as Actor|null;
+    const combat=game.combats?.get(data.combat);
+    const eligible=!!actor&&hasInjury(actor,data.injury??"Broken Ribs")&&data.distance>4&&!!combat?.started&&(get<string>(combat,"flags."+MODULE+".evasionEpoch")??"")===data.epoch;
+    const root=html[0]?.querySelector<HTMLElement>(".pneuma-injury-card");if(root)root.dataset.injury=injuryId(data);
+    if(!data.applied&&!eligible){
+      if(root){root.dataset.state="withdrawn";const summary=root.querySelector(".pneuma-injury-summary")??root.querySelector(".rollcard-bottom p");if(summary)summary.textContent="This injury warning is no longer applicable.";}
+    }
     for(const button of html.find<HTMLButtonElement>("[data-ribs-apply]").toArray()){
       if(!actor||(!game.user?.isGM&&!actor.isOwner)){button.remove();continue;}
-      button.disabled=data.applied===true||data.distance<=4||!game.combats?.get(data.combat)?.started;
+      button.disabled=data.applied===true||!eligible;
       button.addEventListener("click",async event=>{event.preventDefault();if(button.disabled)return;button.disabled=true;try{await requestDamage(message.id!);}catch(e){ui.notifications!.error(String(e));button.disabled=false;}});
     }
   });

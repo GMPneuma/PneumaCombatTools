@@ -1,3 +1,4 @@
+import { allActors, escapeHTML as escape } from "./shared.js";
 import {registerNativeWrapper} from "./native-wrappers.js";
 import {gunAmmo} from "./weapon-ammo.js";
 import type {EquipmentItem} from "./weapon-data.js";
@@ -16,7 +17,7 @@ interface AmmoWeapon extends Item {
 }
 const active = new WeakSet<AmmoWeapon>();
 const observers = new WeakSet<Function>();
-const escape = (text: string) => text.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
+
 
 /** CPR recreates these instance methods in loadMixins on every item preparation. */
 export function observeWeaponAmmo(item: AmmoWeapon): void {
@@ -39,7 +40,7 @@ export function observeWeaponAmmo(item: AmmoWeapon): void {
         if (action && report && shouldReport(this)) {
           try {
             await ChatMessage.create({speaker: ChatMessage.getSpeaker({actor:this.actor}),
-              content:`<p>${escape(player)} ${action} ${escape(this.name ?? "weapon")}</p>`});
+              content:`<p class="pneuma-ammo-notice" data-ammo-action="${action==='reloads'?'reload':'change'}">${escape(player)} ${action} ${escape(this.name ?? "weapon")}</p>`});
           } catch (error) {
             console.error("pneuma-combattools | Ammunition chat message failed", error);
             ui.notifications!.warn("Ammunition changed, but its chat message could not be posted.");
@@ -66,8 +67,6 @@ export function registerAmmoChat(): void {
       return result;
     }, "WRAPPER");
     // Include existing linked actors and unlinked token actors on every scene.
-    for (const actor of game.actors!) for (const item of actor.items) observeWeaponAmmo(item as AmmoWeapon);
-    for (const scene of game.scenes!) for (const token of scene.tokens)
-      if (token.actor) for (const item of token.actor.items) observeWeaponAmmo(item as AmmoWeapon);
+    for (const actor of allActors()) for (const item of actor.items) observeWeaponAmmo(item as AmmoWeapon);
   });
 }

@@ -7,7 +7,7 @@ import {movementHUD} from "./aoe/movement.js";
 import { grappleHUD } from "./grapple/state.js";
 import { registerHUDMessages, postHUDMessage, listHUDMessages, dismissHUDMessage, hudMessageKey } from "./hud-messages.js";
 import { getItemMarkers } from "./item-markers.js";
-import { createEKGTrace, vitalState, indicatorState, signalExposure, clearRoundExposures, type LampId } from "./biomonitor.js";
+import { ekgPaused, setEKGPaused, createEKGTrace, vitalState, indicatorState, signalExposure, clearRoundExposures, type LampId } from "./biomonitor.js";
 const MODULE = "pneuma-combattools";
 declare global { interface SettingConfig {
   "pneuma-combattools.biomonitorShowHP": boolean;
@@ -252,7 +252,6 @@ function openCard(id: string) {
   else ui.notifications!.info("Open the pending Combat Tools resolution card in chat.");
 }
 
-let ekgPaused = false;
 let lampTimer: ReturnType<typeof setTimeout> | undefined;
 function createEKG(state: ReturnType<typeof vitalState> | "unknown", compact = false) {
   const svg = createEKGTrace(state);
@@ -262,7 +261,7 @@ function createEKG(state: ReturnType<typeof vitalState> | "unknown", compact = f
     svg.setAttribute("aria-pressed", String(ekgPaused));
     svg.setAttribute("aria-label", (ekgPaused ? "Resume" : "Pause") + (compact ? " EKG animation." : " EKG animation. Focus or hover to reveal hit points."));
   };
-  const togglePlayback = () => { ekgPaused = !ekgPaused; if (compact) medicalSignature = ""; syncPlayback(); };
+  const togglePlayback = () => { setEKGPaused(!ekgPaused); if (compact) medicalSignature = ""; syncPlayback(); };
   svg.addEventListener("click", togglePlayback);
   svg.addEventListener("keydown", event => {
     if (event.key === "Enter" || event.key === " ") { event.preventDefault(); togglePlayback(); }

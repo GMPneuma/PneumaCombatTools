@@ -1,4 +1,5 @@
-import {resolveEncounter,encounterRef} from "../encounter.js";
+import { primaryGM as electedGM } from "../shared.js";
+import {resolveEncounter} from "../encounter.js";
 import { requireCombatSocket } from "../socket-health.js";
 import { resolutionSection, rollOutcomeClass } from "../card-structure.js";
 import type { RollItem } from "../native-combat.js";
@@ -8,7 +9,7 @@ import { resultFlag, delivery, escapeHTML, type QuickhackResult } from "./messag
 import { canOperate, roleFor, nativeQuickhackRoll, criticalD10 } from "./rolls.js";
 import { enabled, label, routing } from "./settings.js";
 import { isNetrunnerEjected } from "./rules.js";
-import { resultConnectionValid, ejectConnection, combatConnections, trackingCombat, type Connection } from "./connections.js";
+import { resultConnectionValid, ejectConnection, combatConnections, type Connection } from "./connections.js";
 
 interface Request { quickhackType: string; messageId: string; requesterId: string; total: number; rollContent?: string; connectionId?: string; id?: string; rollerId?: string; gmId?: string }
 interface Pending { request: Request; rollerId: string; timer: ReturnType<typeof setTimeout> }
@@ -100,7 +101,7 @@ async function resolveForceOut(request: Request) {
   if (roller.id === game.user!.id) await performResistance(prompt); else game.socket!.emit(channel, prompt);
 }
 async function performResistance(request: Request) {
-  const gm = game.users!.filter(user => user.active && user.isGM).sort((a,b) => a.id.localeCompare(b.id))[0];
+  const gm = electedGM();
   if (!enabled() || request.rollerId !== game.user!.id || request.gmId !== gm?.id) return;
   const context = await contextFor(request.messageId);
   if (!context || !canOperate(context.source)) return;

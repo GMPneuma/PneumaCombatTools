@@ -1,3 +1,4 @@
+import { allActors, primaryGM as electedGM, escapeHTML as escape } from "./shared.js";
 import {prepareBowAttack} from "./bow-loading.js";
 import {tokenEncounter,resolveEncounter,encounterRef,type EncounterRef} from "./encounter.js";
 import {attackCrossesSmoke} from "./aoe/smoke-obscuration.js";
@@ -46,8 +47,8 @@ let queue: Promise<unknown> = Promise.resolve();
 let trackingReady = true;
 const flag = <T>(doc: object, name: string): T | undefined =>
   foundry.utils.getProperty(doc, "flags." + MODULE + "." + name) as T | undefined;
-const escape = (text: unknown) => String(text ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-function authority(): User | undefined { return game.users?.filter(user => user.active && user.isGM).sort((a,b) => a.id.localeCompare(b.id))[0]; }
+
+function authority(): User | undefined { return electedGM(); }
 export const defenderKey = (actor: Actor): string => encodeURIComponent(actor.uuid).replaceAll(".", "%2E");
 function exchangeCombatId(data: Exchange): string | null | undefined {
   // Older confirmed exchanges have an unambiguous round reference; pending ones do not.
@@ -462,12 +463,8 @@ export function registerCombatResolution(): void {
     for (const message of game.messages ?? []) pendingCards.remember(message);
     if (authority()?.id === game.user!.id) {
       trackingReady = false;
-      const actors = new Map<string, Actor>();
-      for (const actor of game.actors ?? []) actors.set(actor.uuid, actor);
-      for (const scene of game.scenes ?? []) for (const token of scene.tokens)
-        if (token.actor) actors.set(token.actor.uuid, token.actor);
       void (async () => {
-        for (const actor of actors.values()) await migrateActorUsage(actor);
+        for (const actor of allActors()) await migrateActorUsage(actor);
         trackingReady = true;
         refreshPending();
       })().catch(error => {
@@ -533,7 +530,7 @@ export function registerCombatResolution(): void {
       }
       if (game.user!.isGM && data.state === "waiting") {
         const cancel = document.createElement("button");
-        cancel.className = "pneuma-cancel-exchange"; cancel.type = "button"; cancel.textContent = "Cancel exchange";
+        cancel.dataset.gmOnly = "true"; cancel.className = "pneuma-cancel-exchange"; cancel.type = "button"; cancel.textContent = "Cancel exchange";
         cancel.addEventListener("click", () => {
           void request(message.id!, "cancel").catch(error => ui.notifications!.error(error.message));
         });

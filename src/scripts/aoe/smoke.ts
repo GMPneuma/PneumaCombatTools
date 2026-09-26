@@ -54,6 +54,10 @@ async function finishCombatSmoke(combat:Combat) {
     if(ids.length)await scene.deleteEmbeddedDocuments("MeasuredTemplate",ids);
   }
 }
+function refreshSmokeCard(document:MeasuredTemplateDocument) {
+  const source=smoke(document)?.source,message=(source?game.messages?.get(source):undefined) as ChatMessage|undefined;
+  if(message?.visible)ui.chat?.updateMessage(message,false);
+}
 export function registerSmoke() {
   Hooks.on("canvasTearDown",()=>{for(const id of [...drawings.keys()])remove(id);});
   Hooks.on("canvasReady",()=>{for(const d of canvas.scene?.templates??[])if(smoke(d))draw(d);void expireSmoke();});
@@ -62,7 +66,7 @@ export function registerSmoke() {
   Hooks.once("ready",()=>{void expireSmoke();});
   Hooks.on("updateWorldTime",()=>{for(const d of canvas.scene?.templates??[])if(smoke(d)&&(smoke(d)!.duration?durationExpired(smoke(d)!.duration):smoke(d)!.expires<=game.time!.worldTime))remove(d.id!);void expireSmoke();});
   Hooks.on("createMeasuredTemplate",(d:MeasuredTemplateDocument)=>{if((d.parent as Scene|null)?.id===canvas.scene?.id&&smoke(d))draw(d);});
-  Hooks.on("updateMeasuredTemplate",(d:MeasuredTemplateDocument)=>{if((d.parent as Scene|null)?.id===canvas.scene?.id&&smoke(d))draw(d);});
-  Hooks.on("deleteMeasuredTemplate",(d:MeasuredTemplateDocument)=>remove(d.id!));
+  Hooks.on("updateMeasuredTemplate",(d:MeasuredTemplateDocument)=>{if((d.parent as Scene|null)?.id===canvas.scene?.id&&smoke(d))draw(d);refreshSmokeCard(d);});
+  Hooks.on("deleteMeasuredTemplate",(d:MeasuredTemplateDocument)=>{remove(d.id!);refreshSmokeCard(d);});
   Hooks.on("refreshMeasuredTemplate",(t:MeasuredTemplate)=>{if(!smoke(t.document))return;t.template?.clear();const h=canvas.interface?.grid.getHighlightLayer(t.highlightId);if(h)h.visible=false;});
 }

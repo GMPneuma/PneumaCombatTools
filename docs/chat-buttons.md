@@ -1,6 +1,6 @@
 # Chat button skin contract
 
-Current implementation: Combat Tools 0.8.1; source-reviewed 2026-09-23.
+Current implementation: Combat Tools 0.9.0 plus local changes; source-reviewed 2026-09-26.
 
 Scope: Combat Tools buttons inside chat messages, plus its Interact With Armor and Half Armor SP buttons on native damage cards. HUDs, dialogs, flyouts, native roll expansion/undo links and other modules are not restyled.
 
@@ -8,6 +8,7 @@ Scope: Combat Tools buttons inside chat messages, plus its Interact With Armor a
 
 - `.pneuma-chat-button`: shared appearance and stable geometry; workflow action selectors remain intact.
 - `[data-chat-kind="action|toggle|recovery|cancel"]`: semantic variant.
+- `[data-chat-role="gm"]`: GM-only/override presentation; red badge/outline, normal background and black text; charcoal/light text on enabled hover or keyboard focus. This is independent of action/recovery/cancel kind.
 - `.pneuma-chat-icon`: square compact action or effect slot.
 - `[aria-pressed="true"]`: selected toggle, solid fill and checked box; false has an empty box.
 - `:disabled`, `[aria-disabled="true"]`: unavailable. Existing workflow logic owns permissions and disabling.
@@ -29,6 +30,8 @@ All button variables use the prefix `--pneuma-chat-button-`:
 | hover-background, hover-color, hover-shadow | Hover appearance, with no selected-state imitation |
 | selected, selected-color, selected-border | Active toggle fill, text and border (charcoal, white and red by default) |
 | recovery-border, cancel-border | GM recovery and cancellation emphasis |
+| gm-background, gm-color, gm-border | GM neutral appearance; border token also colors the badge |
+| gm-hover-background, gm-hover-color | GM hover/focus appearance |
 | icon-background, icon-color, icon-border | Dark effect-icon wells |
 | height, font-size, font-weight, font-family, line-height | Shared sizing and typography |
 | padding, margin, gap, border-width, radius | Shared spacing and shape |

@@ -1,3 +1,4 @@
+import { primaryGM as authority } from "./shared.js";
 import { MANUAL_MODULE as M, manualEscape as esc, manualNumber, groupContent, type ManualCard, type InjuryResult } from "./manual-roll-state.js";
 import { damageContent, handleDamage, renderDamage, selectedDamageTarget, damageValues, type DamageRequest } from "./damage-flow.js";
 import { validateDamageStatuses } from "./damage-status.js";
@@ -13,7 +14,6 @@ type Wire = { manualType: "request" | "reply"; id: string; user: string; message
 const channel = "module." + M;
 const flag = "flags." + M + ".manualRoll";
 const state = (message: ChatMessage) => foundry.utils.getProperty(message, flag) as ManualCard | undefined;
-const authority = () => game.users?.filter(user => user.active && user.isGM).sort((a,b) => a.id.localeCompare(b.id))[0];
 const report = (error: unknown) => ui.notifications!.error((error as Error).message ?? String(error));
 let queue: Promise<unknown> = Promise.resolve();
 const pending = new Map<string, {resolve(): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout>}>();
@@ -195,8 +195,8 @@ export function bindManualCard(message: ChatMessage, html: HTMLElement) {
     for(const row of data.rows??[]) {
       if(!game.user!.isGM && row.user!==game.user!.id)continue;
       const slot=root.querySelector<HTMLElement>('[data-group-user="'+CSS.escape(row.user)+'"] .pneuma-group-action')!;
-      if(row.state==="waiting" || retry.has(message.id+":"+row.user))addButton(slot,retry.has(message.id+":"+row.user)?"Finish roll":"Roll",()=>rollGroup(message,data,row.user));
-      else if(row.state==="rolling" && game.user!.isGM)addButton(slot,"Release",()=>send(message.id!,{action:"reset",row:row.user}));
+      if(row.state==="waiting" || retry.has(message.id+":"+row.user))addButton(slot,retry.has(message.id+":"+row.user)?"Finish roll":"Roll",()=>rollGroup(message,data,row.user)).dataset.gmOnly=String(game.user!.isGM && row.user!==game.user!.id);
+      else if(row.state==="rolling" && game.user!.isGM)addButton(slot,"Release",()=>send(message.id!,{action:"reset",row:row.user})).dataset.gmOnly="true";
     }return;
   }
   const controls=root.querySelector<HTMLElement>(".pneuma-manual-controls")!;
@@ -208,7 +208,7 @@ export function bindManualCard(message: ChatMessage, html: HTMLElement) {
     },{canEditEffects:!!game.user!.isGM || game.user!.id===data.creator}).catch(report);
     if((data.damage.result?.sixes??0)>=2 && !data.injuryBusy)addButton(controls,"Roll critical injury for selected token",()=>send(message.id!,{action:"injury",target:selectedDamageTarget()}));
   } else if(!data.injuryBusy)addButton(controls,"Apply injury to selected token",()=>send(message.id!,{action:"injury",target:selectedDamageTarget()}));
-  if(game.user!.isGM && (data.injuryBusy || data.damage && ["review","applying"].includes(data.damage.status)))addButton(controls,"Mark resolved after GM review",()=>send(message.id!,{action:"review"}));
+  if(game.user!.isGM && (data.injuryBusy || data.damage && ["review","applying"].includes(data.damage.status)))addButton(controls,"Mark resolved after GM review",()=>send(message.id!,{action:"review"})).dataset.gmOnly="true";
 }
 function field(label:string, control:string) {const name=/name="([^"]+)"/.exec(control)?.[1]??'field';return '<div class="form-group"><label for="pneuma-roll-'+name+'">'+label+'</label><div class="form-fields">'+control.replace('name=', 'id="pneuma-roll-'+name+'" name=')+'</div></div>';}
 const pair=(content:string)=>'<div class="pneuma-roll-pair">'+content+'</div>';

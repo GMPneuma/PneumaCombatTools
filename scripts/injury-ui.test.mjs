@@ -24,10 +24,16 @@ try{
   window.game={user:gm,users:[gm,owner],combats:new Map([["c",{id:"c",started:true}]]),messages:[],modules:new Map()};game.messages.get=id=>game.messages.find(m=>m.id===id);
   window.fromUuid=async()=>actor;
   const {registerInjuryMechanics,warnBrokenRibs}=await import("/scripts/injury-mechanics.js");
-  window.draw=async message=>{const root=document.querySelector("#card");root.innerHTML=message.content;for(const f of hooks.renderChatMessage)await f(message,{find:s=>({toArray:()=>[...root.querySelectorAll(s)]})});};
+  window.draw=async message=>{const root=document.querySelector("#card");root.innerHTML=message.content;for(const f of hooks.renderChatMessage)await f(message,{0:root,find:s=>({toArray:()=>[...root.querySelectorAll(s)]})});};
   window.ChatMessage={getSpeaker:()=>({}),async create(data){const m={...data,id:"m",async update(data){for(const[k,v]of Object.entries(data))set(this,k,v);await draw(this);}};game.messages.push(m);await draw(m);return m;}};
   registerInjuryMechanics();await warnBrokenRibs({uuid:"Token.a",actor,name:"Rage"},{combat:"c",turn:"p:1",spent:3,onFoot:6});
  });
+ await page.evaluate(async()=>{actor.items=[];await draw(game.messages[0]);});
+ assert.equal(await page.locator('[data-state="withdrawn"]').count(),1);
+ assert.equal(await page.getByRole('button',{name:'Apply 5 damage'}).isDisabled(),true);
+ await page.evaluate(async()=>{actor.items=[{type:'criticalInjury',name:'Broken Ribs'}];game.combats.get('c').flags={'pneuma-combattools':{evasionEpoch:'reset'}};await draw(game.messages[0]);});
+ assert.equal(await page.getByRole('button',{name:'Apply 5 damage'}).isDisabled(),true);
+ await page.evaluate(async()=>{delete game.combats.get('c').flags;await draw(game.messages[0]);});
  const button=page.getByRole("button",{name:"Apply 5 damage"});
  assert.equal(await button.isEnabled(),true);assert.equal(await page.evaluate(()=>actor.system.derivedStats.hp.value),30);
  assert.equal(await page.evaluate(()=>document.querySelector("#card").scrollWidth<=360),true);

@@ -153,7 +153,7 @@ test("menu categories separate ranged/melee and inventory throws and grenades",a
  assert.deepEqual(grenadeEntries([weapon("Grenade",{variety:"grenade",type:"armorPiercing"},{type:"ammo"}),weapon("Smoke",{variety:"grenade",type:"smoke"},{type:"ammo"}),weapon("EMP",{variety:"grenade",type:"emp"},{type:"ammo"}),weapon("Bullet",{variety:"heavyPistol",type:"armorPiercing"},{type:"ammo"}),weapon("Rocket",{variety:"rocket",type:"armorPiercing"},{type:"ammo"}),weapon("Misnamed grenade",{type:"grenade",variety:"rifle"},{type:"ammo"})]).map(r=>r.name),["Grenade","Smoke","EMP"]);
 });
 test("thrown roll item preserves source, uses Athletics and chosen dice, and does not discharge inventory",async()=>{
- const {thrownRollItem,usedThrownName}=await import("../dist/scripts/thrown-weapons.js");
+ const {thrownRollItem}=await import("../dist/scripts/thrown-weapons.js");
  globalThis.foundry={utils:{deepClone:structuredClone}};
  globalThis.CONFIG={Item:{documentClass:class {constructor(data,context){Object.assign(this,data);this.parent=context.parent;} async confirmRoll(){throw Error("must not mutate inventory");}}}};
  const source={name:"Rock",system:{weaponType:"thrownWeapon",damage:"6d6",ignoreArmorPercent:50,magazine:{value:0,max:1}}};
@@ -162,7 +162,6 @@ test("thrown roll item preserves source, uses Athletics and chosen dice, and doe
  assert.equal(item.system.damage,"3d6");assert.equal(item.system.ignoreArmorPercent,0);assert.equal(item.parent,actor);
  assert.equal(source.system.magazine.value,0);assert.equal(source.system.damage,"6d6");
  const roll={};assert.equal(await item.confirmRoll(roll),roll);
- assert.equal(usedThrownName("Rock"),"Rock (used)");assert.equal(usedThrownName("Rock (used)"),"Rock (used)");
 });
 
 test("grenade menu excludes depleted inventory",async()=>{

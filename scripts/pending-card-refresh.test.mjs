@@ -46,3 +46,32 @@ cards[0].flags["pneuma-combattools"].exchange.state="resolved";
 hooks.updateChatMessage.forEach(fn=>fn(cards[0]));flush();
 hooks.updateActor.forEach(fn=>fn({uuid:"Actor.one"}));flush();assert.deepEqual(changed,[]);
 console.log("Pending-card hooks: one startup scan only, relevant actor/item/combat refresh, resolved-card cleanup passed.");
+
+// Multiple defenders share one AoE card; removing a completed row stops its refreshes.
+const areaChanges=[];
+const areas=new PendingCardRefresh(message=>areaChanges.push(message.id),message=>{
+ const data=message.area;
+ if(data?.phase!=='responses')return;
+ const actors=data.rows.filter(row=>['waiting','rolling'].includes(row.state)).map(row=>row.actor);
+ return actors.length?{actors}:undefined;
+});
+const area={id:'area',visible:true,area:{phase:'responses',rows:[{actor:'a',state:'waiting'},{actor:'b',state:'rolling'}]}};
+areas.remember(area);areas.refresh('a');areas.refresh('b');flush();assert.deepEqual(areaChanges.splice(0),['area']);
+area.area.rows[0].state='hit';areas.remember(area);areas.refresh('a');flush();assert.deepEqual(areaChanges,[]);
+areas.refresh('b');area.area.phase='resolved';areas.remember(area);flush();assert.deepEqual(areaChanges,[]);
+area.area.phase='responses';areas.remember(area);areas.refresh('b');areas.forget('area');flush();assert.deepEqual(areaChanges,[]);
+console.log('Multi-defender pending cards: one refresh per frame, completed rows, resolution and deletion passed.');
+
+// Condition-dependent controls follow effect/item and combat changes, without rescanning messages.
+{
+ const {registerConditionCardRefresh}=await import('../dist/scripts/pending-card-refresh.js');
+ const hooks={};globalThis.Hooks={on:(name,fn)=>(hooks[name]??=[]).push(fn),once:(name,fn)=>(hooks[name]??=[]).push(fn)};
+ globalThis.Actor=class{constructor(uuid){this.uuid=uuid;}};
+ const actor=new Actor('Actor.condition'),message={id:'condition',visible:true,scope:{actors:[actor.uuid],combat:'c'}};
+ const updated=[];globalThis.game={messages:[message],user:{isGM:true}};globalThis.ui={chat:{updateMessage:m=>updated.push(m.id)}};
+ registerConditionCardRefresh(m=>m.scope);hooks.ready[0]();
+ hooks.deleteActiveEffect[0]({parent:actor});hooks.updateItem[0]({parent:actor});flush();assert.deepEqual(updated.splice(0),['condition']);
+ hooks.updateCombat[0]({id:'other'});flush();assert.deepEqual(updated,[]);
+ hooks.updateCombat[0]({id:'c'});flush();assert.deepEqual(updated.splice(0),['condition']);
+ hooks.deleteChatMessage[0](message);hooks.updateActor[0](actor);flush();assert.deepEqual(updated,[]);
+}

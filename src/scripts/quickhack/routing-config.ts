@@ -72,10 +72,6 @@ export function scenarioFor({ sourceIsPlayer, targetIsPlayer }: Scenario) {
   return SCENARIO.NPC_TO_NPC;
 }
 
-export function resolveAttackRollAudience({ sourceIsPlayer }: Pick<Scenario, "sourceIsPlayer">) {
-  return sourceIsPlayer ? AUDIENCE.PUBLIC : AUDIENCE.GM;
-}
-
 export function resolveJackInRouting(config: Partial<RoutingConfig>, { sourceIsPlayer, targetIsPlayer, targetAware }: Scenario & { targetAware: boolean }) {
   const normalized = normalizeRoutingConfig(config);
   const scenario = scenarioFor({ sourceIsPlayer, targetIsPlayer });

@@ -1,5 +1,13 @@
 # Combat Tools feature inventory
 
+The indicator size control is labeled “Indicator Scale” (previously “Indicator distance”); existing profiles retain their values.
+
+Grenade placement (unreleased): area placement clears the native Token HUD. Hidden blast/aim templates and grid highlights remain non-rendering for GMs; manual Show restores them. Missed attacks use one brief instruction and a labeled “Place New Target Center” button. Browser fixtures cover HUD clearing, GM visibility, preview cleanup, and the labeled card; live Foundry verification remains pending.
+
+Explosive area cards use the concise notice: “GM resolves all aspects of cover and terrain.”
+
+Cleanup and refresh efficiency (unreleased, 2026-09-26): EMP refreshes track affected actors and combine queued changes; unrelated combat updates no longer scan world actors or refresh every EMP card. AoE refreshes use an event-maintained pending-card index rather than scanning chat history. HTML escaping, GM election, and actor enumeration are shared. Obsolete helpers/settings/translations are removed; the active flat -4 evasion rule and legacy readers remain. Targeted automated regression coverage is separate from live Foundry multiplayer verification.
+
 Animated Turn Indicator (unreleased): 16 animated styles, including all ten roles. Self-CTH gear → Animated Turn Indicator provides Default Indicator and My Indicator buttons. Default appearance is stored in world settings and edited by the GM; NPCs and players without token or personal overrides inherit it. GM-only This Token overrides are stored on the scene TokenDocument, with priority over the player profile; Use inherited settings removes the token override. My Indicator stores a complete shared profile on the user document, so all viewers see the current character owner’s selected style, color, thickness, distance, opacity and speed. Assigned character user takes priority, then a stable non-GM owner; offline status does not change selection. Use Default Indicator removes the personal override. Animated/Static/Off display remains a client-only preference. Inputs auto-save; rapid slider changes are coalesced. Native active-scene, visibility, parenting and teardown behavior remain. Shared profile selection, permissions and browser form flows are tested; live multiplayer acceptance remains pending.
 
 Biomonitor composite icon: shifted the heart and its crack 3 SVG units right; bell position and icon dimensions are unchanged.
@@ -215,3 +223,17 @@ Per-token indicator overrides: GMs can open This Token from an owned token’s S
 - MedTech medical cross is fixed red independently of the selected profile color.
 - Exec is redesigned as Corporate Authority: stepped skyscraper crest, angular side framing, outward-moving command signals and three rank chevrons. Removed the inbox and org chart.
 - All styles retain cached geometry. Strict build, 407 passing tests (4 skipped), and PIXI dark/light animation fixtures pass; live Foundry visual review remains pending.
+
+- Implemented: compact resistance rows (e.g. Poison DV13) with a shield Resist icon; all GM-only chat actions and explicit overrides share a normal background, red outline and GM badge, and black action text; hover/focus switches to charcoal with light action text across combat, damage, area effects, instant effects, grapple, EMP, and manual/group checks. Existing permissions remain unchanged. Build/browser fixtures verify presentation; live Foundry validation remains pending.
+
+- Implemented: GM Remove smoke / Restore smoke toggles the saved smoke template visibility and attack obscuration together. Hidden smoke imposes no automatic attack penalty; restored, unexpired smoke does. The original lifetime continues while removed; expired/deleted smoke cannot be restored.
+
+- Implemented: other-token right-click HUD offers Wake using action when the selected owned character is conscious and the target is Unconscious. The GM applies native Unconscious removal; Prone remains. Touching range and action expenditure remain player/GM adjudicated.
+
+- Implemented: personal EKG pause/resume also controls the viewer's hover EKG, including an already visible trace, newly hovered tokens, and health-state redraws. The existing session-local preference remains local to the viewer.
+
+- Implemented: per-target resistance, Evasion/Concentration, and instant damage rolls show compact clickable totals beside their outcome/pending action. Native roll HTML is retained inside a collapsed disclosure. Manual group checks already retain clickable totals.
+
+- Fixed: combat end/reset/deletion clears temporary injury items and their status markers (Teargas Damaged Eye, Flashbang Eye/Ear, Sonic Shock Ear), while permanent injuries and other encounters remain. Existing native round/time expiry remains. Reapplication also repairs a missing marker for a pre-existing permanent injury. Biomonitor condition checks verify affected-actor display and cleanup; live verification pending.
+
+- Implemented audit F1/F3/F4: condition-aware Wake/Extinguish controls and stale-request rejection; current-injury/combat-epoch availability for movement warnings with batched card refresh; scoped reload notice, injury-kind and QuickHack error identifiers. Historical results and native card styling remain. QuickHack recovery (F2) explicitly deferred by user; its behavior is unchanged.

@@ -1,3 +1,4 @@
+import { primaryGM as electedGM } from "../shared.js";
 import {displayedEncounter,sceneEncounter,resolveEncounter,encounterRef,type EncounterRef} from "../encounter.js";
 import { requireCombatSocket } from "../socket-health.js";
 import { MODULE } from "./availability.js";
@@ -138,7 +139,7 @@ export function registerConnections() {
     } else if ((payload.quickhackType === "connect" || payload.quickhackType === "awareness") && primaryGM()) {
       void connect(payload).then(() => sendReply(payload), error => sendReply(payload, String(error)));
     } else if (payload.quickhackType === "connected" && payload.requesterId === game.user!.id) {
-      const gm = game.users!.filter(user => user.active && user.isGM).sort((a,b) => a.id.localeCompare(b.id))[0];
+      const gm = electedGM();
       if (gm?.id !== payload.gmId) return;
       const request = requests.get(payload.id); if (!request) return;
       clearTimeout(request.timer); requests.delete(payload.id);

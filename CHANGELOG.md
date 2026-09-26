@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.9.1 - 2026-09-26
+
+- Standardize GM-only chat controls with red outlines and GM badges, with charcoal hover styling. Add consistent CSS hooks for card customization.
+- Show group results and pending actions inline; click a roll total to expand its native roll details. Simplify resistance controls and cover/terrain wording.
+- Hide the Token HUD during grenade placement, label the replacement target control, and fix lingering scattered blast displays.
+- Let the GM remove and restore smoke. Removed smoke stops applying attack penalties; restored smoke resumes them without resetting its duration.
+- Add **Wake using action** to the target HUD for unconscious characters, preserving Prone.
+- Synchronize personal and hover EKG pause behavior. Rename the indicator setting to **Indicator Scale**.
+- Repair temporary eye/ear status synchronization and clean up linked temporary injuries when their timer or originating encounter ends.
+- Refresh condition and movement-injury cards when their underlying state changes; reject stale actions.
+- Consolidate shared helpers, remove dead code, and reduce redundant AoE/EMP card refresh work. Improve active-GM selection.
+- Audit chat-card flows and styling, update the documentation, and regenerate all 15 Mermaid diagrams.
+
+QuickHack recovery changes remain deferred. Automated Animations compatibility is not included.
+
+Validation: production build, automated regressions and targeted browser fixtures. Live Foundry multiplayer verification remains pending.
+
 ## 0.9.0 - 2026-09-26
 
 - Add 16 lightweight Animated Turn Indicator styles, including role-specific designs, configurable color, thickness, distance, opacity and speed.

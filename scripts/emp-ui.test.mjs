@@ -28,13 +28,11 @@ try {
   window.Dialog=class{constructor(data){this.data=data;}render(){document.querySelector('.dialog')?.remove();const root=document.createElement('section');root.className='dialog';root.innerHTML=this.data.content;for(const [id,config]of Object.entries(this.data.buttons)){const button=document.createElement('button');button.dataset.button=id;button.textContent=config.label;button.onclick=()=>config.callback?.([root]);root.append(button);}document.body.append(root);return this;}};
   window.wrap=element=>({0:element,length:element?1:0,find:selector=>wrap(element?.querySelector(selector)),first(){return this;},append(node){element?.append(node);}});
  });
- await page.addScriptTag({type:'module',content:'import {registerEmp,chooseEmp,configureEmp,createEmp} from "/scripts/emp.js"; Object.assign(window,{chooseEmp,configureEmp,createEmp});registerEmp();window.loaded=true;'});
+ await page.addScriptTag({type:'module',content:'import {registerEmp,chooseEmp,createEmp} from "/scripts/emp.js"; Object.assign(window,{chooseEmp,createEmp});registerEmp();window.loaded=true;'});
  await page.waitForFunction(()=>window.loaded);
  await page.evaluate(()=>(hooks.renderTokenHUD??[]).forEach(f=>f({object:{actor}},wrap(document.getElementById('hud')))));
  assert.equal(await page.locator('[title="EMP: disable cyberware"]').count(),0);
- await page.evaluate(()=>configureEmp(actor));
- assert.equal(await page.locator('select[name="mode"] option').count(),4);
- await page.selectOption('select[name="chooser"]','player');await page.locator('[data-button="create"]').click();
+ await page.evaluate(()=>createEmp(actor,{count:2,chooser:'player',mode:'equal',policy:{foundational:true,cascade:true,electronics:true,immune:[]}}));
  await page.waitForFunction(()=>messages.length===1);
  assert.deepEqual(await page.evaluate(()=>messages[0].whisper),['gm','owner']);
  assert(!await page.evaluate(()=>messages[0].content.includes('<test>')));

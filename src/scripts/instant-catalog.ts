@@ -22,4 +22,4 @@ export function ammoProfile(type:string|undefined,variety?:string) {
   const entry=type?ammunition[type]:undefined;
   return entry&&(!variety||(variety==="rocket"?entry.rocket:variety==="grenade"&&entry.grenade))?entry:undefined;
 }
-export const escapeInstant=(value:unknown)=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]!));
+export { escapeHTML as escapeInstant } from "./shared.js";

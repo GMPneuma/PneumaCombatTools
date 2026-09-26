@@ -18,6 +18,15 @@ test('only active scene smoke counts, including gridless polygons and overlappin
  scene.templates[0].flags['pneuma-combattools'].smoke={cells:[[10,10,20,15,10,20]],expires:160};
  assert(attackCrossesSmoke(p(0,15),p(30,15),scene));
 });
+test('removed smoke stops penalties, restored smoke resumes them without extending its lifetime',()=>{
+ globalThis.foundry={utils:{getProperty:(o,path)=>path.split('.').reduce((v,k)=>v?.[k],o)}};
+ globalThis.game={time:{worldTime:100},combats:new Map()};
+ const template={hidden:false,flags:{'pneuma-combattools':{smoke:{cells:[cell],expires:160}}}},scene={templates:[template]};
+ assert(attackCrossesSmoke(p(0,15),p(30,15),scene));
+ template.hidden=true;assert(!attackCrossesSmoke(p(0,15),p(30,15),scene));
+ template.hidden=false;assert(attackCrossesSmoke(p(0,15),p(30,15),scene));
+ game.time.worldTime=160;assert(!attackCrossesSmoke(p(0,15),p(30,15),scene));
+});
 test('native smoke modifier applies once, preserves other modifiers and forces a review dialog',async()=>{
  const roll={mods:[{id:'other',value:2,source:'Other'}],addMod(mods){this.mods.push(...mods)},async handleRollDialog(event){this.event=event;return true}};
  assert(await smokeAttackDialog(roll,{}, {},{ctrlKey:true},true));

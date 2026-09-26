@@ -1,3 +1,4 @@
+import { allActors, primaryGM as empGM } from "./shared.js";
 import {resolveEncounter,type EncounterRef} from "./encounter.js";
 import {activeLegInjuryPenalty} from "./injury-rules.js";
 import {penaltyFlags,missingPenaltyFlags} from "./penalty-flags.js";
@@ -9,7 +10,7 @@ export {empDisabled};
 export interface EmpRequest { encounter?:EncounterRef; id: string; actor: string; count: number; chooser: "gm" | "player" | "random"; mode: EmpRandom; policy: EmpPolicy; state: "pending" | "applied"; selected?: string[]; affectedNames?: string[]; message?: string; source?:DisableSource; sourceActor?:string; seconds?:number; duration?:EffectDuration; origin?:string; method?:EmpMethod; offered?:string[]; selectedNames?:string[]; resistedNames?:string[] }
 export interface EmpRecord {actor: string; items: string[]; timed?:boolean}
 const path = `flags.${MODULE}`;
-export const empGM = () => game.users?.filter(u => u.active && u.isGM).sort((a,b) => a.id!.localeCompare(b.id!))[0];
+export { primaryGM as empGM } from "./shared.js";
 export const empRequests = (combat: Combat) => foundry.utils.getProperty(combat, `${path}.empRequests`) as Record<string,EmpRequest> | undefined ?? {};
 export const empRecords = (combat: Combat) => foundry.utils.getProperty(combat, `${path}.empRecords`) as Record<string,EmpRecord> | undefined ?? {};
 let queue: Promise<unknown> = Promise.resolve();
@@ -83,10 +84,7 @@ export async function finishEmp(combat: Combat, deleted = false) {
 }
 export async function reconcileEmp() {
   // One startup pass also cleans stale markers if a combat was deleted while this module was unavailable.
-  const actors = new Map<string,Actor>();
-  for (const actor of game.actors ?? []) actors.set(actor.uuid,actor);
-  for (const scene of game.scenes ?? []) for (const token of scene.tokens) if (token.actor) actors.set(token.actor.uuid,token.actor);
-  for (const actor of actors.values()) {
+  for (const actor of allActors()) {
     for(const effect of actor.effects){
       const flags=foundry.utils.getProperty(effect,path) as {disabledLegPenalty?:boolean;frameConsequences?:boolean;quickhackEffect?:string}|undefined;
       if((flags?.disabledLegPenalty||flags?.frameConsequences||["slow","impair-movement"].includes(flags?.quickhackEffect??""))&&missingPenaltyFlags(effect))
@@ -152,10 +150,6 @@ export async function expireDisablements(actor:Actor, endedCombat?:string) {
   });
   if(stale.length)await actor.deleteEmbeddedDocuments("ActiveEffect",stale.map(e=>e.id!));
   await syncDisabledLimbs(actor);
-}
-export async function sweepDisablements() {
-  const actors=new Map<string,Actor>();for(const a of game.actors??[])actors.set(a.uuid,a);for(const scene of game.scenes??[])for(const t of scene.tokens)if(t.actor)actors.set(t.actor.uuid,t.actor);
-  for(const actor of actors.values())await expireDisablements(actor);
 }
 
 /** Aggregate overlapping frame consequences; retain the strongest penalty only. */

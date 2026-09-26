@@ -20,6 +20,3 @@ export async function improvisedSource(): Promise<object> {
   if (!item) throw new Error("Could not load the native Thrown Weapon.");
   return item.toObject();
 }
-export function usedThrownName(name: string): string {
-  return /\(used\)$/i.test(name.trim()) ? name : name + " (used)";
-}

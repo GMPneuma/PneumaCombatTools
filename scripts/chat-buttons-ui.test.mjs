@@ -5,13 +5,13 @@ const browser=await chromium.launch({channel:'msedge',headless:true});
 try {
  const page=await browser.newPage({viewport:{width:760,height:740}});
  await page.setContent(`<main class="chat-message"><h3>Chat button states</h3>
- <section class="pneuma-defense-controls"><button>Evade</button><button>Do not Evade</button><button class="pneuma-cancel-exchange">Cancel exchange</button></section>
- <section class="pneuma-manual-controls"><button id="apply">Apply to selected token</button><button>Mark resolved after GM review</button><button disabled title="Waiting for damage roll">Apply injury</button><button class="pneuma-damage-status-slot">+</button></section>
+ <section class="pneuma-defense-controls"><button>Evade</button><button>Do not Evade</button><button class="pneuma-cancel-exchange" data-gm-only="true">Cancel exchange</button></section>
+ <section class="pneuma-manual-controls"><button id="apply">Apply to selected token</button><button data-gm-only="true">Mark resolved after GM review</button><button disabled title="Waiting for damage roll">Apply injury</button><button class="pneuma-damage-status-slot">+</button></section>
  <section><button id="half" class="pneuma-half-armor" aria-pressed="false">Half Armor SP</button><button class="pneuma-half-armor" aria-pressed="true">Half Armor SP</button></section>
  <section class="pneuma-aoe-card"><button data-aoe-action="apply" title="Apply shared damage"><i class="test-bolt"></i></button><button data-aoe-action="apply" disabled title="Damage applied"><i class="test-bolt"></i></button><button data-aoe-action="reset" title="Release roll"><i class="test-reset"></i></button></section>
- <section class="pneuma-grapple-controls"><button>Roll Brawling</button><button>End (GM)</button></section>
+ <section class="pneuma-grapple-controls"><button>Roll Brawling</button><button data-gm-only="true">End (GM)</button></section>
  <section class="pneuma-quickhack-actions"><button>Force Out</button></section>
- <section><button data-emp-select>Choose affected items</button><button data-instant-action="roll">Resist DV15</button><button data-ribs-apply>Apply 5 damage</button></section>
+ <section><button data-emp-select data-gm-only="true">Choose affected items</button><button data-instant-action="roll">Resist DV15</button><button data-ribs-apply>Apply 5 damage</button></section>
  <section class="pneuma-group-action"><button>Roll</button></section><a class="pneuma-group-total">15</a><button id="native">Native control</button></main>`);
  await page.addStyleTag({content:await readFile('dist/styles/pneuma-combattools.css','utf8')});
  await page.addStyleTag({content:`body{font:14px Arial;background:#ddd;padding:20px}section{margin:12px 0}.test-bolt::before{content:"ϟ"}.test-reset::before{content:"↻"} .pneuma-defense-controls{display:flex;gap:4px} button:hover { padding:20px; border-width:7px; font-size:25px; font-weight:bold; transform:scale(1.3); margin:10px; width:500px; }`});
@@ -53,6 +53,18 @@ try {
  assert.equal(await page.locator('[data-aoe-action=apply][disabled]').getAttribute('aria-label'),'Applied');
  await page.evaluate(()=>{const b=document.createElement('button');b.dataset.instantAction='review';b.textContent='GM: mark resolved';document.querySelector('main').append(b)});
  await page.waitForFunction(()=>document.querySelector('[data-instant-action=review]').classList.contains('pneuma-chat-button'));
+ const gmButtons=page.locator('[data-chat-role="gm"]');
+ assert.equal(await gmButtons.count(),6,'GM controls across card families and asynchronous controls share the role');
+ await page.mouse.move(740,720);await page.locator('#apply').blur();
+ const normal=await page.locator('#apply').evaluate(n=>getComputedStyle(n).backgroundColor);
+ const skins=await gmButtons.evaluateAll(nodes=>nodes.map(n=>{const s=getComputedStyle(n);return [s.backgroundColor,s.color,s.borderColor,getComputedStyle(n,'::before').content]}));
+ for(const skin of skins){assert.deepEqual(skin,skins[0]);assert.equal(skin[0],normal);assert.equal(skin[3],'"GM"');}
+ assert.equal(await page.locator('[data-instant-action="roll"] i.fa-shield-halved').count(),1);
+ const gmBox=await gmButtons.first().boundingBox();await gmButtons.first().hover();assert.deepEqual(await gmButtons.first().boundingBox(),gmBox);
+ await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-chat-role="gm"]')).backgroundColor==='rgb(41, 41, 41)');
+ assert.equal(await gmButtons.first().evaluate(n=>getComputedStyle(n).color),'rgb(238, 238, 238)');
+ assert.equal(await gmButtons.first().evaluate(n=>getComputedStyle(n,'::before').color),'rgb(196, 59, 59)');
+ await page.screenshot({path:process.env.TEMP+'/pct-gm-hover.png',fullPage:true});
  await page.addStyleTag({content:':root {--pneuma-chat-button-selected:rgb(70,30,100);--pneuma-chat-button-height:32px}'});
  await page.waitForFunction(()=>getComputedStyle(document.querySelector('#half')).backgroundColor==='rgb(70, 30, 100)');
  assert.equal(await page.locator('[data-aoe-action=reset]').evaluate(n=>getComputedStyle(n).height),'32px');

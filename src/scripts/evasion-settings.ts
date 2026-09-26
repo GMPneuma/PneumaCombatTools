@@ -17,7 +17,6 @@ declare global {
     "pneuma-combattools.evasionSolo": EvasionQualifier;
     "pneuma-combattools.evasionAllowance": EvasionAllowance;
     "pneuma-combattools.evasionLuckCost": number;
-    "pneuma-combattools.evasionFlatPenalty": boolean;
     "pneuma-combattools.evasionCumulativePenalty": boolean;
   }
 }
@@ -133,7 +132,7 @@ export function registerEvasionSettings() {
     game.settings!.register(MODULE, key, { scope: "world", config: false, type: String, default: defaultValue });
   }
   game.settings!.register(MODULE, "evasionLuckCost", { scope: "world", config: false, type: Number, default: 1 });
-  for (const key of ["evasionFlatPenalty", "evasionCumulativePenalty"] as const) {
+  for (const key of ["evasionCumulativePenalty"] as const) {
     game.settings!.register(MODULE, key, { scope: "world", config: false, type: Boolean, default: false });
   }
   Hooks.on("renderSettingsConfig", (_app: SettingsConfig, html: JQuery) => {

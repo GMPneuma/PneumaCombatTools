@@ -1,3 +1,4 @@
+import { primaryGM as gm, escapeHTML } from "../shared.js";
 import {tokenEncounter,encounterRef,resolveEncounter,requireParticipants,type EncounterRef} from "../encounter.js";
 import {updateTouchesPath} from "../update-path.js";
 import { requireCombatSocket } from "../socket-health.js";
@@ -8,8 +9,7 @@ import { chokeDamage, nextChoke, visibleChoke, winsGrab } from "./rules.js";
 import { MODULE, grappleActionBlocked, property, grapples, grappleFor, actorGrapples, type Grapple, type Participant, type SkillResult } from "./state.js";
 
 const CHANNEL = `module.${MODULE}`;
-const escapeHTML = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]!);
-const gm = () => game.users?.filter(u => u.active && u.isGM).sort((a,b) => a.id.localeCompare(b.id))[0];
+
 const owns = (actor: Actor, user: User) => user.isGM || actor.testUserPermission(user, "OWNER");
 const report = (error: unknown) => { console.error(MODULE, error); ui.notifications!.error(String((error as Error).message ?? error)); };
 export interface GrappleRequest {
@@ -336,8 +336,8 @@ export function renderGrapple(message: ChatMessage, html: JQuery) {
   const source = scene?.tokens.find(t => t.uuid === g.source.token), target = scene?.tokens.find(t => t.uuid === g.target.token);
   const canSource = !!source?.actor && owns(source.actor,game.user!);
   const canTarget = !!target?.actor && owns(target.actor,game.user!);
-  const add = (label: string, run: () => Promise<unknown>) => {
-    const button = document.createElement("button");button.type="button";button.textContent=label;
+  const add = (label: string, run: () => Promise<unknown>, gmOnly = false) => {
+    const button = document.createElement("button");button.type="button";button.textContent=label;button.dataset.gmOnly=String(gmOnly);
     button.addEventListener("click",async event => {
       event.preventDefault();event.stopPropagation();
       if (localBusy.has(g.id)) return; localBusy.add(g.id); button.disabled=true;
@@ -350,7 +350,7 @@ export function renderGrapple(message: ChatMessage, html: JQuery) {
   } else if (g.state === "waiting" && canTarget) add("Roll Brawling",() => respond(g));
   else if (g.state === "choice" && canSource) { add("Hold Target",() => act("hold"));add("Take Held Object",() => act("take")); }
 
-  if (game.user?.isGM && g.state !== "ended") add("End (GM)",() => act("cancel"));
+  if (game.user?.isGM && g.state !== "ended") add("End (GM)",() => act("cancel"),true);
 }
 export function registerGrapple() {
   Hooks.once("ready",() => {

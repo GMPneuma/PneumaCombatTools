@@ -427,3 +427,37 @@ test('EMP application uses its saved encounter clock while GM views another scen
 });
 
 test('pending EMP selection cannot cross an encounter reset',async()=>{const f=fixture();f.request.encounter={combatId:'c',combatEpoch:'old'};f.combat.flags[module].evasionEpoch='new';await assert.rejects(applyEmpSelection(f.combat,'r',['arm'],f.player),/reset/);assert.equal(empDisabled(f.arm),false);});
+
+test('EMP refresh indexes affected actors, batches events and ignores unrelated combat writes',async()=>{
+ const f=fixture();globalThis.Actor=class{};globalThis.Item=class{};
+ Object.setPrototypeOf(f.actor,Actor.prototype);for(const item of f.actor.items){Object.setPrototypeOf(item,Item.prototype);item.parent=f.actor;}
+ game.time={worldTime:100};Object.assign(f.combat,{round:1,turn:0,turns:[{}]});Object.assign(f.request,{source:'cyberware-malfunction',seconds:3});
+ await applyEmpSelection(f.combat,'r',['arm'],f.player);
+ const hooks={},errors=[];globalThis.Hooks={on:(n,fn)=>(hooks[n]??=[]).push(fn),once:(n,fn)=>(hooks[n]??=[]).push(fn)};
+ const {registerEmpRefresh}=await import('../dist/scripts/emp-refresh.js');
+ const {empWork}=await import('../dist/scripts/emp-state.js');
+ const fire=(n,...args)=>{for(const fn of hooks[n]??[])fn(...args);};
+ registerEmpRefresh(e=>errors.push(e));fire('ready');await empWork(async()=>{});
+ let checks=0;const filter=f.actor.effects.filter;f.actor.effects.filter=function(...args){checks++;return filter.apply(this,args);};
+ // No routine event is allowed to enumerate the world or scenes.
+ game.actors={ [Symbol.iterator](){throw Error('Unexpected world scan');} };game.scenes={ [Symbol.iterator](){throw Error('Unexpected scene scan');} };
+ fire('updateCombat',f.combat,{name:'new title'});await empWork(async()=>{});assert.equal(checks,0);
+ fire('updateCombat',f.combat,{turn:1});await empWork(async()=>{});const once=checks;assert(once>0);checks=0;
+ fire('updateItem',f.arm);fire('updateItem',f.weapon);fire('updateWorldTime');await empWork(async()=>{});assert.equal(checks,once);
+ checks=0;const unrelated=Object.assign(new Actor(),{uuid:'Actor.other',items:[],effects:[]});fire('updateItem',Object.assign(new Item(),{parent:unrelated}));await empWork(async()=>{});assert.equal(checks,0);
+ f.combat.round=2;fire('updateCombat',f.combat,{round:2});await empWork(async()=>{});assert(!empDisabled(f.arm));assert(!get(f.arm,key+'.timedDisables.r'));
+ checks=0;fire('updateWorldTime');await empWork(async()=>{});assert.equal(checks,0);assert.deepEqual(errors,[]);
+});
+
+test('EMP cards refresh only changed requests, removed requests and combat availability',async()=>{
+ const f=fixture();globalThis.FormApplication=class{};const hooks={};globalThis.Hooks={on:(n,fn)=>(hooks[n]??=[]).push(fn),once:(n,fn)=>(hooks[n]??=[]).push(fn)};
+ foundry.data={fields:{ObjectField:class{}}};game.settings={register(){},registerMenu(){}};const refreshed=[];globalThis.ui={chat:{updateMessage:m=>refreshed.push(m.id)},notifications:{error:e=>{throw Error(e)}}};
+ game.messages=collection([{id:'one'},{id:'two'}]);f.request.message='one';f.combat.flags[module].empRequests.other={...f.request,id:'other',message:'two'};
+ const {registerEmp}=await import('../dist/scripts/emp.js');registerEmp();
+ const fire=(n,...args)=>{for(const fn of hooks[n]??[])fn(...args);};fire('createCombat',f.combat);
+ fire('updateCombat',f.combat,{name:'renamed'});fire('updateCombat',f.combat,{round:2});assert.deepEqual(refreshed,[]);
+ f.request.state='applied';fire('updateCombat',f.combat,{[key+'.empRequests.r.state']:'applied'});assert.deepEqual(refreshed.splice(0),['one']);
+ delete f.combat.flags[module].empRequests.other;fire('updateCombat',f.combat,{flags:{[module]:{empRequests:{'-=other':null}}}});assert.deepEqual(refreshed.splice(0),['two']);
+ game.user=f.player;f.combat.started=false;fire('updateCombat',f.combat,{turn:null});assert.deepEqual(refreshed.splice(0),['one']);
+ fire('deleteCombat',f.combat);assert.deepEqual(refreshed.splice(0),['one']);
+});

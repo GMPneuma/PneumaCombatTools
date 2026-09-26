@@ -1,21 +1,28 @@
-/** Track only unresolved cards and batch each affected card once per frame. */
+/** Track workflow-selected cards and batch each affected card once per frame. */
+type PendingScope = { actors: string[]; combat?: string | null };
+function exchangeScope(message: ChatMessage): PendingScope | undefined {
+  const data = foundry.utils.getProperty(message, "flags.pneuma-combattools.exchange") as
+    { state?: string; defenderActor: string; combatId?: string | null; round?: string } | undefined;
+  if (!data || !["waiting", "applying"].includes(data.state ?? "")) return;
+  return { actors: [data.defenderActor], combat: data.combatId !== undefined ? data.combatId
+    : data.round === "outside-combat" ? null : data.round?.split(":")[0] };
+}
 export class PendingCardRefresh {
-  private cards = new Map<string, { message: ChatMessage; actor: string; combat: string | null | undefined }>();
+  private cards = new Map<string, PendingScope & { message: ChatMessage }>();
   private queued = new Set<string>();
   private scheduled = false;
-  constructor(private update: (message: ChatMessage) => void) {}
+  constructor(private update: (message: ChatMessage) => void,
+    private scope: (message: ChatMessage) => PendingScope | undefined = exchangeScope) {}
   remember(message: ChatMessage): void {
     if (!message.id) return;
-    const data = foundry.utils.getProperty(message, "flags.pneuma-combattools.exchange") as
-      { state?: string; defenderActor: string; combatId?: string | null; round?: string } | undefined;
-    if (!data || !["waiting", "applying"].includes(data.state ?? "")) { this.forget(message.id); return; }
-    this.cards.set(message.id, { message, actor: data.defenderActor,
-      combat: data.combatId !== undefined ? data.combatId : data.round === "outside-combat" ? null : data.round?.split(":")[0] });
+    const scope = this.scope(message);
+    if (!scope) { this.forget(message.id); return; }
+    this.cards.set(message.id, { message, ...scope });
   }
   forget(id: string): void { this.cards.delete(id); this.queued.delete(id); }
   refresh(actor?: string, combat?: string): void {
     for (const [id, card] of this.cards) {
-      if (actor !== undefined && card.actor !== actor) continue;
+      if (actor !== undefined && !card.actors.includes(actor)) continue;
       if (combat !== undefined && card.combat !== combat) continue;
       this.queued.add(id);
     }
@@ -30,4 +37,18 @@ export class PendingCardRefresh {
       }
     });
   }
+}
+
+/** Shared actor/combat invalidation for condition-dependent card controls. */
+export function registerConditionCardRefresh(scope:(message:ChatMessage)=>PendingScope|undefined):void {
+  const index=new PendingCardRefresh(message=>{ui.chat?.updateMessage(message,false);},scope);
+  Hooks.once("ready",()=>{for(const message of game.messages??[])index.remember(message);});
+  for(const hook of ["createChatMessage","updateChatMessage","renderChatMessage"])Hooks.on(hook,(message:ChatMessage)=>index.remember(message));
+  Hooks.on("deleteChatMessage",(message:ChatMessage)=>index.forget(message.id!));
+  Hooks.on("updateActor",(actor:Actor)=>index.refresh(actor.uuid));
+  for(const hook of ["createItem","updateItem","deleteItem","createActiveEffect","updateActiveEffect","deleteActiveEffect"])Hooks.on(hook,(doc:Item|ActiveEffect)=>{
+    const actor=doc.parent instanceof Actor?doc.parent:doc.parent?.parent instanceof Actor?doc.parent.parent:undefined;
+    if(actor)index.refresh(actor.uuid);
+  });
+  for(const hook of ["updateCombat","deleteCombat"])Hooks.on(hook,(combat:Combat)=>index.refresh(undefined,combat.id!));
 }

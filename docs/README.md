@@ -1,6 +1,6 @@
 # Combat Tools documentation
 
-Current guides describe release **0.8.1**, reviewed against source on **2026-09-23**. Historical proposals and audits are explicitly separated. Source/build/browser verification does not imply live multiplayer certification.
+The chat-card audit, styling contract and flow map describe **0.9.1**, reviewed on **2026-09-26**. Other guides retain their individual review dates. Historical proposals and audits are explicitly separated. Source/build/browser verification does not imply live multiplayer certification.
 
 ## Start here
 
@@ -31,6 +31,8 @@ Current guides describe release **0.8.1**, reviewed against source on **2026-09-
 | Automated versus manual condition behavior | [Status mechanics](status-mechanics-audit.md) |
 
 ## Integration and maintenance
+
+- [Chat-card audit, 2026-09-26](chat-card-audit-2026-09-26.md): complete family inventory, flow findings, styling contract and verification.
 
 - [Flow and chat-card map](flow-map.md): diagrams, decisions, controls, storage and outcomes; [rendered browser version](flow-diagrams.html).
 - [HUD message API](hud-api.md): copyable macros, recipients, modes and cleanup; read-only Neural Intrusion integration.

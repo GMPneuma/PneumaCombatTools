@@ -2,11 +2,11 @@
 
 Encounter selection now follows the [shared active-scene policy](encounters.md); saved actions and effect clocks remain tied to their originating encounter.
 
-Current source: Combat Tools 0.8.0, reviewed 2026-09-23. Code inspection and diagram-render validation are distinct from live multiplayer certification.
+Current source: Combat Tools 0.9.1, reviewed 2026-09-26. Code inspection and diagram-render validation are distinct from live multiplayer certification.
 
 **M** below means **flags.pneuma-combattools**. For example, ChatMessage M.exchange means ChatMessage.flags.pneuma-combattools.exchange. **Transient** means dialog/client/GM memory, not durable document storage. Diagram IDs correspond to table rows. Native CPR dialogs may offer additional version-dependent controls. Every control remains subject to ownership, GM authority, settings and current state.
 
-[Open all rendered diagrams](flow-diagrams.html) for a browser-readable version without a Mermaid plugin. The tables below remain the reference for controls and storage.
+[Open all rendered diagrams](flow-diagrams.html) for a browser-readable version without a Mermaid plugin. The tables below remain the reference for controls and storage. See the [complete chat-card audit](chat-card-audit-2026-09-26.md) for open findings.
 
 ## Overview
 
@@ -99,18 +99,25 @@ flowchart TD
  B5 --> B8["B8 Complete / hide"]
  B6 --> B8
  B7 --> B8
+ B7 --> BP["Suppressed marker: expires at end of target next turn"]
+ B4 --> BT["Click per-target total to expand native roll"]
+ B2 -->|Smoke| BS["Smoke template: one-minute lifetime"]
+ BS -->|GM Remove smoke| BH["Hidden: no smoke attack penalty"]
+ BH -->|GM Restore smoke| BS
+ BS --> BX["Expiry or combat end: delete"]
+ BH --> BX
 ~~~
 
 | Step | Surface / buttons | Storage and result |
 |---|---|---|
-| B1 | Grenade/launcher/shell/Suppressive Fire HUD entry. Left-click placement; Escape/right-click cancel. | Local measured-template preview transient; early cancellation avoids ammo expenditure. |
+| B1 | Grenade/launcher/shell/Suppressive Fire HUD entry. Token HUD closes for placement. Left-click placement; Escape/right-click cancel. | Local measured-template preview transient; early cancellation avoids ammo expenditure. |
 | B2 | Native attack dialog. | ChatMessage M.aoe: geometry/settings/recipient snapshots, exchange; phase=scatter/responses. Native ammo expenditure. |
-| B3 | GM Place actual blast. | Updated area/recipients in same M.aoe record. |
-| B4 | Per-row Evade / Don't Evade, optional Cover Up, or Concentration. GM Add selected token, Exclude target, Override as affected, affected/unaffected review, Release unfinished response. | M.aoe.rows[]: UUID, eligibility, state=waiting/rolling/hit/miss/other, claim, total/HTML. Saved attackDiceRevealed guard prevents repeated animation. |
+| B3 | GM Place New Target Center inside the gray area. | Updated area/recipients in same M.aoe record. |
+| B4 | Per-row Evade / Don't Evade, optional Cover Up, or Concentration. GM Add selected token, Exclude target, Override as affected, affected/unaffected review, Release unfinished response. | Clickable per-row total expands saved native roll; M.aoe.rows[]: UUID, eligibility, state=waiting/rolling/hit/miss/other, claim, total/HTML. Saved attackDiceRevealed guard prevents repeated animation. |
 | B5 | Move outside AoE; pick destination. | Token coordinates; row moved/moveCost. Optional combatant MOVE spent/debt records; ordinary tracked movement also Token M.movement. |
 | B6 | Roll shared damage; per-row Apply shared damage (Shift options); instant-effect controls; GM damage reset/review; manual-effects completion for unknown special ammo. | M.aoe.exchange.damage shared; rows[].damage / instant individual. Actor mutations from flows 2/4. |
-| B7 | Concentration; GM coverage overrides. | Row outcome. Failure records Move to cover / Run if needed. General action enforcement remains manual. |
-| B8 | GM Show/Hide attack area; Remove smoke when present. | M.aoe.areaHidden / resolutionComplete; MeasuredTemplate M.areaMessage / areaShape. Completion hides attack marker. Card deletion removes attack template. Separate template M.smoke expires independently. |
+| B7 | Concentration; GM coverage overrides. | Row outcome. Failure applies Suppressed through the end of the target’s next turn; Move to cover / Run if needed remains a manual obligation. GM exclusion/reset clears that response’s marker. |
+| B8 | GM Show/Hide attack area; Remove smoke / Restore smoke when present. | M.aoe.areaHidden / resolutionComplete; MeasuredTemplate M.areaMessage / areaShape. Completion hides attack marker. Card deletion removes attack template. Separate template M.smoke expires independently; hidden smoke causes no attack penalty, restoration keeps the original clock. Expired/deleted smoke cannot be restored. |
 
 ## 4. Instant effects / ammunition
 
@@ -126,15 +133,18 @@ flowchart LR
  I3 -->|EMP / Microwaver| E["Disablement flow"]
  I3 -->|Interrupted| I4["I4 GM review"]
  I4 --> I5
+ I2 --> IR["Clickable inline total and outcome or pending action"]
+ IR -->|Click or keyboard| ID["Expand original native roll"]
+ I5 --> IL["Native clocks and combat-end cleanup"]
 ~~~
 
 | Step | Surface / buttons | Storage and result |
 |---|---|---|
 | I1 | AoE row, Microwaver hit or module effect integration/API. | Standalone ChatMessage M.instant.effect or M.aoe.rows[].instant: effect ID, actor, state. Source attack can hold M.microwaverClaim. |
-| I2 | Resist DV…; native skill dialog; GM unaffected; GM release roll. | pending → rolling → resisted/failed; total/HTML/user/nonce saved. |
-| I3 | Apply [effect]; GM unaffected. | failed → applying → applied. Actor damage/status/injury changes and saved summary. EMP/Microwaver opens a separate selection request. |
+| I2 | Effect DV in heading; shield Resist; native skill dialog; GM Unaffected / Release roll; clickable result total. | pending → rolling → resisted/failed; total/HTML/user/nonce saved. |
+| I3 | Inline Apply; GM Unaffected. | failed → applying → applied. Actor damage/status/injury changes and saved summary. EMP/Microwaver opens a separate selection request. |
 | I4 | GM mark resolved after checking target. | review/applying until acknowledged. |
-| I5 | Sleep: Wake (touching Action). Incendiary: Extinguish (Action). Otherwise no further normal decision. | Native duration/statuses/effects/temporary injury Items; M.instantLifetime where used. Actor M.lastBurnTurn prevents duplicate burn damage. |
+| I5 | Sleep: Wake (touching Action). Incendiary: Extinguish (Action). Otherwise no further normal decision. | Native duration/statuses/effects/temporary injury Items; temporary Eye/Ear clear on timer or originating combat end, permanent injuries remain. M.instantLifetime where used. Actor M.lastBurnTurn prevents duplicate burn damage. |
 
 ## 5. EMP / Microwaver / cyberware disablement
 
@@ -204,6 +214,8 @@ flowchart TD
  Q5 -->|Disable cyberware| E["EMP flow"]
  Q2 -->|Detected| Q6["Q6 Force Out"]
  Q5 -->|Detected| Q6
+ Q5 -->|Caught error| QM["Manual resolution required"]
+ Q5 -.->|GM disconnect during writes| QX["May retain Resolving: recovery deferred"]
  Q6 -->|Target wins| Q7["Q7 Ejected"]
  Q6 -->|Runner wins or tie| Q2
  Q2 -->|Jack Out| Q8["Q8 Disconnected"]
@@ -240,7 +252,7 @@ flowchart LR
 | R2 | Automatic Broken Ribs / Foreign Object (Body/Head) check. | Injury inventory and Combat M.evasionEpoch checked. |
 | R3 | Owner/GM Apply 5 damage. | ChatMessage M.brokenRibs: injury/actor/token/combat/turn/epoch/distance/applied; separate card per injury. |
 | R4 | Applied result; no duplicate application. | Actor HP -5 and M.ribsApplications receipt; card applied=true. |
-| R5 | No Apply control when threshold/encounter invalid. | Eligibility recalculated; withdrawal is not damage undo. |
+| R5 | No Apply control when threshold/encounter invalid. | Current injury, movement threshold, active encounter and reset epoch are checked before enabling Apply and again by the handler; injury and combat changes refresh the card. Withdrawal is not damage undo. |
 
 Burning and duration expiry normally mutate actors/items/effects without another decision card. Initiative uses native combat rolls/cards. Combat-bar layout, alert HUD, incoming detection banners, status picker and item markers are supporting interfaces rather than separate chat decision trees.
 
@@ -278,6 +290,7 @@ flowchart TD
  M3 --> D["Shared damage / effects flow"]
  M2 -->|Critical injury| M4["M4 Native table result"]
  M4 --> M5["M5 Apply injury to selected actor"]
+ M2 -->|STAT Skill Role: native sheet View or Roll| MN["Native CPR sheet workflow"]
  M2 -->|Standard / custom / STAT| M6["M6 Result card"]
  M2 -->|GM group request| M7["M7 Shared waiting rows"]
  M7 --> M8["M8 Player native skill roll"]
@@ -300,6 +313,8 @@ flowchart TD
 | M9 | Green Success / red Fail only if DV set; ties fail. | Row done; no automatic actor consequence. |
 | M10 | Click total again to collapse. | Client DOM expansion only; modifiers expanded inside the revealed roll. |
 | MR | Permission-specific GM release/reset controls. | Row claim reset; already published results require deliberate recovery. |
+
+Native Skill/Role View and Roll entries delegate to the selected character sheet and its normal chat publication. They do not add a Combat Tools result state.
 
 ## 10. HUD messaging and optional visual integration
 
@@ -354,3 +369,50 @@ flowchart LR
 | C6 | Counters, start marker, advisory HUD and condition state. | Token movement reset; scoped expiry/Actor reminders; no general action budget. |
 
 All graphs show optional branches, not mandatory extra actions. HTML/CSS is presentation; document flags and native documents own mechanics. Hidden DV/results are tabletop presentation, not client-data secrecy.
+
+## 12. Condition cleanup and wake support
+
+~~~mermaid
+flowchart TD
+ L1["Teargas / Flashbang / Sonic Shock"] --> L2["Native temporary injury item plus status marker"]
+ L2 --> L3["Affected actor Biomonitor and token status"]
+ L3 -->|Clock expires| L4["Remove temporary item and marker"]
+ L3 -->|Originating combat ends or is deleted| L4
+ LP["Pre-existing permanent injury"] --> LK["Preserved"]
+ LS["Sleep or System Reset"] --> LU["Unconscious plus Prone"]
+ LU -->|Timer / damage / sleep-card Wake| LW["Remove Sleep; retain Prone"]
+ LU -->|Other-token HUD Wake using action| LH["GM removes native Unconscious; retain Prone"]
+ LF["Incendiary / burning"] --> LB["End-turn damage once; Extinguish or cleanup"]
+~~~
+
+Wake HUD uses a conscious owned helper and another unconscious token; touching range and action spending remain manually adjudicated. A status notification can name a different actor from the Biomonitor currently displayed. Historical instant-effect cards retain their original application summary, but Wake/Extinguish controls are filtered against current actor conditions and refresh after actor/item/effect changes. Stale follow-up requests are rejected without replaying the original effect.
+
+## 13. Reload notices and delegated native cards
+
+~~~mermaid
+flowchart LR
+ N1["Native reload / change ammunition"] --> N2{"Report enabled and player-owned combat participant?"}
+ N2 -->|No| N3["Native operation only"]
+ N2 -->|Yes and ammunition changed| N4["Plain reload or ammo-change chat notice"]
+ N2 -->|Cancelled or unchanged| N3
+ N5["Native initiative / Skill / Role / table / standard roll"] --> N6["Native CPR or Foundry card and controls"]
+ N7["Custom XdY plus modifier"] --> N8["Scoped label plus native Foundry roll"]
+~~~
+
+Reload reporting has no follow-up controls and no Combat Tools rollback. Bow loading uses its separate native-loading prompt and is excluded from reload notices. Delegated native cards retain system-owned details, application, and undo handlers where supplied.
+
+## 14. Chat presentation and inline details
+
+~~~mermaid
+flowchart TD
+ P1["Saved content plus native roll HTML"] --> P2["Foundry chat-message wrapper"]
+ P2 --> P3["Viewer and current-state action filtering"]
+ P3 --> P4["Scoped Combat Tools layout and control classes"]
+ P4 --> PG["GM badge and red outline; charcoal on hover or focus"]
+ P4 --> PR["Group / AoE / resistance totals stay inline"]
+ PR -->|Click total| PE["Reveal original roll details"]
+ PE -->|Click again| PR
+ P4 --> PN["Native dice and undo handlers retained"]
+~~~
+
+Native wrapper/background typography stays with Foundry/CPR. Module-specific layout and states use pneuma-prefixed selectors. Scoped reload, injury-kind and QuickHack-error identifiers are now implemented; optional native-header framing improvements remain in the audit. Rebuild the standalone HTML with scripts/render-flow-diagrams.mjs using PNEUMA_PLAYWRIGHT_MODULE and PNEUMA_MERMAID_SOURCE. Archived history diagrams are intentionally unchanged.

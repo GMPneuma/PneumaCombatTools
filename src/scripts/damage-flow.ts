@@ -1,3 +1,4 @@
+import { escapeHTML as escape } from "./shared.js";
 import {requireParticipants,resolveEncounter,encounterRef,tokenEncounter,type EncounterRef} from "./encounter.js";
 import {interactArmorSelected, halfArmorSelected, halfArmorControl, armorIgnorePercent} from "./half-armor.js";
 import {reportExposure} from "./effect-events.js";
@@ -91,7 +92,6 @@ export function damageContent(data: Exchange, mode: "full" | "roll" = "full"): s
   }
   const status = ["rolled", "applied"].includes(damage.status) ? ""
     : '<p class="pneuma-damage-status">' + labels[damage.status] + '</p>';
-  const escape = (value:string) => value.replace(/[&<>"']/g, char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[char]!);
   const targets = (damage.selectedTargets ?? []).map(target=>'<li data-application-id="'+escape(target.id)+'">'+escape(target.name)+'</li>').join("");
   const history = targets ? '<div class="pneuma-damage-targets"><strong>Applied to</strong><ol class="pneuma-damage-target-history" aria-label="Applied to selected targets">'+targets+'</ol></div>' : "";
   const actions = mode === "full" && damage.result ? resolutionSection("damage-apply",
@@ -288,8 +288,9 @@ export async function renderDamage(message: ChatMessage, data: Exchange, html: J
   const defender = manual ? {isOwner:true} : await damageActor(data.defender);
   const panel = document.createElement("div"); panel.className = "pneuma-damage-controls";
   const recoveryPanel = document.createElement("div"); recoveryPanel.className = "pneuma-damage-recovery-controls";
-  const button = (label: string, run: (event: MouseEvent) => Promise<unknown>, destination?: "recorded" | "selected") => {
+  const button = (label: string, run: (event: MouseEvent) => Promise<unknown>, destination?: "recorded" | "selected", gmOnly = false) => {
     const node = document.createElement(destination ? "a" : "button");
+    node.dataset.gmOnly = String(gmOnly);
     if (destination) {
       node.className = "pneuma-apply-damage";
       node.dataset.pneumaDamageTarget = destination;
@@ -343,7 +344,7 @@ export async function renderDamage(message: ChatMessage, data: Exchange, html: J
   const drop = html.find('[data-action="pneumaRollDamage"]');
 
   const missed = !manual && data.hit === false && !data.damageAllowedOnMiss;
-  if (missed && game.user!.isGM) button("Allow damage on miss", () => send("damageAllowMiss"));
+  if (missed && game.user!.isGM) button("Allow damage on miss", () => send("damageAllowMiss"), undefined, true);
   if (!missed && attacker.isOwner && !data.damage && (!data.improvised || data.improvisedDice)) drop.on("click", event => {
     event.preventDefault(); event.stopPropagation();
     void rollDamage(message.id!, data, send, !!event.shiftKey).catch(error => { ui.notifications!.error(error.message); ui.chat?.updateMessage(message); });
@@ -386,9 +387,9 @@ export async function renderDamage(message: ChatMessage, data: Exchange, html: J
     if (!manual) button(data.defenderName, event => applyFromCard(data, send, event.shiftKey, data.defender, "recorded", halfArmorSelected(event), interactArmorSelected(event)), "recorded");
     button("to selected target", event => applyFromCard(data, send, event.shiftKey, selectedDamageTarget(), "selected", halfArmorSelected(event), interactArmorSelected(event)), "selected");
   }
-  if (!manual && game.user!.isGM && status === "rolling") button("Release unfinished damage roll", () => send("damageReset"));
+  if (!manual && game.user!.isGM && status === "rolling") button("Release unfinished damage roll", () => send("damageReset"), undefined, true);
   if (!manual && game.user!.isGM && (status === "review" || status === "applying"))
-    button("Mark resolved after GM review", () => send("damageResolved"));
+    button("Mark resolved after GM review", () => send("damageResolved"), undefined, true);
   const actions = html.find(".pneuma-damage-application-box");
   if (panel.childElementCount) (actions.length ? actions : html.find(".message-content")).append(panel);
   if (recoveryPanel.childElementCount) {

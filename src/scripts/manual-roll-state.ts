@@ -1,3 +1,4 @@
+import { escapeHTML as manualEscape } from "./shared.js";
 import type { DamageState } from "./damage-flow.js";
 export const MANUAL_MODULE = "pneuma-combattools";
 export interface GroupRow { user: string; actor: string; name: string; state: "waiting" | "rolling" | "done"; nonce?: string; roller?: string; total?: number; html?: string }
@@ -7,7 +8,7 @@ export interface ManualCard {
   damage?: DamageState; injury?: InjuryResult; rows?: GroupRow[]; skill?: string; dv?: number; hideDV?: boolean;
   injuryApplications?: string[]; injuryBusy?: boolean;
 }
-export const manualEscape = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]!);
+export { escapeHTML as manualEscape } from "./shared.js";
 export function manualNumber(value: unknown, name: string, min: number, max: number): number {
   const number = Number(value);
   if (value === "" || !Number.isInteger(number) || number < min || number > max) throw Error(name + " must be a whole number from " + min + " to " + max + ".");

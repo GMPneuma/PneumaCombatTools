@@ -1,3 +1,4 @@
+import {canWake,wakeUsingAction,registerWake} from "./wake.js";
 import {registerDisplaySettings} from "./display-settings.js";
 import {registerCombatBarSettings} from "./combat-bar-settings.js";
 import {registerChatButtons} from "./chat-buttons.js";
@@ -93,6 +94,7 @@ Hooks.once("init", () => {
   registerInstantEffects();
   registerNativeEffectIntegration();
   registerAreaAttacks();
+  registerWake();
   registerCriticalSettings();
   registerSettingsLayout();
   game.settings!.register(MODULE_ID, "maNoAblation", {
@@ -201,6 +203,7 @@ Hooks.once("init", () => {
         && quickhackEnabled() && canShowQuickhack(Array.from(attacker.actor.items) as unknown as MenuWeapon[]);
       return {
         ...super.getData(options),
+        canWake: canWake(attacker,this.object??undefined),
         ejectNetrunners,
         offensiveQuickhacks,
         standalone: isStandalone(this.object!),
@@ -294,6 +297,12 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
     return;
   }
   const attacker = selection?.target === token ? selection.attacker : selectedAttacker();
+  html.find<HTMLButtonElement>("[data-wake-action]").on("click",async event=>{
+    event.preventDefault();event.stopPropagation();const button=event.currentTarget;if(button.disabled||!attacker)return;button.disabled=true;
+    try{await wakeUsingAction(attacker,token);hud.clear();}
+    catch(error){ui.notifications!.error(error instanceof Error?error.message:String(error));}
+    finally{button.disabled=false;}
+  });
   if (attacker?.actor && html[0]) bindWeaponAmmo(html[0], attacker.actor);
   if (attacker?.actor && html[0]) decorateItemList(html[0], attacker.actor);
   html.find<HTMLButtonElement>("[data-grapple-action]").on("click", async event => {

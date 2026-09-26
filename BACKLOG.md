@@ -1,5 +1,21 @@
 # Combat Tools roadmap and backlog
 
+Indicator setting label renamed to “Indicator Scale”; saved values and sizing behavior are unchanged.
+
+Grenade placement cleanup (local): native Token HUD clears when area placement begins, including GM scatter placement. Hidden attack templates and grid highlights also disable rendering so GM visibility refreshes cannot restore them. Missed-blast instructions are shortened and the crosshair button reads “Place New Target Center.” Automated placement/visibility and scattered-card completion checks added; live Foundry validation remains pending.
+
+Cover/terrain notice simplified as requested: “GM resolves all aspects of cover and terrain.” Mechanics unchanged.
+
+## Authorized cleanup pass — implemented locally, 2026-09-26
+
+- Shared HTML escaping, stable primary-GM selection, and UUID-deduplicated world/synthetic actor enumeration. Status authority retains its owner fallback.
+- EMP indexes affected actors, batches refresh work, and ignores unrelated combat writes. Full startup reconciliation remains. EMP chat cards refresh only for changed/removed requests or changed combat availability.
+- AoE uses the shared pending-card tracker, seeded once at ready and maintained by message events; item/effect changes no longer scan chat history.
+- Removed the obsolete EMP configuration dialog, thrown-name suffix helper, unused Quickhack audience helper, two obsolete translations, and five unused imports/parameters. Moved test-only overlap geometry into a fixture; the EMP browser fixture now exercises the supported creation API.
+- Removed only the unread `evasionFlatPenalty` registration/type. The active `evasionHomebrew.rule = "flat"` still applies -4. Other legacy evasion readers, saved HUD message compatibility, and intentional test reset helpers remain.
+
+This supersedes the remaining cleanup candidates in the historical 2026-09-20 audit. Automated checks cover batching, expiration, pending-card indexing, and request/removal refreshes; live Foundry multiplayer validation remains pending. No release performed.
+
 ## Incoming Attack queue standardization — implemented locally
 
 Removed the legacy card-derived attack alert map and startup scan. New incoming attacks enter the shared HUD queue once, retaining actor scope and card navigation. Clear removes that queue entry; updates/reselection/reload cannot rebuild old notices. Resolution/deletion removes any remaining notice. This completes the previously incomplete queue standardization; attack resolution data stays on cards, notification state does not.
@@ -164,3 +180,20 @@ Approved GM-only This Token mode with Use inherited settings. Store appearance o
 - Implemented final indicator revision: replace Glitch Frame with Vector Wake; green-bottom/red-top Rockerboy levels; redesign TECH and MedTech; enlarge Media recording dot and add red LIVE text; Exec inbox plus org chart. Supersedes previous Glitch Frame, minimal MedTech and simple Exec art. Saved style keys remain compatible.
 
 - Implemented superseding indicator revision: approved TECH diagnostic overlay replaces tool silhouettes; MedTech cross is always red; Exec corporate authority crest/rank/command design replaces inbox and org chart. Saved style keys remain unchanged.
+
+- Implemented: compact resistance rows (e.g. Poison DV13) with a shield Resist icon; all GM-only chat actions and explicit overrides share a normal background, red outline and GM badge, and black action text; hover/focus switches to charcoal with light action text across combat, damage, area effects, instant effects, grapple, EMP, and manual/group checks. Existing permissions remain unchanged. Build/browser fixtures verify presentation; live Foundry validation remains pending.
+
+- Implemented: GM Remove smoke / Restore smoke toggles the saved smoke template visibility and attack obscuration together. Hidden smoke imposes no automatic attack penalty; restored, unexpired smoke does. The original lifetime continues while removed; expired/deleted smoke cannot be restored.
+
+- Implemented: other-token right-click HUD offers Wake using action when the selected owned character is conscious and the target is Unconscious. The GM applies native Unconscious removal; Prone remains. Touching range and action expenditure remain player/GM adjudicated.
+
+- Implemented: personal EKG pause/resume also controls the viewer's hover EKG, including an already visible trace, newly hovered tokens, and health-state redraws. The existing session-local preference remains local to the viewer.
+
+- Implemented: per-target resistance, Evasion/Concentration, and instant damage rolls show compact clickable totals beside their outcome/pending action. Native roll HTML is retained inside a collapsed disclosure. Manual group checks already retain clickable totals.
+
+- Fixed: combat end/reset/deletion clears temporary injury items and their status markers (Teargas Damaged Eye, Flashbang Eye/Ear, Sonic Shock Ear), while permanent injuries and other encounters remain. Existing native round/time expiry remains. Reapplication also repairs a missing marker for a pre-existing permanent injury. Biomonitor condition checks verify affected-actor display and cleanup; live verification pending.
+
+## Chat-card audit — 2026-09-26
+Completed the source/browser review of every chat publication family; see [audit](docs/chat-card-audit-2026-09-26.md). Open recommendations: current-condition Wake/Extinguish availability, interrupted QuickHack GM review, stale injury-warning controls, reload and injury-specific CSS identifiers. Optional native header consistency and explicit QuickHack reroll wording remain recommendations, not implemented features. Updated all current Mermaid flows and regenerated the browser diagrams. No gameplay changes made in this audit.
+
+- Implemented audit F1/F3/F4: condition-aware Wake/Extinguish controls and stale-request rejection; current-injury/combat-epoch availability for movement warnings with batched card refresh; scoped reload notice, injury-kind and QuickHack error identifiers. Historical results and native card styling remain. QuickHack recovery (F2) explicitly deferred by user; its behavior is unchanged.
