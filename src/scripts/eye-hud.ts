@@ -97,8 +97,7 @@ let hudBody: HTMLElement | undefined;
 let medicalSignature = "";
 let messageSignature = "";
 let queued = false;
-const dismissed = new Set<string>();
-const attacks = new Map<string, ChatMessage>();
+const ATTACK_NOTICE_SOURCE="pneuma-combattools.attack";
 function actorInFocus(): Actor | undefined {
   const tokens = canvas.tokens?.controlled ?? [];
   if (tokens.length === 1 && tokens[0]?.actor?.isOwner) return tokens[0].actor;
@@ -161,7 +160,7 @@ function updateCrewButton(actor: Actor | undefined, alert: boolean, title: strin
   }
   const open = game.settings!.get(MODULE, "eyeHUD") && !game.settings!.get(MODULE, "eyeHUDMinimized");
   crewButton.title = title;
-  crewButton.setAttribute("aria-label", open ? "Minimize Biomon" : "Open Biomon");
+  crewButton.setAttribute("aria-label", open ? "Minimize Biomonitor" : "Open Biomonitor");
   crewButton.setAttribute("aria-expanded", String(!!open));
   crewButton.dataset.state = readHUDVitals(actor).state;
   crewButton.classList.toggle("has-alert", alert);
@@ -184,15 +183,18 @@ function positionAttachments() {
 function exchange(message: ChatMessage): Record<string, unknown> | undefined {
   return foundry.utils.getProperty(message, "flags." + MODULE + ".exchange") as Record<string, unknown> | undefined;
 }
-function remember(message: ChatMessage) {
+async function queueIncomingAttack(message: ChatMessage) {
+  const data=exchange(message);
+  if(!message.visible||!message.isContentVisible||data?.state!=="waiting"||typeof data.defenderActor!=="string")return;
+  const actor=await fromUuid(data.defenderActor) as Actor|null;
+  if(!actor?.isOwner||!message.visible||!message.isContentVisible||exchange(message)?.state!=="waiting")return;
+  postHUDMessage({source:ATTACK_NOTICE_SOURCE,id:message.id!,text:"Incoming Attack",mode:"queued",actor:actor.uuid,chatMessage:message.id!});
+}
+function refreshChatNotice(message:ChatMessage) {
+  const data=exchange(message);
+  // Updates can retire an existing entry, never create or resurrect one.
+  if(!message.visible||!message.isContentVisible||!["waiting","applying"].includes(String(data?.state)))dismissHUDMessage(ATTACK_NOTICE_SOURCE,message.id!);
   if(foundry.utils.getProperty(message,"flags.pneuma-combattools.quickhack"))schedule();
-  const data = exchange(message);
-  const previous = attacks.get(message.id!);
-  if (!data && !previous) return;
-  if (data?.state === "waiting" || data?.state === "applying") attacks.set(message.id!, message);
-  else { attacks.delete(message.id!); dismissed.delete(message.id!); }
-  const actor = actorInFocus();
-  if (actor && (data?.defenderActor === actor.uuid || (previous && exchange(previous)?.defenderActor === actor.uuid))) schedule();
 }
 function schedule() {
   if (queued) return;
@@ -481,7 +483,7 @@ function render() {
   const incomingRows: HTMLElement[] = [];
   if (!game.settings!.get(MODULE, "eyeHUD")) {
     for (const key of flashNotices.keys()) removeFlashNotice(key);
-    updateCrewButton(actorInFocus(), false, "Open Biomon");
+    updateCrewButton(actorInFocus(), false, "Open Biomonitor");
     clearEffectArrivals(); effectActor = undefined; previousEffects.clear();
     sidebarResizeObserver.disconnect(); observedSidebar = null;
     attachments?.remove(); attachments = undefined;
@@ -497,21 +499,15 @@ function render() {
   const monitor = !!actor;
   const savedMessage = game.settings!.get(MODULE, "eyeHUDMessage");
   const custom = savedMessage && !dismissedLegacyMessages.has(savedMessage.id) && savedMessage.expires > Date.now() && savedMessage.recipients.includes(game.user!.id!) ? savedMessage : undefined;
-  const pending = !ownActor ? [] : [...attacks.values()].filter(message => {
-    const data = exchange(message);
-    return message.visible && message.isContentVisible && !dismissed.has(message.id!)
-      && data?.defenderActor === ownActor!.uuid;
-  });
   type AlertEntry = { key: string; text: string; open?: () => void; clear: () => void };
   const messages: AlertEntry[] = [
-    ...pending.map(message => ({ key: "attack:" + message.id!, text: "Incoming Attack", open: () => openCard(message.id!), clear: () => { dismissed.add(message.id!); } })),
     ...(custom ? [{ key: "legacy:" + custom.id, text: custom.text, clear: () => { dismissedLegacyMessages.add(custom.id); } }] : []),
-    ...listHUDMessages().map(message => ({ key: hudMessageKey(message), text: message.text, clear: () => dismissHUDMessage(message.source, message.id) }))
+    ...listHUDMessages().filter(message=>!message.actor||message.actor===ownActor?.uuid).map(message => ({ key: hudMessageKey(message), text: message.text, ...(message.chatMessage?{open:()=>openCard(message.chatMessage!)}:{}),clear: () => dismissHUDMessage(message.source, message.id) }))
   ];
   const minimized = prefersMinimized;
   const rows = minimized ? [] : monitor && actor ? eyeConditions(actor, data) : [];
   const panel = root ??= element("section", "pneuma-eye-hud");
-  panel.id = "pneuma-eye-hud"; panel.setAttribute("aria-label", "Status HUD · " + (actor?.name ?? "No character") + (shared ? " · Biomonitor link" : ""));
+  panel.id = "pneuma-eye-hud"; panel.setAttribute("aria-label", "Biomonitor · " + (actor?.name ?? "No character") + (shared ? " · Biomonitor link" : ""));
   const header = element("header", "pneuma-eye-header");
   panel.classList.toggle("is-shared", shared);
   panel.classList.add("is-docked");
@@ -647,7 +643,7 @@ function render() {
     previousControls.forEach(controls => controls.remove()); controlParent.append(header);
   }
   panel.classList.toggle("is-integrated-mini", minimized && integratedHUD());
-  updateCrewButton(actor, messages.length > 0, messages[0]?.text ?? "Biomon");
+  updateCrewButton(actor, messages.length > 0, messages[0]?.text ?? "Biomonitor");
   if (panel.parentElement !== document.body) document.body.append(panel);
   extras.classList.toggle("is-minimized", minimized);
   extras.classList.toggle("is-integrated", leftAlignedMessages());
@@ -661,8 +657,8 @@ export function registerEyeHUD() {
   const module = game.modules!.get(MODULE) as unknown as {api?: Record<string, unknown>};
   module.api = {...module.api, getNeuralIntrusionActor: neuralIntrusionActor};
   const crewActive = !!game.modules?.get("pneuma-crewtools")?.active;
-  game.settings!.register(MODULE, "crewHUDIntegration", { name: "Integrate with Pneuma’s Crew Tools HUD", hint: "Minimize Biomon into Crew Tools’ HUD. Falls back to the normal control when that HUD is unavailable.", scope: "client", config: crewActive, type: Boolean, default: true, onChange: schedule });
-  game.settings!.register(MODULE, "eyeHUDDock", { name: "Biomon position", hint: "Choose the top-left or top-right position. Top left sits diagonally below Crew Tools when its HUD is visible, otherwise below navigation and beside canvas tools. Integration does not change placement. Combat bar Top right overrides this choice to Top left until that dock is changed.", scope: "client", config: true, type: String, choices: { right: "Top right", left: "Top left" }, default: "left", onChange: schedule });
+  game.settings!.register(MODULE, "crewHUDIntegration", { name: "Integrate with Pneuma’s Crew Tools HUD", hint: "Minimize Biomonitor into Crew Tools’ HUD. Falls back to the normal control when that HUD is unavailable.", scope: "client", config: crewActive, type: Boolean, default: true, onChange: schedule });
+  game.settings!.register(MODULE, "eyeHUDDock", { name: "Biomonitor position", hint: "Choose the top-left or top-right corner.", scope: "client", config: true, type: String, choices: { right: "Top right", left: "Top left" }, default: "left", onChange: schedule });
   Hooks.once("ready", () => {
     const entry = game.modules?.get("pneuma-crewtools");
     const api = (entry as unknown as { api?: { hudShortcuts?: CrewShortcutAPI } } | undefined)?.api?.hudShortcuts;
@@ -688,10 +684,10 @@ export function registerEyeHUD() {
     schedule();
   });
   game.settings!.register(MODULE, "eyeHUDMessage", { scope: "world", config: false, type: Object, default: null, onChange: messageChanged });
-  game.settings!.register(MODULE, "eyeHUD", { name: "Status HUD", hint: "Show your vitals, conditions, statuses and private notifications.", scope: "client", config: true, type: Boolean, default: true, onChange: schedule });
+  game.settings!.register(MODULE, "eyeHUD", { name: "Show Biomonitor", hint: "Show your vitals, conditions, statuses and private notifications.", scope: "client", config: true, type: Boolean, default: true, onChange: schedule });
   // Keep the old hidden setting registered for compatibility; manual dragging is retired.
   game.settings!.register(MODULE, "eyeHUDPosition", { scope: "client", config: false, type: Object, default: null });
-  Hooks.once("ready", () => { for (const message of game.messages ?? []) remember(message); messageChanged(); });
+  Hooks.once("ready", messageChanged);
   Hooks.on("pneumaCombatBarDockChanged", schedule);
   for (const hook of ["controlToken", "canvasReady", "createToken", "deleteToken"]) Hooks.on(hook, schedule);
   Hooks.on("updateUser", (user: User) => { if (user.id === game.user?.id) schedule(); });
@@ -712,8 +708,9 @@ export function registerEyeHUD() {
       if ([actorInFocus(), displayedActor(), hoveredHUDToken?.actor].some(actor => actor && changed.includes(actor.uuid))) schedule();
     });
   }
-  Hooks.on("createChatMessage", remember); Hooks.on("updateChatMessage", remember);
-  Hooks.on("deleteChatMessage", (message: ChatMessage) => { const tracked = attacks.delete(message.id!); dismissed.delete(message.id!); if (tracked || foundry.utils.getProperty(message,"flags.pneuma-combattools.quickhack")) schedule(); });
+  Hooks.on("createChatMessage", (message:ChatMessage)=>{void queueIncomingAttack(message).catch(error=>console.error(MODULE,"Incoming attack notice failed",error));if(foundry.utils.getProperty(message,"flags.pneuma-combattools.quickhack"))schedule();});
+  Hooks.on("updateChatMessage", refreshChatNotice);
+  Hooks.on("deleteChatMessage", (message: ChatMessage) => { dismissHUDMessage(ATTACK_NOTICE_SOURCE,message.id!);if(foundry.utils.getProperty(message,"flags.pneuma-combattools.quickhack")) schedule(); });
   for (const hook of ["renderSidebar", "collapseSidebar"]) Hooks.on(hook, () => { if (root) dockHUD(root); });
   window.addEventListener("resize", () => { if (root) dockHUD(root); });
 }

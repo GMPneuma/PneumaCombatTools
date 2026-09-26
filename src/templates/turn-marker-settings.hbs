@@ -1,0 +1,17 @@
+<form autocomplete="off">
+  <p class="notes">Preview appears only for you on your selected token or assigned character, even outside combat. Closing this window restores the turn indicator. Display preferences are in Configure Settings.</p>
+  <nav class="flexrow" aria-label="Indicator settings">
+    <button type="button" data-indicator-mode="default" aria-pressed="{{isDefault}}">Default Indicator</button>
+    <button type="button" data-indicator-mode="personal" aria-pressed="{{isPersonal}}">My Indicator</button>
+    {{#if hasToken}}<button type="button" data-indicator-mode="token" {{#unless tokenName}}disabled{{/unless}} aria-pressed="{{isToken}}">This Token</button>{{/if}}
+  </nav>
+  {{#if isDefault}}{{#if isGM}}<p class="notes">GM default for viewers without a local default.</p>{{else}}<p class="notes">Your default for tokens without a custom indicator. Only affects your view. Use Default for Everyone applies this to every token.</p><div class="form-group"><label>Use GM Default</label><input type="checkbox" data-use-gm-default {{checked useGMDefault}}></div>{{/if}}{{/if}}{{#if isToken}}<p class="notes">Override for <strong>{{tokenName}}</strong> only. Changes save automatically.</p><div class="form-group"><label>Use inherited settings</label><input type="checkbox" data-use-inherited {{checked useInherited}}></div>{{/if}}{{#if isPersonal}}<p class="notes">Everyone sees these settings when your character takes a turn. Changes save automatically.</p>
+  <div class="form-group"><label>Use My Default Indicator</label><input type="checkbox" data-use-default {{checked useDefault}}></div>{{/if}}
+  <fieldset {{#if readOnly}}disabled{{/if}}>
+    <legend>{{#if isToken}}This Token — {{tokenName}}{{else}}{{#if isDefault}}Default Indicator{{else}}My Indicator{{/if}}{{/if}}</legend>
+    <div class="form-group"><label>Style</label><div class="form-fields"><select name="pneuma-combattools.turnMarkerStyle">{{selectOptions styles selected=profile.turnMarkerStyle}}</select></div></div>
+    <div class="form-group"><label>Color</label><div class="form-fields"><input type="text" name="pneuma-combattools.turnMarkerColor" value="{{profile.turnMarkerColor}}" placeholder="#ffc36a"><input type="color" data-edit="pneuma-combattools.turnMarkerColor" value="{{profile.turnMarkerColor}}"></div></div>
+    {{#each ranges}}<div class="form-group"><label>{{label}}</label><div class="form-fields"><input type="range" name="pneuma-combattools.{{key}}" min="{{range.min}}" max="{{range.max}}" step="{{range.step}}" value="{{value}}"><span class="range-value">{{displayValue}}</span></div></div>{{/each}}
+  </fieldset>
+  <footer class="sheet-footer flexrow"><button type="button" data-close>Close</button></footer>
+</form>

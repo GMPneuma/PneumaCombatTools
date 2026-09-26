@@ -8,7 +8,7 @@ try {
  await page.addStyleTag({content:await readFile('dist/styles/pneuma-combattools.css','utf8')});
  await page.addStyleTag({content:'body{background:#ddd;font:14px Arial;padding:12px} .rollcard{padding:8px;border:1px solid #888;margin:8px 0} button{cursor:pointer} h3{margin:4px 0}'});
  await page.evaluate(()=>{
-  window.hooks={};window.Hooks={on:(k,f)=>(hooks[k]??=[]).push(f),once:()=>{}};
+  window.hooks={};window.Hooks={on:(k,f)=>(hooks[k]??=[]).push(f),off:(k,id)=>{hooks[k][id-1]=()=>{};},once:()=>{}};
   window.game={system:{id:'cyberpunk-red-core'},user:{id:'gm',isGM:true,active:true},settings:{get:()=>false},i18n:{localize:k=>k}};
   const gm=game.user,p1={id:'p1',isGM:false,active:true,name:'Player 1'},p2={id:'p2',isGM:false,active:true,name:'Player 2'};
   game.users=[gm,p1,p2];game.users.get=id=>game.users.find(u=>u.id===id);game.messages=new Map();
@@ -16,7 +16,7 @@ try {
   window.fromUuid=async id=>id.startsWith("Token.")?{uuid:id,actor}:actor;
   window.foundry={utils:{deepClone:o=>structuredClone(o),getProperty:(o,p)=>p.split('.').reduce((v,k)=>v?.[k],o),randomID:()=>Math.random().toString(36)}};
   window.ui={notifications:{error:message=>{throw Error(message)},warn:()=>{}},chat:{updateMessage:()=>{}}};
-  window.Dialog=class {constructor(data){window.dialog=data;}render(){return this;}static async prompt(data){window.promptData=data;}};
+  window.Dialog=class {constructor(data){this.data=data;window.dialog=data;}render(){return this;}static async prompt(data){window.promptData=data;}};
   window.ChatMessage={getSpeaker:()=>({}),applyRollMode:()=>{},create:async data=>{window.created=data;return data;}};
   window.wrap=nodes=>({length:nodes.length,find:s=>wrap(nodes.flatMap(n=>[...n.querySelectorAll(s)])),prop:(k,v)=>{nodes.forEach(n=>n[k]=v);return wrap(nodes);},attr:(k,v)=>{nodes.forEach(n=>n.setAttribute(k,v));return wrap(nodes);},append:n=>nodes[0]?.append(n),on:(event,fn)=>nodes.forEach(n=>n.addEventListener(event,fn))});
   window.$=node=>wrap([node]);
@@ -35,7 +35,7 @@ try {
   window.damageSixes=roll=>roll.faces.filter(n=>n===6).length;
  });
  const nativeRoot=process.env.TEMP+'/crewtools-cpr-native/fvtt-cyberpunk-red-core-v0.92.4-75b8c9d7cb76ed1ea2797a3404ce77172d424b6b/src';
- const native=await readFile(nativeRoot+'/modules/rolls/cpr-rolls.js','utf8');
+ const native=await readFile(process.env.PNEUMA_CPR_ROLLS || nativeRoot+'/modules/rolls/cpr-rolls.js','utf8');
  await page.addScriptTag({type:'module',content:native.replace(/^import .*$/gm,'')+'\nwindow.manualNativeClasses={CPRRoll,CPRDamageRoll,CPRTableRoll};'});
  for(const [file,names] of [['half-armor','armorIgnorePercent,halfArmorControl,halfArmorSelected,interactArmorSelected,bindHalfArmor,registerHalfArmor'],['manual-roll-state','MANUAL_MODULE,manualEscape,manualNumber,groupOutcome,groupContent']]) {
   const code=await readFile('dist/scripts/'+file+'.js','utf8');await page.addScriptTag({type:'module',content:code+'\nObject.assign(window,{'+names+'});'});
@@ -45,7 +45,7 @@ try {
  await page.addScriptTag({type:'module',content:'const retry=new Map();'+sharedDamage.slice(sharedDamage.indexOf('export async function renderDamage('))+'\nwindow.renderDamage=renderDamage;'});
  let code=await readFile('dist/scripts/manual-rolls.js','utf8');
  code=code.replace(/^import .*$/gm,'').replace('return await import(path);','return window.manualNativeClasses;').replace('(await import(path)).default','window.nativeUtils');
- await page.addScriptTag({type:'module',content:'const M=MANUAL_MODULE,esc=manualEscape;\n'+code+'\nObject.assign(window,{manualContent,handleManualRequest,bindManualCard,registerManualRolls,openManualRolls,damagePrompt,basePrompt,groupPrompt,criticalPrompt,statPrompt});'});
+ await page.addScriptTag({type:'module',content:'const M=MANUAL_MODULE,esc=manualEscape;\n'+code+'\nObject.assign(window,{manualContent,handleManualRequest,bindManualCard,registerManualRolls,openManualRolls,damagePrompt,basePrompt,groupPrompt,criticalPrompt,statPrompt,characterRollPrompt});'});
  await page.waitForFunction(()=>window.handleManualRequest);
  const result=await page.evaluate(async()=>{
   const check=(b,m)=>{if(!b)throw Error(m)};
@@ -93,7 +93,28 @@ try {
   holder.querySelector('[name=customDice]').value='1';holder.querySelector('[name=customSides]').value='1';holder.querySelector('[name=base]').value='-2';facesQueue.push([1]);await baseDialog.buttons.roll.callback([holder]);check(created.content.includes('1d1-2 = -1'),'minimum custom dice and negative modifier');holder.querySelector('[value=standard]').checked=true;holder.querySelector('[value=standard]').dispatchEvent(new Event('change',{bubbles:true}));check(holder.querySelector('.pneuma-custom-roll').disabled,'switching back locks custom');
   game.user=game.users.get('p1');game.user.character=actor;window.canvas={tokens:{controlled:[]}};
   actor.system={stats:{ref:{value:6},luck:{value:2,max:8}}};actor.getStat=stat=>actor.system.stats[stat].value;
-  openManualRolls();check(document.querySelector('.pneuma-roll-flyout-title').textContent==='Manual Rolls','menu header');check(document.activeElement.classList.contains('pneuma-roll-flyout'),'no item initially focused');check(!!document.querySelector('[data-roll-choice=stat]')&&!document.querySelector('[data-roll-choice=group]'),'player STAT menu');document.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown'}));check(document.activeElement.dataset.rollChoice==='damage','keyboard navigation');document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));
+  openManualRolls();check(document.querySelector('.pneuma-roll-flyout-title').textContent==='Manual Rolls','menu header');check(document.activeElement.classList.contains('pneuma-roll-flyout'),'no item initially focused');check(!!document.querySelector('[data-roll-choice=stat]')&&!document.querySelector('[data-roll-choice=group]'),'player STAT menu');
+  check(JSON.stringify([...document.querySelectorAll('.pneuma-roll-section')].map(s=>[...s.querySelectorAll('button')].map(b=>b.dataset.rollChoice)))===JSON.stringify([['base'],['stat','skill','role'],['damage','critical']]),'three ordered sections');
+  document.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown'}));check(document.activeElement.dataset.rollChoice==='base','keyboard navigation');document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));
+  canvas.tokens.controlled=[{actor}];
+  window.Handlebars={helpers:{cprGetSkillModInfo:()=>2}};
+  actor.system.stats.int={value:7};
+  const skill={id:'skill',type:'skill',name:'Perception',system:{level:4,stat:'int'},sheet:{render:()=>window.viewedSkill=true}},role={id:'role',type:'role',name:'Tech',system:{mainRoleAbility:'Maker',rank:4,hasRoll:false,abilities:[{name:'Upgrade Expertise',rank:3,hasRoll:true},{name:'Field Expertise',rank:2,hasRoll:true}]},sheet:{render:()=>window.viewedRole=true}};
+  actor.items=[skill,role];actor.items.get=id=>actor.items.find(i=>i.id===id);actor.sheet={_onRoll:async event=>window.nativeEvent={...event.currentTarget.dataset}};
+  const clickList=async selector=>{holder.querySelector(selector).click();await new Promise(resolve=>setTimeout(resolve,0));};
+  await characterRollPrompt('skill');holder.innerHTML=dialog.content;dialog.render([holder]);
+  check(!holder.querySelector('select')&&holder.querySelectorAll('tbody tr').length===1,'skill list replaces dropdown');
+  check([...holder.querySelectorAll('tbody td')].slice(1,4).map(td=>td.textContent).join(',')==='4,2,13','native level modifier and base');
+  await clickList('[data-action=view]');check(viewedSkill,'skill view opens item');
+  await clickList('[data-action=roll]');check(nativeEvent.itemId==='skill'&&nativeEvent.rollType==='skill','native skill roll delegation');
+  skill.system.level=5;for(const callback of hooks.updateItem)callback({...skill,parent:actor});check(dialog.content.includes('<td>14</td>'),'values refresh after item update');
+  window.skillListPreview=dialog.content;dialog.close();
+  await characterRollPrompt('roleAbility');holder.innerHTML=dialog.content;dialog.render([holder]);check(holder.querySelectorAll('tbody tr').length===3,'all main and sub abilities');
+  check(holder.querySelector('[data-choice="1"][data-action=roll]').disabled,'nonrolling role disables only roll');
+  await clickList('[data-choice="2"][data-action=roll]');check(nativeEvent.rollSubtype==='subRoleAbility'&&nativeEvent.rollTitle==='Upgrade Expertise','native sub ability delegation');
+  await clickList('[data-choice="1"][data-action=view]');check(viewedRole,'nonrolling role opens native sheet');
+  window.roleListPreview=dialog.content;dialog.close();
+  actor.items=[];actor.sheet=undefined;canvas.tokens.controlled=[];
   await statPrompt();holder.innerHTML=promptData.content;check(holder.textContent.includes('LUCK (2)'),'current stat instead of maximum');
   holder.querySelector('[name=stat]').value='ref';actor.system.stats.ref.value=5;
   for(const [die,outcome] of [[4,'success'],[5,'fail'],[10,'fail'],[1,'success']]) {
@@ -160,4 +181,7 @@ try {
  await page.screenshot({path:process.env.TEMP+'/pct-roll-menu-layout.png',fullPage:true});
  await page.evaluate(()=>{document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));document.querySelector('#cards').innerHTML='<div class="pneuma-roll-dialog" style="padding:16px;border:1px solid #888;width:350px"><h3>Cyberpunk roll</h3>'+customFormPreview+'<button style="width:100%">Roll</button></div>';});
  await page.screenshot({path:process.env.TEMP+'/pct-custom-roll.png',fullPage:true});
+ await page.setViewportSize({width:620,height:600});
+ await page.evaluate(()=>{document.body.innerHTML='<div class="pneuma-roll-dialog"><h3>Skills — Pex</h3>'+skillListPreview+'<h3>Role Abilities — Pex</h3>'+roleListPreview+'</div>';});
+ await page.screenshot({path:process.env.TEMP+'/pct-character-roll-lists.png',fullPage:true});
 } finally {await browser.close()}

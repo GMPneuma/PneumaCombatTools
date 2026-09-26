@@ -312,6 +312,63 @@ async function groupPrompt() {
     await create({kind:"group",creator:game.user!.id!,title:skill,rollMode:"roll",skill,...(dv!==""?{dv:manualNumber(dv,"DV",0,100)}:{}),hideDV:new FormData(form).has("hideDV"),rows:chosen.map(user=>({user:user.id!,actor:user.character!.uuid,name:user.name+" — "+user.character!.name,state:"waiting"}))});
   });
 }
+async function characterRollPrompt(kind: "skill" | "roleAbility") {
+  const selected=canvas.tokens?.controlled??[];
+  if(selected.length!==1||!selected[0]?.actor)throw Error("Select one character token first.");
+  const actor=selected[0].actor;
+  if(!actor.isOwner)throw Error("You do not control this character.");
+  type Choice={item:Item;name:string;subtype?:string;hasRoll:boolean;rank:number;stat?:string};
+  let choices:Choice[]=[];
+  const content=()=>{
+    choices=actor.items.filter(item=>String(item.type)===(kind==="skill"?"skill":"role")).flatMap<Choice>(item=>{
+      const data=item.system as unknown as {level:number;stat:string;rank:number;mainRoleAbility:string;hasRoll:boolean;abilities:{name:string;rank:number;hasRoll:boolean}[]};
+      if(kind==="skill")return [{item,name:item.name!,hasRoll:true,rank:data.level,stat:data.stat}];
+      return [{item,name:data.mainRoleAbility||item.name!,subtype:"mainRoleAbility",hasRoll:data.hasRoll,rank:data.rank},
+        ...(data.abilities??[]).map(ability=>({item,name:ability.name,subtype:"subRoleAbility",hasRoll:ability.hasRoll,rank:ability.rank}))];
+    }).sort((a,b)=>a.name.localeCompare(b.name));
+    return '<div class="pneuma-character-roll-list"><table><thead><tr><th>'+(kind==="skill"?'Skill':'Role Ability')+'</th><th>'+(kind==="skill"?'Level':'Rank')+'</th><th>Mod</th>'+(kind==="skill"?'<th>Base</th>':'')+'<th colspan="2">Actions</th></tr></thead><tbody>'+choices.map((choice,index)=>{
+      // Same modifier helper and base formula as CPR's character sheet.
+      const mod=Number(Handlebars.helpers.cprGetSkillModInfo!(choice.name,actor,"modTotal",{hash:{}}));
+      const base=choice.rank+mod+Number(foundry.utils.getProperty(actor,`system.stats.${choice.stat}.value`));
+      return '<tr><td>'+esc(choice.name)+(kind==="roleAbility"?'<small>'+esc(choice.item.name!)+'</small>':'')+'</td><td>'+choice.rank+'</td><td>'+mod+'</td>'+(kind==="skill"?'<td>'+base+'</td>':'')+'<td><button type="button" data-choice="'+index+'" data-action="view" aria-label="View '+esc(choice.name)+'">View</button></td><td><button type="button" data-choice="'+index+'" data-action="roll" aria-label="Roll '+esc(choice.name)+'"'+(choice.hasRoll?'':' disabled title="This ability has no native roll"')+'>Roll</button></td></tr>';
+    }).join('')+'</tbody></table></div>';
+  };
+  const initial=content();
+  if(!choices.length)throw Error(kind==="skill"?"This character has no skills.":"This character has no role abilities.");
+  const run=async(choice:Choice,action:string)=>{
+      if(!actor.isOwner)throw Error("You do not control this character.");
+      if(!choice||actor.items.get(choice.item.id!)!==choice.item)throw Error("This ability is no longer available.");
+      if(action==="view"){choice.item.sheet?.render(true);return;}
+      if(!choice.hasRoll)return;
+      // The native sheet owns modifiers, dialogs, LUCK, dice animation and chat publication.
+      const sheet=actor.sheet as ActorSheet & {_onRoll?(event:unknown):Promise<void>};
+      if(!sheet?._onRoll)throw Error("The character sheet does not provide CPR's native roll handler.");
+      const control=document.createElement("a");
+      control.dataset.itemId=choice.item.id!;control.dataset.rollType=kind;control.dataset.rollTitle=choice.name;
+      if(choice.subtype)control.dataset.rollSubtype=choice.subtype;
+      await sheet._onRoll({currentTarget:control,target:control,type:"click",ctrlKey:false,metaKey:false,shiftKey:false});
+  };
+  let busy=false;
+  const hooks:[string,number][]=[];
+  const dialog=new Dialog({title:(kind==="skill"?"Skill Roll — ":"Role Ability — ")+actor.name,content:initial,buttons:{},
+    render:html=>{
+      const root=(html as JQuery)[0]!;
+      root.querySelectorAll<HTMLButtonElement>("button[data-choice]").forEach(button=>button.addEventListener("click",()=>{
+        if(busy)return;
+        const choice=choices[Number(button.dataset.choice)];if(!choice)return;
+        busy=true;
+        void run(choice,button.dataset.action!).catch(report).finally(()=>{busy=false;});
+      }));
+    },close:()=>{for(const [event,id] of hooks)Hooks.off(event,id);}
+  },{width:kind==="skill"?560:520,classes:["pneuma-roll-dialog"]});
+  const refresh=(document:Actor|Item|ActiveEffect)=>{
+    if(document!==actor&&document.parent!==actor&&document.parent?.parent!==actor)return;
+    dialog.data.content=content();dialog.render(false);
+  };
+  for(const event of ["updateActor","createItem","updateItem","deleteItem","createActiveEffect","updateActiveEffect","deleteActiveEffect"])
+    hooks.push([event,Hooks.on(event,refresh)]);
+  dialog.render(true);
+}
 let closeRollFlyout: (()=>void) | undefined;
 export function openManualRolls(anchor = document.querySelector<HTMLElement>("[data-pneuma-manual-rolls]")): void {
   if(closeRollFlyout){closeRollFlyout();return;}
@@ -322,14 +379,18 @@ export function openManualRolls(anchor = document.querySelector<HTMLElement>("[d
   const events=new AbortController();
   const close=(focus=false)=>{events.abort();panel.remove();anchor.setAttribute("aria-expanded","false");closeRollFlyout=undefined;if(focus&&anchor.isConnected)anchor.focus();};
   closeRollFlyout=()=>close();anchor.setAttribute("aria-expanded","true");
-  const choices:[string,string,string,()=>Promise<void>][]=[
-    ["damage","Damage","fa-burst",damagePrompt],["critical","Critical Injury","fa-heart-crack",criticalPrompt],
-    ["base","Cyberpunk Roll","fa-dice-d10",basePrompt],["stat","STAT Roll","fa-chart-simple",statPrompt],
-    ...(game.user?.isGM?[["group","Group Check","fa-users",groupPrompt] as [string,string,string,()=>Promise<void>]]:[])];
-  for(const [id,label,icon,run] of choices){
+  const sections:[string,string,string,()=>Promise<void>][][]=[
+    [["base","General Roll","fa-dice-d10",basePrompt]],
+    [["stat","STAT Roll","fa-chart-simple",statPrompt],["skill","Skill Roll","fa-list",()=>characterRollPrompt("skill")],["role","Role Ability","fa-star",()=>characterRollPrompt("roleAbility")]],
+    [["damage","Damage","fa-burst",damagePrompt],["critical","Critical Injury","fa-heart-crack",criticalPrompt]]];
+  if(game.user?.isGM)sections.push([["group","Group Check","fa-users",groupPrompt]]);
+  for(const choices of sections){
+    const section=document.createElement("div");section.className="pneuma-roll-section";section.setAttribute("role","group");panel.append(section);
+    for(const [id,label,icon,run] of choices){
     const button=document.createElement("button");button.type="button";button.dataset.rollChoice=id;button.setAttribute("role","menuitem");
     button.innerHTML='<i class="fas '+icon+'" aria-hidden="true"></i><span>'+label+'</span>'+(id==="group"?'<small>GM</small>':'');
-    button.addEventListener("click",()=>{close();void run().catch(report);});panel.append(button);
+    button.addEventListener("click",()=>{close();void run().catch(report);});section.append(button);
+    }
   }
   document.body.append(panel);
   const rect=anchor.getBoundingClientRect(),bounds=panel.getBoundingClientRect();

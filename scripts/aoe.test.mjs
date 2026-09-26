@@ -334,6 +334,20 @@ test('area attacks reject unseen aim squares before ammunition is consumed',asyn
  const f=fixture();f.source.checkCollision=(_point,options)=>{assert.equal(options.type,'sight');return true};
  await assert.rejects(startAreaAttack(f.source,f.target,'w','attack'),/line of sight/);assert.equal(f.weapon.system.magazine.value,20);assert.equal(f.messages.length,0);
 });
+test("suppression adds its status on failure, preserves other effects on GM correction, and ties avoid it",async()=>{
+ const f=fixture('suppression');
+ f.b.createEmbeddedDocuments=async(_type,rows)=>{f.b.effects.push(...rows.map((r,i)=>({...r,id:'suppressed'+i,statuses:new Set(r.statuses)})));};
+ f.b.deleteEmbeddedDocuments=async(_type,ids)=>{f.b.effects=f.b.effects.filter(e=>!ids.includes(e.id));};
+ await startAreaAttack(f.source,f.target,'w','suppressive');
+ await f.request('claim',{nonce:'one'});await f.request('commit',{nonce:'one',total:19,html:'failed'});
+ assert.equal(f.data().rows[0].state,'hit');assert.equal(f.b.effects.length,1);assert.equal(f.b.effects[0].name,'Suppressed');
+ assert.ok(f.b.effects[0].statuses.has('pd7p69lbketdc8by'));
+ f.b.effects.push({id:'manual',name:'Suppressed',statuses:new Set(['pd7p69lbketdc8by'])});
+ await f.request('exclude',{user:'gm'});assert.deepEqual(f.b.effects.map(e=>e.id),['manual']);
+ await f.request('reset',{user:'gm'});await f.request('claim',{nonce:'two'});await f.request('commit',{nonce:'two',total:20,html:'tie'});
+ assert.equal(f.data().rows[0].state,'miss');assert.deepEqual(f.b.effects.map(e=>e.id),['manual']);
+ await f.request('forcehit',{user:'gm'});assert.equal(f.b.effects.length,2);
+});
 
 test('original explosive target marker stays put after GM scatter and follows area visibility',async()=>{
  const f=fixture('explosive',5);await startAreaAttack(f.source,f.target,'w','attack');

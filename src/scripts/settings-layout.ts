@@ -5,11 +5,12 @@ const groups = [
   { id: "combat", title: "Attack & Damage Cards", keys: ["hideAttackWeapon", "showArmorControls", "maNoAblation", "reportWeaponReloads"] },
   { id: "evasion", title: "Evasion & Area Attacks", keys: ["evasionEligibility", "configureEvasion", "npcAutoEvasion", "areaSettingsMenu"] },
   { id: "movement", title: "Movement & Initiative", keys: ["movementTracking", "pneumaHomebrew"] },
+  { id: "turn-marker", title: "Animated Turn Indicator", keys: ["turnMarkerSettings", "turnMarkerEnabled", "turnMarkerForceDefault", "turnMarkerStyle", "turnMarkerColor", "turnMarkerThickness", "turnMarkerDistance", "turnMarkerOpacity", "turnMarkerSpeed", "turnMarkerDisplay"] },
   { id: "injuries", title: "Injuries & Effects", keys: ["criticalInjuries", "injuryTurnEndReminder", "empBehaviorMenu", "customStatusesMenu"] },
   { id: "quickhack", title: "QuickHack", keys: ["quickhackEnabled", "quickhackMode", "quickhackMessages"] },
-  { id: "combat-bar", title: "Combat Bar", keys: COMBAT_BAR_SETTING_KEYS },
-  { id: "token-hud", title: "Token HUD & Targeting", keys: ["targetedRightClick", "tightHUD", "hudScale", "iconColor", "statusIconScale", "hoverDV", "hoverAutofire", "alwaysShowEKG"] },
-  { id: "status-hud", title: "Status HUD & Biomonitor", keys: ["eyeHUD", "eyeHUDDock", "crewHUDIntegration", "biomonitorShowHP", "forcePlayerHUDAnimations", "eyeHUDAnimateMessages", "biomonitorFlashSeconds"] },
+  { id: "combat-bar", title: "Combat Bar", keys: [...COMBAT_BAR_SETTING_KEYS,"combatBarSettings"] },
+  { id: "token-hud", title: "Token HUD & Targeting", keys: ["tokenHUDSettings", "hoverDV", "hoverAutofire", "alwaysShowEKG"] },
+  { id: "status-hud", title: "Biomonitor", keys: ["eyeHUD", "biomonitorSettings", "eyeHUDDock", "crewHUDIntegration", "biomonitorShowHP", "forcePlayerHUDAnimations", "eyeHUDAnimateMessages", "biomonitorFlashSeconds"] },
 ] as const;
 
 /** Keep native saved fields and submission behavior; present their paired values as one choice. */
@@ -99,10 +100,23 @@ export function groupModuleSettings(root: HTMLElement): void {
   // Future settings stay accessible instead of disappearing when their group is not yet assigned.
   appendGroup("other", "Other Settings", [...rows.keys()]);
   combatBarPositionControls(root);
+  hoverDVControls(root);
 }
 
 export function registerSettingsLayout(): void {
   Hooks.on("renderSettingsConfig", (_app: SettingsConfig, html: JQuery) => {
     if (html[0]) groupModuleSettings(html[0]);
   });
+}
+
+/** One presentation select preserves both existing client settings and native save behavior. */
+export function hoverDVControls(root:HTMLElement):void{
+ const enabled=root.querySelector<HTMLInputElement>('[name="pneuma-combattools.hoverDV"]'),autofire=root.querySelector<HTMLInputElement>('[name="pneuma-combattools.hoverAutofire"]');
+ if(!enabled||!autofire||root.querySelector('[data-hover-dv-mode]'))return;
+ const row=enabled.closest<HTMLElement>('.form-group')!;enabled.hidden=true;autofire.closest<HTMLElement>('.form-group')!.hidden=true;
+ const label=row.querySelector('label');if(label)label.textContent="Hover Weapon DVs";
+ const select=document.createElement('select');select.dataset.hoverDvMode="";select.setAttribute('aria-label','Hover Weapon DVs');
+ for(const [value,text] of [['off','Off'],['single','Single Shot'],['autofire','Single Shot + Autofire']])select.add(new Option(text,value));
+ select.value=enabled.checked?(autofire.checked?'autofire':'single'):'off';
+ select.addEventListener('change',()=>{enabled.checked=select.value!=='off';autofire.checked=select.value==='autofire';enabled.dispatchEvent(new Event('change',{bubbles:true}));autofire.dispatchEvent(new Event('change',{bubbles:true}));});enabled.after(select);
 }

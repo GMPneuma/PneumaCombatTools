@@ -1,5 +1,15 @@
 # Combat Tools feature inventory
 
+Animated Turn Indicator (unreleased): 16 animated styles, including all ten roles. Self-CTH gear → Animated Turn Indicator provides Default Indicator and My Indicator buttons. Default appearance is stored in world settings and edited by the GM; NPCs and players without token or personal overrides inherit it. GM-only This Token overrides are stored on the scene TokenDocument, with priority over the player profile; Use inherited settings removes the token override. My Indicator stores a complete shared profile on the user document, so all viewers see the current character owner’s selected style, color, thickness, distance, opacity and speed. Assigned character user takes priority, then a stable non-GM owner; offline status does not change selection. Use Default Indicator removes the personal override. Animated/Static/Off display remains a client-only preference. Inputs auto-save; rapid slider changes are coalesced. Native active-scene, visibility, parenting and teardown behavior remain. Shared profile selection, permissions and browser form flows are tested; live multiplayer acceptance remains pending.
+
+Biomonitor composite icon: shifted the heart and its crack 3 SVG units right; bell position and icon dimensions are unchanged.
+
+Combat menu ownership (unreleased): targeted menus use their own pneuma-target-menu class instead of the native status-effects class, with explicit positioning, visibility and pointer behavior. They retain 230px width without module-specific exceptions. Native status pickers are unaffected.
+
+## Hover EKG contrast (unreleased)
+
+The 105×30 hover EKG has a 65% black backing and subtle dark waveform shadow for bright maps. Existing health colors, placement, animation and visibility rules are preserved.
+
 ## Blank icon color save fix (0.8.6)
 
 The world icon-color setting defaults to amber (`#ffc36a`). Saving null, empty or whitespace-only values normalizes to `#ffc36a` before Foundry v12 validates the ColorField, preventing a cleared color textbox from interrupting the GM's settings save. Valid custom colors and unrelated settings retain native behavior. Regression tests cover normalization and subsequent Autofire/HP preference saves; live Foundry confirmation remains pending.
@@ -59,7 +69,7 @@ Current source: release 0.8.3, reviewed 2026-09-24. “Implemented” means pres
 - Grenade, rocket and shotgun-shell placement, wall-clipped recipient coverage, native ammo handling, GM scatter placement and target-list corrections.
 - Individual evasion and relocation; optional MOVE costs, debt and Cover Up homebrew.
 - One shared damage roll with per-target application; results below the shared roll; GM Show/Hide attack area and automatic completion hiding.
-- Suppressive fire with native attack and individual Concentration checks; recorded cover obligation, manually adjudicated actions.
+- Suppressive fire with native attack and individual Concentration checks; failed checks apply Suppressed. Each new combat suppression clears at the end of the affected character's next turn (next round if currently their turn), using its originating encounter and combatant identity. Reset/deletion or combatant removal also clears timed markers; expiry catches up on reconnect. GM exclusion/reset removes only that response's marker. Cover movement and outside-combat clearing remain manual.
 - Armor-Piercing and Smart ammunition handling; reusable Poison, Biotoxin, EMP, Microwaver, Flashbang, Ignite, Sleep, Teargas and Smoke flows.
 - Native fire recognition and once-per-ended-turn damage at strongest severity; Extinguish, Sleep wake-on-damage/touch, temporary sensory injuries and timed cleanup.
 - Persistent scene smoke independent of its attack marker/card; footprint and expiry saved. Smoke penalties and sensory interaction remain manual.
@@ -68,6 +78,8 @@ Current source: release 0.8.3, reviewed 2026-09-24. “Implemented” means pres
 
 - Opposed Grab, Hold Target / Take Held Object, Escape and third-party Break Grapple.
 - Self-HUD Close Combat controls identify the other participant. Choke/Throw/Release unlock after the establishing turn in combat; Choke has a once-per-round guard.
+- Choke applies Choking 1 then Choking 2 to the defender. Unconscious replaces the managed stage; skipped rounds clear managed choking markers. Release, successful escape/break, throw and other grapple-end cleanup remove all Choking 1/2 markers from participants, including manual ones. Unconscious and unrelated conditions remain.
+- The token status menu omits Lightly/Seriously/Mortally Wounded, Speed Heal and Quick Fix; their catalog definitions and automated effects remain intact.
 - Separate follow-up results preserve the original grapple card. Managed penalties, held-token following/scale and cleanup; held-object transfer remains manual.
 - Jack-In, detection, connection tracking, Jack Out, eleven QuickHacks, Force Out and encounter-long ejection.
 - Configurable QuickHack availability and result audiences; native Interface/Concentration rolls, range/wall sight and installed-program checks.
@@ -87,7 +99,7 @@ Current source: release 0.8.3, reviewed 2026-09-24. “Implemented” means pres
 - Square-grid movement counters, scene-space start markers, collision-aware adjacent diagonal accounting, run indication and owner Reset. Reset is movement-only undo.
 - Broken Ribs and both Foreign Object injuries have separate movement-damage cards and optional turn-end reminders.
 - Native injury modifiers plus MOVE floor, Evasion restrictions and Combat Tools Cracked Skull headshot correction. Action/speech/limb restrictions are advisory; no general action economy.
-- Biomonitor vitals/EKG, medical guidance, active drugs/pharma, cyberware and situational states; private incoming-attack and API messages.
+- Biomonitor vitals/EKG, medical guidance, active drugs/pharma, cyberware and situational states; private incoming-attack and API messages. Incoming Attack uses the shared session queue, created only when a new waiting attack arrives for an owned actor. Entries retain actor scope and a chat-card navigation link. Dismissal removes the queue entry; card updates and reconnecting never recreate it. Resolved/deleted cards retire remaining entries. No pending-card scan or separate attack alert store remains.
 - Player focus follows an owned selected token, assigned character's unique scene token, or a single owned token when no character is assigned. GM focus remains selection-based.
 - Left/right HUD docking; top-right combat bar temporarily forces HUD left without overwriting the preference.
 - Optional Crew Tools integration uses its shortcut API and retains status colors. Standalone and integrated HUD placement agree.
@@ -105,7 +117,7 @@ Current source: release 0.8.3, reviewed 2026-09-24. “Implemented” means pres
 - Native token HUD retained; self/target routing, compact flyouts, targeted right-click, HUD sizing and icon color controls.
 - Self-HUD alert toggle, thrown weapons/grenades and optional speedware initiative reroll.
 - Ranged DV hover with elevation and optional Autofire; installed functional weapon/attachment filtering.
-- Manual Rolls flyout with no initially selected entry; native Cyberpunk Critical Success/Failure, bounded custom dice, roll-under STAT, manual damage/critical injury and GM group requests.
+- Manual Rolls has three sections: General Roll; STAT Roll, Skill Roll, Role Ability; Damage, Critical Injury. GM Group Check is retained separately. General Roll keeps the Cyberpunk/custom dice UI; STAT keeps its existing roll-under behavior. Skill/Role lists require one owned selected token. Skills show Level, Mod and Base using the native sheet's modifier helper/formula; roles show Rank and Mod. Values refresh on actor/item/effect changes. Each row has View (native item sheet) and Roll (native CPR sheet handler, including modifiers, LUCK, dice and chat); Roll is disabled for nonrolling abilities. No menu entry is initially selected. Verified with build and rendered browser fixtures, not live multiplayer.
 - Group DV optional/hidden, per-player Roll buttons, green/red outcomes and click-total details with modifiers expanded.
 - Positive-label Show armor controls setting, off by default; compact settings editor and four combat-bar position radios.
 - Native status/injury/drug synchronization, custom status names/icons, and declarative native timed effects.
@@ -134,3 +146,72 @@ AoE re-placement: missed aim templates are gray and inactive while waiting for t
 Disablement audit fixes: active native leg-injury modifiers (including renamed native items) offset the cyberleg penalty; disabled/suppressed effects do not. Generic Disabled labels are display-only, including for evasion. Module-owned aggregate limb/frame penalties restore automatically while their item/combat causes remain active, including after manual effect deletion or disabling. Internal-frame policies derive from combat requests and item causes; legacy empty frame markers are removed. CPR modifier metadata repairs also cover Slow and Impair Movement.
 
 - EMP settings streamlined: grouped selection controls, collapsible protection and frame options (open when configured), and conditional numeric fields. Existing behavior and saved values retained.
+
+Animated Turn Indicator expansion (unreleased): 16 selectable styles: Segmented HUD, Scanner, Glitch Frame, Signal Echo, Data Stream, Arc Discharge, Rockerboy — Soundwave, Solo — Fire Control, Netrunner — Quadrant Circuit, Tech — Toolworks, Medtech — Trauma Scan, Media — Live Feed, Exec — Command Grid, Lawman — Dispatch, Fixer — Eurobuck Flow, and Nomad — Redline. Role styles are manual choices, not automatic actor-role assignment. The existing appearance controls and saved circuit key are retained in the Default/My settings. All effects honor the resolved owner/default color (Dispatch always uses blue/red; Nomad’s arc uses green/yellow/orange/red; Media’s recording dot is red), thickness, distance, opacity and speed; static/off and reduced-motion behavior remain. Cached paths use pulses, moving packets, transforms, gauge rotation or alternating prebuilt filaments, without per-frame geometry rebuilds, filters or particles. All 16 tested in PIXI on dark/light backgrounds and at thickness extremes; low-end hardware and live Foundry acceptance remain unverified.
+
+Indicator viewer switches: User Turn indicator is a client master switch (default on); disabling it destroys the active indicator and removes its ticker. Use default for everyone (default off) bypasses all personal profiles, including the viewer’s own, and renders the shared world default. Neither switch edits anyone’s profile or changes another viewer’s display. Both are available above Default/My in the live editor and in Module Settings.
+
+Role indicator refinements: Media has a blinking red recording dot at upper right; Medtech uses a medical cross and two restrained scanning brackets instead of an EKG; Solo has expanding/contracting targeting brackets and a vertically scanning aim line. Lawman uses fixed blue and red for its frame and alternating bars, independent of selected color. Nomad’s speed arc and ticks progress clockwise from green at the upper end through yellow and orange to the redline at the lower end, following the needle’s increasing-RPM direction; its needle and road dashes retain chosen color. Colors and arc geometry are cached; local static/off and speed controls still apply.
+
+Indicator Distance is limited to 0–50 in Default/My controls and runtime profile normalization; older saved values above 50 render at 50.
+
+Arc Discharge redesigned: six small contacts close to the token perimeter, with brief jagged arcs and short forks jumping between neighboring contacts in an irregular sequence. Long radial spokes and continuously visible wires are removed. Three prebuilt routes per gap are reused; frames change only alpha, without particles or redraws. Distance, thickness, color, opacity, speed and local static/off still apply.
+
+Indicator Speed is limited to 0–2; Opacity is limited to 50–100% and displayed as a percentage in the live editor. Default/personal values outside these ranges are clamped when read and rendered.
+
+Fixer Eurobuck Flow replaces the contact-node network with a vector Eurobuck (€$) display below the token and six moving banknotes along side transaction rails. Currency and bill geometry are cached; per-frame changes are position/alpha only. Existing fixer profile selections and user controls remain compatible.
+
+Role simplification: Medtech is reduced to three graphics: the cross and two slow scanning brackets, removing the surrounding badge, ticks, circuit corners and segmented arcs. Tech Toolworks replaces its network-like routes with two counter-rotating toothed gears and an open-ended wrench below the portrait. Cached geometry and saved style keys are retained.
+
+Netrunner now uses the four-quadrant circuit design with traveling packets. The old Packet Route drawing and duplicate standalone Quadrant Circuit option are removed, leaving 16 styles. Legacy circuit profiles resolve to netrunner; a GM ready hook upgrades the world default key when needed.
+
+Configure Settings now includes Animated Turn Indicator → Configure for both players and GMs. It opens the same complete Default/My editor and viewer switches as Self-CTH. World-default editing remains GM-only; existing inline settings and the HUD shortcut remain available.
+
+Per-token indicator overrides: GMs can open This Token from an owned token’s Self-CTH settings menu or a targeted token’s gear shortcut. Configure Settings also captures a single selected token when opening. Token context stays fixed while editing; its name is displayed. Separate scene tokens sharing an actor can have different settings. Priority is viewer master/force-default, then token override, owner profile, world default. Only GMs can write/reset token overrides; deleted tokens reject writes. Native updateToken refreshes all viewers. Tests cover precedence, independent NPCs, inheritance reset, permissions and HUD/editor access; live multiplayer verification remains pending.
+
+### Local indicator editor preview
+- Opening Animated Turn Indicator previews the active Default/My/This Token profile on the opening token, selected owned token, or assigned character token. No combat or current turn is required.
+- Preview is local rendering only; no preview flags or combat state are written. Appearance edits still save normally. Closing the editor restores the real turn indicator; scene teardown and token destruction clean up the preview.
+- Master off, display Off/Static and token visibility remain respected. The editor previews the selected profile even with Use default for everyone enabled; normal viewing resumes on close.
+- Verified by strict build, runtime lifecycle tests and editor browser fixture; not yet verified in a live multiplayer session.
+
+### Indicator settings separation and selection tracking
+- Main Configure Settings contains only Use Turn Indicator, Use Default for Everyone, Animated Turn Indicator Display, and the Configure button. Appearance settings remain registered with existing saved values but are hidden from the main list.
+- Configure contains Default Indicator / My Indicator and GM-only This Token profiles; no duplicate client controls. The GM token tab is disabled until a token is available.
+- The open editor follows newly controlled tokens, updates the override name/profile and local preview, and keeps queued writes bound to the original token. Its native controlToken listener is removed on close.
+- Verified by strict build, 402 passing tests (4 skipped), and a browser fixture covering selection changes and correct-token saves; live Foundry verification remains pending.
+
+### Player-local default indicator
+- Players can now edit Default Indicator in Configure. This saves a separate User flag `pneuma-combattools.turnIndicatorDefault`; it only changes that user's rendered fallback. It neither changes the GM world default nor becomes the player's shared My Indicator.
+- Rendering chooses token override, character owner's My Indicator, then viewing user's default (falling back to GM world default). Use Default for Everyone bypasses both custom layers and uses the viewing user's default.
+- Use GM Default removes the player's local default and resumes following world changes. GM Default Indicator editing continues to change the world default. Main settings remain the same three display preferences plus Configure.
+- Validated with runtime viewer-switch tests, profile isolation/reset tests and browser editor tests; live multiplayer verification remains pending.
+
+### My Indicator inherits the player's default
+- Use My Default Indicator clears the separate personal override and follows that player's Default Indicator, falling back to the GM default only when the player has none. Preview, initial customization and other viewers' rendering resolve the same owner default.
+- Player default changes propagate to their inherited My Indicator; explicit personal and token overrides remain independent. Other viewers can still use their own Use Default for Everyone preference.
+- Supersedes the earlier direct GM-default fallback for My Indicator. Regression checks cover distinct viewer/owner defaults, reset, preview and customization seeded from the player's default.
+
+- Animated Turn Indicator Display now offers Animated and Static only. Legacy client Off selections migrate on ready to master disabled plus a motion-appropriate display mode, preserving hidden indicators until the user enables the master switch. Build and automated migration checks cover the change.
+
+### Settings cleanup: approved submenu layout
+- Combat Bar keeps its visibility switch and existing movement setting in main settings; a Configure entry opens the existing editor for position, size, layout and tooltip preferences. Hidden appearance settings are still rendered with native v12 settings row metadata and retain their saved keys/scopes.
+- Biomonitor keeps Show Biomonitor + Configure; position, Crew integration, HP numbers, GM animation forcing, local animations and flash duration live inside. Token HUD has Configure for right-click behavior, Compact Token HUD, sizing and the existing GM icon color.
+- Hover Weapon DVs combines the existing two flags into Off / Single Shot / Single Shot + Autofire without migrating or dropping saved settings.
+- QuickHack keeps Enable + Configure; its existing routing window now also edits rules mode.
+- Unified visible Biomonitor naming; corrected tooltip, EKG access and amber-default wording. Position descriptions are concise; conflict notes appear only for top-right combat bar plus a saved top-right Biomonitor preference.
+- Movement and combat rule placements remain unchanged. No separate display/world categories or house-rules group added.
+- Strict build, automated permission/save checks and browser fixtures cover controls, Hover DV state, integrations and conflict visibility. Browser fixtures are not live Foundry multiplayer verification.
+
+### Indicator visual revision
+- Glitch Frame is completely replaced by Vector Wake: three orbital arrowheads and curved fading tails. Existing `glitch` selections resolve to the new effect without losing settings.
+- Rockerboy side meters use fixed green-to-yellow-to-red colors from bottom to top; red peak segments now illuminate during high levels.
+- TECH uses a workshop gantry, moving piston jaws, opposing gears and a ratcheting wrench. MedTech uses filling treatment cartridges, scanning brackets and a medical shield, without reusing the EKG.
+- Media has a recording dot twice its former radius and fixed red vector LIVE lettering inside the lower-left frame. Exec has a corporate inbox, arriving envelope and mini organization chart with dispatch packets.
+- Cached geometry only; animation modifies transforms/alpha. Verified all 16 styles on dark/light maps, object-count stability, moving elements, color ordering and thickness extremes with PIXI browser fixtures plus runtime tests. Live Foundry visual review remains pending.
+
+### TECH diagnostics and corporate authority revision
+- TECH now uses four mounting brackets, an asymmetric calibration rail with moving cursor, three sequential component checks and a stepped repair-progress strip. Removed the gears, piston jaws and wrench silhouette.
+- MedTech medical cross is fixed red independently of the selected profile color.
+- Exec is redesigned as Corporate Authority: stepped skyscraper crest, angular side framing, outward-moving command signals and three rank chevrons. Removed the inbox and org chart.
+- All styles retain cached geometry. Strict build, 407 passing tests (4 skipped), and PIXI dark/light animation fixtures pass; live Foundry visual review remains pending.

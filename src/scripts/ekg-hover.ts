@@ -43,7 +43,7 @@ function refresh(){
   position();
 }
 export function registerHoverEKG(){
-  game.settings!.register(MODULE,"alwaysShowEKG",{name:"Always show EKG",hint:"Show the hovered token EKG to everyone. When off, a selected owned Medtech (or assigned Medtech when none is selected) can see it, and anyone can see a target with an installed Biomonitor. No numeric HP is shown.",scope:"world",config:true,type:Boolean,default:false,onChange:refresh});
+  game.settings!.register(MODULE,"alwaysShowEKG",{name:"Allow everyone to see hover EKG",hint:"Show the hovered token EKG to everyone. When off, a selected owned Medtech (or assigned Medtech when none is selected) can see it, and anyone can see a target with an installed Biomonitor. No numeric HP is shown.",scope:"world",config:true,type:Boolean,default:false,onChange:refresh});
   Hooks.on("hoverToken",(token:Token,entered:boolean)=>{if(entered)hovered=token;else if(hovered===token)hovered=undefined;else return;refresh();});
   Hooks.on("controlToken",refresh);
   Hooks.on("updateUser",refresh);

@@ -365,7 +365,7 @@ export function registerCombatBar(): void {
     scope: "client", config: true, type: Boolean, default: true, onChange: refresh,
   });
   game.settings!.register(MODULE, "combatBarDock", {
-    name: "Combat bar position", hint: "Top right anchors movement controls in the top-right corner beside the sidebar and forces BiomonHUD to top left. Returning to bottom left restores your saved Biomon position.",
+    name: "Combat bar position", hint: "Choose where the combat bar appears.",
     scope: "client", config: true, type: String, default: "bottom-left", choices: {"bottom-left":"Bottom left", "top-right":"Top right"},
     onChange: () => { refresh(); Hooks.callAll("pneumaCombatBarDockChanged"); },
   });
@@ -383,7 +383,7 @@ export function registerCombatBar(): void {
     name: "Combat bar minimized", scope: "client", config: false, type: Boolean, default: false, onChange: refresh,
   });
   game.settings!.register(MODULE, "combatBarNameOnly", {
-    name: "Show name only", hint: "Show only the actor's name in combat bar portrait tooltips, without click instructions.",
+    name: "Hide combat bar tooltip instructions", hint: "Show only the actor's name in combat bar portrait tooltips, without click instructions.",
     scope: "client", config: true, type: Boolean, default: false, onChange: refresh,
   });
   // Keep portrait nodes stable between the two clicks; a selection rerender would swallow dblclick.

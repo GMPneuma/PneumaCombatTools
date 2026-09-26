@@ -104,8 +104,12 @@ version: 2
 | `mode` | Omitted, `"flash"` or `"queued"`. |
 | `duration` | Finite number from 0 to 86400 seconds; omitted defaults to 60; **0 also means 60**, not forever. Validated even when mode controls lifetime. |
 | `recipients` | Omitted/`"self"`; GM-only `"players"` or nonempty array of connected User IDs. |
+| `actor` | Optional actor UUID (1–200 characters). Show the queued entry only while that actor is the user's HUD focus. |
+| `chatMessage` | Optional chat message ID (1–100 characters). Makes the notice a link to that card; never recreates a notice from the card. |
 
-`HUDNotice` is `{ source, id, text, expires, mode? }`. Timed `expires` is Unix milliseconds; queued `expires` is zero.
+`HUDNotice` is `{ source, id, text, expires, mode?, actor?, chatMessage? }`. Timed `expires` is Unix milliseconds; queued `expires` is zero.
+
+Incoming Attack uses this same queue under `pneuma-combattools.attack`, with the new attack card ID as notice ID. Only live creation of a waiting attack for an owned actor enqueues it. Clearing removes it locally. Updates may retire resolved notices but never re-enqueue them; loading saved cards does not generate alerts. Queue state is session-only.
 
 ## Update, clear and inspect
 

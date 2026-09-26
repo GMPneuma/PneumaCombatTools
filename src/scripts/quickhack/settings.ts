@@ -19,7 +19,7 @@ class QuickhackSettings extends FormApplication {
   constructor() { super({}); }
   static override get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
-      id: "pneuma-quickhack-settings", title: "QuickHack message settings", width: 610,
+      id: "pneuma-quickhack-settings", title: "QuickHack settings", width: 610,
       template: `modules/${MODULE}/templates/quickhack-settings.hbs`, closeOnSubmit: true,
     });
   }
@@ -33,7 +33,7 @@ class QuickhackSettings extends FormApplication {
       { key: "npcToPlayerQuickhackRevealAttacker", title: "Attacker identity", choices: { true: "Show NPC name", false: "Unknown Netrunner" } },
       { key: "playerToNpcJackInAudience", title: "Who sees NPC awareness?", choices: { sourceOwners: "Only the Attacker and GM", public: "Everyone", gm: "Only GM" } },
     ].map(row => ({ ...row, value: String(config[row.key as keyof RoutingConfig]) }));
-    return { groups: [
+    return {mode:mode(),modes:{raw:"RAW",owned:"Must Buy QuickHack",loaded:"Must Be Loaded in Equipped Cyberdeck"}, groups: [
       {title:"NPC → Player: Jack-In", rows:rows.slice(0,3)},
       {title:"NPC → Player: QuickHack", rows:rows.slice(3,5)},
       {title:"Player → NPC: Jack-In", rows:rows.slice(5)},
@@ -41,6 +41,7 @@ class QuickhackSettings extends FormApplication {
   }
   protected override async _updateObject(_event: Event, data: Record<string, unknown>) {
     if (!game.user!.isGM) return;
+    if(["raw","owned","loaded"].includes(String(data.mode)))await game.settings!.set(MODULE,"quickhackMode",data.mode as QuickhackMode);
     await game.settings!.set(MODULE, "quickhackRouting", normalizeRoutingConfig({
       npcToPlayerJackInAudience: String(data.npcToPlayerJackInAudience),
       npcToPlayerJackInShowTotals: data.npcToPlayerJackInShowTotals === "true",
@@ -54,10 +55,10 @@ class QuickhackSettings extends FormApplication {
 export function registerQuickhackSettings(refresh: () => void) {
   game.settings!.register(MODULE, "quickhackEnabled", { name: "Enable QuickHack", hint: "Enable QuickHack controls, rolls, effects and macros. Disable the standalone Pneuma Quickhack module before using this integration.",
     scope: "world", config: true, type: Boolean, default: true, onChange: refresh });
-  game.settings!.register(MODULE, "quickhackMode", { name: "QuickHack rules mode", scope: "world", config: true,
+  game.settings!.register(MODULE, "quickhackMode", { name: "QuickHack rules mode", scope: "world", config: false,
     type: String, default: "raw", choices: { raw: "RAW", owned: "Must Buy QuickHack", loaded: "Must Be Loaded in Equipped Cyberdeck" }, onChange: refresh });
   game.settings!.register(MODULE, "quickhackRouting", { scope: "world", config: false,
     // @ts-expect-error Foundry v12 supports ObjectField settings; pinned typings omit this overload.
     type: new foundry.data.fields.ObjectField(), default: DEFAULT_ROUTING_CONFIG });
-  game.settings!.registerMenu(MODULE, "quickhackMessages", { name: "QuickHack message settings", label: "Configure messages", hint: "Configure visibility, totals and attacker identity.", icon: "fas fa-comments", type: QuickhackSettings, restricted: true });
+  game.settings!.registerMenu(MODULE, "quickhackMessages", { name: "QuickHack settings", label: "Configure", hint: "Rules mode, message visibility, totals and attacker identity.", icon: "fas fa-comments", type: QuickhackSettings, restricted: true });
 }

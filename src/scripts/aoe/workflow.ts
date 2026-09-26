@@ -1,4 +1,5 @@
 import {tokenEncounter,encounterRef,resolveEncounter,requireParticipants,type EncounterRef} from "../encounter.js";
+import {suppressionExpiry} from "../suppression.js";
 import {attackCrossesSmoke} from "./smoke-obscuration.js";
 import {halfArmorSelected, interactArmorSelected} from "../half-armor.js";
 import {automaticNPCEvasion} from "../evasion-settings.js";
@@ -265,6 +266,14 @@ export async function handleAreaRequest(req:Request) {
     row.state="hit";
   }
   else throw Error("Unknown area response.");
+  if(data.kind==="suppression") {
+    const actor=await actorAt(row.uuid),definition=masterStatuses.find(s=>s.name==="Suppressed")!;
+    const source=message.id+":"+row.uuid;
+    const own=Array.from(actor.effects).filter(e=>foundry.utils.getProperty(e,`flags.${MODULE}.suppressionSource`)===source);
+    if(row.state==="hit"&&!own.some(e=>!e.disabled))
+      await actor.createEmbeddedDocuments("ActiveEffect",[{name:definition.name,img:definition.img,statuses:[definition.id],changes:[],flags:{[String(MODULE)]:{suppressionSource:source,suppressionExpiry:suppressionExpiry(resolveEncounter(data.exchange),row.uuid)}}}]);
+    else if(row.state!=="hit"&&own.length)await actor.deleteEmbeddedDocuments("ActiveEffect",own.map(e=>e.id!));
+  }
   await save(message,data);
 }
 function send(message:string,action:string,extra:Partial<Request>={}) {
@@ -517,4 +526,3 @@ export function registerAreaAttacks() {
     }
   });
 }
-

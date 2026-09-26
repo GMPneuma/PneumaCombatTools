@@ -4,7 +4,7 @@ import { requireCombatSocket } from "../socket-health.js";
 import { rollOutcomeClass, styleOpposedRolls } from "../card-structure.js";
 import { nativeCard, rollHidden, spendBonusLuck, type RollItem } from "../native-combat.js";
 import { masterStatuses } from "../status-catalog.js";
-import { chokeDamage, nextChoke, winsGrab } from "./rules.js";
+import { chokeDamage, nextChoke, visibleChoke, winsGrab } from "./rules.js";
 import { MODULE, grappleActionBlocked, property, grapples, grappleFor, actorGrapples, type Grapple, type Participant, type SkillResult } from "./state.js";
 
 const CHANNEL = `module.${MODULE}`;
@@ -105,6 +105,13 @@ async function grappleEffect(actor: Actor, id: string) {
     changes:existingPenalty ? [] : [{key:"bonuses.allActions",mode:CONST.ACTIVE_EFFECT_MODES.ADD,value:"-2",priority:20}],
     flags:{[String(MODULE)]:{grappleId:id},[String("cyberpunk-red-core")]:{changes:{cats:{0:"misc"},situational:{0:{isSituational:false,onByDefault:true}}}}}}]);
 }
+async function chokingEffect(actor: Actor, id: string, count: number) {
+  const definition = masterStatuses.find(s => s.name === `Choking ${count}`);
+  const own = Array.from(actor.effects).filter(e => property<string>(e,"grappleId") === id && property<boolean>(e,"choking"));
+  if (definition && own.some(e => !e.disabled && e.statuses.has(definition.id))) return;
+  if (own.length) await actor.deleteEmbeddedDocuments("ActiveEffect",own.map(e => e.id!));
+  if (definition) await actor.createEmbeddedDocuments("ActiveEffect",[{name:definition.name,img:definition.img,statuses:[definition.id],changes:[],flags:{[String(MODULE)]:{grappleId:id,choking:true}}}]);
+}
 async function removeGrappleEffects(scene: Scene, g: Grapple) {
   const target = scene.tokens.find(t => t.uuid === g.target.token);
   if (target && g.tokenPlacement) await target.update({
@@ -113,9 +120,12 @@ async function removeGrappleEffects(scene: Scene, g: Grapple) {
   for (const p of [g.source,g.target]) {
     const actor = scene.tokens.find(t => t.uuid === p.token)?.actor;
     if (!actor) continue;
-    const ids = Array.from(actor.effects).filter(e => property<string>(e,"grappleId") === g.id).map(e => e.id!);
+    const ids = Array.from(actor.effects).filter(e => property<string>(e,"grappleId") === g.id || isChoking(e)).map(e => e.id!);
     if (ids.length) await actor.deleteEmbeddedDocuments("ActiveEffect",ids);
   }
+}
+function isChoking(effect:ActiveEffect):boolean {
+  return masterStatuses.some(s=>s.name.startsWith("Choking ")&&(effect.statuses.has(s.id)||effect.name===s.name));
 }
 async function end(scene: Scene, g: Grapple, note: string, endedBy?: string) {
   await removeGrappleEffects(scene,g);
@@ -233,6 +243,7 @@ export async function handleGrappleRequest(r: GrappleRequest): Promise<string | 
     await status(target.actor!,"Prone");
     await end(scene,{...g,lastAction:"throw"},`${g.source.name} threw ${g.target.name}: ${receipt.amount} direct HP damage; Prone. Grapple ended. Get Up before using Move Action.`);
   } else {
+    await chokingEffect(target.actor!,g.id,receipt.unconscious ? 0 : Math.max(1,receipt.choke?.count ?? 1));
     const next: Grapple = {...g,lastAction:"choke",revision:g.revision+1,choke:receipt.choke,
       note:`Choke: ${receipt.amount} direct HP damage; armor unchanged. ${receipt.choke?.combat ? `${receipt.choke.count}/3 consecutive rounds.` : "Outside combat: GM tracks consecutive rounds."}${receipt.unconscious ? " Target is Unconscious." : ""}`};
     delete next.operation; await save(scene,next);
@@ -382,6 +393,16 @@ export function registerGrapple() {
     }).catch(report);
   };
   Hooks.on("updateCombat",(combat: Combat,changes: {round?:number}) => {if (changes.round === 0) finishCombat(combat);});
+  Hooks.on("updateCombat",(combat: Combat,changes: {round?:number}) => {
+    if(gm()?.id!==game.user?.id||changes.round===undefined||changes.round===0)return;
+    void serialized(async()=>{
+      for(const g of Object.values(property<Record<string,Grapple>>(combat,"grapples")??{})){
+        if(!g.choke||visibleChoke(g.choke,combat.id!,Number(combat.round)))continue;
+        const actor=game.scenes?.get(g.scene)?.tokens.find(t=>t.uuid===g.target.token)?.actor;
+        if(actor)await chokingEffect(actor,g.id,0);
+      }
+    }).catch(report);
+  });
   Hooks.on("deleteCombat",(combat: Combat) => finishCombat(combat,true));
   // Foundry sends update options from the initiating client to the GM with the document update.
   // Capture before mutation, then move the held token only after the grappler's update succeeds.
@@ -430,7 +451,7 @@ export function registerGrapple() {
     void serialized(async () => {for (const g of grapples(scene).filter(g => g.state !== "ended" && [g.source.token,g.target.token].includes(token.uuid))) {
       // Synthetic actor can still be read from the deleted token during this hook.
       if (token.actor) {
-        const ids = Array.from(token.actor.effects).filter(e => property<string>(e,"grappleId") === g.id).map(e => e.id!);
+        const ids = Array.from(token.actor.effects).filter(e => property<string>(e,"grappleId") === g.id || isChoking(e)).map(e => e.id!);
         if (ids.length && token.actor.isToken === false) await token.actor.deleteEmbeddedDocuments("ActiveEffect",ids);
       }
       await end(scene,g,"Grapple ended: a participant token was deleted.");

@@ -7,6 +7,9 @@ try {
  const page=await browser.newPage({viewport:{width:600,height:500}});
  await page.setContent('<style>body{background:#333;padding:30px;font:13px Arial}button{font:inherit}button:disabled{opacity:.4}</style><div id="token-hud"></div>');
  await page.addStyleTag({content:await readFile('dist/styles/pneuma-combattools.css','utf8')});
+ // Native status-picker styling must not affect the Combat Tools menu.
+ await page.addStyleTag({content:'#token-hud {position:relative;width:60px} #token-hud .status-effects {visibility:hidden;position:absolute;width:100px;display:grid;pointer-events:all} #token-hud .status-effects.active {visibility:visible}'});
+ await page.addStyleTag({content:'#token-hud.monks-little-details .status-effects { width:unset !important; grid-template-columns:130px 130px 130px 130px !important; }'});
  if(process.env.PNEUMA_FONT_AWESOME_CSS)await page.addStyleTag({url:process.env.PNEUMA_FONT_AWESOME_CSS});
  await page.addScriptTag({path:process.env.PNEUMA_HANDLEBARS_SCRIPT||tmpdir()+'/pneuma-handlebars-4.7.8.min.js'});
  await page.addScriptTag({content:(await readFile('dist/scripts/weapon-ammo.js','utf8')).replaceAll('export ','')+'\nwindow.bindWeaponAmmo=bindWeaponAmmo;window.refreshWeaponAmmo=refreshWeaponAmmo;'});
@@ -19,11 +22,19 @@ try {
   const weapons=[...actor.items.keys()].map(id=>({id,name:{empty:'Empty SMG',partial:'Partial SMG',full:'Full SMG'}[id],category:'attack',gunAmmo:true,autofire:true}));
   weapons.push({id:'bow',name:'Bow',category:'attack'});
   const root=document.querySelector('#token-hud');root.innerHTML=Handlebars.compile(template)({weapons});
+  root.classList.add('monks-little-details');
   root.querySelector('.combat-weapons').hidden=false;root.querySelector('.pneuma-combat-menu').classList.add('active');
   root.querySelector('.combat-heading').textContent='Ranged weapons';root.querySelector('.combat-empty').hidden=true;
   bindWeaponAmmo(root,actor);
  },await readFile('dist/templates/combat-hud.hbs','utf8'));
  const row=id=>page.locator(`[data-weapon-ammo="${id}"]`);
+ const menu=page.locator('.pneuma-target-menu');
+ assert.equal(await menu.evaluate(el=>el.classList.contains('status-effects')),false);
+ assert.equal(await menu.evaluate(el=>getComputedStyle(el).position),'absolute');
+ assert.equal(await menu.evaluate(el=>getComputedStyle(el).pointerEvents),'all');
+ await menu.evaluate(el=>el.classList.remove('active'));assert.equal(await menu.isVisible(),false);
+ await menu.evaluate(el=>el.classList.add('active'));assert.equal(await menu.isVisible(),true);
+ assert.equal(await page.locator('.pneuma-combat-menu').evaluate(el=>getComputedStyle(el).width),'230px','Combat menu keeps its width with Monk status-tray styles');
  assert.equal(await row('empty').locator('.combat-ammo-menu').isVisible(),true);
  assert.equal(await row('partial').locator('.combat-ammo-menu').isVisible(),false);
  assert.equal(await row('empty').locator('[data-attack-mode="aimed"]').isVisible(),false);

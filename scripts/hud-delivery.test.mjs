@@ -21,5 +21,11 @@ test("HUD delivery preserves legacy expiry, retains queued notices and routes fl
     dismissHUDMessage("test","flash");assert.equal(flashes.at(-1).remove,true);
     assert.equal(entry.api.hud.version,2);
     assert.throws(()=>postHUDMessage({source:"test",id:"bad",text:"x",mode:"bad"}),/mode/);
+    postHUDMessage({source:"attack",id:"card",text:"Incoming Attack",mode:"queued",actor:"Scene.scene.Token.token.Actor.actor",chatMessage:"card"});
+    const linked=listHUDMessages().find(n=>n.source==="attack");
+    assert.equal(linked.actor,"Scene.scene.Token.token.Actor.actor");assert.equal(linked.chatMessage,"card");assert.equal(linked.expires,0);
+    dismissHUDMessage("attack","card");assert.equal(listHUDMessages().some(n=>n.source==="attack"),false);
+    assert.throws(()=>postHUDMessage({source:"test",text:"x",actor:123}),/reference/);
+    assert.throws(()=>postHUDMessage({source:"test",text:"x",chatMessage:""}),/reference/);
   } finally { for(const n of listHUDMessages()) dismissHUDMessage(n.source,n.id); }
 });

@@ -1,4 +1,5 @@
 <form autocomplete="off">
+  <div class="form-group"><label>Rules mode</label><div class="form-fields"><select name="mode">{{selectOptions modes selected=mode}}</select></div></div>
   <p class="notes">NPC attack rolls and NPC-to-NPC results are GM-blind. Undetected NPC Jack-In results remain GM-only. Player attack rolls are public.</p>
   {{#each groups}}
   <fieldset><legend>{{title}}</legend>

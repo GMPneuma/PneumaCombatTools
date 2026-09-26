@@ -1,8 +1,13 @@
+import {registerDisplaySettings} from "./display-settings.js";
+import {registerCombatBarSettings} from "./combat-bar-settings.js";
 import {registerChatButtons} from "./chat-buttons.js";
 import {registerHalfArmor} from "./half-armor.js";
 import {registerManualRolls} from "./manual-rolls.js";
 import {registerInjuryNotices} from "./injury-notices.js";
 import {registerPlayersControl} from "./players-control.js";
+import {openTurnMarkerSettings,registerTurnMarkerSettings} from "./turn-marker-settings.js";
+import {registerTurnMarker} from "./turn-marker.js";
+import {registerSuppression} from "./suppression.js";
 import { registerCombatBar } from "./combat-bar.js";
 import {registerInjuryMechanics} from "./injury-mechanics.js";
 import {registerNativeEffectIntegration} from "./native-effect-integration.js";
@@ -77,6 +82,9 @@ Hooks.once("init", () => {
   registerEvasionSettings();
   registerCombatResolution();
   registerCombatBar();
+  registerTurnMarker();
+  registerTurnMarkerSettings();
+  registerSuppression();
   registerPlayersControl();
   registerMovement();
   registerInjuryMechanics();
@@ -116,6 +124,8 @@ Hooks.once("init", () => {
       range: { min: 0.5, max: 2, step: 0.1 }, onChange: refreshHUDPosition,
     });
   }
+  registerDisplaySettings();
+  registerCombatBarSettings();
   // Use Foundry's click/unclick handlers so combat clicks never call Token.control().
   CONFIG.Token.objectClass = class CombatToken extends CONFIG.Token.objectClass {
     private combatClick = false;
@@ -230,7 +240,20 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
     if (hud.object !== token || hud.element[0] !== html[0]) return;
     html.find(".col.right").first().append(controls);
   }
+  if(game.user?.isGM&&!data.selfCTH){
+    html.find(".col.right").first().append('<div class="control-icon" role="button" tabindex="0" data-token-indicator title="Animated Turn Indicator: This Token" aria-label="Animated Turn Indicator: This Token"><i class="fas fa-gear" aria-hidden="true"></i></div>');
+    html.find("[data-token-indicator]").on("click keydown",event=>{if(event.type==="keydown"&&!["Enter"," "].includes(event.key??""))return;event.preventDefault();event.stopPropagation();openTurnMarkerSettings(token.document);});
+  }
   if (data.selfCTH) {
+    html.find("[data-self-settings-toggle]").on("click keydown",event=>{
+      if(event.type==="keydown"&&!["Enter"," "].includes(event.key??""))return;
+      event.preventDefault();event.stopPropagation();const panel=html.find("[data-self-settings-menu]");
+      const open=panel.prop("hidden");panel.prop("hidden",!open);$(event.currentTarget).attr("aria-expanded",String(open));
+    });
+    html.find("[data-turn-animation]").on("click",event=>{
+      event.preventDefault();event.stopPropagation();openTurnMarkerSettings(token.document);
+      html.find("[data-self-settings-menu]").prop("hidden",true);html.find("[data-self-settings-toggle]").attr("aria-expanded","false");
+    });
     html.find("[data-self-close-toggle]").on("click keydown",event=>{
       if(event.type==="keydown"&&!["Enter"," "].includes(event.key??""))return;
       event.preventDefault();event.stopPropagation();const panel=html.find("[data-self-close-menu]");panel.prop("hidden",!panel.prop("hidden"));

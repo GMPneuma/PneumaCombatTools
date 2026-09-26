@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 const {chromium}=await import(process.env.PNEUMA_PLAYWRIGHT_MODULE);
 const browser=await chromium.launch({channel:'msedge',headless:true});
 try{
- const page=await browser.newPage();await page.setContent('<style>#token-hud{position:absolute;left:120px;top:100px;width:120px;height:120px}#token-hud .col{position:absolute;width:40px;height:100%;display:flex;flex-direction:column}#token-hud .col.right{right:-50px}#token-hud .control-icon{width:40px;height:40px}</style><div id="token-hud" class="placeable-hud"><div class="col right"></div><button data-native>Native</button></div>');
+ const page=await browser.newPage();page.on('pageerror',error=>console.error(error.message));await page.setContent('<style>#token-hud{position:absolute;left:120px;top:100px;width:120px;height:120px}#token-hud .col{position:absolute;width:40px;height:100%;display:flex;flex-direction:column}#token-hud .col.right{right:-50px}#token-hud .control-icon{width:40px;height:40px}</style><div id="token-hud" class="placeable-hud"><div class="col right"></div><button data-native>Native</button></div>');
  await page.addScriptTag({content:await readFile(process.env.PNEUMA_JQUERY_SOURCE,'utf8')});await page.addScriptTag({content:await readFile(process.env.PNEUMA_HANDLEBARS_SOURCE,'utf8')});
  await page.evaluate(template=>{
   Handlebars.registerHelper('eq',(a,b)=>a===b);Handlebars.registerHelper('localize',s=>s);window.renderTemplate=async()=>Handlebars.compile(template)(window.renderData);
@@ -17,7 +17,7 @@ try{
  },await readFile('src/templates/combat-hud.hbs','utf8'));
  const main=(await readFile('dist/scripts/main.js','utf8')).replace(/^import .*;\s*/gm,'');
  const names=[...new Set([...main.matchAll(/^\s+(register\w+)\(\);/gm)].map(m=>m[1]))].filter(n=>n!=='registerSelfCTH');
- const stubs=names.map(name=>`const ${name}=()=>{};`).join('\n')+'\nconst registerQuickhack=()=>{},decorateItemList=()=>{},connectionFor=()=>undefined,quickhackEnabled=()=>false,forceOutEntries=()=>[],attackEntries=()=>[],thrownEntries=()=>[],grenadeEntries=()=>window.grenades??[],grappleMenu=()=>window.grappleActions??[],useGrapple=async(s,t,a)=>{window.grappleUsed=a;},trackingCombat=()=>undefined;';
+ const stubs=names.map(name=>`const ${name}=()=>{};`).join('\n')+'\nconst DEFAULT_ICON_COLOR="#ffc36a",installIconColorNormalization=()=>{},tokenEncounter=()=>game.combat,displayedEncounter=()=>game.combat;const openTurnMarkerSettings=token=>{window.animationOpened=true;window.indicatorToken=token;},registerQuickhack=()=>{},bindWeaponAmmo=()=>{},decorateItemList=()=>{},connectionFor=()=>undefined,quickhackEnabled=()=>false,forceOutEntries=()=>[],attackEntries=()=>[],thrownEntries=()=>[],grenadeEntries=()=>window.grenades??[],grappleMenu=()=>window.grappleActions??[],useGrapple=async(s,t,a)=>{window.grappleUsed=a;},trackingCombat=()=>undefined;';
  const emp=(await readFile('dist/scripts/effect-duration.js','utf8'))+'\n'+(await readFile('dist/scripts/emp-rules.js','utf8')).replace(/^import .*;\s*/gm,''),self=(await readFile('dist/scripts/self-cth.js','utf8')).replace(/^import .*;\s*/gm,'');
  await page.addScriptTag({type:'module',content:emp+'\n'+self+'\n'+stubs+'\n'+main+'\nhooks.init.forEach(fn=>fn());window.loaded=true;'});await page.waitForFunction(()=>window.loaded);
  await page.evaluate(()=>{
@@ -31,6 +31,12 @@ try{
  await page.evaluate(template=>window.sourceTemplate=template,await readFile('src/templates/combat-hud.hbs','utf8'));
  await page.evaluate(()=>show(own));assert.equal(await page.locator('[data-self-cth]').count(),1);assert.equal(await page.locator('[data-combat-action]').count(),0);assert.equal(await page.locator('[data-self-initiative]').count(),0);assert.equal(await page.locator('[data-native]').count(),1);
  await page.addStyleTag({content:await readFile('dist/styles/pneuma-combattools.css','utf8')});
+ await page.locator('[data-self-settings-toggle]').dispatchEvent('click');
+ assert.equal(await page.locator('[data-self-settings-toggle]').getAttribute('aria-expanded'),'true');
+ assert.equal(await page.locator('[data-self-settings-menu] button').first().innerText(),'Animated Turn Indicator');
+ await page.screenshot({path:process.env.TEMP+'/pct-self-cth-settings.png'});
+ await page.locator('[data-turn-animation]').click();assert.equal(await page.evaluate(()=>animationOpened),true);
+ assert.equal(await page.locator('[data-self-settings-menu]').isVisible(),false);
  await page.evaluate(()=>document.querySelector('#token-hud').style.setProperty('--pneuma-cth-icon-color','#12ab34'));
  assert.equal(await page.locator('[data-self-cth] > [data-self-alert-hud] .fa-bell').count(),1);
  assert.equal(await page.locator('[data-self-cth] > section:not([hidden]), [data-self-cth] > strong, [data-self-cth] .notes').count(),0);
@@ -84,5 +90,8 @@ try{
  const normal=await grenade.evaluate(n=>getComputedStyle(n).backgroundColor),bounds=await grenade.boundingBox();
  await grenade.hover();assert.notEqual(await grenade.evaluate(n=>getComputedStyle(n).backgroundColor),normal);assert.deepEqual(await grenade.boundingBox(),bounds);
  await page.screenshot({path:process.env.TEMP+'/pct-self-cth-grenades.png'});
+ await page.evaluate(()=>{game.user.isGM=true;canvas.tokens.controlled=[own];return show(enemy);});
+ assert.equal(await page.locator('[data-token-indicator]').count(),1);await page.locator('[data-token-indicator]').click();assert.equal(await page.evaluate(()=>indicatorToken===enemy.document),true);
+ await page.evaluate(()=>{canvas.tokens.controlled=[own];document.querySelector('#token-hud').innerHTML='<div class="col right"></div>';return show(own);});await page.locator('[data-self-settings-toggle]').click();await page.locator('[data-turn-animation]').click();assert.equal(await page.evaluate(()=>indicatorToken===own.document),true);
  console.log('Self CTH browser checks passed: own-token replacement, native controls retained, setting toggle, Shift-right-click, D10 native reroll and target actions.');
 }finally{await browser.close();}

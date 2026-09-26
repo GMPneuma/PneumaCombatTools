@@ -4,6 +4,7 @@ const {chromium}=await import(process.env.PNEUMA_PLAYWRIGHT_MODULE);
 const browser=await chromium.launch({channel:"msedge",headless:true});
 try{
  const page=await browser.newPage({viewport:{width:1100,height:800}});
+ page.on('pageerror',error=>console.error(error.message));
  await page.emulateMedia({reducedMotion:"no-preference"});
  await page.setContent('<style>body{background:#17222c}</style><aside id="sidebar" style="position:fixed;right:0;top:0;width:300px;height:100vh"></aside><div id="chat-log"><div data-message-id="attack">Chat resolution</div></div>');
  await page.addStyleTag({content:(await readFile("dist/styles/pneuma-combattools.css","utf8")).replace("icons/biomon-alert.svg", "data:image/svg+xml;base64," + (await readFile("dist/styles/icons/biomon-alert.svg")).toString("base64"))});
@@ -21,6 +22,10 @@ try{
     set:async(_m,k,v)=>{values[k]=v;settings[k].onChange?.(v);}
   }};
   window.canvas={tokens:{controlled:[]}};
+  window.displayedEncounter=()=>game.combat;
+  window.resolveEncounter=()=>game.combat;
+  window.fromUuid=async uuid=>uuid===actor.uuid?actor:canvas.tokens.placeables?.find(t=>t.actor.uuid===uuid)?.actor??null;
+  game.messages=Array.from({length:3},(_,n)=>({id:'old'+n,visible:true,isContentVisible:true,flags:{'pneuma-combattools':{exchange:{state:'waiting',defenderActor:actor.uuid}}}}));
   window.foundry={utils:{randomID:()=>String(window.testMessageId=(window.testMessageId??0)+1),getProperty:(o,p)=>p.split(".").reduce((v,k)=>v?.[k],o)}};
   window.ui={sidebar:{activateTab:()=>{window.openedChat=true;}},notifications:{info:()=>{}}};
  });
@@ -40,6 +45,7 @@ try{
  await page.waitForFunction(()=>hooks.ready?.length);
  await page.evaluate(()=>{hooks.ready.forEach(f=>f());});
  await page.waitForSelector('.pneuma-eye-medical');
+ assert.equal(await page.evaluate(()=>moduleEntry.api.hud.list().length),0,'Saved pending cards do not recreate Incoming Attack on startup');
  assert.equal(await page.evaluate(()=>settings.eyeHUDAnimateMessages.scope),'client');
  assert.equal(await page.evaluate(()=>values.eyeHUDAnimateMessages),true);
  await page.evaluate(()=>moduleEntry.api.hud.send({source:'animation',id:'arrival',text:'New transmission'}));
@@ -184,6 +190,7 @@ try{
   hooks.createChatMessage.forEach(f=>f(defaultAttack));
  });
  await page.waitForSelector('.pneuma-eye-notification.is-attack');
+ assert.equal(await page.evaluate(()=>moduleEntry.api.hud.list().find(n=>n.id==='default-attack')?.mode),'queued','Incoming attacks use the shared queue');
  await page.evaluate(()=>{
   hooks.deleteChatMessage.forEach(f=>f(defaultAttack));
   game.user.isGM=true;
@@ -222,10 +229,23 @@ try{
  assert.match(await page.locator('#pneuma-eye-hud').getAttribute('aria-label'),/Smitty/,'No implant means no shared HUD');
  await page.evaluate(()=>{for(let i=0;i<5;i++)moduleEntry.api.hud.send({source:'test',id:String(i),text:'Notice '+i,duration:0});});
  await page.waitForFunction(()=>document.querySelectorAll('.pneuma-eye-notification').length===3);
- assert.equal(await page.evaluate(()=>moduleEntry.api.hud.list().length),3);
- assert.equal(await page.evaluate(()=>moduleEntry.api.hud.list().every(n=>n.expires>Date.now())),true,'Ordinary messages expire even with legacy duration=0');
+ assert.equal(await page.evaluate(()=>moduleEntry.api.hud.list().length),4,'Queued attack survives the three timed-message limit');
+ assert.equal(await page.evaluate(()=>moduleEntry.api.hud.list().filter(n=>n.mode!=='queued').every(n=>n.expires>Date.now())),true,'Ordinary messages expire even with legacy duration=0');
  await page.getByRole('button',{name:'Clear notification: Incoming Attack',exact:true}).click();
  assert.equal(await page.evaluate(()=>message.flags['pneuma-combattools'].exchange.state),'waiting','Dismiss does not resolve an attack');
+ await page.evaluate(()=>{
+  for(const state of ['applying','resolved','waiting']){message.flags['pneuma-combattools'].exchange.state=state;hooks.updateChatMessage.forEach(f=>f(message));}
+  hooks.controlToken.forEach(f=>f());hooks.ready.forEach(f=>f());
+ });
+ assert.equal(await page.evaluate(()=>moduleEntry.api.hud.list().some(n=>n.id==='attack')),false,'Updates, reselection and startup never recreate cleared attack notices');
+ await page.evaluate(()=>{window.fresh={...message,id:'fresh',flags:{'pneuma-combattools':{exchange:{state:'waiting',defenderActor:actor.uuid}}}};hooks.createChatMessage.forEach(f=>f(fresh));});
+ await page.waitForFunction(()=>moduleEntry.api.hud.list().some(n=>n.id==='fresh'));
+ await page.evaluate(()=>{fresh.flags['pneuma-combattools'].exchange.state='resolved';hooks.updateChatMessage.forEach(f=>f(fresh));});
+ assert.equal(await page.evaluate(()=>moduleEntry.api.hud.list().some(n=>n.id==='fresh')),false,'Resolved cards retire queued attack notices');
+ if(process.env.PNEUMA_HUD_QUEUE_ONLY==='1'){
+  console.log('HUD queue browser checks passed: saved cards ignored, new attacks queued, native card links, dismissal survives updates/reselection/startup, resolved entries removed.');
+  await browser.close();process.exit(0);
+ }
  await page.evaluate(()=>{moduleEntry.api.hud.list().forEach(n=>moduleEntry.api.hud.dismiss(n.source,n.id));moduleEntry.api.hud.send({source:'test',id:'expiry',text:'Short notice',duration:.05});});
  await page.waitForFunction(()=>!document.querySelector('.pneuma-eye-notification'));
  await page.evaluate(()=>{window.originalEffects=effects;effects=effects.filter(e=>e.name!=='Cover');hooks.updateActor.forEach(f=>f(actor));});
@@ -258,6 +278,7 @@ try{
   assert.ok(b.x>=7,'HUD fits available viewport');
   assert.ok(await page.locator('#pneuma-eye-attachments').evaluate(e=>e.getBoundingClientRect().right<=document.getElementById('sidebar').getBoundingClientRect().left-7),'Notifications stay outside dock');
  }
+ await page.evaluate(()=>game.settings.set('pneuma-combattools','eyeHUDDock','right'));
  await assertDocked();
  await page.evaluate(()=>document.getElementById('sidebar').style.width='32px');
  await assertDocked();

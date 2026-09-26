@@ -29,10 +29,11 @@ try {
    groups[0].querySelector(".effect-control").click();
    groups[0].querySelector(".effect-control").dispatchEvent(new MouseEvent("contextmenu",{bubbles:true}));
    const all=[...tray.querySelectorAll(".effect-control")];
-   return {closed,grouped,clicks,contexts,count:all.length,sameNodes:all.every(n=>before.includes(n)),headingColor:getComputedStyle(groups[0].querySelector("summary")).color,display:getComputedStyle(tray).display};
+   return {closed,grouped,clicks,contexts,count:all.length,hidden:before.filter(n=>!all.includes(n)).map(n=>n.title).sort(),sameNodes:all.every(n=>before.includes(n)),headingColor:getComputedStyle(groups[0].querySelector("summary")).color,display:getComputedStyle(tray).display};
  });
- assert.equal(result.headingColor,"rgb(240, 240, 224)");assert.equal(result.closed,true);assert.equal(result.count,65);assert.equal(result.sameNodes,true);
- assert.deepEqual(result.grouped,[{name:"Crit Head",count:11},{name:"Crit Body",count:11},{name:"Pharmaceuticals",count:5},{name:"Drugs",count:10}]);
+ assert.equal(result.headingColor,"rgb(240, 240, 224)");assert.equal(result.closed,true);assert.equal(result.count,60);assert.equal(result.sameNodes,true);
+ assert.deepEqual(result.hidden,['Lightly Wounded','Mortally Wounded','Quick Fix','Seriously Wounded','Speed Heal']);
+ assert.deepEqual(result.grouped,[{name:"Crit Head",count:11},{name:"Crit Body",count:11},{name:"Pharmaceuticals",count:4},{name:"Drugs",count:10}]);
  assert.equal(result.clicks,1);assert.equal(result.contexts,1);assert.equal(result.display,"block");
  const visibility = await page.evaluate(() => {
    const root = document.querySelector("#token-hud");

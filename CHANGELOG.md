@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.9.0 - 2026-09-26
+
+- Add 16 lightweight Animated Turn Indicator styles, including role-specific designs, configurable color, thickness, distance, opacity and speed.
+- Support GM world defaults, player-local defaults, shared My Indicator profiles and per-token GM overrides. Preview edits locally outside combat; follow token selection while editing.
+- Consolidate Combat Bar, Biomonitor, Token HUD and QuickHack settings, combine hover DV choices and clarify labels. Preserve existing saved settings and rule placement.
+- Apply Suppressed after suppression and remove it at the end of the target's next turn. Apply Choking and clear it when the grapple ends.
+- Make incoming attack alerts use the shared HUD queue so dismissed alerts do not reappear from attack cards.
+- Reorganize Manual Rolls and provide skill/role lists with current values and View/Roll controls. Remove automatic wound states and instant effects from the manual status picker.
+- Improve hover EKG contrast and scale, scope Combat Tools menus to avoid other-module styling conflicts, and adjust the Biomonitor alert icon.
+
+Validation: strict production build, automated regressions and targeted browser/PIXI fixtures. Live Foundry multiplayer verification remains pending.
+
+
 ## 0.8.6 - 2026-09-25
 
 - Default the HUD icon color to amber (`#ffc36a`) and normalize cleared color values before native validation, preventing blank color input from interrupting GM settings saves.

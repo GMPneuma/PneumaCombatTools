@@ -67,13 +67,27 @@ test('Hold adds native -2 effects, roles, HUD names and two-handed restrictions;
 test('Choke applies HP once, shows attacker and defender counters, and third round sets unconscious',async()=>{
  const f=setup();await f.hold();const [a,b]=f.actors;
  const rev=f.read().revision;await f.request('choke');assert.equal(b.system.derivedStats.hp.value,24);
+ assert.equal(b.effects.filter(e=>e.name==='Choking 1').length,1);assert.equal(a.effects.some(e=>e.name.startsWith('Choking')),false);
  await assert.rejects(f.request('choke','g',{revision:rev}),/changed/);
  await assert.rejects(f.request('choke'),/already applied/);
  assert.match(grappleHUD(a)[1].text,/Choking: b — 1\/3/);assert.match(grappleHUD(b)[1].text,/Being choked by: a — 1\/3/);
- f.combat.round=3;await f.request('choke');f.combat.round=4;await f.request('choke');
+ f.combat.round=3;await f.request('choke');assert.equal(b.effects.some(e=>e.name==='Choking 1'),false);assert.equal(b.effects.filter(e=>e.name==='Choking 2').length,1);
+ f.combat.round=4;await f.request('choke');assert.equal(b.effects.some(e=>e.name.startsWith('Choking')),false);
  assert.equal(b.system.derivedStats.hp.value,12);assert.equal(b.effects.some(e=>e.name==='Unconscious'),true);
  f.combat.round=6;assert.equal(grappleHUD(b).length,1);
  await f.request('choke');assert.equal(f.read().choke.count,1);
+});
+test('Release clears managed and manually applied choking but preserves unrelated conditions',async()=>{
+ const f=setup();await f.hold();await f.request('choke');
+ const b=f.actors[1];b.effects.push({id:'manual',name:'Choking 2',flags:{},statuses:new Set()});
+ b.effects.push({id:'other',name:'Prone',flags:{},statuses:new Set()});
+ await f.request('release');assert.deepEqual(b.effects.map(e=>e.id),['other']);
+});
+test('A skipped choke round clears the managed stage without ending the grapple',async()=>{
+ const f=setup();await f.hold();await f.request('choke');registerGrapple();f.combat.round=4;
+ for(const callback of f.hooks.updateCombat)callback(f.combat,{round:4});
+ for(let n=0;n<30&&f.actors[1].effects.some(e=>e.name==='Choking 1');n++)await new Promise(r=>setTimeout(r,5));
+ assert.deepEqual(f.actors[1].effects.map(e=>e.name),['Grappled']);assert.equal(f.read().state,'active');
 });
 test('Throw ignores armor, applies prone, and ends both participants penalties',async()=>{
  const f=setup();await f.hold();const b=f.actors[1];b.system.derivedStats.hp.value=2;b.system.armor={body:{sp:20}};
@@ -81,7 +95,9 @@ test('Throw ignores armor, applies prone, and ends both participants penalties',
  assert.deepEqual(b.effects.map(e=>e.name),['Prone']);assert.equal(f.actors[0].effects.length,0);assert.equal(grappleHUD(b).length,0);
 });
 test('Escape and third-party breaks oppose the grappler, preserve penalties until success, and ties fail',async()=>{
- const f=setup();await f.hold();await f.start('escape',f.tokens[1],f.tokens[0],'startBreak');await f.respond('escape',15);
+ const f=setup();await f.hold();await f.request('choke');
+ f.actors[1].effects.push({id:'manual',name:'Choking 2',flags:{},statuses:new Set()});
+ await f.start('escape',f.tokens[1],f.tokens[0],'startBreak');await f.respond('escape',15);
  assert.equal(f.read().state,'active');
  assert.match(f.read('escape').note,/^Escape failed/);
  assert.doesNotMatch(grappleContent(f.read('escape')),/Grab failed/);

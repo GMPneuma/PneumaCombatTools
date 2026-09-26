@@ -9,8 +9,11 @@ export interface HUDMessageOptions {
   duration?: number;
   /** Omit for legacy timed notices; queued waits for dismissal. */
   mode?: "flash" | "queued";
+  /** Optional actor-scoped queue entry and navigation target; never an alert source. */
+  actor?: string;
+  chatMessage?: string;
 }
-export interface HUDNotice { source: string; id: string; text: string; expires: number; mode?: "flash" | "queued" }
+export interface HUDNotice { source: string; id: string; text: string; expires: number; mode?: "flash" | "queued"; actor?:string; chatMessage?:string }
 type HUDWire = { kind: "hud-message"; action: "send" | "remove"; recipients: string[]; notice: HUDNotice };
 const notices = new Map<string, HUDNotice>();
 let notifyHUD = () => {};
@@ -18,6 +21,8 @@ let notifyFlash = (_notice: HUDNotice, _remove = false) => {};
 let expiryTimer: ReturnType<typeof setTimeout> | undefined;
 export const hudMessageKey = (message: Pick<HUDNotice, "source" | "id">) => JSON.stringify([message.source, message.id]);
 function validPart(value: unknown): value is string { return typeof value === "string" && value.length > 0 && value.length <= 100; }
+const validContext=(message:{actor?:unknown;chatMessage?:unknown})=>(message.actor===undefined||typeof message.actor==="string"&&message.actor.length>0&&message.actor.length<=200)&&(message.chatMessage===undefined||validPart(message.chatMessage));
+const context=(message:HUDMessageOptions|HUDNotice)=>({...(message.actor?{actor:message.actor}:{}),...(message.chatMessage?{chatMessage:message.chatMessage}:{})});
 function refreshMessages() {
   if (expiryTimer) clearTimeout(expiryTimer);
   let next = Infinity;
@@ -44,6 +49,7 @@ function receiveHUDMessage(wire: HUDWire) {
   if (wire.action !== "send" || typeof message.text !== "string" || !message.text.trim() || message.text.length > 200
     || !Number.isFinite(message.expires) || message.expires < 0 || (message.expires !== 0 && message.expires <= Date.now())) return;
   if (message.mode !== undefined && message.mode !== "flash" && message.mode !== "queued") return;
+  if (!validContext(message)) return;
   const key = hudMessageKey(message);
   notifyFlash(message, true);
   if (message.mode === "flash") {
@@ -56,7 +62,7 @@ function receiveHUDMessage(wire: HUDWire) {
   // Explicit queued alerts are never silently evicted by a later alert.
   const timed = [...notices.entries()].filter(([, notice]) => notice.mode !== "queued");
   if (message.mode !== "queued" && timed.length >= 3) notices.delete(timed[0]![0]);
-  notices.set(key, { source: message.source, id: message.id, text: message.text, expires: message.mode === "queued" ? 0 : message.expires || Date.now() + 60000, ...(message.mode ? { mode: message.mode } : {}) });
+  notices.set(key, { source: message.source, id: message.id, text: message.text, expires: message.mode === "queued" ? 0 : message.expires || Date.now() + 60000, ...(message.mode ? { mode: message.mode } : {}),...context(message) });
   refreshMessages();
 }
 function recipientsFor(target: HUDMessageOptions["recipients"]): string[] {
@@ -75,11 +81,12 @@ export function postHUDMessage(options: HUDMessageOptions): string {
   if (!options || !validPart(options.source) || (options.id !== undefined && !validPart(options.id))) throw new Error("Provide a source and optional ID of 1–100 characters.");
   if (typeof options.text !== "string" || !options.text.trim() || options.text.trim().length > 200) throw new Error("HUD text must contain 1–200 characters.");
   if (options.mode !== undefined && options.mode !== "flash" && options.mode !== "queued") throw new Error("HUD mode must be flash or queued.");
+  if (!validContext(options)) throw new Error("Invalid HUD actor or chat message reference.");
   const duration = options.duration === 0 ? 60 : options.duration ?? 60;
   if (!Number.isFinite(duration) || duration < 0 || duration > 86400) throw new Error("HUD duration must be 0–86400 seconds.");
   const recipients = recipientsFor(options.recipients);
   const id = options.id ?? foundry.utils.randomID();
-  dispatchHUDMessage({ kind: "hud-message", action: "send", recipients, notice: { source: options.source, id, text: options.text.trim(), expires: options.mode === "queued" ? 0 : Date.now() + duration * 1000, ...(options.mode ? { mode: options.mode } : {}) } });
+  dispatchHUDMessage({ kind: "hud-message", action: "send", recipients, notice: { source: options.source, id, text: options.text.trim(), expires: options.mode === "queued" ? 0 : Date.now() + duration * 1000, ...(options.mode ? { mode: options.mode } : {}),...context(options) } });
   return id;
 }
 export function removeHUDMessage(source: string, id: string, recipients?: HUDMessageOptions["recipients"]): void {
