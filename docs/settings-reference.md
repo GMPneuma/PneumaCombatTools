@@ -1,6 +1,6 @@
 # Settings reference
 
-Source-generated registration inventory for Combat Tools 0.8.0, reviewed 2026-09-23. Literal registrations are listed below; dynamic homebrew subfields are configured through their parent forms. Defaults are source defaults, not a claim about an existing world's saved values. Expressions identify conditional visibility/defaults.
+Historical source-generated registration inventory for Combat Tools 0.8.0, reviewed 2026-09-23. For the current user-facing layout, labels and scope, use the [settings handbook](handbook/Combat%20Tools%20-%20Settings%20Reference.md). The tables below retain older registration values and visibility, including the former null icon-color default; they are not the current settings UI. Dynamic homebrew subfields are configured through their parent forms. Existing saved world values can differ from source defaults.
 
 ## Organization and use
 

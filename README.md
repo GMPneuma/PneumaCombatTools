@@ -1,6 +1,6 @@
 # Pneuma's Combat Tools
 
-Combat workflows for **Foundry VTT v12** and **Cyberpunk RED Core**. Current release: **0.8.6**. Requires **libWrapper** and an active GM for coordinated workflows.
+Combat workflows for **Foundry VTT v12** and **Cyberpunk RED Core**. Current release: **0.9.2**. Requires **libWrapper** and an active GM for coordinated workflows.
 
 ## Features
 
@@ -25,6 +25,7 @@ Enable libWrapper and Combat Tools in a Cyberpunk RED Core world. Restart the Fo
 
 ## Start here
 
+- [Current player and GM handbook](docs/handbook/Combat%20Tools%20Documentation.md): use-case guides, module integration, troubleshooting, macros and Mermaid workflows; reviewed against 0.9.0 plus local changes on 2026-09-26.
 - [Player guide](docs/player-guide.md) and [GM guide](docs/gm-guide.md).
 - [Settings reference](docs/settings-reference.md).
 - [Workflow diagrams and state storage](docs/flow-map.md).

@@ -1,5 +1,7 @@
 # Combat Tools feature inventory
 
+Optional character-sheet attack routing (unreleased): **Route character-sheet attacks through Combat Tools**, under Attack & Damage Cards, is a world setting and defaults OFF. Supported native weapon attack clicks preserve fire mode and use the existing dispatcher. Explicit token sheets retain their token; actor-directory sheets use one controlled matching token or one unambiguous scene token. Ordinary attacks require one visible target; area weapons can open placement without a target. Disabled routing, unsupported actions, absent GM, or ambiguous context retain native behavior. Once routed, cancellation/errors never replay a native attack. Hand grenades retain their HUD flow. Automated routing tests pass; live multiplayer verification remains pending.
+
 The indicator size control is labeled “Indicator Scale” (previously “Indicator distance”); existing profiles retain their values.
 
 Grenade placement (unreleased): area placement clears the native Token HUD. Hidden blast/aim templates and grid highlights remain non-rendering for GMs; manual Show restores them. Missed attacks use one brief instruction and a labeled “Place New Target Center” button. Browser fixtures cover HUD clearing, GM visibility, preview cleanup, and the labeled card; live Foundry verification remains pending.

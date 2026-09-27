@@ -1,5 +1,7 @@
 # Combat Tools chat-card styling contract
 
+Character-sheet attack routing (unreleased, off by default) reuses the existing single-target and area card renderers. It adds no card markup, CSS classes, state selectors or controls; all existing card visibility and styling contracts apply.
+
 Targeted HUD menus: `.pneuma-target-menu.pneuma-combat-menu.pneuma-panel` replaces the former `.status-effects` root class. Combat Tools explicitly supplies absolute positioning, top alignment, content-box sizing, pointer events, and hidden visibility until `.active`. Width remains 230px. The Monk-specific `!important` override is removed. Native status pickers and self-action flyouts remain separate.
 
 Hover EKG (outside chat scope): `.pneuma-hover-ekg` uses a 105×30 footprint (75% of the original size) and pointer-event passthrough, with a 65% black background and 3px corner radius. `.pneuma-hover-ekg .pneuma-eye-trace` adds a dark drop shadow; health-state colors and existing trace animation remain unchanged.

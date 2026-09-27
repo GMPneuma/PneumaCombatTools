@@ -1,9 +1,12 @@
 # Combat Tools documentation
 
-The chat-card audit, styling contract and flow map describe **0.9.1**, reviewed on **2026-09-26**. Other guides retain their individual review dates. Historical proposals and audits are explicitly separated. Source/build/browser verification does not imply live multiplayer certification.
+The chat-card audit, styling contract and flow map describe **0.9.2**, reviewed on **2026-09-26**. Other guides retain their individual review dates. Historical proposals and audits are explicitly separated. Source/build/browser verification does not imply live multiplayer certification.
 
 ## Start here
 
+- [Current use-case handbook](handbook/Combat%20Tools%20Documentation.md): 22 linked notes, reviewed against the 0.9.0 working tree on 2026-09-26. Includes player/GM guides, installation, integrations, ten Mermaid workflows, settings, macros, troubleshooting and a source register. The Obsidian edition uses wiki links; this project edition uses standard Markdown links.
+- [Player guide — current handbook](handbook/Combat%20Tools%20-%20Player%20Guide.md) and [GM guide — current handbook](handbook/Combat%20Tools%20-%20GM%20Guide.md).
+- [Settings — current handbook](handbook/Combat%20Tools%20-%20Settings%20Reference.md), [module integration](handbook/Combat%20Tools%20-%20Module%20Integration.md), and [Combat Mermaids](handbook/Combat%20Tools%20-%20Combat%20Mermaids.md).
 - [Complete feature inventory](../IMPLEMENTED_FEATURES.md).
 - [Feature list ready to post](feature-list-for-posting.md): major features and smaller conveniences.
 - [Player guide](player-guide.md) and [GM guide](gm-guide.md).

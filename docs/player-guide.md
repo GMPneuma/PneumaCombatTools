@@ -2,6 +2,8 @@
 
 Current implementation: Combat Tools 0.8.1; source-reviewed 2026-09-23.
 
+For the consolidated 2026-09-26 working-tree guide, see the [current player handbook](handbook/Combat%20Tools%20-%20Player%20Guide.md).
+
 ## Start with your token
 
 Select one owned token, then right-click another token for target actions. Right-click your own token for self controls. Native Foundry token controls remain. Assign your Character in player configuration so your Biomonitor and incoming notices have a default character when nothing is selected; without an assignment, a single owned scene token can serve as fallback.

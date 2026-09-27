@@ -20,7 +20,7 @@ Biological eligibility and conditional immunity are GM rulings. Native ordinary 
 
 Temporary sensory injuries and Sleep use one-minute native durations: 20 rounds in combat, game time outside combat. Existing permanent injuries/unrelated unconsciousness are preserved. Wake leaves Prone. Fire recognizes native severity and applies strongest-severity damage once at the affected turn end; no out-of-combat automatic ticking.
 
-Smoke has a separate MeasuredTemplate, saved wall-clipped cells/polygon and animated primary-canvas display. It survives attack-area hiding, chat deletion and reload. It expires on its clock or combat end, or GM Remove smoke/template deletion. Automatic smoke penalties and sensory interactions are not implemented; an earlier missing-display report remains a live verification item.
+Smoke has a separate MeasuredTemplate, saved wall-clipped cells/polygon and animated primary-canvas display. It survives attack-area hiding, chat deletion and reload. It expires on its clock or combat end. Current source applies a native −4 obscured-task modifier once when the supported attack line crosses active smoke; the dialog offers Ignore smoke for equipment or GM rulings. GM Remove smoke / Restore smoke toggles visibility and automatic obscuration while preserving the original lifetime; expired/deleted smoke cannot be restored. Equipment capabilities and vertical smoke volume are not inferred. See the [current area guide](handbook/Combat%20Tools%20-%20Area%20Attacks%20and%20Suppressive%20Fire.md). Live scene/fog behavior remains a verification item.
 
 ## Integration
 

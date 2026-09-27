@@ -2,7 +2,7 @@
 
 Encounter selection now follows the [shared active-scene policy](encounters.md); saved actions and effect clocks remain tied to their originating encounter.
 
-Current source: Combat Tools 0.9.1, reviewed 2026-09-26. Code inspection and diagram-render validation are distinct from live multiplayer certification.
+Current source: Combat Tools 0.9.2, reviewed 2026-09-26. Code inspection and diagram-render validation are distinct from live multiplayer certification.
 
 **M** below means **flags.pneuma-combattools**. For example, ChatMessage M.exchange means ChatMessage.flags.pneuma-combattools.exchange. **Transient** means dialog/client/GM memory, not durable document storage. Diagram IDs correspond to table rows. Native CPR dialogs may offer additional version-dependent controls. Every control remains subject to ownership, GM authority, settings and current state.
 
@@ -12,7 +12,11 @@ Current source: Combat Tools 0.9.1, reviewed 2026-09-26. Code inspection and dia
 
 ~~~mermaid
 flowchart TD
- HUD["Target HUD / Self-CTH"] --> A["Single-target attack"]
+ SHEET["Native sheet attack"] --> ROUTE{"Routing enabled and context valid?"}
+ ROUTE -->|No| NATIVE["Native system workflow"]
+ ROUTE -->|Single target| A["Single-target attack"]
+ ROUTE -->|Area weapon| B["Area attack / suppression"]
+ HUD["Target HUD / Self-CTH"] --> A
  HUD --> B["Area attack / suppression"]
  HUD --> G["Grappling"]
  HUD --> Q["Jack-In / Quickhack / Eject"]
@@ -33,11 +37,11 @@ flowchart TD
  C --> EXP
 ~~~
 
-Combat Tools attacks always use combat cards. QuickHack retains a separate enable switch. Arrows indicate possible branches, not effects that occur on every attack.
+Combat Tools attacks always use combat cards. Optional sheet routing falls back to native behavior only before an attack starts; area placement may start without a target. Hand grenades retain their HUD entry. QuickHack retains a separate enable switch. Arrows indicate possible branches, not effects that occur on every attack.
 
 ## 1. Single-target attacks
 
-Sources: [attack-menu.ts](../src/scripts/attack-menu.ts), [combat-resolution.ts](../src/scripts/combat-resolution.ts).
+Sources: [sheet-attacks.ts](../src/scripts/sheet-attacks.ts), [attack-menu.ts](../src/scripts/attack-menu.ts), [combat-resolution.ts](../src/scripts/combat-resolution.ts).
 
 ~~~mermaid
 flowchart LR
@@ -53,7 +57,7 @@ flowchart LR
 
 | Step | Surface / buttons | Storage and result |
 |---|---|---|
-| A1 | Target HUD weapon: attack, aimed, autofire, thrown/improvised. Self-CTH thrown weapon requires a target. | Transient source/target/item/mode. Area weapons branch to flow 3. |
+| A1 | Target HUD weapon: attack, aimed, autofire, thrown/improvised. Self-CTH thrown weapon requires a target. Optional native sheet attack routing preserves fire mode, is OFF by default, and requires an unambiguous attacker and target. | Transient source/target/item/mode. Area weapons branch to flow 3. |
 | A2 | Native attack roll/confirm/cancel; modifiers. | Native roll transient until publication; native ammo/inventory mutation. Aimed location: Actor.flags.cyberpunk-red-core.aimedLocation. |
 | A3 | Chat Evade (configured cost label) / Free evasion, Don't Evade; GM Cancel exchange. RAW eligible NPCs can auto-respond. | ChatMessage M.exchange: saved attack/dice, UUIDs, DV, mode, encounter, state=waiting. Attack visually withheld. Responder claims transient in GM memory. |
 | A4 | Native Evasion dialog; Finish payment if interrupted. | M.exchange defense/state=applying; Actor LUCK and M.evasionPayment; Combat evasion usage records. |

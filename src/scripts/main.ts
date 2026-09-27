@@ -1,3 +1,4 @@
+import {registerSheetAttacks} from "./sheet-attacks.js";
 import {canWake,wakeUsingAction,registerWake} from "./wake.js";
 import {registerDisplaySettings} from "./display-settings.js";
 import {registerCombatBarSettings} from "./combat-bar-settings.js";
@@ -67,6 +68,7 @@ Hooks.once("init", () => {
   if (game.system!.id !== "cyberpunk-red-core") return;
   registerSocketHealth();
   registerAmmoChat();
+  registerSheetAttacks();
   registerManualRolls();
   registerHalfArmor();
   registerChatButtons();

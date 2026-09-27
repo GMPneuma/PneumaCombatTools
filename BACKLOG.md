@@ -1,5 +1,9 @@
 # Combat Tools roadmap and backlog
 
+## Character-sheet attack routing — implemented locally, 2026-09-26
+
+Optional character-sheet attack routing (unreleased): **Route character-sheet attacks through Combat Tools**, under Attack & Damage Cards, is a world setting and defaults OFF. Supported native weapon attack clicks preserve fire mode and use the existing dispatcher. Explicit token sheets retain their token; actor-directory sheets use one controlled matching token or one unambiguous scene token. Ordinary attacks require one visible target; area weapons can open placement without a target. Disabled routing, unsupported actions, absent GM, or ambiguous context retain native behavior. Once routed, cancellation/errors never replay a native attack. Hand grenades retain their HUD flow. Automated routing tests pass; live multiplayer verification remains pending.
+
 Indicator setting label renamed to “Indicator Scale”; saved values and sizing behavior are unchanged.
 
 Grenade placement cleanup (local): native Token HUD clears when area placement begins, including GM scatter placement. Hidden attack templates and grid highlights also disable rendering so GM visibility refreshes cannot restore them. Missed-blast instructions are shortened and the crosshair button reads “Place New Target Center.” Automated placement/visibility and scattered-card completion checks added; live Foundry validation remains pending.

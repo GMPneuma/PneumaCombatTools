@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.2 - 2026-09-26
+
+- Add **Route character-sheet attacks through Combat Tools** under **Attack & Damage Cards**. This optional world setting is **off by default**.
+- Preserve native attack fire modes and use the existing defense, damage and effect workflows. Area weapons and suppressive fire open placement, including when no token is targeted; hand grenades retain their HUD flow.
+- Resolve explicit token sheets and unambiguous controlled/scene tokens. Keep native behavior when routing is disabled or the required context is missing, ambiguous or unsupported.
+- Prevent native roll replay after routed cancellation or errors; reuse existing duplicate-click and ammunition checks.
+- Update flow diagrams and include the player/GM handbook and documentation corrections.
+
+Validation: 427 automated tests passed, four skipped; production build, strict type checks, settings browser fixture and 15 Mermaid diagrams passed. Live Foundry multiplayer verification remains pending.
+
+
 ## 0.9.1 - 2026-09-26
 
 - Standardize GM-only chat controls with red outlines and GM badges, with charcoal hover styling. Add consistent CSS hooks for card customization.
