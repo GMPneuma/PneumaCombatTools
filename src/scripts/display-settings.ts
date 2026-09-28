@@ -1,5 +1,5 @@
 const MODULE="pneuma-combattools";
-export const BIOMONITOR_KEYS=["eyeHUDDock","crewHUDIntegration","biomonitorShowHP","forcePlayerHUDAnimations","eyeHUDAnimateMessages","biomonitorFlashSeconds"];
+export const BIOMONITOR_KEYS=["eyeHUDDock","crewHUDIntegration","biomonitorShowHP","forcePlayerHUDAnimations","eyeHUDAnimateMessages","biomonitorFlashSeconds","messageAlertSound","messageAlertVolume"];
 export const TOKEN_HUD_KEYS=["targetedRightClick","tightHUD","hudScale","iconColor","statusIconScale"];
 /** Match Foundry v12 SettingsConfig row data, including native DataField inputs. */
 export function nativeSettingRows(keys:readonly string[]):Record<string,unknown>[]{
@@ -30,7 +30,21 @@ class DisplaySettings extends FormApplication{
  }));root.querySelector('[data-close]')?.addEventListener("click",()=>{void this.close();});}
  protected override async _updateObject(_event:Event,_data:Record<string,unknown>){}
 }
-class BiomonitorSettings extends DisplaySettings{protected override keys=BIOMONITOR_KEYS;static override get defaultOptions(){return {...super.defaultOptions,id:"pneuma-biomonitor-settings",title:"Biomonitor"};}}
+class BiomonitorSettings extends DisplaySettings{
+ protected override keys=BIOMONITOR_KEYS;
+ static override get defaultOptions(){return {...super.defaultOptions,id:"pneuma-biomonitor-settings",title:"Biomonitor"};}
+ override activateListeners(html:JQuery){
+  super.activateListeners(html);if(!game.user?.isGM)return;
+  const root=html[0],path=root?.querySelector<HTMLInputElement>('[name="pneuma-combattools.messageAlertSound"]'),volume=root?.querySelector<HTMLInputElement>('[name="pneuma-combattools.messageAlertVolume"]');
+  if(!path||!volume)return;
+  const browse=document.createElement("button");browse.type="button";browse.title="Choose popup sound";browse.innerHTML='<i class="fas fa-file-audio" aria-hidden="true"></i>';browse.setAttribute("aria-label",browse.title);
+  browse.addEventListener("click",()=>{new FilePicker({type:"audio",current:path.value,callback:value=>{path.value=value;path.dispatchEvent(new Event("change",{bubbles:true}));}}).render(true);});path.after(browse);
+  const play=document.createElement("button");play.type="button";play.innerHTML='<i class="fas fa-play" aria-hidden="true"></i> Play';
+  play.addEventListener("click",async()=>{const src=path.value.trim();if(!src){ui.notifications!.warn("Choose a sound file to preview.");return;}play.disabled=true;
+   try{await foundry.audio.AudioHelper.play({src,volume:Math.min(1,Math.max(0,Number(volume.value))),loop:false},false);}catch(error){ui.notifications!.error("Sound preview failed: "+String(error));}finally{play.disabled=false;}
+  });volume.closest(".form-fields")?.append(play);
+ }
+}
 class TokenHUDSettings extends DisplaySettings{protected override keys=TOKEN_HUD_KEYS;static override get defaultOptions(){return {...super.defaultOptions,id:"pneuma-token-hud-settings",title:"Token HUD"};}}
 export function registerDisplaySettings(){
  for(const key of [...BIOMONITOR_KEYS,...TOKEN_HUD_KEYS]){const setting=game.settings!.settings.get(`${MODULE}.${key}` as keyof SettingConfig);if(setting)setting.config=false;}

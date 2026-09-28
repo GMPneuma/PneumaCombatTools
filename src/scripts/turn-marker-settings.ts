@@ -9,7 +9,7 @@ type MarkerKey=typeof TURN_MARKER_KEYS[number];
 export type IndicatorMode="default"|"personal"|"token";
 export async function saveTurnMarkerSetting(id:string,value:string|boolean,mode:IndicatorMode="personal",token?:TokenDocument):Promise<void>{
  const key=id.slice(MODULE.length+1) as MarkerKey;
- if(!id.startsWith(MODULE+".")||!TURN_MARKER_KEYS.includes(key))throw Error("Unknown Animated Turn Indicator setting.");
+ if(!id.startsWith(MODULE+".")||!TURN_MARKER_KEYS.includes(key))throw Error("Unknown Turn Indicator setting.");
  if(!isLocal(key)&&mode==="token"&&!game.user?.isGM)throw Error("Only a GM can change a token indicator.");
  const config=game.settings!.settings.get(id as keyof SettingConfig)!;
  let normalized:string|number|boolean=value;
@@ -48,7 +48,7 @@ export class TurnMarkerSettings extends FormApplication{
   previewTurnMarker(this,token?.document,normalizeIndicator(raw));
  }
  override async close(options?:Parameters<FormApplication["close"]>[0]){if(this.selectionHook!==undefined)Hooks.off("controlToken",this.selectionHook);this.selectionHook=undefined;endTurnMarkerPreview(this);return super.close(options);}
- static override get defaultOptions(){return foundry.utils.mergeObject(super.defaultOptions,{title:"Animated Turn Indicator",id:"pneuma-turn-marker-settings",width:480,height:"auto",closeOnSubmit:false,submitOnChange:false,submitOnClose:false,template:"modules/pneuma-combattools/templates/turn-marker-settings.hbs"}) as typeof FormApplication.defaultOptions;}
+ static override get defaultOptions(){return foundry.utils.mergeObject(super.defaultOptions,{title:"Turn Indicator",id:"pneuma-turn-marker-settings",width:480,height:"auto",closeOnSubmit:false,submitOnChange:false,submitOnClose:false,template:"modules/pneuma-combattools/templates/turn-marker-settings.hbs"}) as typeof FormApplication.defaultOptions;}
  override async getData(){
   const personal=personalIndicator(game.user),override=tokenIndicator(this.token),profile=this.mode==="token"?(override??indicatorForActor(this.token?.actor??undefined)):this.mode==="personal"?(personal??viewerDefaultIndicator()):(game.user?.isGM?defaultIndicator():viewerDefaultIndicator());
   return {isGM:!!game.user?.isGM,useGMDefault:!localDefaultOverride(),hasToken:!!game.user?.isGM,isToken:this.mode==="token",tokenName:this.token?.name,useInherited:!override,profile,isDefault:this.mode==="default",isPersonal:this.mode==="personal",readOnly:this.mode==="token"&&!game.user?.isGM,useDefault:!personal,styles:{off:"Off",...MARKER_STYLES},ranges:APPEARANCE_KEYS.filter(key=>!["turnMarkerStyle","turnMarkerColor"].includes(key)).map(key=>{const config=game.settings!.settings.get(`${MODULE}.${key}`)!;return {key,label:config.name,value:profile[key],displayValue:key==="turnMarkerOpacity"?Math.round(Number(profile[key])*100)+"%":profile[key],range:config.range};})};
@@ -95,5 +95,5 @@ let editor:TurnMarkerSettings|undefined;
 export function openTurnMarkerSettings(token?:TokenDocument):void{editor??=new TurnMarkerSettings();void editor.showToken(token);}
 
 export function registerTurnMarkerSettings():void{
- game.settings!.registerMenu(MODULE,"turnMarkerSettings",{name:"Animated Turn Indicator",label:"Configure",hint:"Default Indicator, My Indicator and GM token overrides. Changes save automatically.",icon:"fas fa-circle-notch",type:TurnMarkerSettings,restricted:false});
+ game.settings!.registerMenu(MODULE,"turnMarkerSettings",{name:"Turn Indicator",label:"Configure",hint:"Default Indicator, My Indicator and GM token overrides. Changes save automatically.",icon:"fas fa-circle-notch",type:TurnMarkerSettings,restricted:false});
 }

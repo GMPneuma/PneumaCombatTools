@@ -62,8 +62,9 @@ export async function captureWithChat(chat: NativeDamageChat, actor: Actor, name
     await apply(view);
     if(coverUp){
       const native=actor as Actor & {getEquippedArmors(location:string):Item[];_ablateArmor(location:string,amount:number):Promise<void>};
-      const amount=native.getEquippedArmors(location).length?coverUp.ablation:0;
-      if(amount)await native._ablateArmor(location,amount);
+      const locations=["body","head"].filter(part=>native.getEquippedArmors(part).length);
+      const amount=locations.length?coverUp.ablation:0;
+      if(amount)for(const part of locations)await native._ablateArmor(part,amount);
       for(const data of captured){data.ablation=amount;data.ignoreArmorPercent=coverUp.ignorePercent;data.ignoreBelowSP=coverUp.ignoreBelow;}
     }
     if(aimedHead&&location==="head"&&hasInjury(actor,"Cracked Skull")){
@@ -81,7 +82,7 @@ export async function captureWithChat(chat: NativeDamageChat, actor: Actor, name
     if (!captured.length) throw new Error("Native damage applied without a captured result. Check the recipient before continuing.");
     return await Promise.all(captured.map(async (data, index) => compactDamageApplication(
       await renderTemplate("systems/cyberpunk-red-core/templates/chat/cpr-damage-application-card.hbs", data),
-      name, data.location ?? location, id + "-" + index)+(data.pneumaCrackedSkull?'<p class="pneuma-injury-damage">Cracked Skull: penetrating headshot damage ×3; bonus damage unchanged.</p>':"")+(coverUp?'<p class="pneuma-cover-up-damage">Cover Up: armor SP ×2; armor ablation ×2, including blocked damage.</p>':"")));
+      name, data.location ?? location, id + "-" + index)+(data.pneumaCrackedSkull?'<p class="pneuma-injury-damage">Cracked Skull: penetrating headshot damage ×3; bonus damage unchanged.</p>':"")+(coverUp?'<p class="pneuma-cover-up-damage">Cover Up: armor SP ×2; all worn head and body armor ablates ×2, including blocked damage.</p>':"")));
   } finally {
     damageCaptures.delete(view);
   }

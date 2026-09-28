@@ -3,7 +3,7 @@ import { itemView } from "./content.js";
 import { enabled } from "./settings.js";
 
 /** Reuse CPR's weapon-row controls, as the standalone QuickHack module did. */
-export function registerQuickhackSheet(execute: (action: string, actorUuid: string) => Promise<void>) {
+export function registerQuickhackSheet(execute: (action: string, actorUuid: string, quickhackId?: string, skipDialog?: boolean) => Promise<void>) {
   Hooks.on("renderActorSheet", (app: ActorSheet, html: JQuery) => {
     const root = html[0];
     if (!root) return;
@@ -30,7 +30,7 @@ export function registerQuickhackSheet(execute: (action: string, actorUuid: stri
       const control = (event.target as Element).closest<HTMLElement>("[data-combat-tools-quickhack]");
       if (!control) return;
       event.preventDefault(); event.stopImmediatePropagation();
-      if (enabled()) void execute(control.dataset.combatToolsQuickhack!, app.actor.uuid)
+      if (enabled()) void execute(control.dataset.combatToolsQuickhack!, app.actor.uuid, undefined, event.shiftKey)
         .catch(error => { console.error(error); ui.notifications!.error("QuickHack failed. See the console for details."); });
     }, true);
   });

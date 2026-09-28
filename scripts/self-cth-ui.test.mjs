@@ -17,12 +17,13 @@ try{
  },await readFile('src/templates/combat-hud.hbs','utf8'));
  const main=(await readFile('dist/scripts/main.js','utf8')).replace(/^import .*;\s*/gm,'');
  const names=[...new Set([...main.matchAll(/^\s+(register\w+)\(\);/gm)].map(m=>m[1]))].filter(n=>n!=='registerSelfCTH');
- const stubs=names.map(name=>`const ${name}=()=>{};`).join('\n')+'\nconst DEFAULT_ICON_COLOR="#ffc36a",installIconColorNormalization=()=>{},tokenEncounter=()=>game.combat,displayedEncounter=()=>game.combat;const openTurnMarkerSettings=token=>{window.animationOpened=true;window.indicatorToken=token;},registerQuickhack=()=>{},bindWeaponAmmo=()=>{},decorateItemList=()=>{},connectionFor=()=>undefined,quickhackEnabled=()=>false,forceOutEntries=()=>[],attackEntries=()=>[],thrownEntries=()=>[],grenadeEntries=()=>window.grenades??[],grappleMenu=()=>window.grappleActions??[],useGrapple=async(s,t,a)=>{window.grappleUsed=a;},trackingCombat=()=>undefined;';
+ const stubs=names.map(name=>`const ${name}=()=>{};`).join('\n')+'\nconst DEFAULT_ICON_COLOR="#ffc36a",installIconColorNormalization=()=>{},tokenEncounter=()=>game.combat,displayedEncounter=()=>game.combat;const openTurnMarkerSettings=token=>{window.animationOpened=true;window.indicatorToken=token;},registerQuickhack=()=>{},bindWeaponAmmo=()=>{},decorateItemList=()=>{},connectionFor=()=>undefined,quickhackEnabled=()=>true,forceOutEntries=()=>[{messageId:"intrusion",label:"Eject Netrunner"}],attackEntries=()=>[],thrownEntries=()=>[],grenadeEntries=()=>window.grenades??[],grappleMenu=()=>window.grappleActions??[],useGrapple=async(s,t,a)=>{window.grappleUsed=a;},trackingCombat=()=>undefined,selfActions=()=>[],performSelfAction=async()=>{},canWake=()=>false,hasQuickhackSight=()=>true,actorQuickhacks=()=>[];';
+ const eligibility=(await readFile('dist/scripts/attack-menu.js','utf8')).match(/export function canShowQuickhack[\s\S]*?\n}/)[0];
  const emp=(await readFile('dist/scripts/effect-duration.js','utf8'))+'\n'+(await readFile('dist/scripts/emp-rules.js','utf8')).replace(/^import .*;\s*/gm,''),self=(await readFile('dist/scripts/self-cth.js','utf8')).replace(/^import .*;\s*/gm,'');
- await page.addScriptTag({type:'module',content:emp+'\n'+self+'\n'+stubs+'\n'+main+'\nhooks.init.forEach(fn=>fn());window.loaded=true;'});await page.waitForFunction(()=>window.loaded);
+ await page.addScriptTag({type:'module',content:eligibility+'\n'+emp+'\n'+(await readFile('dist/scripts/quickhack/self-ice.js','utf8')).replace(/^import .*;\s*/gm,'')+'\n'+self+'\n'+stubs+'\n'+main+'\nhooks.init.forEach(fn=>fn());window.loaded=true;'});await page.waitForFunction(()=>window.loaded);
  await page.evaluate(()=>{
-  window.own=Object.assign(new CONFIG.Token.objectClass(),{isOwner:true,isVisible:true,actor:{isOwner:true,items:[{type:'cyberware',name:'Kerenzikov',system:{isInstalledInActor:true}}]},document:{uuid:'Token.own'}});
-  window.enemy=Object.assign(new CONFIG.Token.objectClass(),{isOwner:false,isVisible:true,actor:{isOwner:false,items:[]},document:{uuid:'Token.enemy'}});
+  window.own=Object.assign(new CONFIG.Token.objectClass(),{isOwner:true,isVisible:true,controlled:true,actor:{uuid:'Actor.own',isOwner:true,items:[{type:'cyberware',name:'Kerenzikov',system:{isInstalledInActor:true}}]},document:{uuid:'Token.own'}});
+  window.enemy=Object.assign(new CONFIG.Token.objectClass(),{isOwner:false,isVisible:true,actor:{uuid:'Actor.enemy',isOwner:false,items:[]},document:{uuid:'Token.enemy'}});
   window.event={shiftKey:false,getLocalPosition:()=>({x:0,y:0}),stopPropagation(){}};
   window.rolls=[];game.combat={uuid:'Combat.c',started:true,combatants:[{id:'c',initiative:15,token:own.document}],rollInitiative:async(...args)=>rolls.push(args)};
   game.combats=new Map();canvas.tokens.controlled=[own];window.hud=new CONFIG.Token.hudClass();canvas.tokens.hud=hud;
@@ -33,23 +34,18 @@ try{
  await page.addStyleTag({content:await readFile('dist/styles/pneuma-combattools.css','utf8')});
  await page.locator('[data-self-settings-toggle]').dispatchEvent('click');
  assert.equal(await page.locator('[data-self-settings-toggle]').getAttribute('aria-expanded'),'true');
- assert.equal(await page.locator('[data-self-settings-menu] button').first().innerText(),'Animated Turn Indicator');
+ assert.equal(await page.locator('[data-self-settings-menu] button').first().innerText(),'Turn Indicator');
  await page.screenshot({path:process.env.TEMP+'/pct-self-cth-settings.png'});
  await page.locator('[data-turn-animation]').click();assert.equal(await page.evaluate(()=>animationOpened),true);
  assert.equal(await page.locator('[data-self-settings-menu]').isVisible(),false);
  await page.evaluate(()=>document.querySelector('#token-hud').style.setProperty('--pneuma-cth-icon-color','#12ab34'));
- assert.equal(await page.locator('[data-self-cth] > [data-self-alert-hud] .fa-bell').count(),1);
+ assert.equal(await page.locator('[data-self-alert-hud]').count(),0);
  assert.equal(await page.locator('[data-self-cth] > section:not([hidden]), [data-self-cth] > strong, [data-self-cth] .notes').count(),0);
  assert.equal(await page.locator('[data-roll-initiative]').count(),0);
  assert.equal(await page.locator('[data-self-thrown-toggle]').count(),1);
  await page.locator('[data-self-thrown-toggle]').dispatchEvent('keydown',{key:'Enter'});assert.equal(await page.locator('[data-self-thrown-menu]').evaluate(e=>e.hidden),false);assert.equal(await page.locator('[data-self-thrown-menu]').isVisible(),true);assert.equal(await page.locator('[data-self-thrown-menu]').evaluate(e=>e.classList.contains('status-effects')),false);
  await page.locator('[data-self-thrown-toggle]').dispatchEvent('click');assert.equal(await page.locator('[data-self-thrown-menu]').evaluate(e=>e.hidden),true);
- assert.equal(await page.locator('[data-self-alert-hud] > i').evaluate(n=>getComputedStyle(n).color),'rgb(18, 171, 52)');
- await page.evaluate(()=>settings.eyeHUD=false);
- await page.locator('[data-self-alert-hud]').dispatchEvent('click');await page.waitForFunction(()=>settings.eyeHUD===true);
- await page.evaluate(()=>show(own));
- await page.locator('[data-self-alert-hud]').dispatchEvent('keydown',{key:'Enter'});await page.waitForFunction(()=>settings.eyeHUD===false);
- await page.evaluate(()=>{settings.pneumaHomebrew=true;return show(own,true);});assert.equal(await page.locator('[data-self-cth] > [data-self-initiative] .fa-dice-d10').count(),1);assert.equal(await page.locator('[data-self-initiative] > i').evaluate(n=>getComputedStyle(n).color),'rgb(18, 171, 52)');assert.equal(await page.locator('[data-combat-action]').count(),0);
+ await page.evaluate(()=>{settings.pneumaHomebrew=true;return show(own,true);});assert.equal(await page.locator('[data-self-cth] [data-self-initiative] .fa-dice-d10').count(),1);assert.equal(await page.locator('[data-self-initiative] > i').evaluate(n=>getComputedStyle(n).color),'rgb(238, 238, 238)');assert.equal(await page.locator('[data-combat-action]').count(),0);
  await page.locator('[data-self-initiative]').dispatchEvent('click');assert.deepEqual(await page.evaluate(()=>rolls),[[['c'],{updateTurn:true}]]);
  await page.evaluate(()=>{settings.pneumaHomebrew=false;});await page.locator('[data-self-initiative]').dispatchEvent('click');assert.equal(await page.evaluate(()=>rolls.length),1);
  await page.evaluate(()=>{canvas.tokens.controlled=[own];return show(enemy);});assert.equal(await page.locator('[data-combat-action]').count(),3);assert.equal(await page.locator('[data-self-initiative]').count(),0);
@@ -91,7 +87,26 @@ try{
  await grenade.hover();assert.notEqual(await grenade.evaluate(n=>getComputedStyle(n).backgroundColor),normal);assert.deepEqual(await grenade.boundingBox(),bounds);
  await page.screenshot({path:process.env.TEMP+'/pct-self-cth-grenades.png'});
  await page.evaluate(()=>{game.user.isGM=true;canvas.tokens.controlled=[own];return show(enemy);});
- assert.equal(await page.locator('[data-token-indicator]').count(),1);await page.locator('[data-token-indicator]').click();assert.equal(await page.evaluate(()=>indicatorToken===enemy.document),true);
+ assert.equal(await page.locator('[data-token-indicator]').count(),0);
+ assert.equal(await page.locator('[data-combat-action="quickhacks"]').count(),0);
+ assert.equal(await page.locator('[data-eject-message]').count(),0);
+ assert.equal(await page.locator('[data-self-cth]').count(),0);
+ await page.evaluate(()=>{own.actor.items.push({type:'role',name:'Netrunner'});canvas.tokens.controlled=[own];return show(enemy);});
+ assert.equal(await page.locator('[data-combat-action="quickhacks"]').count(),1);
  await page.evaluate(()=>{canvas.tokens.controlled=[own];document.querySelector('#token-hud').innerHTML='<div class="col right"></div>';return show(own);});await page.locator('[data-self-settings-toggle]').click();await page.locator('[data-turn-animation]').click();assert.equal(await page.evaluate(()=>indicatorToken===own.document),true);
+ for (const name of ['settings','close','thrown','actions','settings']) {
+  await page.locator('[data-self-'+name+'-toggle]').dispatchEvent('click');
+  assert.equal(await page.locator('.pneuma-self-menu:not([hidden])').count(),1);
+  assert.equal(await page.locator('[data-self-'+name+'-toggle]').getAttribute('aria-expanded'),'true');
+  const colors=await page.locator('[data-self-'+name+'-toggle]').evaluate(n=>{const c=getComputedStyle(n);return [c.backgroundColor,c.color,c.borderColor];});
+  assert.deepEqual(await page.locator('[data-self-'+name+'-menu] .combat-heading').evaluate(n=>{const c=getComputedStyle(n);return [c.backgroundColor,c.color,c.borderColor];}),colors);
+ }
+ await page.locator('[data-self-settings-toggle]').dispatchEvent('keydown',{key:' '});
+ assert.equal(await page.locator('.pneuma-self-menu:not([hidden])').count(),0);
+ await page.evaluate(()=>{document.querySelector('#token-hud').innerHTML=Handlebars.compile(sourceTemplate)({standalone:false,offensiveQuickhacks:true,selfIce:{walls:3,cleared:1,dv:10},canBreach:true,gmBreach:true,quickhacks:[{id:'overheat',name:'Overheat',dv:8}]});});
+ assert.match(await page.locator('.combat-quickhacks').innerText(),/1\/3 Passwalls cleared/);
+ assert.equal(await page.locator('[data-quickhack-id="overheat"]').isDisabled(),true);
+ assert.equal(await page.locator('[data-quickhack-id="breach"]').count(),1);
+ assert.equal(await page.locator('[data-breach-override]').count(),1);
  console.log('Self CTH browser checks passed: own-token replacement, native controls retained, setting toggle, Shift-right-click, D10 native reroll and target actions.');
 }finally{await browser.close();}

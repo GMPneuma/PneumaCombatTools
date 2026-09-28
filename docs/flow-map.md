@@ -2,7 +2,7 @@
 
 Encounter selection now follows the [shared active-scene policy](encounters.md); saved actions and effect clocks remain tied to their originating encounter.
 
-Current source: Combat Tools 0.9.2, reviewed 2026-09-26. Code inspection and diagram-render validation are distinct from live multiplayer certification.
+Current source: Combat Tools 0.9.2 plus local changes, reviewed 2026-09-28. Code inspection and diagram-render validation are distinct from live multiplayer certification.
 
 **M** below means **flags.pneuma-combattools**. For example, ChatMessage M.exchange means ChatMessage.flags.pneuma-combattools.exchange. **Transient** means dialog/client/GM memory, not durable document storage. Diagram IDs correspond to table rows. Native CPR dialogs may offer additional version-dependent controls. Every control remains subject to ownership, GM authority, settings and current state.
 
@@ -61,7 +61,7 @@ flowchart LR
 | A2 | Native attack roll/confirm/cancel; modifiers. | Native roll transient until publication; native ammo/inventory mutation. Aimed location: Actor.flags.cyberpunk-red-core.aimedLocation. |
 | A3 | Chat Evade (configured cost label) / Free evasion, Don't Evade; GM Cancel exchange. RAW eligible NPCs can auto-respond. | ChatMessage M.exchange: saved attack/dice, UUIDs, DV, mode, encounter, state=waiting. Attack visually withheld. Responder claims transient in GM memory. |
 | A4 | Native Evasion dialog; Finish payment if interrupted. | M.exchange defense/state=applying; Actor LUCK and M.evasionPayment; Combat evasion usage records. |
-| A5 | Revealed rolls/result; Roll damage icon, Shift-click options. Manual damage override can remain on misses. | Same card state=resolved, hit and defense saved. Saved attack dice revealed. Microwaver hit creates effect card. |
+| A5 | Revealed rolls/result; Roll damage icon; normal click opens options, Shift-click rolls immediately. Manual damage override can remain on misses. | Same card state=resolved, hit and defense saved. Saved attack dice revealed. Microwaver hit creates effect card. |
 | A6 | No ordinary response controls. | state=cancelled. Cancellation is not general undo. |
 
 ## 2. Shared damage, statuses and critical injury
@@ -110,6 +110,10 @@ flowchart TD
  BH -->|GM Restore smoke| BS
  BS --> BX["Expiry or combat end: delete"]
  BH --> BX
+ B5 --> BR["GM Reset Player Action before movement or application"]
+ B6 --> BR
+ B7 --> BR
+ BR --> B4
 ~~~
 
 | Step | Surface / buttons | Storage and result |
@@ -117,7 +121,7 @@ flowchart TD
 | B1 | Grenade/launcher/shell/Suppressive Fire HUD entry. Token HUD closes for placement. Left-click placement; Escape/right-click cancel. | Local measured-template preview transient; early cancellation avoids ammo expenditure. |
 | B2 | Native attack dialog. | ChatMessage M.aoe: geometry/settings/recipient snapshots, exchange; phase=scatter/responses. Native ammo expenditure. |
 | B3 | GM Place New Target Center inside the gray area. | Updated area/recipients in same M.aoe record. |
-| B4 | Per-row Evade / Don't Evade, optional Cover Up, or Concentration. GM Add selected token, Exclude target, Override as affected, affected/unaffected review, Release unfinished response. | Clickable per-row total expands saved native roll; M.aoe.rows[]: UUID, eligibility, state=waiting/rolling/hit/miss/other, claim, total/HTML. Saved attackDiceRevealed guard prevents repeated animation. |
+| B4 | Per-row Evade / Don't Evade, optional Cover Up, or Concentration. GM Add selected token; Exclude target before response; Reset Player Action afterward (before movement/application). Legacy affected/unaffected review remains. | Clickable per-row total expands saved native roll; M.aoe.rows[]: UUID, eligibility, state=waiting/rolling/hit/miss/other, claim, total/HTML. Saved attackDiceRevealed guard prevents repeated animation. |
 | B5 | Move outside AoE; pick destination. | Token coordinates; row moved/moveCost. Optional combatant MOVE spent/debt records; ordinary tracked movement also Token M.movement. |
 | B6 | Roll shared damage; per-row Apply shared damage (Shift options); instant-effect controls; GM damage reset/review; manual-effects completion for unknown special ammo. | M.aoe.exchange.damage shared; rows[].damage / instant individual. Actor mutations from flows 2/4. |
 | B7 | Concentration; GM coverage overrides. | Row outcome. Failure applies Suppressed through the end of the target’s next turn; Move to cover / Run if needed remains a manual obligation. GM exclusion/reset clears that response’s marker. |
@@ -420,3 +424,5 @@ flowchart TD
 ~~~
 
 Native wrapper/background typography stays with Foundry/CPR. Module-specific layout and states use pneuma-prefixed selectors. Scoped reload, injury-kind and QuickHack-error identifiers are now implemented; optional native-header framing improvements remain in the audit. Rebuild the standalone HTML with scripts/render-flow-diagrams.mjs using PNEUMA_PLAYWRIGHT_MODULE and PNEUMA_MERMAID_SOURCE. Archived history diagrams are intentionally unchanged.
+
+AoE response correction: answered rows offer the GM **Reset Player Action** in place of their coverage override. Before movement or application starts, reset clears that row’s response and restores its initial buttons; it preserves other targets and the shared rolls. Spent Luck is not refunded.

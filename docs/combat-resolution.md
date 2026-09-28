@@ -10,7 +10,7 @@ Eligible defenders choose **Evade** or **Don't Evade**. GM unaware-defender hand
 
 ## Damage controls
 
-Roll damage normally or Shift-click for native options. The shared application section supplies a named target (when applicable), **to selected target**, and three effect slots. Ad-hoc damage uses this same renderer without a recorded defender. AoE keeps application lightning controls beside recipients and places receipts below its shared roll.
+Click Roll damage for native options, or Shift-click to roll immediately. The shared application section supplies a named target (when applicable), **to selected target**, and three effect slots. Ad-hoc damage uses this same renderer without a recorded defender. AoE keeps application lightning controls beside recipients and places receipts below its shared roll.
 
 Selected-target applications are recorded in an Applied to list. Native result details/undo remain expandable where supplied. Captured target/application state guards repeated writes; this does not provide universal rollback across secondary effects.
 

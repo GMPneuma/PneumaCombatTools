@@ -10,6 +10,22 @@ const life=(doc:object)=>foundry.utils.getProperty(doc,key) as Lifetime|undefine
 const status=(name:string)=>{const s=masterStatuses.find(s=>s.name===name);if(!s)throw Error("Missing status: "+name);return s;};
 const active=(e:ActiveEffect)=>!e.disabled&&!e.isSuppressed&&!foundry.utils.getProperty(e,"system.isSuppressed");
 const allEffects=(actor:Actor):ActiveEffect[]=>Array.from(actor.allApplicableEffects?.()??actor.effects);
+const speedhealKey="flags."+M+".speedhealEffects";
+const isSpeedheal=(effect:ActiveEffect)=>effect.statuses.has(status("Speed Heal").id)||effect.statuses.has("speedheal");
+export async function trackSpeedheal(effect:ActiveEffect,combat:Combat):Promise<void> {
+  if(!active(effect)||!isSpeedheal(effect)||!effect.uuid)return;
+  const saved=foundry.utils.getProperty(combat,speedhealKey) as string[]|undefined;
+  if(!saved?.includes(effect.uuid))await combat.update({[speedhealKey]:[...(saved??[]),effect.uuid]});
+}
+export async function clearCombatSpeedheal(combat:Combat):Promise<void> {
+  const saved=foundry.utils.getProperty(combat,speedhealKey) as string[]|undefined;
+  for(const uuid of saved??[]){
+    const effect=await fromUuid(uuid) as ActiveEffect|null;
+    if(effect&&isSpeedheal(effect))await effect.delete();
+  }
+  if(saved?.length&&game.combats?.get(combat.id!)===combat)
+    await combat.update({["flags."+M+".-=speedhealEffects"]:null});
+}
 const fireLevels=()=>[[status("On Fire (Mild)").id,2],[status("On Fire (Strong)").id,4],[status("On Fire (Deadly)").id,6]] as const;
 const fireDamage=(e:ActiveEffect)=>Math.max(0,...fireLevels().filter(([id])=>e.statuses.has(id)).map(([,damage])=>damage),life(e)?.kind==="fire"?2:0);
 const sleepEffect=(e:ActiveEffect)=>e.statuses.has(status("Unconscious").id)&&(e.name==="Sleep"||life(e)?.kind==="sleep");
@@ -92,6 +108,7 @@ export async function expireInstantActor(actor:Actor,now=game.time!.worldTime) {
 
 /** Native durations are enough to qualify; manually applied effects are included. */
 export async function finishTimedEffects(combat:Combat) {
+  await clearCombatSpeedheal(combat);
   const participants=new Set(Array.from(combat.combatants??[]).map(c=>c.actor?.uuid));
   for(const actor of actors()) {
     const belongs=(effect:ActiveEffect)=>{
@@ -133,6 +150,22 @@ export async function burnTurn(actor:Actor,turn:string) {
   await actor.update({"system.derivedStats.hp.value":hp-Math.max(...effects.map(fireDamage)),["flags."+M+".lastBurnTurn"]:turn} as never);
 }
 export function registerInstantLifetimes() {
+  const track=(effect:ActiveEffect)=>{
+    if(!active(effect)||!isSpeedheal(effect)||!(effect.parent instanceof Actor))return;
+    const actor=effect.parent;
+    const combats=Array.from(game.combats??[]).filter(c=>c.started&&c.active&&c.combatants.some(row=>row.actor?.uuid===actor.uuid));
+    if(combats.length!==1)return;
+    const combat=combats[0]!;
+    enqueue(async()=>{
+      // A rapid combat end may arrive while the status hook is queued.
+      if(!combat.started||!game.combats?.get(combat.id!)){if(isSpeedheal(effect))await effect.delete();return;}
+      await trackSpeedheal(effect,combat);
+    });
+  };
+  Hooks.on("createActiveEffect",track);
+  Hooks.on("updateActiveEffect",(effect:ActiveEffect,changes:Record<string,unknown>)=>{
+    if("statuses" in changes||changes.disabled===false)track(effect);
+  });
   type Turn={actor?:Actor;round:number;turn:number;started:boolean};
   const previous=new Map<string,Turn>();
   const rememberCombat=(c:Combat)=>previous.set(c.id!,{actor:c.combatant?.actor??undefined,round:c.round??0,turn:c.turn??0,started:c.started});

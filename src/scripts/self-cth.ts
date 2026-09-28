@@ -4,7 +4,7 @@ const MODULE="pneuma-combattools";
 declare global {interface SettingConfig {"pneuma-combattools.pneumaHomebrew":boolean}}
 /** GM ownership covers every token: retain target actions when acting as a different token. */
 export function isSelfCTH(token:Token|undefined,attacker:Token|undefined):boolean {
-  return !!token?.isOwner&&(!game.user?.isGM||!attacker||attacker===token);
+  return !!token?.isOwner&&(!game.user?.isGM||(token.controlled&&(!attacker||attacker===token)));
 }
 export function hasSpeedware(actor:Actor|undefined):boolean {
   return !!actor?.items.some(item=>{
@@ -40,5 +40,7 @@ export function registerSelfCTH(){
   const refresh=()=>{const hud=canvas.tokens?.hud;if(hud?.object&&hud.rendered)hud.render(true);};
   game.settings!.register(MODULE,"pneumaHomebrew",{name:"Speedware allows Rerolling Initiative",hint:"Installed functional speedware allows an Action to re-roll initiative from the self CTH. Other homebrew settings remain independent.",scope:"world",config:true,type:Boolean,default:false,onChange:refresh});
   for(const hook of ["createItem","updateItem","deleteItem"])Hooks.on(hook,(item:Item)=>{if(item.parent?.uuid===canvas.tokens?.hud?.object?.actor?.uuid)refresh();});
+  for(const hook of ["createActiveEffect","updateActiveEffect","deleteActiveEffect"])Hooks.on(hook,(effect:ActiveEffect)=>{if(effect.parent?.uuid===canvas.tokens?.hud?.object?.actor?.uuid)refresh();});
+  Hooks.on("updateActor",(actor:Actor)=>{if(actor.uuid===canvas.tokens?.hud?.object?.actor?.uuid)refresh();});
   for(const hook of ["updateCombat","deleteCombat","createCombatant","updateCombatant","deleteCombatant"])Hooks.on(hook,refresh);
 }

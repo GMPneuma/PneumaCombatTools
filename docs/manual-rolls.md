@@ -20,3 +20,9 @@ Group rows show Waiting/Rolling/result. If DV exists, a total greater than DV su
 Damage, injury and group cards persist in ChatMessage `flags.pneuma-combattools.manualRoll`; plain Cyberpunk/custom/STAT results are roll cards, not ongoing request records. Damage and injury application remain separate from rolling.
 
 Implementation: [manual-rolls.ts](../src/scripts/manual-rolls.ts), [manual-roll-state.ts](../src/scripts/manual-roll-state.ts), [damage-flow.ts](../src/scripts/damage-flow.ts).
+
+**Evasion** appears beside Damage and Critical Injury. Select one owned character token; click for the native Evasion dialog or Shift-click for a direct roll. This is a standalone native roll for manual adjudication when a managed attack response is unavailable; it does not change attack/AoE cards or override native injury restrictions.
+
+The leftmost **Favorite** column in Skill Roll and Role Ability toggles a star. Save at most **three total** across both forms. Favorites belong to you and appear at the bottom of Manual Rolls. Select exactly one owned character token. Each shortcut rolls that token’s matching skill or role ability, using its current stats. Your favorites stay the same when you switch tokens. Click for native options, or Shift-click for a direct roll. Unstar an entry before adding a fourth.
+
+**GM Group Check shortcuts:** choose a skill in the dropdown, then click one of the three vertical **+** slots to save it. Click a saved skill to select it; **×** clears that slot. These shortcuts are saved for your GM user and do not use the three personal roll favorites. Set DV/players as usual, then click **Request rolls**.

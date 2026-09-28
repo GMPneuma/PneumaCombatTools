@@ -234,3 +234,19 @@ test('wake and extinguish reject stale followups and never reapply conditions',a
   await assert.rejects(handleInstant(s,{action},f.owner,f.save),/no longer active/);
  }
 });
+
+test('Speedheal records exact effect UUIDs on Combat and cleans only recorded matching statuses',async()=>{
+ const {trackSpeedheal,clearCombatSpeedheal}=await import('../dist/scripts/instant-lifetime.js');
+ const combat={id:'speed',flags:{},update:async changes=>{for(const [k,v]of Object.entries(changes))set(combat,k,v);}};
+ const removed=[];const effect={uuid:'Actor.a.ActiveEffect.speed',statuses:new Set(['speedheal']),delete:async()=>removed.push('speed')};
+ globalThis.game={combats:new Map([['speed',combat]])};
+ await trackSpeedheal(effect,combat);await trackSpeedheal(effect,combat);
+ assert.deepEqual(get(combat,'flags.pneuma-combattools.speedhealEffects'),[effect.uuid]);
+ globalThis.fromUuid=async uuid=>uuid===effect.uuid?effect:null;
+ await clearCombatSpeedheal(combat);assert.deepEqual(removed,['speed']);
+ effect.statuses=new Set(['other']);await clearCombatSpeedheal(combat);assert.deepEqual(removed,['speed']);
+ effect.statuses=new Set(['speedheal']);effect.disabled=true;
+ const other={id:'other',flags:{},update:async()=>{throw Error('Disabled effect must not enroll');}};
+ await trackSpeedheal(effect,other);
+ game.combats.clear();effect.disabled=false;await clearCombatSpeedheal(combat);assert.equal(removed.length,2);
+});

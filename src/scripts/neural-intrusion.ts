@@ -15,7 +15,7 @@ export function bindStatusActions(container: HTMLElement, actor: Actor, refresh:
       ? [{name: "Extinguish", icon: "fa-fire-extinguisher", run: () => extinguishStatus(actor).then(refresh)}]
       : forceOutEntries(actor).map((row, index, rows) => ({
         name: "Eject Netrunner — " + row.name + (rows.filter(other => other.name === row.name).length > 1 ? " (" + (index + 1) + ")" : ""),
-        icon: "fa-plug-circle-xmark", run: () => ejectStatus(actor, row.messageId)
+        icon: "fa-plug-circle-xmark", run: (event: MouseEvent) => ejectStatus(actor, row.messageId,event.shiftKey)
       }));
     if (!actions.length) return;
     const panel = document.createElement("div"); panel.className = "pneuma-status-actions pneuma-panel";
@@ -28,7 +28,7 @@ export function bindStatusActions(container: HTMLElement, actor: Actor, refresh:
       const icon = document.createElement("i"); icon.className = "fas " + action.icon; icon.setAttribute("aria-hidden", "true");
       const label = document.createElement("span"); label.textContent = action.name;
       button.append(icon, label); panel.append(button);
-      button.addEventListener("click", () => { close(); void action.run().catch(reportStatusError); });
+      button.addEventListener("click", event => { close(); void action.run(event).catch(reportStatusError); });
     }
     document.body.append(panel);
     const anchor = light.getBoundingClientRect(), bounds = panel.getBoundingClientRect();
@@ -52,7 +52,7 @@ function reportStatusError(error: unknown): void { ui.notifications!.error(error
 export async function extinguishStatus(actor: Actor): Promise<void> {
   if (actor.isOwner) await clearInstantCondition(actor, "fire");
 }
-export async function ejectStatus(actor: Actor, messageId: string): Promise<void> {
+export async function ejectStatus(actor: Actor, messageId: string, skipDialog = false): Promise<void> {
   if (!actor.isOwner || !forceOutEntries(actor).some(row => row.messageId === messageId)) return;
-  await beginForceOut({id:messageId});
+  await beginForceOut({id:messageId},skipDialog);
 }

@@ -157,3 +157,33 @@ See [the complete card audit](chat-card-audit-2026-09-26.md). Native main-card C
 
 ### Condition-aware controls and audit selector fixes
 Wake/Extinguish controls are omitted when their current actor condition is absent, disabled or suppressed. Saved historical effect summaries remain unchanged. Actor/item/effect and combat events batch refresh only indexed relevant cards, including embedded AoE instant rows. Injury cards use .pneuma-injury-summary and data-state="withdrawn" when injury/epoch/encounter checks fail; applied receipts remain intact. Their data-injury value is now injury-specific (Foreign Object themes must update old broken-ribs selectors). Reload paragraphs add .pneuma-ammo-notice and data-ammo-action="reload|change", retaining default native CSS. QuickHack summaries add .pneuma-quickhack-effect-failed and data-effect-state="failed|resolved"; the legacy failure class is retained for compatibility. No QuickHack recovery control or behavior was added.
+
+AoE response reset: `.pneuma-aoe-target [data-aoe-action="reset"]` is a labeled **Reset Player Action** button using the shared GM styling. Waiting rows retain `exclude`; answered rows replace `exclude`/`forcehit` with `reset`. Players cannot see reset. Native disabled styling is used after movement or application starts, with a reason in its title. Reset returns the row to `data-state="waiting"` and restores the original controls.
+
+AoE reset presentation: icon plus **Reset**, inline in the original player-response controls; tooltip/accessible label remains **Reset Player Action**.
+
+AoE long response descriptions (Cover Up and suppression) use a full-width `.pneuma-aoe-response-description` below the player line so they cannot push Reset onto a separate line.
+
+Cover Up homebrew: double ablation applies to all equipped head and body armor, including blocked hits. Settings and the damage receipt state this explicitly; shields retain native damage handling.
+
+AoE headings use the weapon/item name alone, retaining only the Suppressive Fire suffix. Automatic Blast, Shells and ammunition-effect heading labels are removed; effect mechanics and per-target details are unchanged.
+
+Attack titles: hidden names use weapon/melee type, Martial Arts, Grenade or Rocket. Visible names use the weapon name, actual martial-arts roll skill, or grenade ammunition type. Suppressive Fire retains its suffix. `.pneuma-attack-name` truncates visually with a full-title hover tooltip.
+
+Critical Injury application buttons use the cracked-heart icon (`fa-heart-crack`) instead of dice; tooltip and action remain unchanged.
+
+Damage-recipient rows place damage and critical-injury buttons together before `.pneuma-damage-recipient-label`. The alternate recipient label is **token** (formerly “to selected target”); action tooltips retain precise selected-token wording.
+
+## Ineligible ranged defenders
+
+Within `.pneuma-combat-message .pneuma-resolution-result`, resolved ineligible ranged attacks include `small.pneuma-cannot-evade`: "Target cannot evade", with the eligibility reason as a tooltip. GMs receive a compact native `button.pneuma-evasion-override` ("Allow evasion") on that same line, before damage or follow-up effects start. It is added only for GMs on visible cards; no existing selectors are removed. The override moves `resolved` back to `waiting`, retaining native attack/Evasion markup and existing pending controls, then returns to `resolved` after the choice. The resolved note becomes "GM allowed evasion". Example: `.pneuma-combat-message .pneuma-cannot-evade { font-size: 0.8em; }`. The previously revealed attack dice are not replayed when overridden defense resolves.
+
+## Roll shortcut
+
+Existing roll controls retain their native nodes, selectors, state and visibility rules. Shift-click uses a direct native roll, including pending Evasion, area responses, Brawling, instant resistance, group rolls and damage. Normal damage clicks open roll options; `.pneuma-result-damage` documents Shift-click in its tooltip. Required input/selection dialogs remain. Application controls still use Shift-click for application options; they do not initiate a roll. No styling selectors were removed.
+
+The single-target `.pneuma-evasion-override` is included in the shared chat-button selector and receives `.pneuma-chat-button[data-chat-role="gm"]`, the GM badge, native button behavior, Evasion icon and shared hover/focus/busy presentation. Compact padding/font/margin use the shared button tokens. Example: `.pneuma-evasion-override[data-chat-role="gm"]`. AoE does not currently expose this override.
+
+## Self-ICE breach
+
+Breach results reuse `.pneuma-quickhack-card`, its native `.rollcard` and `.cpr-block` classes, heading, roll, and result sections. `data-state="success"`/`"failure"` tracks the Interface outcome. Detail reports cleared/total walls and the manually spent one-Net-Action cost. No effect or ejection controls are added. Cards go to source owners plus GMs (NPC rolls to GMs). Existing selectors remain. Example: `.pneuma-quickhack-card[data-state="success"] .pneuma-quickhack-detail`. The target HUD uses its existing `.combat-weapon-name` controls for Breach and the GM progress override; QuickHack buttons remain disabled until all walls clear.

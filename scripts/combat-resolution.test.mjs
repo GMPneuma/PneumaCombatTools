@@ -532,3 +532,47 @@ test('missed attacks require explicit GM approval before damage and keep the mis
  await request('damage','damageClaim',{nonce:'n'});
  assert.equal(get(msg,'flags.pneuma-combattools.exchange.damage.status'),'rolling');
 });
+
+test("ineligible ranged PCs and NPCs bypass prompts; eligible and melee retain choice",async()=>{
+ const {skipUnavailableEvasion,exchangeContent}=await import('../dist/scripts/combat-resolution.js');
+ for(const npc of [false,true]) {
+  setup();game.settings.get=()=>"raw";actor.hasPlayerOwner=!npc;actor.system.stats.ref.value=7;
+  const data=message('skip').flags['pneuma-combattools'].exchange;
+  skipUnavailableEvasion(data,actor,combats.get('combat'));
+  assert.equal(data.state,'resolved');assert.equal(data.hit,true);assert.match(exchangeContent(data),/Target cannot evade/);
+  data.total=13;skipUnavailableEvasion(data,actor,combats.get('combat'));assert.equal(data.hit,false);
+ }
+ for(const ranged of [true,false]) {
+  setup();game.settings.get=()=>"raw";
+  const data=message('eligible').flags['pneuma-combattools'].exchange;data.ranged=ranged;
+  if(!ranged)actor.system.stats.ref.value=7;
+  skipUnavailableEvasion(data,actor,combats.get('combat'));assert.equal(data.state,'waiting');
+ }
+});
+test("GM override reopens ineligible attack and permits owner evasion; damage blocks reopening",async()=>{
+ setup();game.settings.get=()=>"raw";actor.system.stats.ref.value=7;
+ const msg=message('override'),data=msg.flags['pneuma-combattools'].exchange;
+ Object.assign(data,{state:'resolved',cannotEvade:'Requires REF 8+',hit:true});
+ await assert.rejects(request('override','overrideEvasion'),/Only a GM/);
+ const gm=()=>serialized({id:'gm-request',user:'gm',message:'override',action:'overrideEvasion'});
+ data.damage={status:'rolling'};await assert.rejects(gm(),/before damage/);delete data.damage;
+ await gm();assert.equal(msg.flags['pneuma-combattools'].exchange.state,'waiting');
+ const claim=await request('override','claim');assert.equal(claim.offer.allowed,true);assert.equal(claim.offer.cost,0);
+ await request('override','commit',{nonce:claim.nonce,defense:{...defense(),fee:0,bonus:0}});
+ const result=msg.flags['pneuma-combattools'].exchange;
+ assert.equal(result.state,'resolved');assert.equal(result.hit,false);assert.equal(result.attackRevealed,true);
+ assert.equal(actor.system.stats.luck.value,5);
+ await assert.rejects(gm(),/before damage/);
+});
+
+test("Shift-click skips native evasion and GM attack dialogs while retaining costs and smoke modifiers",async()=>{
+ const {attackDialog,smokeAttackDialog}=await import('../dist/scripts/native-combat.js');
+ setup();game.user={isGM:true};const events=[];
+ const roll={mods:[],addMod(mods){this.mods.push(...mods);},handleRollDialog:async event=>{events.push(event);return true;}};
+ await evasionDialog(roll,actor,{},-4,2,true);
+ assert.equal(events.at(-1).ctrlKey,true);assert.notEqual(events.at(-1).type,'click');assert.equal(roll.mods[0].value,-4);
+ const result=await attackDialog(roll,actor,{}, {type:'click',shiftKey:true});assert.equal(result.confirmed,true);assert.equal(result.unaware,false);assert.equal(events.at(-1).ctrlKey,true);
+ await smokeAttackDialog(roll,actor,{}, {shiftKey:true},true);assert.equal(events.at(-1).ctrlKey,true);assert.equal(roll.mods.at(-1).value,-4);
+ await evasionDialog(roll,actor,{},0,0);assert.equal(events.at(-1).ctrlKey,false);
+ await assert.rejects(attackDialog(roll,actor,{}, {shiftKey:true},true),/Choose improvised damage/);assert.equal(events.at(-1).ctrlKey,false);
+});

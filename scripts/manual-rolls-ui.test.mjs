@@ -96,7 +96,7 @@ try {
   game.user=game.users.get('p1');game.user.character=actor;window.canvas={tokens:{controlled:[]}};
   actor.system={stats:{ref:{value:6},luck:{value:2,max:8}}};actor.getStat=stat=>actor.system.stats[stat].value;
   openManualRolls();check(document.querySelector('.pneuma-roll-flyout-title').textContent==='Manual Rolls','menu header');check(document.activeElement.classList.contains('pneuma-roll-flyout'),'no item initially focused');check(!!document.querySelector('[data-roll-choice=stat]')&&!document.querySelector('[data-roll-choice=group]'),'player STAT menu');
-  check(JSON.stringify([...document.querySelectorAll('.pneuma-roll-section')].map(s=>[...s.querySelectorAll('button')].map(b=>b.dataset.rollChoice)))===JSON.stringify([['base'],['stat','skill','role'],['damage','critical']]),'three ordered sections');
+  check(JSON.stringify([...document.querySelectorAll('.pneuma-roll-section')].map(s=>[...s.querySelectorAll('button')].map(b=>b.dataset.rollChoice)))===JSON.stringify([['base'],['stat','skill','role'],['damage','critical','evasion']]),'three ordered sections');
   document.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown'}));check(document.activeElement.dataset.rollChoice==='base','keyboard navigation');document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));
   canvas.tokens.controlled=[{actor}];
   window.Handlebars={helpers:{cprGetSkillModInfo:()=>2}};

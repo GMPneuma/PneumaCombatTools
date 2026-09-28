@@ -7,7 +7,7 @@ registerHooks({resolve(specifier,context,next){
  if(specifier==="/systems/cyberpunk-red-core/modules/rolls/cpr-rolls.js")return {shortCircuit:true,url:'data:text/javascript,export const CPRRoll=globalThis.SmartRoll'};
  if(specifier==="./placement.js"&&context.parentURL?.endsWith("/aoe/workflow.js"))return {shortCircuit:true,url:"data:text/javascript,"+encodeURIComponent('export const templateData=area=>({t:area.shape,x:area.origin.x,y:area.origin.y}); export const areaCoverage=area=>box=>globalThis.testCoverage(area,box) && !globalThis.CONFIG.Canvas.polygonBackends.move.testCollision(area.origin,{x:box.x+1,y:box.y+1},{type:"move",mode:"any"}); export const clippedPoints=()=>[]; export const placeArea=async(make,p)=>globalThis.previewCancel?null:make(p);')};
  if(specifier==="/systems/cyberpunk-red-core/modules/extern/cpr-dice-handler.js")return {shortCircuit:true,url:"data:text/javascript,export default {handle3dDice:async(roll,mode)=>{globalThis.diceShown.push({roll,mode})}}"};
- if(specifier==="./damage-application.js"&&context.parentURL?.endsWith("/damage-flow.js"))return {shortCircuit:true,url:"data:text/javascript,"+encodeURIComponent('export async function captureDamageApplication(actor,n,l,id,apply){await apply(actor);arguments[6]?.({rawDamageDealt:globalThis.testPenetrated?5:0,hpReduction:globalThis.testPenetrated?5:0});return ["<div>applied</div>"]}')};
+ if(specifier==="./damage-application.js"&&context.parentURL?.endsWith("/damage-flow.js"))return {shortCircuit:true,url:"data:text/javascript,"+encodeURIComponent('export async function captureDamageApplication(actor,n,l,id,apply){globalThis.testCoverUp=arguments[5];await apply(actor);arguments[6]?.({rawDamageDealt:globalThis.testPenetrated?5:0,hpReduction:globalThis.testPenetrated?5:0});return ["<div>applied</div>"]}')};
  return next(specifier,context);
 }});
 const {evadeAllowed,winsAreaDefense}=await import("../dist/scripts/aoe/geometry.js");
@@ -228,8 +228,9 @@ test("Cover Up damage hands the per-target modifier to native application",async
  const f=fixture();game.settings.get=(_m,k)=>k==="areaSettings"?{...defaults,coverUp:true}:k==="rollMode"?"roll":false;
  await startAreaAttack(f.source,f.target,"w","attack");await f.request("other");
  let args;f.b._applyDamage=async(...values)=>args=values;
- f.data().exchange.damage={status:"rolled",result:{html:"damage",values:{total:20,bonus:0,location:"body",ablation:1,ammo:"grenade",ignorePercent:0,ignoreBelow:0,lethal:true}}};
+ f.data().exchange.damage={status:"rolled",result:{html:"damage",values:{total:25,bonus:5,location:"body",ablation:2,ammo:"grenade",ignorePercent:0,ignoreBelow:0,lethal:true}}};
  await f.request("damage",{damageRequest:{action:"damageApply",targetUuid:f.target.document.uuid,application:"recorded",applicationId:"cover",options:{useShield:false,damageReductionRole:false,damageReductionAE:false,brainDamageReduction:false}}});
+ assert.deepEqual(globalThis.testCoverUp,{ablation:4,ignorePercent:0,ignoreBelow:0});
  assert.equal(args[3],0);assert.equal(args[5],-100);assert.equal(f.data().rows[0].damage.recordedApplied,true);
  assert.equal(f.data().exchange.damage.result.values.ignorePercent,0);
 });
@@ -403,4 +404,35 @@ test('GM smoke removal is reversible and does not delete its footprint or reset 
  assert.deepEqual(template.flags,before);assert(f.scene.templates.has(template.id));
  await assert.rejects(f.request('removeSmoke',{user:'gm'}),/Choose whether/);
  f.scene.templates.splice(0);await assert.rejects(f.request('removeSmoke',{user:'gm',hidden:false}),/expired or was deleted/);
+});
+
+test('GM reset restores one target choices, clears rolls and invalidates unfinished claims',async()=>{
+ const f=fixture();await startAreaAttack(f.source,f.target,'w','attack');
+ const originalOther=structuredClone(f.data().rows.find(r=>r.uuid===f.third.document.uuid));
+ await f.request('decline');
+ await assert.rejects(f.request('reset'),/GM only/);
+ await f.request('reset',{user:'gm'});
+ let row=f.data().rows.find(r=>r.uuid===f.target.document.uuid);assert.equal(row.state,'waiting');
+ await f.request('claim',{nonce:'old'});await f.request('reset',{user:'gm'});
+ await assert.rejects(f.request('commit',{nonce:'old',total:30,html:'stale'}),/expired/);
+ await f.request('claim',{nonce:'new'});await f.request('commit',{nonce:'new',total:30,html:'native roll'});
+ await f.request('reset',{user:'gm'});row=f.data().rows.find(r=>r.uuid===f.target.document.uuid);
+ assert.equal(row.state,'waiting');assert.equal(row.total,undefined);assert.equal(row.html,undefined);assert.equal(row.claim,undefined);
+ assert.deepEqual(f.data().rows.find(r=>r.uuid===f.third.document.uuid),originalOther);
+ assert.match(f.messages[0].content,/data-aoe-action="exclude"/);
+});
+
+test('response reset blocks applied work and clears only Cover Up prone created by this row',async()=>{
+ for(const preexisting of [false,true]){
+ const f=fixture();game.settings.get=(_m,k)=>k==='areaSettings'?{...defaults,coverUp:true}:k==='rollMode'?'roll':false;
+ f.b.createEmbeddedDocuments=async(_type,rows)=>{const created=rows.map((r,i)=>({...r,id:'cover'+i,statuses:new Set(r.statuses)}));f.b.effects.push(...created);return created;};
+ f.b.deleteEmbeddedDocuments=async(_type,ids)=>{f.b.effects=f.b.effects.filter(e=>!ids.includes(e.id));};
+ if(preexisting){const {masterStatuses}=await import('../dist/scripts/status-catalog.js');f.b.effects.push({id:'existing',statuses:new Set([masterStatuses.find(s=>s.name==='Prone').id])});}
+ await startAreaAttack(f.source,f.target,'w','attack');await f.request('other');await f.request('reset',{user:'gm'});
+ const row=f.data().rows.find(r=>r.uuid===f.target.document.uuid);assert.equal(row.coverUp,undefined);assert.equal(f.b.effects.length,preexisting?1:0);
+ }
+ for(const lock of [{moved:true},{damage:{status:'applying'}},{instant:{state:'applied'}},{instant:{state:'rolling'}}]){
+ const f=fixture();await startAreaAttack(f.source,f.target,'w','attack');await f.request('decline');Object.assign(f.data().rows.find(r=>r.uuid===f.target.document.uuid),lock);
+ await assert.rejects(f.request('reset',{user:'gm'}),/Cannot reset/);
+ }
 });

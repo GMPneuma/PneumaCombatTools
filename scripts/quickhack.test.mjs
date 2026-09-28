@@ -404,3 +404,43 @@ test('QuickHack follows active scene encounter when player and GM view unrelated
 test('ambiguous QuickHack encounters stop before rolling',async()=>{const f=fixture();game.combats.push({...f.encounter,id:'second'});await executeQuickhack(f.a,f.b,'jack-in');assert.equal(f.state.rolls,0);assert.match(f.notices.at(-1),/Multiple active/);});
 test('QuickHack cannot use another token of the same actor as membership',async()=>{const f=fixture();f.encounter.combatants[1].token={...f.b.document,uuid:'Scene.scene.Token.copy'};await executeQuickhack(f.a,f.b,'jack-in');assert.equal(f.state.rolls,0);assert.match(f.notices.at(-1),/participating tokens/);});
 test('QuickHack result rejects reset epoch even if connection flags remain',async()=>{const f=fixture();await executeQuickhack(f.a,f.b,'jack-in');const saved=f.cards[0].flags[MODULE].quickhack;f.encounter.flags[MODULE].evasionEpoch='reset';assert.equal(resultConnectionValid(f.source,{...saved,connectionId:f.cards[0].id}),false);await assert.rejects(establishConnection(f.cards[0]),/reset/);});
+
+const {selfIce}=await import('../dist/scripts/quickhack/self-ice.js');
+const {overrideBreach}=await import('../dist/scripts/quickhack/connections.js');
+const iceItem=()=>({type:'cyberware',name:'Self-ICE',system:{isInstalledInActor:true}});
+test('Self-ICE counts only functional installed copies, caps at three, uses DV6/8/10',()=>{
+ const f=fixture();for(let n=1;n<=4;n++){f.target.items.push(iceItem());assert.equal(selfIce(f.target).walls,Math.min(n,3));assert.equal(selfIce(f.target).dv,4+2*Math.min(n,3));}
+ f.target.items[0].system.isInstalledInActor=false;f.target.items[1].flags={[MODULE]:{itemMarkers:{disabled:true}}};f.target.items[2].flags={[MODULE]:{empCombats:['combat']}};assert.equal(selfIce(f.target).walls,1);
+});
+test('breach requires connection, blocks hacks, ties fail, each success clears one; replay cannot clear twice',async()=>{
+ const f=fixture();f.target.items.push(iceItem(),iceItem(),iceItem());
+ await executeQuickhack(f.a,f.b,'breach');assert.equal(f.state.rolls,0);
+ await executeQuickhack(f.a,f.b,'jack-in');const awareness=structuredClone(activeConnection(f.source,f.target.uuid).awareness);
+ await executeQuickhack(f.a,f.b,'overheat');assert.equal(f.state.rolls,1);
+ f.state.total=10;await executeQuickhack(f.a,f.b,'breach');assert.equal(activeConnection(f.source,f.target.uuid).breachCleared,0);
+ f.state.total=11;await executeQuickhack(f.a,f.b,'breach',true);assert.equal(activeConnection(f.source,f.target.uuid).breachCleared,1);
+ await establishConnection(f.cards.at(-1));assert.equal(activeConnection(f.source,f.target.uuid).breachCleared,1);
+ await executeQuickhack(f.a,f.b,'breach');await executeQuickhack(f.a,f.b,'breach');assert.equal(activeConnection(f.source,f.target.uuid).breachCleared,3);
+ assert.deepEqual(activeConnection(f.source,f.target.uuid).awareness,awareness);
+ const rolls=f.state.rolls;await executeQuickhack(f.a,f.b,'breach');assert.equal(f.state.rolls,rolls);
+ f.state.total=1;await executeQuickhack(f.a,f.b,'overheat');assert.equal(f.state.rolls,rolls+1);
+ await jackOut(f.source,f.target.uuid);await executeQuickhack(f.a,f.b,'jack-in');assert.equal(activeConnection(f.source,f.target.uuid).breachCleared,0);
+});
+test('GM override clamps progress; players cannot override; pending breach cancels after disconnect',async()=>{
+ const f=fixture();f.target.items.push(iceItem());await executeQuickhack(f.a,f.b,'jack-in');
+ await overrideBreach(f.source,f.target,99);assert.equal(activeConnection(f.source,f.target.uuid).breachCleared,1);
+ game.user.isGM=false;await overrideBreach(f.source,f.target,0);assert.equal(activeConnection(f.source,f.target.uuid).breachCleared,1);game.user.isGM=true;
+ await overrideBreach(f.source,f.target,0);f.state.onDialog=()=>jackOut(f.source,f.target.uuid);f.state.total=20;
+ await executeQuickhack(f.a,f.b,'breach');assert.equal(f.state.rolls,1);assert.equal(connectionFor(f.source,f.target.uuid).state,'disconnected');
+});
+
+test('breach dialog must not advance a wall after GM changes progress',async()=>{const f=fixture();f.target.items.push(iceItem(),iceItem(),iceItem());await executeQuickhack(f.a,f.b,'jack-in');f.state.total=11;f.state.onDialog=()=>overrideBreach(f.source,f.target,1);await executeQuickhack(f.a,f.b,'breach');console.log('progress after override during roll:',activeConnection(f.source,f.target.uuid).breachCleared,'rolls:',f.state.rolls);assert.equal(activeConnection(f.source,f.target.uuid).breachCleared,1);});
+test('breach luck must be consumed',async()=>{const f=fixture();f.target.items.push(iceItem());f.source.system={stats:{luck:{value:5}}};f.source.update=async changes=>{for(const [k,v] of Object.entries(changes))put(f.source,k,v);};await executeQuickhack(f.a,f.b,'jack-in');f.state.total=8;const create=f.role.createRoll;f.role.createRoll=()=>({...create(),luck:3});await executeQuickhack(f.a,f.b,'breach');console.log('luck after +3 breach:',f.source.system.stats.luck.value);assert.equal(f.source.system.stats.luck.value,2);});
+
+test('QuickHack LUCK is not spent on cancellation, and insufficient LUCK prevents rolling',async()=>{
+ const f=fixture();f.source.system={stats:{luck:{value:2}}};const updates=[];f.source.update=async changes=>{updates.push(changes);for(const [k,v] of Object.entries(changes))put(f.source,k,v);};
+ const create=f.role.createRoll;f.role.createRoll=()=>({...create(),luck:3});
+ await executeQuickhack(f.a,f.b,'jack-in');assert.equal(f.state.rolls,0);assert.equal(updates.length,0);assert.match(f.notices.at(-1),/LUCK/);
+ f.role.createRoll=()=>({...create(),luck:1,handleRollDialog:async()=>false});await executeQuickhack(f.a,f.b,'jack-in');assert.equal(f.state.rolls,0);assert.equal(updates.length,0);
+ f.role.createRoll=()=>({...create(),luck:1});await executeQuickhack(f.a,f.b,'jack-in');assert.equal(f.source.system.stats.luck.value,1);assert.equal(updates.length,1);
+});

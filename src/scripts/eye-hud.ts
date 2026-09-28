@@ -1,3 +1,4 @@
+import {playNotificationSound} from "./notification-sounds.js";
 import {displayedEncounter} from "./encounter.js";
 import {bindStatusActions, closeStatusActions} from "./neural-intrusion.js";
 import {forceOutEntries} from "./quickhack/force-out.js";
@@ -396,7 +397,8 @@ function removeFlashNotice(key: string): void {
 function showFlashNotice(notice: import("./hud-messages.js").HUDNotice, remove = false): void {
   const key = hudMessageKey(notice);
   removeFlashNotice(key);
-  if (remove || !game.settings!.get(MODULE, "eyeHUD")) return;
+  if (remove || (!game.settings!.get(MODULE, "eyeHUD") && notice.source !== "pneuma-turn-alert")) return;
+  if(!notice.suppressDefaultSound)playNotificationSound("message");
   const row = element("div", "pneuma-hud-flash");
   row.setAttribute("role", "status");
   row.textContent = notice.text;
@@ -417,6 +419,7 @@ function showFlashNotice(notice: import("./hud-messages.js").HUDNotice, remove =
 
 /** Animate the real text, retaining its layout slot and private recipient filtering. */
 function animateIncomingMessages(rows: HTMLElement[]) {
+  if(rows.some(row=>row.dataset.suppressDefaultSound!=="true"))playNotificationSound("message");
   if (!hudAnimationsEnabled() || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const entries = rows.map(row => {
     const text = row.firstElementChild as HTMLElement;
@@ -498,10 +501,10 @@ function render() {
   const monitor = !!actor;
   const savedMessage = game.settings!.get(MODULE, "eyeHUDMessage");
   const custom = savedMessage && !dismissedLegacyMessages.has(savedMessage.id) && savedMessage.expires > Date.now() && savedMessage.recipients.includes(game.user!.id!) ? savedMessage : undefined;
-  type AlertEntry = { key: string; text: string; open?: () => void; clear: () => void };
+  type AlertEntry = { suppressDefaultSound?:boolean; key: string; text: string; open?: () => void; clear: () => void };
   const messages: AlertEntry[] = [
     ...(custom ? [{ key: "legacy:" + custom.id, text: custom.text, clear: () => { dismissedLegacyMessages.add(custom.id); } }] : []),
-    ...listHUDMessages().filter(message=>!message.actor||message.actor===ownActor?.uuid).map(message => ({ key: hudMessageKey(message), text: message.text, ...(message.chatMessage?{open:()=>openCard(message.chatMessage!)}:{}),clear: () => dismissHUDMessage(message.source, message.id) }))
+    ...listHUDMessages().filter(message=>!message.actor||message.actor===ownActor?.uuid).map(message => ({ key: hudMessageKey(message), text: message.text, suppressDefaultSound:message.suppressDefaultSound, ...(message.chatMessage?{open:()=>openCard(message.chatMessage!)}:{}),clear: () => dismissHUDMessage(message.source, message.id) }))
   ];
   const minimized = prefersMinimized;
   const rows = minimized ? [] : monitor && actor ? eyeConditions(actor, data) : [];
@@ -561,6 +564,7 @@ function render() {
       }
       const row = element("div", "pneuma-eye-notification" + (message.open ? " is-attack" : ""));
       row.dataset.noticeKey = message.key; row.dataset.noticeText = message.text;
+      row.dataset.suppressDefaultSound=String(!!message.suppressDefaultSound);
       incomingRows.push(row);
       const text = message.open ? control(message.text, message.open) : element("span", "", message.text);
       if (message.open) text.setAttribute("aria-label", "Incoming attack: open chat card");

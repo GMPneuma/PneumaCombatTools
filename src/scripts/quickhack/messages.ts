@@ -6,7 +6,8 @@ import { enabled, label } from "./settings.js";
 import { gmAudience, type Audience } from "./rolls.js";
 
 export interface QuickhackResult extends Partial<EncounterRef> {
-  type: "jackIn" | "quickhack";
+  type: "jackIn" | "quickhack" | "breach";
+  breachCleared?: number;
   combatUuid?: string;
   sourceActorUuid: string; targetActorUuid: string; sourceTokenUuid: string; targetTokenUuid: string;
   quickhackId?: string; success: boolean; alerted: boolean; audience: string; revealAttacker: boolean;
@@ -22,7 +23,7 @@ export function delivery(audience: string, source: Actor, target: Actor): Audien
 }
 export function resultFlag(message: ChatMessage) {
   const value = ((message.flags as Record<string, unknown>)[MODULE] as { quickhack?: QuickhackResult } | undefined)?.quickhack;
-  return value && ["jackIn", "quickhack"].includes(value.type) ? value : undefined;
+  return value && ["jackIn", "quickhack", "breach"].includes(value.type) ? value : undefined;
 }
 export async function postResult(source: Token, target: Token, result: QuickhackResult,
   title: string, outcome: string, detail: string, rollContent = "") {

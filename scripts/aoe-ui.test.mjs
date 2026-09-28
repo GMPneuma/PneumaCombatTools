@@ -210,5 +210,35 @@ try {
   for(const fn of hooks.deleteChatMessage??[])fn(msg);
   await Promise.resolve();if(JSON.stringify(deleted)!==JSON.stringify(['blast','aim']))throw Error('Original aim marker not cleaned up');
  });
+ await page.evaluate(async()=>{
+  const {areaContent}=await import('/scripts/aoe/workflow.js');
+  const root=document.querySelector('#card') ?? Object.assign(document.body.appendChild(document.createElement('div')),{id:'card'});
+  fromUuid=async uuid=>({actor:{...targetActor,testUserPermission:()=>uuid==='owned'}});
+  data.ammoType=undefined;data.special=false;data.kind='explosive';data.phase='responses';data.exchange.damage=undefined;data.effectsResolved=false;
+  const row={uuid:'owned',actor:'actor',name:'Player',img:'',eligible:true,state:'hit'};data.rows=[row];
+  const render=async()=>{root.innerHTML=areaContent(data);for(const fn of hooks.renderChatMessage??[])await fn(message,{0:root,find:s=>({toArray:()=>[...root.querySelectorAll(s)]})});};
+  await render();
+  const reset=root.querySelector('[data-aoe-action="reset"]');
+  if(!reset||!reset.textContent.includes('Reset')||reset.textContent.includes('Player Action')||reset.disabled)throw Error('Missing labeled GM reset');
+  if(root.querySelector('[data-aoe-action="exclude"], [data-aoe-action="forcehit"]'))throw Error('Old GM override remains after response');
+  for(const kind of ['explosive','suppression'])for(const width of [260,310,380]){
+    data.kind=kind;row.coverUp=kind==='explosive';root.style.width=width+'px';await render();
+    await new Promise(resolve=>requestAnimationFrame(resolve));
+    const name=root.querySelector('.pneuma-aoe-name').getBoundingClientRect(),button=root.querySelector('[data-aoe-action="reset"]').getBoundingClientRect();
+    if(button.top>name.bottom||button.bottom<name.top)throw Error('Reset left player line: '+kind+' '+width);
+    const description=root.querySelector('.pneuma-aoe-response-description').getBoundingClientRect();
+    if(description.top<button.bottom-1)throw Error('Description must be below player controls');
+  }
+  data.kind='explosive';delete row.coverUp;root.style.width='';
+  row.state='waiting';await render();
+  if(root.querySelector('[data-aoe-action="reset"]')||!root.querySelector('[data-aoe-action="exclude"]')||!root.querySelector('[data-aoe-action="decline"]'))throw Error('Original choices not restored');
+  row.state='hit';row.damage={status:'applying'};await render();
+  if(!root.querySelector('[data-aoe-action="reset"]').disabled)throw Error('Applied work must not reset');
+  data.exchange.title='Very long custom grenade weapon name '.repeat(5);root.style.width='260px';await render();
+  const heading=root.querySelector('.pneuma-attack-name');
+  if(heading.title!==data.exchange.title||getComputedStyle(heading).textOverflow!=='ellipsis'||heading.scrollWidth<=heading.clientWidth)throw Error('Long heading must truncate with full tooltip');
+  game.user={id:'def',isGM:false};await render();
+  if(root.querySelector('[data-aoe-action="reset"]'))throw Error('Player sees GM reset');
+ });
  console.log("AoE browser checks passed: owner controls, Cover Up hiding, compact escaped markup, wall-polygon preview, place/cancel cleanup.");
 }finally{await browser.close();}

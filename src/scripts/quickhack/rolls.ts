@@ -1,4 +1,4 @@
-import { rollHidden, nativeCard, type NativeRoll, type RollItem } from "../native-combat.js";
+import { rollHidden, nativeCard, spendBonusLuck, type NativeRoll, type RollItem } from "../native-combat.js";
 import { MODULE } from "./availability.js";
 import { enabled } from "./settings.js";
 
@@ -8,13 +8,15 @@ export const publicAudience = (): Audience => ({ whisper: [], blind: false });
 export const roleFor = (actor: Actor) => actor.items.find(item => String(item.type) === "role" && item.name?.trim().toLowerCase() === "netrunner") as RollItem | undefined;
 export const canOperate = (actor: Actor, user: User = game.user!) => user.isGM || actor.testUserPermission(user, "OWNER");
 export async function nativeQuickhackRoll(actor: Actor, item: RollItem, title: string, audience: Audience,
-  validate = () => enabled(), sourceToken?: Token, publish = true) {
+  validate = () => enabled(), sourceToken?: Token, publish = true, skipDialog = false) {
   if (!validate() || !canOperate(actor)) return null;
   let roll = item.createRoll(String(item.type) === "role" ? "roleAbility" : "skill", actor, { rollSubType: "mainRoleAbility" });
   roll.rollTitle = title;
-  if (!await roll.handleRollDialog({ ctrlKey: false, metaKey: false, type: "chat" }, actor, item)) return null;
+  if (!await roll.handleRollDialog({ ctrlKey: skipDialog, metaKey: false, type: "chat" }, actor, item)) return null;
   roll = await item.confirmRoll(roll);
   if (!validate() || !canOperate(actor)) return null;
+  const luck = Number(roll.luck ?? 0);
+  if (luck !== 0) await spendBonusLuck(actor, luck);
   if (audience.blind) await rollHidden(roll); else await roll.roll();
   const content = await nativeCard(roll);
   if (!validate()) return null;

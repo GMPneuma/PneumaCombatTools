@@ -259,20 +259,20 @@ async function request(data: Omit<GrappleRequest,"grappleType"|"request"|"user">
     pending.set(wire.request,{resolve,reject,timer});game.socket!.emit(CHANNEL,wire);
   });
 }
-async function brawling(actor: Actor): Promise<SkillResult | undefined> {
+async function brawling(actor: Actor, skipDialog = false): Promise<SkillResult | undefined> {
   const name = game.i18n!.localize("CPR.global.itemType.skill.brawling");
   const item = actor.items.find(i => String(i.type) === "skill" && ["brawling",name.toLowerCase()].includes(i.name?.toLowerCase() ?? "")) as RollItem | undefined;
   if (!item) throw new Error("Character has no native Brawling skill.");
   if (foundry.utils.getProperty(item,"system.stat") !== "dex") throw new Error("Brawling must use DEX. Correct the native skill before rolling.");
   let roll = item.createRoll("skill",actor);
-  if (!await roll.handleRollDialog({type:"grapple",ctrlKey:false,metaKey:false},actor,item)) return;
+  if (!await roll.handleRollDialog({type:"grapple",ctrlKey:skipDialog,metaKey:false},actor,item)) return;
   roll = await item.confirmRoll(roll);
   await spendBonusLuck(actor,Number(roll.luck) || 0);
   await rollHidden(roll);
   return {total:Number(roll.resultTotal),html:await nativeCard(roll)};
 }
 const localBusy = new Set<string>();
-export async function useGrapple(source: Token, target: Token, action: string) {
+export async function useGrapple(source: Token, target: Token, action: string, skipDialog = false) {
   const key = source.document.uuid;
   if (localBusy.has(key)) return;
   localBusy.add(key);
@@ -287,8 +287,8 @@ export async function useGrapple(source: Token, target: Token, action: string) {
       const opponent = action === "escape" && own ? tokenFor(scene,own.source.token) : target.document;
       validatePair(scene,source.document,opponent);
       const encounter=encounterRef(tokenEncounter(scene.id,[source.document.uuid,opponent.uuid]),scene.id,[source.document.uuid,opponent.uuid]);
-      if (!await Dialog.confirm({title:action === "grab" ? "Grab" : action === "escape" ? "Escape" : "Break Grapple",content:action === "grab" ? "<p>This costs an Action. Confirm you have a free hand to attempt this Grab.</p>" : "<p>This costs an Action. Attempt to break the grapple?</p>"})) return;
-      const result = await brawling(source.actor); if (!result) return;
+      if (!skipDialog && !await Dialog.confirm({title:action === "grab" ? "Grab" : action === "escape" ? "Escape" : "Break Grapple",content:action === "grab" ? "<p>This costs an Action. Confirm you have a free hand to attempt this Grab.</p>" : "<p>This costs an Action. Attempt to break the grapple?</p>"})) return;
+      const result = await brawling(source.actor,skipDialog); if (!result) return;
       resolveEncounter(encounter);
       await request({encounter,scene:scene.id!,id:foundry.utils.randomID(),revision:0,action:action === "grab" ? "start" : "startBreak",source:source.document.uuid,target:opponent.uuid,result,rollMode:game.settings!.get("core","rollMode") ?? "roll"});
     } else {
@@ -298,14 +298,14 @@ export async function useGrapple(source: Token, target: Token, action: string) {
   } catch(error) { report(error); } finally { localBusy.delete(key); }
 }
 const responseCache = new Map<string,{result:SkillResult;claim:string | undefined}>();
-async function respond(g: Grapple) {
+async function respond(g: Grapple, skipDialog = false) {
   const base = {scene:g.scene,id:g.id,revision:g.revision};
   const key = g.scene + ":" + g.id + ":" + g.revision;
   const cached = responseCache.get(key);
   const claim = cached?.claim ?? await request({...base,action:"claim"});
   let result = cached?.result;
   try {
-    if (!result) result = await brawling(tokenFor(sceneFor(g.scene),g.target.token).actor!);
+    if (!result) result = await brawling(tokenFor(sceneFor(g.scene),g.target.token).actor!,skipDialog);
     if (!result) { await request({...base,action:"unclaim",claim});return; }
     responseCache.set(key,{result,claim});
     await request({...base,action:"respond",claim,result});
@@ -336,18 +336,18 @@ export function renderGrapple(message: ChatMessage, html: JQuery) {
   const source = scene?.tokens.find(t => t.uuid === g.source.token), target = scene?.tokens.find(t => t.uuid === g.target.token);
   const canSource = !!source?.actor && owns(source.actor,game.user!);
   const canTarget = !!target?.actor && owns(target.actor,game.user!);
-  const add = (label: string, run: () => Promise<unknown>, gmOnly = false) => {
+  const add = (label: string, run: (event: MouseEvent) => Promise<unknown>, gmOnly = false) => {
     const button = document.createElement("button");button.type="button";button.textContent=label;button.dataset.gmOnly=String(gmOnly);
     button.addEventListener("click",async event => {
       event.preventDefault();event.stopPropagation();
       if (localBusy.has(g.id)) return; localBusy.add(g.id); button.disabled=true;
-      try { await run(); } catch(error) { report(error); } finally { localBusy.delete(g.id);button.disabled=false; }
+      try { await run(event); } catch(error) { report(error); } finally { localBusy.delete(g.id);button.disabled=false; }
     });controls.append(button);
   };
   const act = (action: string) => request({scene:g.scene,id:g.id,revision:g.revision,action});
   if (g.operation) {
     if (canSource || game.user?.isGM) add(`Retry ${g.operation.action}`,() => act(g.operation!.action));
-  } else if (g.state === "waiting" && canTarget) add("Roll Brawling",() => respond(g));
+  } else if (g.state === "waiting" && canTarget) add("Roll Brawling",event => respond(g,event.shiftKey));
   else if (g.state === "choice" && canSource) { add("Hold Target",() => act("hold"));add("Take Held Object",() => act("take")); }
 
   if (game.user?.isGM && g.state !== "ended") add("End (GM)",() => act("cancel"),true);

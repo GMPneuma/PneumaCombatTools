@@ -12,7 +12,7 @@ Select one owned token, then right-click another token for target actions. Right
 
 1. Choose the weapon/action from the target HUD; complete the native CPR roll dialog.
 2. The defender chooses Evade or Don't Evade when offered. The attack result stays hidden until the decision resolves.
-3. Read the combined result. Roll damage through its control; Shift-click opens native options.
+3. Read the combined result. Roll damage through its control; normal click opens native options and Shift-click rolls immediately.
 4. Choose attached effects if needed. Apply damage to the recorded target or deliberately use **to selected target**. Selected-target applications remain listed on the card.
 5. Resolve any separate resistance/effect or injury controls. Rolling damage is not the same as applying it.
 

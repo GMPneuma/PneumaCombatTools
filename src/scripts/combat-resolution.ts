@@ -1,3 +1,4 @@
+import {attackTitle,attackHeading} from "./attack-title.js";
 import { allActors, primaryGM as electedGM, escapeHTML as escape } from "./shared.js";
 import {prepareBowAttack} from "./bow-loading.js";
 import {tokenEncounter,resolveEncounter,encounterRef,type EncounterRef} from "./encounter.js";
@@ -29,6 +30,7 @@ declare global {
 interface Usage { round: string; used: number; lastPayment?: string }
 interface Defense { total: number; html: string; dice: string[]; bonus: number; fee: number; penalty: number }
 export interface Exchange extends Partial<EncounterRef> {
+  cannotEvade?: string; evasionOverride?: boolean; attackRevealed?: boolean;
   disableSource?: "microwaver";
   areaAmmo?: {type:string;variety:string};
   attacker: string; defender: string; defenderActor: string; attackerName: string; defenderName: string;
@@ -37,7 +39,7 @@ export interface Exchange extends Partial<EncounterRef> {
   combatId?: string | null; combatEpoch?: string; round?: string; hit?: boolean; damageAllowedOnMiss?: boolean;
   coverUp?:boolean; weaponType?: string; damageFormula?: string; thrownSource?: object; improvised?: boolean; improvisedDice?: number; criticalMethod?: CriticalMethod; weaponId?: string; attackMode?: AttackMode; location?: string; unaware?: boolean; damage?: DamageState;
 }
-interface Request { id: string; user: string; message: string; action: "claim" | "release" | "decline" | "commit" | "resume" | "cancel" | DamageRequest["action"];
+interface Request { id: string; user: string; message: string; action: "overrideEvasion" | "claim" | "release" | "decline" | "commit" | "resume" | "cancel" | DamageRequest["action"];
   statusEffects?: string[]; nonce?: string; defense?: Defense; damage?: DamageRequest["damage"]; options?: DamageRequest["options"]; targetUuid?: string; application?: DamageRequest["application"]; applicationId?: string }
 interface Claim { user: string; message: string; nonce: string; offer: EvasionOffer; round: string }
 const claims = new Map<string, Claim>();
@@ -103,12 +105,30 @@ export function offer(actor: Actor, ranged: boolean, combat?: Combat): EvasionOf
     { ref: Number(get("system.stats.ref.value")), coprocessor, solo, luck: Number(get("system.stats.luck.value")) },
     usage?.round === roundKey(combat) ? usage.used : 0, !!combat?.started);
 }
+function exchangeOffer(actor: Actor, data: Exchange, combat?: Combat): EvasionOffer {
+  const choice = offer(actor, data.ranged, combat);
+  return data.evasionOverride && !choice.allowed
+    ? { allowed: true, penalty: 0, cost: 0, free: 0, reason: "GM override" } : choice;
+}
+export function skipUnavailableEvasion(data: Exchange, actor: Actor, combat?: Combat): void {
+  if (!data.ranged || data.unaware) return;
+  const choice = offer(actor, true, combat);
+  if (choice.allowed) return;
+  data.cannotEvade = choice.reason;
+  data.state = "resolved";
+  data.hit = data.total > data.dv!;
+}
+function canOverrideEvasion(message: ChatMessage, data: Exchange): boolean {
+  return !!data.cannotEvade && !data.evasionOverride && data.state === "resolved" && !data.damage
+    && !flag(message, "microwaverClaim");
+}
 export function exchangeContent(data: Exchange): string {
   if (data.state !== "resolved") return '<div class="pneuma-resolution-card">' + resolutionSection("pending", '<div class="rollcard pneuma-pending-exchange"><div class="rollcard-top"><div class="cpr-block">'
-    + '<div class="pneuma-pending-title">' + escape(data.title) + '</div>'
+    + '<div class="pneuma-pending-title">' + attackHeading(data.title,'div') + '</div>'
     + '<p class="pneuma-pending-status">' + (data.state === "cancelled" ? "Exchange cancelled by GM" : data.state === "applying" ? "Finishing evasion payment…" : "Waiting for defense choice")
     + '</p></div></div></div><div class="pneuma-pending-controls"></div>') + '</div>';
   const doc = new DOMParser().parseFromString(data.html, "text/html");
+  doc.querySelectorAll<HTMLElement>(".rollcard-top .text-normal").forEach(node=>{node.classList.add("pneuma-attack-name");node.title=data.title;});
   let legacyDamage = "";
   doc.querySelectorAll('[data-action="rollDamage"]').forEach(node => {
     if (!legacyDamage) legacyDamage = node.outerHTML;
@@ -141,14 +161,15 @@ export function exchangeContent(data: Exchange): string {
   }
   const opposed = data.unaware ? "Defender unaware — no evasion" : data.defense ? "Evasion " + data.defense.total : data.ranged ? "DV " + data.dv : "Defense declined";
   const damageControl = data.disableSource==="microwaver" ? "" : data.weaponId
-    ? '<button type="button" class="pneuma-result-damage" data-action="pneumaRollDamage" aria-label="Roll damage" title="Roll damage (Shift-click for options; manual override allowed)"><i class="fas fa-droplet" aria-hidden="true"></i></button>'
+    ? '<button type="button" class="pneuma-result-damage" data-action="pneumaRollDamage" aria-label="Roll damage" title="Roll damage (Shift-click to roll immediately; manual override allowed)"><i class="fas fa-droplet" aria-hidden="true"></i></button>'
     : legacyDamage;
   return '<div class="pneuma-resolution-card">'
     + resolutionSection("attack", doc.body.innerHTML, "pneuma-attack-result " + rollOutcomeClass(!!data.hit))
     + defense + resolutionSection("result", '<p class="pneuma-combat-outcome" title="' + escape(opposed) + '">' + damageControl + '<strong class="pneuma-result-summary">'
     + escape(data.attackerName) + ' <span class="' + (data.hit ? "pneuma-hit" : "pneuma-miss") + '">'
     + (data.hit ? "hits" : "misses") + '</span> ' + escape(data.defenderName)
-    + '</strong></p>') + damageContent(data) + '</div>';
+    + '</strong></p>' + (data.cannotEvade ? '<small class="pneuma-cannot-evade" title="' + escape(data.cannotEvade) + '">'
+      + (data.evasionOverride ? 'GM allowed evasion' : 'Target cannot evade') + '</small>' : '')) + damageContent(data) + '</div>';
 }
 async function writeExchange(message: ChatMessage, data: Exchange): Promise<void> {
   const changes: Record<string, unknown> = { ["flags." + MODULE + ".exchange"]: foundry.utils.deepClone(data), content: exchangeContent(data) };
@@ -159,7 +180,7 @@ async function writeExchange(message: ChatMessage, data: Exchange): Promise<void
 async function revealDice(data: Exchange): Promise<void> {
   if (!data.dice.length && !data.defense?.dice.length) return;
   const { Dice } = await nativeAPI();
-  for (const json of [...data.dice, ...(data.defense?.dice ?? [])]) {
+  for (const json of [...(data.attackRevealed ? [] : data.dice), ...(data.defense?.dice ?? [])]) {
     await Dice.handle3dDice(Roll.fromJSON(json) as Roll, data.rollMode);
   }
 }
@@ -219,6 +240,15 @@ export async function handleCombatRequest(request: Request): Promise<Claim | und
     if (claim && claim.nonce === request.nonce && claim.user === user.id) claims.delete(claimKey(data, actor));
     return;
   }
+  if (request.action === "overrideEvasion") {
+    if (!user.isGM) throw new Error("Only a GM can override evasion.");
+    if (!canOverrideEvasion(message, data)) throw new Error("Evasion can only be reopened before damage or follow-up effects begin.");
+    currentCombat(data);
+    data.evasionOverride = true; data.attackRevealed = true; data.state = "waiting";
+    data.hit = undefined;
+    await writeExchange(message, data);
+    return;
+  }
   if (data.state === "resolved" || data.state === "cancelled") {
     if (flag<string>(actor, "evasionPayment") === message.id)
       await actor.update({ ["flags." + MODULE + ".-=evasionPayment"]: null });
@@ -245,7 +275,7 @@ export async function handleCombatRequest(request: Request): Promise<Claim | und
   if (request.action === "claim") {
     if (claim?.user === user.id && claim.message === message.id!) return claim;
     if (claim && game.users?.get(claim.user)?.active) throw new Error("Another Evasion dialog is already open for this defender.");
-    const choice = offer(actor, data.ranged, combat);
+    const choice = exchangeOffer(actor, data, combat);
     if (!choice.allowed) throw new Error(choice.reason);
     const next = { user: user.id!, message: message.id!, nonce: foundry.utils.randomID(), offer: choice, round: roundKey(combat) };
     claims.set(claimKey(data, actor), next); return next;
@@ -256,7 +286,7 @@ export async function handleCombatRequest(request: Request): Promise<Claim | und
   }
   if (!claim || claim.nonce !== request.nonce || claim.user !== user.id || claim.message !== message.id!)
     throw new Error("Review evasion: the reservation expired. Try again.");
-  const current = offer(actor, data.ranged, combat);
+  const current = exchangeOffer(actor, data, combat);
   if (!current.allowed || claim.round !== roundKey(combat) || current.penalty !== claim.offer.penalty || current.cost !== claim.offer.cost)
     throw new Error("Review evasion: conditions changed. Try again with the new cost.");
   const defense = request.defense;
@@ -287,7 +317,7 @@ async function request(message: string, action: Request["action"], extra: Partia
     game.socket!.emit(CHANNEL, { kind: "request", gm: gm.id, packet });
   });
 }
-async function respond(message: ChatMessage, evade: boolean, automatic = false): Promise<void> {
+async function respond(message: ChatMessage, evade: boolean, automatic = false, skipDialog = false): Promise<void> {
   const data = flag<Exchange>(message, "exchange")!;
   if (data.state === "applying") { await request(message.id!, "resume"); retry.delete(message.id!); return; }
   if (!evade) { await request(message.id!, "decline"); return; }
@@ -313,7 +343,7 @@ async function respond(message: ChatMessage, evade: boolean, automatic = false):
     if (!skill) throw new Error("The defender has no Evasion skill item.");
     const roll = skill.createRoll("skill", actor);
     if(automatic){if(!automaticNPCEvasion(actor)||claim.offer.penalty||claim.offer.cost)throw Error("Automatic evasion requires RAW rules.");roll.luck=0;}
-    else if (!await evasionDialog(roll, actor, skill, claim.offer.penalty, claim.offer.cost)) return;
+    else if (!await evasionDialog(roll, actor, skill, claim.offer.penalty, claim.offer.cost, skipDialog)) return;
     checkedLuck(Number(foundry.utils.getProperty(actor, "system.stats.luck.value")), claim.offer.cost, roll.luck);
     await rollHidden(roll);
     const result = { nonce: claim.nonce, defense: { total: roll.resultTotal, html: await nativeCard(roll),
@@ -369,12 +399,13 @@ export async function startCombatExchange(attacker: Token, target: Token, itemId
   await rollHidden(roll);
   roll.entityData = { actor: actor.id!, token: attacker.id, item: itemId, tokens: [target.id] };
   if (mode === "aimed") await actor.update({ "flags.cyberpunk-red-core.aimedLocation": roll.location } as Parameters<Actor["update"]>[0]);
-  const title = game.settings!.get(MODULE, "hideAttackWeapon") ? category : item.name ?? category;
+  const title = attackTitle(item,game.settings!.get(MODULE, "hideAttackWeapon"),roll.skillName);
   roll.rollTitle = title;
   const data: Exchange = { ...encounterRef(combat,attacker.document.parent?.id,[attacker.document.uuid,target.document.uuid]), ...(!thrown&&isMicrowaver(item)?{disableSource:"microwaver" as const}:{}), weaponType: type, ...(thrown ? { thrownSource: thrown.source, improvised: thrown.improvised, improvisedDice: choice.improvisedDice } : {}), criticalMethod: type === "grenadeLauncher" ? "Grenade" : type === "rocketLauncher" ? "Rocket" : undefined, weaponId: itemId, attackMode: mode, location: roll.location, unaware: choice.unaware, combatId, combatEpoch, attacker: attacker.document.uuid, defender: target.document.uuid, defenderActor: target.actor!.uuid,
     attackerName: attacker.name ?? "", defenderName: target.name ?? "", ranged, category, title, dv,
     total: roll.resultTotal, html: await nativeCard(roll), dice: diceJSON(roll),
     rollMode: game.settings!.get("core", "rollMode") ?? "roll", state: "waiting" };
+  skipUnavailableEvasion(data, target.actor!, combat);
   if (choice.unaware) { data.state = "resolved"; data.hit = !ranged || data.total > dv!; }
   const messageData = { content: exchangeContent(data), speaker: ChatMessage.getSpeaker({ actor, token: attacker.document }),
     flags: { [MODULE]: { exchange: data } } } as Parameters<typeof ChatMessage.applyRollMode>[0];
@@ -384,7 +415,7 @@ export async function startCombatExchange(attacker: Token, target: Token, itemId
     const original = actor.items.get(itemId);
     if (original) await setItemMarker(original, "used", { label: "Used" });
   }
-  if (choice.unaware) void revealDice(data).catch(error => console.warn(MODULE, error));
+  if (data.state === "resolved") void revealDice(data).catch(error => console.warn(MODULE, error));
 }
 /** Resetting a Combat removes only its transient counters; deselecting it must not. */
 export function resetCombatTracking(_combat: Combat, changes: Record<string, unknown>): void {
@@ -418,7 +449,7 @@ export function decorateCombatMessage(root: HTMLElement, data: Exchange): void {
 }
 export function registerCombatResolution(): void {
   for (const [key, name, hint, value] of [
-    ["hideAttackWeapon", "Hide attack weapon names", "Use Ranged, Melee or Unarmed instead of weapon names on Combat Tools attack cards.", false],
+    ["hideAttackWeapon", "Hide attack weapon names", "Show weapon types, melee types, Martial Arts, Grenade or Rocket instead of weapon names.", false],
   ] as const) game.settings!.register(MODULE, key, { name, hint, scope: "world", config: true, type: Boolean, default: value });
   registerEvasionDialog();
   registerAttackDialog();
@@ -492,6 +523,18 @@ export function registerCombatResolution(): void {
     if (data.state === "cancelled") return;
     html.find(".message-sender").text(data.attackerName + " → " + data.defenderName);
     if (data.state === "resolved") {
+      if (game.user!.isGM && canOverrideEvasion(message, data)) {
+        const button = document.createElement("button");
+        button.type = "button"; button.className = "pneuma-evasion-override";
+        button.dataset.gmOnly = "true"; button.textContent = "Allow evasion";
+        button.title = "GM override for this attack; the attack roll has already been revealed";
+        button.addEventListener("click", async () => {
+          button.disabled = true;
+          try { await request(message.id!, "overrideEvasion"); }
+          catch (error) { ui.notifications!.error((error as Error).message); button.disabled = false; }
+        });
+        html.find(".pneuma-cannot-evade").append(button);
+      }
       if(data.disableSource==="microwaver")return;
       void renderDamage(message, data, html, (action, extra) => request(message.id!, action, extra))
         .catch(error => console.warn(MODULE, error));
@@ -501,7 +544,7 @@ export function registerCombatResolution(): void {
       if (!actor.isOwner || html.find(".pneuma-defense-controls").length) return;
       let choice: EvasionOffer;
       let available = true;
-      try { choice = offer(actor, data.ranged, currentCombat(data)); }
+      try { choice = exchangeOffer(actor, data, currentCombat(data)); }
       catch (error) {
         available = false;
         choice = { allowed: false, penalty: 0, cost: 0, free: 0, reason: (error as Error).message };
@@ -520,9 +563,9 @@ export function registerCombatResolution(): void {
           button.title = choice.reason;
           button.setAttribute("aria-description", choice.reason);
         }
-        button.addEventListener("click", async () => {
+        button.addEventListener("click", async event => {
           const buttons = panel.querySelectorAll("button"); buttons.forEach(b => b.disabled = true);
-          try { await respond(message, evade); }
+          try { await respond(message, evade, false, event.shiftKey); }
           catch (error) { ui.notifications!.error((error as Error).message); }
           finally { buttons.forEach(b => b.disabled = false); }
         });

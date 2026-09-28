@@ -10,7 +10,7 @@ import { canOperate } from "./rolls.js";
 import { executeQuickhack, actorQuickhacks } from "./workflow.js";
 import { registerConnections, connectionFor, resultConnectionValid } from "./connections.js";
 
-export async function executeActorAction(action: string, actorUuid: string, quickhackId?: string) {
+export async function executeActorAction(action: string, actorUuid: string, quickhackId?: string, skipDialog = false) {
   if (!enabled()) return;
   const actor = await fromUuid(actorUuid) as Actor | null;
   if (!actor || !canOperate(actor)) return;
@@ -18,7 +18,7 @@ export async function executeActorAction(action: string, actorUuid: string, quic
   const active = controlled.length ? controlled : actor.getActiveTokens();
   const targets = [...game.user!.targets];
   if (active.length !== 1 || targets.length !== 1) { ui.notifications!.warn("Select one source token and target one other token."); return; }
-  if (action === "jack-in" || quickhackId) await executeQuickhack(active[0]!, targets[0]!, action === "jack-in" ? "jack-in" : quickhackId!);
+  if (action === "breach" || action === "jack-in" || quickhackId) await executeQuickhack(active[0]!, targets[0]!, action === "breach" ? "breach" : action === "jack-in" ? "jack-in" : quickhackId!, skipDialog);
   else if (action === "quickhack") {
     const hacks = actorQuickhacks(actor);
     if (!hacks.length) { ui.notifications!.warn("No QuickHacks available under the current rules mode."); return; }
@@ -27,7 +27,7 @@ export async function executeActorAction(action: string, actorUuid: string, quic
       label: "Perform QuickHack", rejectClose: false,
       callback: html => String(html.find<HTMLSelectElement>('[name="quickhack"]').val() ?? ""),
     });
-    if (id && enabled()) await executeQuickhack(active[0]!, targets[0]!, id);
+    if (id && enabled()) await executeQuickhack(active[0]!, targets[0]!, id, skipDialog);
   }
 }
 const cards = new Map<string, {message: ChatMessage; valid?: boolean}>();
@@ -144,7 +144,7 @@ export function registerQuickhack(context: () => {source?: Token; target?: Token
       button.addEventListener("click", async event => {
         event.preventDefault(); event.stopPropagation(); if (!enabled() || button.disabled) return;
         button.disabled = true;
-        try { if (button.dataset.quickhackAction === "damage") await rollResultDamage(message); else await beginForceOut(message); }
+        try { if (button.dataset.quickhackAction === "damage") await rollResultDamage(message); else await beginForceOut(message,event.shiftKey); }
         catch (error) { reportError(error); } finally { button.disabled = false; }
       });
     }

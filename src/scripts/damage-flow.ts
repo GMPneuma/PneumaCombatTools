@@ -93,7 +93,7 @@ export function damageContent(data: Exchange, mode: "full" | "roll" = "full"): s
   const status = ["rolled", "applied"].includes(damage.status) ? ""
     : '<p class="pneuma-damage-status">' + labels[damage.status] + '</p>';
   const targets = (damage.selectedTargets ?? []).map(target=>'<li data-application-id="'+escape(target.id)+'">'+escape(target.name)+'</li>').join("");
-  const history = targets ? '<div class="pneuma-damage-targets"><strong>Applied to</strong><ol class="pneuma-damage-target-history" aria-label="Applied to selected targets">'+targets+'</ol></div>' : "";
+  const history = targets ? '<div class="pneuma-damage-targets"><strong>Applied to</strong><ol class="pneuma-damage-target-history" aria-label="Applied to selected tokens">'+targets+'</ol></div>' : "";
   const actions = mode === "full" && damage.result ? resolutionSection("damage-apply",
     '<div class="rollcard-bottom pneuma-damage-application"><div class="cpr-block pneuma-damage-application-box"></div></div>'
       + history + '<div class="pneuma-damage-applications">' + (damage.applications ?? []).join("") + '</div>') : "";
@@ -222,7 +222,7 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
 }
 const retry = new Map<string, { nonce: string; damage: DamageResult }>();
 type Send = (action: DamageRequest["action"], extra?: Partial<DamageRequest>) => Promise<unknown>;
-export async function rollDamage(id: string, data: Exchange, send: Send, showDialog = false): Promise<void> {
+export async function rollDamage(id: string, data: Exchange, send: Send, skipDialog = false): Promise<void> {
   const previous = retry.get(id);
   if (previous) { await send("damageCommit", previous); retry.delete(id); return; }
   const nonce = foundry.utils.randomID();
@@ -234,7 +234,7 @@ export async function rollDamage(id: string, data: Exchange, send: Send, showDia
     if (!item?.createRoll) throw new Error("The original weapon is unavailable.");
     let roll = item.createRoll("damage", actor, { damageType: data.attackMode });
     configureDamage(roll, data);
-    if (!await roll.handleRollDialog({ type: "pneuma-damage", ctrlKey: !showDialog, metaKey: false }, actor, item)) return;
+    if (!await roll.handleRollDialog({ type: "pneuma-damage", ctrlKey: skipDialog, metaKey: false }, actor, item)) return;
     roll = await item.confirmRoll(roll);
     if(data.areaAmmo)configureAreaAmmo(roll,data);
     await rollHidden(roll);
@@ -300,13 +300,13 @@ export async function renderDamage(message: ChatMessage, data: Exchange, html: J
       const icon = document.createElement("i"); icon.className = "fas fa-bolt"; icon.setAttribute("aria-hidden", "true");
       node.append(icon);
       const row = document.createElement("div"); row.className = "pneuma-damage-recipient";
-      row.append(node, document.createTextNode(" " + label)); panel.append(row);
+      row.append(node); panel.append(row);
       if (!manual && hasCriticalInjury(data)) {
         const injury = document.createElement("a"); injury.className = "pneuma-apply-critical";
         injury.dataset.pneumaDamageTarget = destination;
         injury.title = "Roll/apply " + criticalLocation(data) + " critical injury to " + (destination === "recorded" ? data.defenderName : "the selected token");
         injury.setAttribute("aria-label", injury.title); injury.setAttribute("role", "button"); injury.tabIndex = 0;
-        const die = document.createElement("i"); die.className = "fas fa-dice"; die.setAttribute("aria-hidden", "true");
+        const die = document.createElement("i"); die.className = "fas fa-heart-crack"; die.setAttribute("aria-hidden", "true");
         injury.append(die); row.append(injury);
         let rolling = false;
         injury.addEventListener("click", async event => {
@@ -320,6 +320,7 @@ export async function renderDamage(message: ChatMessage, data: Exchange, html: J
           if (event.key === "Enter" || event.key === " ") { event.preventDefault(); injury.click(); }
         });
       }
+      const recipientLabel=document.createElement("span"); recipientLabel.className="pneuma-damage-recipient-label"; recipientLabel.textContent=" " + label; row.append(recipientLabel);
       node.addEventListener("keydown", event => {
         if ((event as KeyboardEvent).key === "Enter" || (event as KeyboardEvent).key === " ") { event.preventDefault(); node.dispatchEvent(new MouseEvent("click", { bubbles: true, shiftKey: (event as KeyboardEvent).shiftKey })); }
       });
@@ -385,7 +386,7 @@ export async function renderDamage(message: ChatMessage, data: Exchange, html: J
     }
     panel.append(statusBox);
     if (!manual) button(data.defenderName, event => applyFromCard(data, send, event.shiftKey, data.defender, "recorded", halfArmorSelected(event), interactArmorSelected(event)), "recorded");
-    button("to selected target", event => applyFromCard(data, send, event.shiftKey, selectedDamageTarget(), "selected", halfArmorSelected(event), interactArmorSelected(event)), "selected");
+    button("token", event => applyFromCard(data, send, event.shiftKey, selectedDamageTarget(), "selected", halfArmorSelected(event), interactArmorSelected(event)), "selected");
   }
   if (!manual && game.user!.isGM && status === "rolling") button("Release unfinished damage roll", () => send("damageReset"), undefined, true);
   if (!manual && game.user!.isGM && (status === "review" || status === "applying"))

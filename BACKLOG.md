@@ -1,5 +1,9 @@
 # Combat Tools roadmap and backlog
 
+AoE Reset Player Action (2026-09-28, unreleased): after a target responds, the row replaces its GM exclude/affected override with a labeled GM reset. Reset clears the response roll/reservation and Cover Up selection, recreates untouched instant choices, and restores the original response controls. It removes only Prone created by this row and uses existing suppression-source cleanup. Other targets and shared attack/damage rolls remain unchanged. Reset is blocked after movement, per-target damage, or effect application begins. Previously spent Luck is not refunded; reset is not a resource rollback.
+
+Speed Heal status restored to the native token status picker under Pharmaceuticals (2026-09-27, unreleased). Uses the existing status ID and icon.
+
 ## Character-sheet attack routing — implemented locally, 2026-09-26
 
 Optional character-sheet attack routing (unreleased): **Route character-sheet attacks through Combat Tools**, under Attack & Damage Cards, is a world setting and defaults OFF. Supported native weapon attack clicks preserve fire mode and use the existing dispatcher. Explicit token sheets retain their token; actor-directory sheets use one controlled matching token or one unambiguous scene token. Ordinary attacks require one visible target; area weapons can open placement without a target. Disabled routing, unsupported actions, absent GM, or ambiguous context retain native behavior. Once routed, cancellation/errors never replay a native attack. Hand grenades retain their HUD flow. Automated routing tests pass; live multiplayer verification remains pending.
@@ -84,7 +88,7 @@ Current source: 0.8.0, reviewed 2026-09-23. This is a status record, not authori
 | Actor/token identity | Token-name vs actor-name presentation; old native cards and undo after scene changes | Retain investigation; do not infer wrong-target mutations from differing labels. |
 | Smoke | Reproduce earlier missing residual smoke report in a real vision/fog scene | Open live report; automated smoke fixtures are passing. |
 | Smoke/senses | Automatic smoke penalties, cyberware-dependent visibility and conditional immunity | Deferred mechanics. |
-| QuickHack | Puppet/Lure decisions, physical Shard Ejection, custom hacks, Net Action spending, Neuroport and Self-ICE/Passwall automation | Manual/deferred; current catalog is not complete automation. |
+| QuickHack | Puppet/Lure decisions, physical Shard Ejection, custom hacks, Net Action spending, Neuroport automation | Manual/deferred; current catalog is not complete automation. Self-ICE/Passwall breach implemented; Net Action spending remains manual. |
 | Status mechanics | Per-condition context, treatment/healing, unsupported drug/pharma behavior and outside-source integration | See current [coverage audit](docs/status-mechanics-audit.md). |
 | EMP timing | Ordinary EMP remains combat-end based; no outside-combat EMP selection | Intentional current boundary; exact timed ordinary EMP requires a new decision. |
 | Native undo | Secondary instant effects/statuses/smoke are not a universal transaction rollback | Manual review; investigate concrete failures before broad changes. |
@@ -201,3 +205,37 @@ Approved GM-only This Token mode with Use inherited settings. Store appearance o
 Completed the source/browser review of every chat publication family; see [audit](docs/chat-card-audit-2026-09-26.md). Open recommendations: current-condition Wake/Extinguish availability, interrupted QuickHack GM review, stale injury-warning controls, reload and injury-specific CSS identifiers. Optional native header consistency and explicit QuickHack reroll wording remain recommendations, not implemented features. Updated all current Mermaid flows and regenerated the browser diagrams. No gameplay changes made in this audit.
 
 - Implemented audit F1/F3/F4: condition-aware Wake/Extinguish controls and stale-request rejection; current-injury/combat-epoch availability for movement warnings with batched card refresh; scoped reload notice, injury-kind and QuickHack error identifiers. Historical results and native card styling remain. QuickHack recovery (F2) explicitly deferred by user; its behavior is unchanged.
+
+AoE reset presentation: icon plus **Reset**, inline in the original player-response controls; tooltip/accessible label remains **Reset Player Action**.
+
+AoE long response descriptions (Cover Up and suppression) use a full-width `.pneuma-aoe-response-description` below the player line so they cannot push Reset onto a separate line.
+
+Cover Up homebrew: double ablation applies to all equipped head and body armor, including blocked hits. Settings and the damage receipt state this explicitly; shields retain native damage handling.
+
+AoE headings use the weapon/item name alone, retaining only the Suppressive Fire suffix. Automatic Blast, Shells and ammunition-effect heading labels are removed; effect mechanics and per-target details are unchanged.
+
+Attack titles: hidden names use weapon/melee type, Martial Arts, Grenade or Rocket. Visible names use the weapon name, actual martial-arts roll skill, or grenade ammunition type. Suppressive Fire retains its suffix. `.pneuma-attack-name` truncates visually with a full-title hover tooltip.
+
+Critical Injury application buttons use the cracked-heart icon (`fa-heart-crack`) instead of dice; tooltip and action remain unchanged.
+
+Damage-recipient rows place damage and critical-injury buttons together before `.pneuma-damage-recipient-label`. The alternate recipient label is **token** (formerly “to selected target”); action tooltips retain precise selected-token wording.
+
+- Implemented (unreleased): skip ranged defense prompts for ineligible PCs/NPCs, show "Target cannot evade", and provide a GM "Allow evasion" exception before damage/follow-up effects start. Reuses existing eligibility and native Evasion; live Foundry verification pending.
+
+- Implemented (unreleased): Shift-click bypasses optional roll dialogs across Combat Tools roll controls. Required setup remains; normal damage clicks open roll options. Supersedes the prior Shift-to-open damage-roll convention. Automated checks are separate from live Foundry verification.
+
+- Implemented (unreleased): Manual Rolls > Damage/Critical Injury section includes Evasion as an owned-token native skill-roll fallback, with Shift-click direct rolling and manual adjudication.
+
+- Implemented (unreleased): personal player Favorite stars for skills/role abilities, three combined maximum, with direct shortcuts at the bottom of Manual Rolls. Stored on the user, never per token or character.
+
+- Implemented (unreleased): GM Group Check has three persistent vertical + slots for common skills; populated slots select the skill without scrolling the dropdown, and × clears a slot.
+
+- Implemented (unreleased): track Speedheal statuses applied during combat on the Combat document and remove the recorded effects when combat ends or is deleted.
+
+- Implemented (unreleased): subtle next-turn pulsing marker, popup-only current/next player turn alerts, and optional local current-turn sound. Uses existing flash text without adding HUD message-list entries.
+
+- Implemented (unreleased): exactly two generated notification sound defaults, GM-configurable path/volume, recipient-local playback; current-turn thunk replaces the earlier generic optional client sound and does not stack with the message cue.
+
+- Implemented (unreleased): Self Actions menu on self CTH replaces initiative icon; includes eligible speedware initiative reroll, conditional Extinguish/Eject Netrunner and MA Recovery for any Martial Art skill 1+.
+
+- MA Recovery correction: supersedes the initial no-roll behavior. Native Martial Art roll must beat DV13 for a free Get Up; otherwise Get Up costs an Action. Both completed results remove Prone; cancel does not.

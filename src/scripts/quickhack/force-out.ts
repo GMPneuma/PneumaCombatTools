@@ -50,7 +50,7 @@ export function forceOutEntries(target: Actor | undefined) {
   });
   return rows.map((row,index)=>({...row,label:"Eject NetRunner — "+row.name+(rows.length>1?" ("+(index+1)+")":"")}));
 }
-export async function beginForceOut(message: Pick<ChatMessage,"id">) {
+export async function beginForceOut(message: Pick<ChatMessage,"id">, skipDialog = false) {
   if (!enabled() || busy.has(message.id!)) return;
   requireCombatSocket();
   busy.add(message.id!);
@@ -60,7 +60,7 @@ export async function beginForceOut(message: Pick<ChatMessage,"id">) {
     if (!game.users!.some(user => user.isGM && user.active)) { ui.notifications!.warn(label("ForceOut.ActiveGmRequired")); return; }
     const concentration = context.target.items.find(item => String(item.type) === "skill" && item.name?.trim().toLowerCase() === "concentration") as RollItem | undefined;
     if (!concentration) throw new Error(label("Error.ConcentrationMissing"));
-    const roll = await nativeQuickhackRoll(context.target, concentration, label("ForceOut.ResultTitle"), delivery(context.result.audience, context.source, context.target), () => enabled() && resultConnectionValid(context.source, {...context.result, connectionId:context.connectionId}), undefined, false);
+    const roll = await nativeQuickhackRoll(context.target, concentration, label("ForceOut.ResultTitle"), delivery(context.result.audience, context.source, context.target), () => enabled() && resultConnectionValid(context.source, {...context.result, connectionId:context.connectionId}), undefined, false, skipDialog);
     if (!roll || !enabled()) return;
     const request: Request = { quickhackType: "force-out", messageId: message.id!, requesterId: game.user!.id, total: roll.total, rollContent: roll.content, connectionId: context.connectionId };
     if (primaryGM()) await resolveForceOut(request); else game.socket!.emit(channel, request);

@@ -181,3 +181,9 @@ Hooks.once("ready", () => {
 The read-only getter returns the focused owned Actor UUID with a detected incoming connection, otherwise `undefined`. The hook supplies that value when it changes; consumers read initial state at ready. It is not a list/count of netrunners and does not itself send a HUD message. Visual Tools uses this contract; Combat Tools retains no glitch/fire-screen renderer.
 
 Implementation: [hud-messages.ts](../src/scripts/hud-messages.ts), [eye-hud.ts](../src/scripts/eye-hud.ts), [socket-health.ts](../src/scripts/socket-health.ts). Browser and unit fixtures cover routing, capacity, updates, modes and cleanup. Live multiplayer verification remains separate.
+
+### Suppress the default popup sound
+
+Pass `suppressDefaultSound: true` to `game.modules.get("pneuma-combattools").api.hud.send(...)` to show a notice silently. The optional boolean works for flash, queued and timed notices, including remote recipients; omitted/false uses the standard Biomonitor alert. It does not suppress a separate sound explicitly played by the caller. Current-turn notifications use this flag and play only the turn thunk.
+
+The GM configures the general alert path, volume and Play preview in **Biomonitor > Configure**. **Turn Indicator > Configure Sound** controls only the turn thunk.

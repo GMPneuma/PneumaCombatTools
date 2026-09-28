@@ -1,3 +1,9 @@
+import {selfIce} from "./quickhack/self-ice.js";
+import {overrideBreach} from "./quickhack/connections.js";
+import {selfActions,performSelfAction} from "./self-actions.js";
+import {registerNotificationSoundSettings} from "./notification-sound-settings.js";
+import {registerNotificationSounds} from "./notification-sounds.js";
+import {registerTurnAlerts} from "./turn-alerts.js";
 import {registerSheetAttacks} from "./sheet-attacks.js";
 import {canWake,wakeUsingAction,registerWake} from "./wake.js";
 import {registerDisplaySettings} from "./display-settings.js";
@@ -31,7 +37,6 @@ import { registerSettingsLayout } from "./settings-layout.js";
 import { enabled as quickhackEnabled } from "./quickhack/settings.js";
 import { actorQuickhacks, executeQuickhack } from "./quickhack/workflow.js";
 import { connectionFor, trackingCombat, jackOut } from "./quickhack/connections.js";
-import { beginForceOut, forceOutEntries } from "./quickhack/force-out.js";
 import { hasQuickhackSight } from "./quickhack/sight.js";
 import { registerCyberpunkStatuses } from "./status-settings.js";
 import { registerEyeHUD } from "./eye-hud.js";
@@ -58,7 +63,7 @@ const MODULE_ID = "pneuma-combattools";
 const TEMPLATE = `modules/${MODULE_ID}/templates/combat-hud.hbs`;
 const label = (key: string) => game.i18n!.localize(`PNEUMA_COMBAT_TOOLS.${key}`);
 let selection: { target: Token; attacker: Token | undefined; combatOnly?: boolean; anchor: { x: number; y: number } } | undefined;
-const isStandalone = (token: Token) => !isSelfCTH(token, selection?.target === token ? selection.attacker : selectedAttacker()) && (!token.isOwner || (selection?.target === token && !!selection.combatOnly));
+const isStandalone = (token: Token) => !isSelfCTH(token, selection?.target === token ? selection.attacker : selectedAttacker()) && (!!game.user?.isGM || !token.isOwner || (selection?.target === token && !!selection.combatOnly));
 const selectedAttacker = () => {
   const tokens = canvas.tokens!.controlled.filter(token => token.actor?.isOwner);
   return tokens.length === 1 ? tokens[0] : undefined;
@@ -86,6 +91,9 @@ Hooks.once("init", () => {
   registerCombatResolution();
   registerCombatBar();
   registerTurnMarker();
+  registerNotificationSounds();
+  registerNotificationSoundSettings();
+  registerTurnAlerts();
   registerTurnMarkerSettings();
   registerSuppression();
   registerPlayersControl();
@@ -140,7 +148,7 @@ Hooks.once("init", () => {
     }
 
     private useCombatMenu(event: PIXI.FederatedPointerEvent) {
-      return this.canOpenCombatMenu() && (!this.isOwner || event.shiftKey
+      return this.canOpenCombatMenu() && ((game.user?.isGM && !this.controlled) || !this.isOwner || event.shiftKey
         || (this.isTargeted && !!game.settings!.get(MODULE_ID, "targetedRightClick")));
     }
 
@@ -197,17 +205,19 @@ Hooks.once("init", () => {
     override getData(options = {}) {
       const attacker = selection && selection.target === this.object ? selection.attacker : selectedAttacker();
       const selfCTH = isSelfCTH(this.object ?? undefined, attacker);
-      if (selfCTH) return {...super.getData(options), standalone: false, selfCTH: true, grappleActions:grappleMenu(this.object??undefined,this.object??undefined), selfAlertHUD: game.settings!.get(MODULE_ID,"eyeHUD"), selfInitiative: selfInitiativeControl(this.object!), selfThrown:[...thrownEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[]),...grenadeEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[])]};
+      if (selfCTH) return {...super.getData(options), standalone: false, selfCTH: true, grappleActions:grappleMenu(this.object??undefined,this.object??undefined), selfInitiative: selfInitiativeControl(this.object!), selfActions:selfActions(this.object!.actor!), selfThrown:[...thrownEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[]),...grenadeEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[])]};
       const connection = attacker?.actor && this.object?.actor ? connectionFor(attacker.actor, this.object.actor.uuid) : undefined;
+      const ice = selfIce(this.object?.actor ?? undefined, connection?.breachCleared ?? 0);
       const sight = !!attacker && !!this.object && quickhackEnabled() && hasQuickhackSight(attacker, this.object);
-      const ejectNetrunners = forceOutEntries(this.object?.actor ?? undefined);
       const offensiveQuickhacks = !!attacker?.actor && attacker.actor.uuid !== this.object?.actor?.uuid
         && quickhackEnabled() && canShowQuickhack(Array.from(attacker.actor.items) as unknown as MenuWeapon[]);
       return {
         ...super.getData(options),
         canWake: canWake(attacker,this.object??undefined),
-        ejectNetrunners,
         offensiveQuickhacks,
+        selfIce: connection?.state === "active" && ice.walls ? ice : undefined,
+        canBreach: sight && connection?.state === "active" && ice.blocked,
+        gmBreach: game.user?.isGM && connection?.state === "active" && ice.walls > 0,
         standalone: isStandalone(this.object!),
         attackTitle: game.user!.isGM && attacker ? game.i18n!.format("PNEUMA_COMBAT_TOOLS.AttackAs", { name: attacker.name }) : label("Attack"),
         weapons: attacker ? [...attackEntries(Array.from(attacker.actor!.items) as unknown as MenuWeapon[]), ...thrownEntries(Array.from(attacker.actor!.items) as unknown as MenuWeapon[])].map(row => ({...row, deferred: ("deferred" in row && row.deferred) || grappleWeaponBlocked(attacker.actor!, attacker.actor!.items.get(row.id!)!)})) : [],
@@ -215,7 +225,7 @@ Hooks.once("init", () => {
         grenades: attacker ? grenadeEntries(Array.from(attacker.actor!.items) as unknown as MenuWeapon[]) : [],
         weaponEmpty: label(attacker ? "NoEquippedWeapons" : "SelectAttacker"),
         quickhacks: attacker?.actor && quickhackEnabled() ? actorQuickhacks(attacker.actor) : [],
-        quickhackConnected: sight && connection?.state === "active",
+        quickhackConnected: sight && connection?.state === "active" && !ice.blocked,
         quickhackJackInDisabled: connection?.state === "ejected" || (connection?.state !== "active" && !sight),
         quickhackJackAction: connection?.state === "active" ? "jack-out" : "jack-in",
         quickhackStatus: connection?.state === "active" ? "Jacked-In" : connection?.state === "ejected" ? "Ejected" : "Not Jacked-In",
@@ -225,7 +235,7 @@ Hooks.once("init", () => {
           { action: "melee", icon: "", title: label("CloseCombat") },
           { action: "thrown", icon: "fa-bomb", title: label("Thrown") },
           { action: "quickhacks", icon: "fa-microchip", title: label("Quickhacks") },
-        ].filter(control => (control.action !== "quickhacks" || offensiveQuickhacks || ejectNetrunners.length > 0)),
+        ].filter(control => (control.action !== "quickhacks" || offensiveQuickhacks)),
       };
     }
 
@@ -245,46 +255,46 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
     if (hud.object !== token || hud.element[0] !== html[0]) return;
     html.find(".col.right").first().append(controls);
   }
-  if(game.user?.isGM&&!data.selfCTH){
-    html.find(".col.right").first().append('<div class="control-icon" role="button" tabindex="0" data-token-indicator title="Animated Turn Indicator: This Token" aria-label="Animated Turn Indicator: This Token"><i class="fas fa-gear" aria-hidden="true"></i></div>');
-    html.find("[data-token-indicator]").on("click keydown",event=>{if(event.type==="keydown"&&!["Enter"," "].includes(event.key??""))return;event.preventDefault();event.stopPropagation();openTurnMarkerSettings(token.document);});
-  }
   if (data.selfCTH) {
-    html.find("[data-self-settings-toggle]").on("click keydown",event=>{
-      if(event.type==="keydown"&&!["Enter"," "].includes(event.key??""))return;
-      event.preventDefault();event.stopPropagation();const panel=html.find("[data-self-settings-menu]");
-      const open=panel.prop("hidden");panel.prop("hidden",!open);$(event.currentTarget).attr("aria-expanded",String(open));
+    const menus = ["settings", "close", "thrown", "actions"];
+    const closeMenus = () => {
+      for (const name of menus) {
+        html.find(`[data-self-${name}-menu]`).prop("hidden", true);
+        html.find(`[data-self-${name}-toggle]`).removeClass("active").attr("aria-expanded", "false");
+      }
+    };
+    for (const name of menus) html.find(`[data-self-${name}-toggle]`).on("click keydown", event => {
+      if (event.type === "keydown" && !["Enter", " "].includes(event.key ?? "")) return;
+      event.preventDefault(); event.stopPropagation();
+      const panel = html.find(`[data-self-${name}-menu]`), open = panel.prop("hidden");
+      closeMenus();
+      panel.prop("hidden", !open);
+      $(event.currentTarget).toggleClass("active", open).attr("aria-expanded", String(open));
+      const colors = getComputedStyle(event.currentTarget);
+      panel.find(".combat-heading").css({backgroundColor: colors.backgroundColor, color: colors.color, borderColor: colors.borderColor});
     });
     html.find("[data-turn-animation]").on("click",event=>{
       event.preventDefault();event.stopPropagation();openTurnMarkerSettings(token.document);
-      html.find("[data-self-settings-menu]").prop("hidden",true);html.find("[data-self-settings-toggle]").attr("aria-expanded","false");
-    });
-    html.find("[data-self-close-toggle]").on("click keydown",event=>{
-      if(event.type==="keydown"&&!["Enter"," "].includes(event.key??""))return;
-      event.preventDefault();event.stopPropagation();const panel=html.find("[data-self-close-menu]");panel.prop("hidden",!panel.prop("hidden"));
+      closeMenus();
     });
     html.find<HTMLButtonElement>("[data-self-grapple]").on("click",async event=>{
       event.preventDefault();event.stopPropagation();if(event.currentTarget.disabled)return;
-      await useGrapple(token,token,event.currentTarget.dataset.selfGrapple!);
+      await useGrapple(token,token,event.currentTarget.dataset.selfGrapple!,!!event.shiftKey);
       if(hud.object===token)hud.render(true);
     });
-    html.find("[data-self-thrown-toggle]").on("click keydown",event=>{if(event.type==="keydown"&&!["Enter"," "].includes(event.key??""))return;event.preventDefault();event.stopPropagation();const panel=html.find("[data-self-thrown-menu]");panel.prop("hidden",!panel.prop("hidden"));});
     html.find<HTMLButtonElement>("[data-self-throw]").on("click",async event=>{
       event.preventDefault();event.stopPropagation();const button=event.currentTarget;if(button.disabled)return;button.disabled=true;
       try{
         const id=button.dataset.selfThrow!;
         const grenade=grenadeEntries(Array.from(token.actor!.items) as unknown as MenuWeapon[]).some(item=>item.id===id);
-        if(grenade){const {startAreaAttack}=await import("./aoe/workflow.js");await startAreaAttack(token,token,id,"attack");}
+        if(grenade){const {startAreaAttack}=await import("./aoe/workflow.js");await startAreaAttack(token,token,id,"attack",!!event.shiftKey);}
         else {const targets=[...game.user!.targets].filter(target=>target!==token);if(targets.length!==1)throw Error("Target one other token for a thrown weapon. Grenades use ground placement.");await attackFromHUD(token,targets[0]!,id,"attack",event);}
       }catch(error){ui.notifications!.error((error as Error).message);}finally{button.disabled=false;}
     });
-    html.find<HTMLElement>("[data-self-alert-hud]").on("click keydown",async event=>{
-      if(event.type==="keydown"&&!["Enter"," "].includes(event.key??""))return;
-      event.preventDefault();event.stopPropagation();const button=event.currentTarget;
-      if(button.getAttribute("aria-disabled")==="true")return;
-      button.setAttribute("aria-disabled","true");
-      try{await game.settings!.set(MODULE_ID,"eyeHUD",!game.settings!.get(MODULE_ID,"eyeHUD"));}
-      catch(error){ui.notifications!.error(error instanceof Error?error.message:String(error));}
+    html.find<HTMLButtonElement>("[data-self-action]").on("click",async event=>{
+      event.preventDefault();event.stopPropagation();const button=event.currentTarget;if(button.disabled)return;button.disabled=true;
+      try{await performSelfAction(token.actor!,button.dataset.selfAction!,button.dataset.message,!!event.shiftKey);}
+      catch(error){ui.notifications!.error((error as Error).message);}
       finally{if(hud.object===token)hud.render(true);}
     });
     html.find<HTMLElement>("[data-self-initiative]").on("click keydown",async event=>{
@@ -309,17 +319,21 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
   if (attacker?.actor && html[0]) decorateItemList(html[0], attacker.actor);
   html.find<HTMLButtonElement>("[data-grapple-action]").on("click", async event => {
     event.preventDefault(); event.stopPropagation();
-    if (attacker) await useGrapple(attacker, token, event.currentTarget.dataset.grappleAction!);
+    if (attacker) await useGrapple(attacker, token, event.currentTarget.dataset.grappleAction!,!!event.shiftKey);
   });
-  html.find<HTMLButtonElement>("[data-eject-message]").on("click", async event => {
+  html.find<HTMLButtonElement>("[data-breach-override]").on("click", async event => {
     event.preventDefault(); event.stopPropagation();
-    const button = event.currentTarget;
-    if (button.disabled || !forceOutEntries(token.actor ?? undefined).some(row => row.messageId === button.dataset.ejectMessage)) return;
-    const message = {id:button.dataset.ejectMessage!};
-    button.disabled = true;
-    try { await beginForceOut(message); }
-    catch (error) { ui.notifications!.error(error instanceof Error ? error.message : "Eject NetRunner failed."); }
-    finally { button.disabled = false; }
+    if (!game.user?.isGM || !attacker?.actor || !token.actor) return;
+    const connection = connectionFor(attacker.actor, token.actor.uuid);
+    const ice = selfIce(token.actor, connection?.breachCleared ?? 0);
+    const cleared = await Dialog.prompt({title: "Self-ICE: cleared Passwalls", content: `<label>Cleared <input name="cleared" type="number" min="0" max="${ice.walls}" step="1" value="${ice.cleared}"></label>`, label: "Apply", rejectClose: false,
+      callback: html => Number(html.find<HTMLInputElement>('[name="cleared"]').val())});
+    if (cleared === null || cleared === undefined) return;
+    try {
+      if (connectionFor(attacker.actor, token.actor.uuid)?.id !== connection?.id) throw Error("The connection changed.");
+      await overrideBreach(attacker.actor, token.actor, cleared);
+      if (hud.object === token) hud.render(true);
+    } catch (error) { ui.notifications!.error((error as Error).message); }
   });
   html.find<HTMLButtonElement>("[data-quickhack-id]").on("click", async event => {
     event.preventDefault(); event.stopPropagation();
@@ -328,7 +342,7 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
     button.disabled = true;
     try {
       if (button.dataset.quickhackId === "jack-out") await jackOut(attacker.actor, token.actor.uuid);
-      else await executeQuickhack(attacker, token, button.dataset.quickhackId!);
+      else await executeQuickhack(attacker, token, button.dataset.quickhackId!,!!event.shiftKey);
     } catch (error) { ui.notifications!.error(error instanceof Error ? error.message : "Jack Out failed."); }
     finally { if (hud.object === token) hud.render(true); }
   });

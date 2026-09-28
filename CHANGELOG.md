@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.9.3 - 2026-09-28
+
+- Add Self-ICE Passwalls: native Interface breach checks at DV6/8/10, per-connection progress, blocked QuickHacks until cleared, and a GM progress override. Reconnecting resets progress. Requires installed functional cyberware named Self-ICE; Net Actions are manually spent.
+- Add Self Actions for speedware initiative rerolls, Extinguish, Eject Netrunner and Martial Arts Recovery against DV13. Recovery reports whether getting up costs an Action.
+- Correct GM/player self-versus-target HUD routing, remove target-side self controls, unify flyout headers, prevent overlapping self menus, and remove the self-HUD Alert toggle.
+- Add subtle concentric next-turn rings and popup-only current/next-turn notices.
+- Ship two original notification sounds with GM file/volume controls and local Play previews. General alerts are configured in Biomonitor; the current-turn thunk is configured in Turn Indicator and plays only for the receiving player. HUD messages support suppressDefaultSound.
+- Add Shift-click direct rolls across combat workflows while retaining required selection/placement steps. Normal damage-roll clicks open options; damage-application options still use Shift-click.
+- Skip ineligible single-target evasion prompts, show a cannot-evade notice, and provide a styled GM override. AoE evasion bypass/override remains deferred.
+- Add manual Evasion, three personal skill/role favorites using the selected token, independent favorite removal, and three GM Group Check skill shortcuts below the dropdown.
+- Restore Speed Heal to the status picker and track combat-applied statuses for cleanup when combat ends, resets or is deleted.
+- Add per-target AoE Reset Player Action before movement, damage or effect application; preserve other responses and shared rolls. Spent LUCK is not refunded.
+- Correct Cover Up double ablation across equipped head/body armor and refine attack titles, AoE descriptions, damage controls and critical-injury icons.
+- Fix QuickHack LUCK deduction, stale breach-dialog validation and unavailable favorites occupying saved slots.
+
+Validation: production build and strict type checks; 451 automated tests passed, four skipped; targeted HUD/favorite browser checks. Live Foundry multiplayer verification remains pending.
+
+
 ## 0.9.2 - 2026-09-26
 
 - Add **Route character-sheet attacks through Combat Tools** under **Attack & Damage Cards**. This optional world setting is **off by default**.

@@ -6,30 +6,30 @@
   <div class="control-icon" role="button" tabindex="0" data-self-settings-toggle title="Settings" aria-label="Settings" aria-expanded="false"><i class="fas fa-gear" aria-hidden="true"></i></div>
   <section class="pneuma-panel pneuma-combat-menu pneuma-self-menu" data-self-settings-menu hidden>
     <strong class="combat-heading">Settings</strong>
-    <ul><li><button type="button" class="combat-weapon-name" data-turn-animation><i class="fas fa-circle-notch" aria-hidden="true"></i><span>Animated Turn Indicator</span></button></li></ul>
+    <ul><li><button type="button" class="combat-weapon-name" data-turn-animation><i class="fas fa-circle-notch" aria-hidden="true"></i><span>Turn Indicator</span></button></li></ul>
   </section>
   {{#if grappleActions.length}}
-  <div class="control-icon" role="button" tabindex="0" data-self-close-toggle title="Close Combat" aria-label="Close Combat"><i class="fas fa-hand-back-fist" aria-hidden="true"></i></div>
+  <div class="control-icon" role="button" tabindex="0" data-self-close-toggle aria-expanded="false" title="Close Combat" aria-label="Close Combat"><i class="fas fa-hand-back-fist" aria-hidden="true"></i></div>
   <section class="pneuma-panel pneuma-combat-menu pneuma-self-menu" data-self-close-menu hidden>
     <strong class="combat-heading">Close Combat</strong>
     <ul>{{#each grappleActions}}<li><button type="button" class="combat-weapon-name" data-self-grapple="{{action}}" title="{{title}}" {{#if disabled}}disabled{{/if}}><i class="fas fa-hand-back-fist" aria-hidden="true"></i><span>{{label}}</span></button></li>{{/each}}</ul>
   </section>
   {{/if}}
-  <div class="control-icon" role="button" tabindex="0" data-self-thrown-toggle title="Thrown weapons and grenades" aria-label="Thrown weapons and grenades"><i class="fas fa-bomb" aria-hidden="true"></i></div>
+  <div class="control-icon" role="button" tabindex="0" data-self-thrown-toggle aria-expanded="false" title="Thrown weapons and grenades" aria-label="Thrown weapons and grenades"><i class="fas fa-bomb" aria-hidden="true"></i></div>
   <section class="pneuma-panel pneuma-combat-menu pneuma-self-menu pneuma-self-thrown" data-self-thrown-menu hidden>
     <strong class="combat-heading">Thrown Weapons &amp; Grenades</strong>
     <ul>{{#each selfThrown}}<li><button type="button" class="combat-weapon-name" data-self-throw="{{id}}" title="{{name}}">{{#if img}}<img src="{{img}}" alt="" width="24" height="24">{{else}}<i class="fas fa-bomb" aria-hidden="true"></i>{{/if}}<span>{{name}}</span></button></li>{{else}}<li class="combat-empty">No thrown weapons or grenades.</li>{{/each}}
     <li><button type="button" class="combat-weapon-name" data-self-throw="__improvised" title="Improvised (requires target)"><img src="systems/cyberpunk-red-core/icons/compendium/weapons/thrown_weapon.svg" alt="" width="24" height="24"><span>Improvised (requires target)</span></button></li></ul>
   </section>
-  <div class="control-icon" role="button" tabindex="0" data-self-alert-hud title="Toggle Alert HUD" aria-label="Toggle Alert HUD" aria-pressed="{{selfAlertHUD}}">
-    <i class="fas fa-bell" aria-hidden="true"></i>
-  </div>
-  {{#if selfInitiative.show}}
-  <div class="control-icon" role="button" tabindex="0" data-self-initiative
-    title="{{selfInitiative.title}}" aria-label="{{selfInitiative.title}}" aria-disabled="{{selfInitiative.disabled}}">
-    <i class="fas fa-dice-d10" aria-hidden="true"></i>
-  </div>
-  {{/if}}
+  <div class="control-icon" role="button" tabindex="0" data-self-actions-toggle title="Self Actions" aria-label="Self Actions" aria-expanded="false"><i class="fas fa-person" aria-hidden="true"></i></div>
+  <section class="pneuma-panel pneuma-combat-menu pneuma-self-menu" data-self-actions-menu hidden>
+    <strong class="combat-heading">Self Actions</strong>
+    <ul>
+      {{#if selfInitiative.show}}<li><button type="button" class="combat-weapon-name" data-self-initiative title="{{selfInitiative.title}}" aria-disabled="{{selfInitiative.disabled}}" {{#if selfInitiative.disabled}}disabled{{/if}}><i class="fas fa-dice-d10" aria-hidden="true"></i><span>Re-roll Initiative</span></button></li>{{/if}}
+      {{#each selfActions}}<li><button type="button" class="combat-weapon-name" data-self-action="{{action}}" data-message="{{message}}" {{#if disabled}}disabled title="Not currently prone"{{/if}}><i class="fas {{icon}}" aria-hidden="true"></i><span>{{label}}</span></button></li>{{/each}}
+      {{#unless selfInitiative.show}}{{#unless selfActions.length}}<li class="combat-empty">No self actions available.</li>{{/unless}}{{/unless}}
+    </ul>
+  </section>
 {{else}}
 {{#if canWake}}<button type="button" class="control-icon" data-wake-action title="Wake using action" aria-label="Wake using action"><i class="fas fa-hand" aria-hidden="true"></i><span>Wake using action</span></button>{{/if}}
 {{#each controls}}
@@ -81,13 +81,11 @@
     </ul>
   </div>
   <div class="combat-quickhacks" hidden>
-    <ul>
-      {{#each ejectNetrunners}}
-      <li><button type="button" class="combat-weapon-name" data-eject-message="{{messageId}}"><span>{{label}}</span></button></li>
-      {{/each}}
-    </ul>
     {{#if offensiveQuickhacks}}
     <p class="notes">{{quickhackNote}}</p>
+    {{#if selfIce}}<p class="notes">Self-ICE · {{selfIce.cleared}}/{{selfIce.walls}} Passwalls cleared · DV{{selfIce.dv}}</p>{{/if}}
+    {{#if canBreach}}<button type="button" class="combat-weapon-name" data-quickhack-id="breach" title="Interface check; costs 1 Net Action (spend manually). Shift-click skips roll options."><i class="fas fa-shield-halved" aria-hidden="true"></i><span>Breach Passwall</span><small>1 Net Action</small></button>{{/if}}
+    {{#if gmBreach}}<button type="button" class="combat-weapon-name" data-breach-override><i class="fas fa-gear" aria-hidden="true"></i><span>GM: Adjust cleared walls</span></button>{{/if}}
     <ul>
       <li><button type="button" class="combat-weapon-name" data-quickhack-id="{{quickhackJackAction}}" {{#if quickhackJackInDisabled}}disabled{{/if}}><i class="fas fa-network-wired" aria-hidden="true"></i><span>Jack In/Out</span></button></li>
       {{#each quickhacks}}

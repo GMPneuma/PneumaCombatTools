@@ -38,8 +38,10 @@ try {
  await page.addScriptTag({type:'module',content:structure+'\nObject.assign(window,{resolutionSection,rollOutcomeClass,combatCardKind,canRenderCombatCard,decorateSharedCard});'});
  await page.waitForFunction(()=>!!window.resolutionSection);
  const catalog=await readFile(new URL('../dist/scripts/instant-catalog.js',import.meta.url),'utf8');
- await page.addScriptTag({type:'module',content:catalog+'\nObject.assign(window,{instantEffects,instantId});'});
+ await page.addScriptTag({type:'module',content:catalog.replace(/^export .* from .*$/gm,'')+'\nObject.assign(window,{instantEffects,instantId});'});
  await page.addScriptTag({type:"module",content:(await readFile("dist/scripts/status-catalog.js","utf8"))+"\nwindow.masterStatuses=masterStatuses;"});
+ await page.addScriptTag({type:'module',content:(await readFile('dist/scripts/shared.js','utf8'))+'\nObject.assign(window,{escapeHTML,escape:escapeHTML,escapeInstant:escapeHTML});'});
+ await page.waitForFunction(()=>!!window.instantEffects);
  const statusSource = await readFile(new URL('../dist/scripts/damage-status.js', import.meta.url), 'utf8');
  await page.addScriptTag({type:'module',content:statusSource.replace(/^import .*$/gm,'')+'\nObject.assign(window,{chooseDamageStatuses,damageStatusChoices,validateDamageStatuses});'});
  await page.waitForFunction(()=>!!window.chooseDamageStatuses);
@@ -68,6 +70,8 @@ try {
  await page.addScriptTag({type:'module',content:(await readFile('dist/scripts/encounter.js','utf8'))+'\nObject.assign(window,{resolveEncounter,encounterRef,tokenEncounter});'});
  const damage=(await readFile(new URL('../dist/scripts/damage-flow.js',import.meta.url),'utf8')).replace(/^import .*$/gm,'');
  await page.addScriptTag({type:'module',content:damage.replace('import(path)', 'Promise.resolve({default:window.nativeDamageDialog})')+'\nObject.assign(window,{damageValues,damageContent,renderDamage,rollDamage});'});
+ await page.addScriptTag({type:'module',content:(await readFile('dist/scripts/attack-title.js','utf8')).replace(/^import .*$/gm,'')+'\nObject.assign(window,{attackHeading});'});
+ await page.waitForFunction(()=>!!window.attackHeading);
  const combat=(await readFile(new URL('../dist/scripts/combat-resolution.js',import.meta.url),'utf8')).replace(/^import .*$/gm,'');
  await page.addScriptTag({type:'module',content:combat+'\nwindow.exchangeContent=exchangeContent;window.decorateCombatMessage=decorateCombatMessage;'});
  await page.waitForFunction(()=>!!window.exchangeContent);
@@ -133,7 +137,7 @@ try {
  assert.match(result.pending,/pneumaRollDamage/);
  assert.equal(await page.locator(".pneuma-damage-application button").count(),3);assert.equal(await page.locator("a.pneuma-apply-damage").count(),2);
  assert.equal(result.header,'DamageSmart');assert.equal(result.weaponRepeated,false);assert.equal(result.bolts,2);assert.deepEqual(result.destinations,['recorded','selected']);
- assert.deepEqual(result.applyButtons,[' Defender',' to selected target']);
+ assert.deepEqual(result.applyButtons,[' Defender',' token']);
  assert.equal(result.nativeApply,0);assert.equal(result.detail,'22');assert.equal(result.requests.length,0);
  assert.match(result.unaware,/Defender unaware/);
  const missControls=await page.evaluate(async()=>{
@@ -308,6 +312,12 @@ try {
    window.fromUuid=async uuid=>({actor:{isOwner:true,sheet:{_drawCriticalInjuryTable:async(t,pack,iteration)=>calls.push([uuid,t.name,pack,iteration])}}});
    await renderDamage({id:"critical"},data,wrap([document.body]),async()=>{});
    const icons=[...document.querySelectorAll(".pneuma-apply-critical")];
+   for(const row of document.querySelectorAll('.pneuma-damage-recipient')){
+     const [damage,injury,label]=row.children;
+     if(!damage.matches('.pneuma-apply-damage')||!injury.matches('.pneuma-apply-critical')||!label.matches('.pneuma-damage-recipient-label'))throw Error('Both buttons must precede recipient');
+     const a=damage.getBoundingClientRect(),b=injury.getBoundingClientRect(),c=label.getBoundingClientRect();
+     if(a.right>b.left+1||b.right>c.left+1||a.bottom<b.top||b.bottom<a.top)throw Error('Recipient buttons must stay together on the left');
+   }
    icons[0].click();
    await new Promise(resolve=>setTimeout(resolve,0));
    window.canvas={tokens:{controlled:[{actor:{isOwner:true},document:{uuid:"Token.selected"}}]}};
@@ -326,6 +336,17 @@ try {
    ["tables","Critical Injuries (Head)"],["Token.selected","Critical Injuries (Head)","injuries",0]]);
 
 
+ const coverLocations=await page.evaluate(async()=>{
+   const results=[];
+   for(const worn of [['body','head'],['head'],['body'],[]])for(const ablation of [0,2,4]){
+     const calls=[],chat={RenderDamageApplicationCard(){}},actor={getEquippedArmors:part=>worn.includes(part)?[{}]:[],_ablateArmor:async(part,n)=>calls.push([part,n])};
+     window.renderTemplate=async()=>'<div><span data-action="toggleVisibility" data-visible-element="d6-data-details">0</span><div class="d6-data-details">Blocked</div></div>';
+     const receipts=await captureWithChat(chat,actor,'Target','body','all-armor',async view=>{await chat.RenderDamageApplicationCard({actor:view,location:'body',hpReduction:0,rawDamageDealt:0});},{ablation,ignorePercent:0,ignoreBelow:0});
+     results.push({calls,note:receipts[0].includes('all worn head and body armor')});
+   }
+   return results;
+ });
+ let coverIndex=0;for(const worn of [['body','head'],['head'],['body'],[]])for(const amount of [0,2,4])assert.deepEqual(coverLocations[coverIndex++],{calls:amount?worn.map(part=>[part,amount]):[],note:true});
  if(process.env.PNEUMA_CPR_ACTOR_SOURCE){
   const source=await readFile(process.env.PNEUMA_CPR_ACTOR_SOURCE,"utf8");const start=source.indexOf("  async _applyDamage(");const method=source.slice(start,source.indexOf("\n  }",start)+4);
   const result=await page.evaluate(async method=>{
@@ -343,6 +364,26 @@ try {
    return cases;
   },method);
   assert.deepEqual(result,[{hp:50,sp:11,ablation:2,summaryAblation:2,note:true},{hp:42,sp:11,ablation:2,summaryAblation:2,note:true},{hp:46,sp:11,ablation:4,summaryAblation:4,note:true}]);
+  const extract=name=>{const start=source.indexOf(name);return source.slice(start,source.indexOf('\n  }',start)+4);};
+  const layered=await page.evaluate(async methods=>{
+    const chat={RenderDamageApplicationCard(){}},utils={calculateArmorSP:async(a,loc,current=false)=>a.system[loc+'Location'].sp-(current?a.system[loc+'Location'].ablation:0)};
+    const native=Function('CPRChat','CPRActorUtils','return ({'+methods.join(',')+'})')(chat,utils);
+    const armor=(id,loc,sp,equipped='equipped')=>({id,system:{equipped,isBodyLocation:loc==='body',isHeadLocation:loc==='head',[loc+'Location']:{sp,ablation:0}}});
+    const results=[];
+    for(const cover of [false,true]){
+      const armors=[armor('kevlar','body',7),armor('jacket','body',11),armor('helmet','head',11),armor('spare','body',11,'owned')];
+      const calls=[];const actor={...native,itemTypes:{armor:armors,role:[]},system:{derivedStats:{hp:{value:50}},externalData:{currentArmorBody:{value:11,max:11},currentArmorHead:{value:11,max:11}}},bonuses:{universalDamageReduction:0},
+        async update(changes){for(const [key,value]of Object.entries(changes)){const parts=key.split('.');let o=this;for(const p of parts.slice(0,-1))o=o[p];o[parts.at(-1)]=value;}},
+        async updateEmbeddedDocuments(_type,rows){for(const row of rows)armors.find(a=>a.id===row._id).system=structuredClone(row.system);},
+        async _ablateArmor(loc,n){calls.push([loc,n]);return native._ablateArmor.call(this,loc,n);}};
+      await captureWithChat(chat,actor,'Smitty','body','native-layered',view=>native._applyDamage.call(view,25,5,'body',cover?0:2,'grenade',cover?-100:0,0,true,{useShield:false,damageReductionRole:false,damageReductionAE:false}),cover?{ablation:4,ignorePercent:0,ignoreBelow:0}:undefined);
+      results.push({hp:actor.system.derivedStats.hp.value,ablation:armors.map(a=>(a.system.bodyLocation??a.system.headLocation).ablation),calls});
+    }
+    return results;
+  },[extract('  async _applyDamage('),extract('  async _ablateArmor('),extract('  getEquippedArmors(')]);
+  assert.deepEqual(layered,[{hp:31,ablation:[2,2,0,0],calls:[['body',2]]},{hp:42,ablation:[4,4,4,0],calls:[['body',0],['body',4],['head',4]]}]);
+  console.log('Official CPR native methods: ordinary AP 19 HP loss / 2 per body layer; Cover Up 8 HP loss / 4 per equipped body and head layer; unworn armor unchanged.');
+
  }
  const applications = await page.evaluate(async () => {
    const native='<div class="rollcard"><div class="rollcard-top"><a data-action="reverseDamage">undo</a></div><div class="d6-number-div"><span class="clickable" data-action="toggleVisibility" data-visible-element="d6-data-details">7</span></div><div class="d6-data-details hide">12 - 5 armor = 7</div></div>';
@@ -458,9 +499,9 @@ try {
    cancel=true;await rollDamage("cancel",data,async action=>sent.push(action),true);
    return {events,sent,rolled};
  });
- assert.equal(damageDialogs.events[0].ctrlKey,true);
+ assert.equal(damageDialogs.events[0].ctrlKey,false);
  assert.notEqual(damageDialogs.events[0].type,"click");
- assert.equal(damageDialogs.events[1].ctrlKey,false);assert.equal(damageDialogs.rolled,2);
+ assert.equal(damageDialogs.events[1].ctrlKey,true);assert.equal(damageDialogs.rolled,2);
  assert.equal(damageDialogs.sent.filter(action=>action==="damageCommit").length,2);
  assert.equal(damageDialogs.sent.filter(action=>action==="damageRelease").length,3);
 

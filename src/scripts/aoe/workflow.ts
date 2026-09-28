@@ -1,3 +1,4 @@
+import {attackTitle,attackHeading} from "../attack-title.js";
 import {inlineRoll} from "../inline-roll.js";
 import { primaryGM as gm, escapeHTML as esc } from "../shared.js";
 import { PendingCardRefresh } from "../pending-card-refresh.js";
@@ -31,7 +32,7 @@ import { checkedLuck } from "../evasion-rules.js";
 interface TargetRow {
   instant?:InstantState; uuid:string; actor:string; name:string; img:string; eligible:boolean;
   state:"waiting"|"rolling"|"hit"|"miss"|"other"; total?:number; html?:string;
-  claim?:{nonce:string;user:string;expires:number}; damage?:DamageState; moved?:boolean; coverUp?:boolean; moveCost?:number;
+  claim?:{nonce:string;user:string;expires:number}; coverProneId?:string; damage?:DamageState; moved?:boolean; coverUp?:boolean; moveCost?:number;
 }
 export interface AreaAttack {
   ammoType?:string; smokeId?:string; scene:string; kind:AreaKind; area:Area; intended:Point; settings:AreaSettings; templateId?:string; aimTemplateId?:string;
@@ -90,6 +91,10 @@ function targets(data:AreaAttack):TargetRow[] {
 function rowEncounter(data:AreaAttack,uuid:string):EncounterRef {return encounterRef(resolveEncounter(data.exchange),data.scene,[data.exchange.attacker,uuid]);}
 const btn=(action:string,icon:string,title:string,target="",label="")=>`<button type="button" data-aoe-action="${action}" data-aoe-target="${esc(target)}" title="${esc(title)}" aria-label="${esc(title)}"><i class="fas ${icon}" aria-hidden="true"></i>${label?" "+esc(label):""}</button>`;
 const awaitingResponses=(data:AreaAttack)=>data.phase==="scatter"||data.rows.some(r=>["waiting","rolling"].includes(r.state));
+function canResetResponse(data:AreaAttack,row:TargetRow):boolean {
+  return row.state!=="waiting" && !row.damage && !row.moved && !data.effectsResolved
+    && (!row.instant || ["pending","failed","resisted","skipped"].includes(row.instant.state) && row.instant.damage===undefined);
+}
 export function areaContent(data:AreaAttack):string {
   const waiting=awaitingResponses(data),profile=ammoProfile(data.ammoType);
   let attackHTML="";
@@ -104,19 +109,20 @@ export function areaContent(data:AreaAttack):string {
     ${inlineRoll(r.total,r.html?`<div class="pneuma-aoe-defense ${rollOutcomeClass(r.state==="miss")}">${r.html}</div>`:undefined,data.kind==="suppression"?"Concentration":"Evasion")}
     ${r.state==="waiting" ? (data.kind==="suppression"?btn("roll","fa-brain","Concentration",r.uuid):btn("roll","fa-person-running","Evade",r.uuid))
       +(data.settings.coverUp&&data.kind!=="suppression"?btn("other","fa-shield","Cover Up instead of Evasion: no roll; Prone, double SP and ablation",r.uuid):"")+(data.kind==="suppression"?"":btn("decline","fa-xmark","Don't Evade",r.uuid))
-      : esc(r.state==="hit"?(data.kind==="suppression"?"Suppressed: Move to cover; Run if needed":r.coverUp?"Cover Up · Prone · SP ×2 / ablation ×2":"Hit"):r.state==="miss"?"Avoided":r.state==="rolling"?"Rolling…":"Cover Up — GM review")}
-    ${["waiting","hit"].includes(r.state)&&!r.damage?btn("exclude","fa-user-slash","GM: exclude target (cover / not on foot)",r.uuid):""}
-    ${r.state==="miss"&&!r.damage?btn("forcehit","fa-crosshairs","GM: override as affected",r.uuid):""}
+      : esc(r.state==="hit"?(data.kind==="suppression"||r.coverUp?"":"Hit"):r.state==="miss"?"Avoided":r.state==="rolling"?"Rolling…":"")}
+    ${r.state==="waiting"&&!r.damage?btn("exclude","fa-user-slash","GM: exclude target (cover / not on foot)",r.uuid):""}
+
     ${r.state==="other"?btn("hit","fa-check","GM: affected",r.uuid)+btn("miss","fa-xmark","GM: unaffected",r.uuid):""}
-    ${r.state==="rolling"?btn("reset","fa-unlock","GM: release unfinished response",r.uuid):""}
+    ${r.state!=="waiting"?btn("reset","fa-rotate-left","Reset Player Action",r.uuid,"Reset"):""}
     ${r.state==="miss"&&data.kind!=="suppression"&&r.total!==undefined&&!r.moved?btn("move","fa-person-walking","Move outside AoE",r.uuid):""}
     ${r.state==="hit"&&data.exchange.damage?.result ? btn("apply","fa-bolt",r.damage?.recordedApplied?"Damage applied":"Apply shared damage (Shift: options)",r.uuid):""}
     ${r.damage&&["review","applying"].includes(r.damage.status)?btn("damageResolved","fa-check-double","GM: mark resolved after checking damage",r.uuid):""}
-    ${r.moved&&r.moveCost?`<span>Move: ${r.moveCost.toFixed(1)}m</span>`:""}</div></div>
+    ${r.moved&&r.moveCost?`<span>Move: ${r.moveCost.toFixed(1)}m</span>`:""}</div>
+    ${r.state==="hit"&&(r.coverUp||data.kind==="suppression")||r.state==="other"?`<span class="pneuma-aoe-response-description">${r.state==="other"?"Cover Up — GM review":data.kind==="suppression"?"Suppressed: Move to cover; Run if needed":"Cover Up · Prone · SP ×2 / ablation ×2"}</span>`:""}</div>
     ${r.state==="hit"&&r.instant?instantContent(r.instant,r.uuid):""}
     `).join("");
   const applications=data.rows.flatMap(r=>r.damage?.applications??[]).join("");
-  return `<section class="rollcard pneuma-aoe-card" data-state="${data.phase==="scatter"?"scatter":waiting?"waiting":"resolved"}"><div class="rollcard-top"><div class="cpr-block"><h3>${esc(data.exchange.title)}${profile?" · "+esc(profile.name):""}</h3></div></div>
+  return `<section class="rollcard pneuma-aoe-card" data-state="${data.phase==="scatter"?"scatter":waiting?"waiting":"resolved"}"><div class="rollcard-top"><div class="cpr-block">${attackHeading(data.exchange.title)}</div></div>
     ${resolutionSection("attack",attack)}
     ${resolutionSection("result",data.phase==="scatter"?"<div class='pneuma-aoe-reposition'><strong>Missed</strong><p>GM: choose a new center inside the gray area.</p></div>"+btn("scatter","fa-crosshairs","Place New Target Center","","Place New Target Center"): `<div role="list" class="pneuma-aoe-targets">${rows||"<p>No tokens in the area.</p>"}</div>`)}
     <div class="pneuma-aoe-actions">${btn("show",data.areaHidden?"fa-eye":"fa-eye-slash",data.areaHidden?"Show attack area":"Hide attack area")}${data.phase==="responses"?btn("add","fa-user-plus","GM: add selected token (manual coverage override)"):""}
@@ -246,7 +252,18 @@ export async function handleAreaRequest(req:Request) {
   if(req.action==="forcehit"){if(!user.isGM||row.state!=="miss"||row.damage||row.instant&&row.instant.state!=="pending")throw Error("GM only.");row.state="hit";data.effectsResolved=false;
   } else if(req.action==="exclude") { if(!user.isGM||!["waiting","hit"].includes(row.state)||row.damage||row.instant&&!["pending","failed"].includes(row.instant.state))throw Error("GM only; damage or effect already started.");row.state="miss";
   } else if(req.action==="reset"){
-    if(!user.isGM)throw Error("GM only.");row.state="waiting";delete row.claim;
+    if(!user.isGM)throw Error("GM only.");
+    if(!canResetResponse(data,row))throw Error("Cannot reset after movement, damage or effect application has started.");
+    if(row.coverProneId) {
+      const actor=await actorAt(row.uuid);
+      const effect=Array.from(actor.effects).find(e=>e.id===row.coverProneId && foundry.utils.getProperty(e,`flags.${MODULE}.coverSource`)===message.id+":"+row.uuid);
+      if(effect)await actor.deleteEmbeddedDocuments("ActiveEffect",[effect.id!]);
+    }
+    row.state="waiting";
+    delete row.claim;delete row.total;delete row.html;delete row.coverUp;delete row.coverProneId;delete row.moveCost;
+    if(row.instant)row.instant=newInstant(row.instant.id,row.actor,row.name,rowEncounter(data,row.uuid));
+    data.effectsResolved=false;
+    if(data.resolutionComplete){data.areaHidden=false;await syncTemplate(message,data);}
   } else if(["hit","miss"].includes(req.action)){
     if(!user.isGM||row.state!=="other")throw Error("GM review is required.");row.state=req.action as "hit"|"miss";
   } else if(req.action==="claim") {
@@ -266,7 +283,10 @@ export async function handleAreaRequest(req:Request) {
     if(row.state!=="waiting"||req.action==="other"&&(data.kind==="suppression"||!data.settings.coverUp||!areaSettings().coverUp)||req.action==="decline"&&data.kind==="suppression")throw Error("This response is unavailable.");
     if(req.action==="other") {
       const actor=await actorAt(row.uuid),prone=masterStatuses.find(s=>s.name==="Prone")!;
-      if(!Array.from(actor.effects).some(e=>!e.disabled&&e.statuses.has(prone.id)))await actor.createEmbeddedDocuments("ActiveEffect",[{name:prone.name,img:prone.img,statuses:[prone.id],changes:[]}]);
+      if(!Array.from(actor.effects).some(e=>!e.disabled&&e.statuses.has(prone.id))) {
+        const created=await actor.createEmbeddedDocuments("ActiveEffect",[{name:prone.name,img:prone.img,statuses:[prone.id],changes:[],flags:{[String(MODULE)]:{coverSource:message.id+":"+row.uuid}}}]);
+        row.coverProneId=created?.[0]?.id??undefined;
+      }
       row.coverUp=true;
     }
     row.state="hit";
@@ -292,7 +312,7 @@ function send(message:string,action:string,extra:Partial<Request>={}) {
   });
 }
 const starting=new Set<string>();
-export async function startAreaAttack(source:Token,target:Token,itemId:string,mode:string) {
+export async function startAreaAttack(source:Token,target:Token,itemId:string,mode:string,skipDialog=false) {
   const actor=source.actor, original=actor?.items.get(itemId) as AreaWeapon|undefined;
   if(!actor||!original||!owns(actor)||starting.has(actor.uuid))return;
   const kind=areaKind(original,mode);if(!kind)return;
@@ -332,7 +352,7 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
       dv=parseDV((await getTable(String(foundry.utils.getProperty(item,"system.dvTable"))))?.getResultsForRoll(distance)[0]?.text);
       if(dv===undefined)throw Error("No native ranged DV table is available for this distance.");
     }
-    if(!await smokeAttackDialog(roll,actor,item,{ctrlKey:false,metaKey:false,type:"pneuma-area"},attackCrossesSmoke(source.center,kind==="explosive"?area.origin:target.center)))return;
+    if(!await smokeAttackDialog(roll,actor,item,{ctrlKey:false,metaKey:false,type:"pneuma-area",shiftKey:skipDialog},attackCrossesSmoke(source.center,kind==="explosive"?area.origin:target.center)))return;
     if(canvas.scene?.id!==scene||source.x!==sourcePosition.x||source.y!==sourcePosition.y||!owns(actor)||actor.items.get(itemId)!==original||areaKind(original,mode)!==kind||!ammoOK())throw Error("The weapon, scene, ownership or ammunition changed.");
     if(String(original.type)!=="ammo"&&grappleWeaponBlocked(actor,original))throw Error("Grappled characters cannot use weapons requiring two hands.");
     checkedLuck(Number(foundry.utils.getProperty(actor,"system.stats.luck.value")),0,roll.luck);
@@ -349,13 +369,13 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
       const path="/systems/cyberpunk-red-core/modules/rolls/cpr-rolls.js";
       const native=await import(path) as {CPRRoll:new(title:string,formula:string)=>import("../native-combat.js").NativeRoll & {additionalMods:unknown[]}};
       const retry=new native.CPRRoll("Smart rocket — second chance","1d10");retry.addMod([{value:10,source:"Smart ammunition"}]);
-      if(await retry.handleRollDialog({type:"pneuma-smart",ctrlKey:false,metaKey:false},actor,item)) {
+      if(await retry.handleRollDialog({type:"pneuma-smart",ctrlKey:skipDialog,metaKey:false},actor,item)) {
         retry.formula="1d10";retry.mods=[{value:10,source:"Smart ammunition"}];retry.additionalMods=[];
         checkedLuck(Number(foundry.utils.getProperty(actor,"system.stats.luck.value")),0,retry.luck);
         await spendBonusLuck(actor,retry.luck);await rollHidden(retry);roll=retry;
       } else {firstAttackHTML="";firstAttackDice=[];}
     }
-    const title=(game.settings!.get(MODULE,"hideAttackWeapon")?"Area attack":original.name??"Area attack")+(kind==="suppression"?" — Suppressive Fire":kind==="shell"?" — Shells":" — Blast");
+    const title=attackTitle(original,game.settings!.get(MODULE,"hideAttackWeapon"),roll.skillName,ammoType)+(kind==="suppression"?" — Suppressive Fire":"");
     roll.rollTitle=title;
     const exchange:Exchange={...encounter,attacker:source.document.uuid,attackerName:source.name??"",defender:source.document.uuid,defenderActor:actor.uuid,defenderName:source.name??"",
       ranged:true,category:"Ranged",title,total:roll.resultTotal,html:(firstAttackHTML?"<div class=\"pneuma-smart-first\">"+firstAttackHTML+"</div>":"")+await nativeCard(roll),dice:[...firstAttackDice,...diceJSON(roll)],dv,
@@ -372,7 +392,7 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
     ChatMessage.applyRollMode(messageData,exchange.rollMode as "roll");await ChatMessage.create(messageData);
   } finally {starting.delete(actor.uuid);}
 }
-async function respond(message:ChatMessage,data:AreaAttack,row:TargetRow,automatic=false) {
+async function respond(message:ChatMessage,data:AreaAttack,row:TargetRow,automatic=false,skipDialog=false) {
   const nonce=foundry.utils.randomID();await send(message.id!,"claim",{target:row.uuid,nonce});
   let committed=false;
   try {
@@ -382,7 +402,7 @@ async function respond(message:ChatMessage,data:AreaAttack,row:TargetRow,automat
     let roll=item.createRoll("skill",actor);
     if(data.kind!=="suppression"&&data.settings.evadePenalty)roll.addMod([{value:data.settings.evadePenalty,source:"Area evasion homebrew"}]);
     if(automatic){if(!automaticArea(actor,data))throw Error("Automatic area evasion requires RAW rules.");roll.luck=0;}
-    else if(!await roll.handleRollDialog({ctrlKey:false,metaKey:false,type:"pneuma-area"},actor,item))return;
+    else if(!await roll.handleRollDialog({ctrlKey:skipDialog,metaKey:false,type:"pneuma-area"},actor,item))return;
     checkedLuck(Number(foundry.utils.getProperty(actor,"system.stats.luck.value")),0,roll.luck);
     if(data.kind!=="suppression"){const blocked=evasionBlocked(actor);if(blocked)throw Error(blocked);}
     roll=await item.confirmRoll(roll);await spendBonusLuck(actor,roll.luck);await roll.roll();
@@ -529,6 +549,9 @@ export function registerAreaAttacks() {
         const eligible=actor?evadeAllowed(Number(foundry.utils.getProperty(actor,"system.stats.ref.value")),data.settings.evade):row.eligible;
         if(blocked||!eligible){button.disabled=true;button.title=blocked??"RAW evasion requires REF 8+.";}
       }
+      if(action==="reset"&&row&&!canResetResponse(data,row)) {
+        button.disabled=true;button.title="Cannot reset after movement, damage or effect application has started.";
+      }
       if(action==="apply"&&(row?.damage?.recordedApplied||["review","applying"].includes(row?.damage?.status??"")))button.disabled=true;
       button.addEventListener("click",async event=>{
         event.preventDefault();event.stopPropagation();if(button.disabled)return;button.disabled=true;
@@ -544,7 +567,7 @@ export function registerAreaAttacks() {
             const area=await placeArea(p=>({...data.area,origin:canvas.grid!.getCenterPoint(p),wallOrigin:canvas.grid!.getCenterPoint(p)}),data.intended,"Choose a new center inside the gray area.",ammoProfile(data.ammoType)?.color);
             if(area)await send(message.id!,"scatter",{area});
           } else if(action==="add") {const selected=canvas.tokens?.controlled??[];if(selected.length!==1)throw Error("Select exactly one token to add.");await send(message.id!,"add",{target:selected[0]!.document.uuid});}
-          else if(action==="roll"&&row)await respond(message,data,row);
+          else if(action==="roll"&&row)await respond(message,data,row,false,event.shiftKey);
           else if(action==="move"&&row)await moveOutside(message,data,row);
           else if(action==="damage")await rollDamage(message.id!,data.exchange,(a,extra)=>send(message.id!,"damage",{damageRequest:{...extra,action:a}}),event.shiftKey);
           else if(action==="apply"&&row)await applyFromCard(rowExchange(data,row),(a,extra)=>send(message.id!,"damage",{target:row.uuid,damageRequest:{...extra,action:a}}),event.shiftKey,row.uuid,"recorded",halfArmorSelected(event),interactArmorSelected(event));

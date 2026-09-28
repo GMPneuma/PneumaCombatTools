@@ -8,9 +8,13 @@ import { canOperate } from "./rolls.js";
 import { enabled } from "./settings.js";
 import { waitForResult } from "./effects.js";
 
+import {selfIce} from "./self-ice.js";
+
 export interface Connection extends Partial<EncounterRef> {
   id: string; sourceActorUuid: string; targetActorUuid: string; sourceTokenUuid: string; targetTokenUuid: string;
   state: "active" | "ejected" | "disconnected"; connectedAt: number;
+  breachCleared?: number;
+  breachResults?: string[];
   awareness?: {alerted:boolean; revealAttacker:boolean; jackInDetected:boolean; quickhackDetected:boolean; audience:string};
 }
 const keyFor = (sourceUuid: string, targetUuid: string) => encodeURIComponent(sourceUuid + "|" + targetUuid).replaceAll(".", "%2E");
@@ -36,7 +40,7 @@ function mergeAwareness(connection: Connection, result: QuickhackResult) {
     quickhackDetected: !!old?.quickhackDetected || result.alerted && result.type === "quickhack",
     audience: result.alerted ? result.audience : old?.audience ?? result.audience};
 }
-interface ConnectRequest { quickhackType: "connect" | "awareness"; id: string; messageId: string; requesterId: string }
+interface ConnectRequest { quickhackType: "connect" | "awareness" | "breach"; id: string; messageId: string; requesterId: string }
 interface DisconnectRequest { quickhackType: "disconnect"; id: string; requesterId: string; combatUuid: string; sourceUuid: string; targetUuid: string; connectionId: string; encounter:EncounterRef }
 interface Reply { quickhackType: "connected"; id: string; requesterId: string; gmId: string; error?: string }
 const requests = new Map<string, { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
@@ -52,7 +56,7 @@ async function connect(request: ConnectRequest) {
   if (!primaryGM() || !enabled()) throw new Error("QuickHack is disabled or no active GM is available.");
   const message = await waitForResult(request.messageId);
   const result = message && resultFlag(message);
-  if (!message || !result || (request.quickhackType === "connect" ? result.type !== "jackIn" : result.type !== "quickhack") || message.author?.id !== request.requesterId) throw new Error("Invalid Jack-In result.");
+  if (!message || !result || (request.quickhackType === "connect" ? result.type !== "jackIn" : result.type !== (request.quickhackType === "breach" ? "breach" : "quickhack")) || message.author?.id !== request.requesterId) throw new Error("Invalid Jack-In result.");
   const combat = resolveEncounter(result);
   if (!combat || combat.uuid !== result.combatUuid) throw new Error("Start combat to track QuickHack connections.");
   const actor = await fromUuid(result.sourceActorUuid) as Actor | null;
@@ -60,6 +64,20 @@ async function connect(request: ConnectRequest) {
   if (!actor || !requester || !canOperate(actor, requester)) throw new Error("Jack-In actor is unavailable.");
   await serialized(combat, async () => {
     if (!enabled() || resolveEncounter(result)?.uuid !== combat.uuid) throw new Error("QuickHack is disabled or the encounter changed.");
+    if (request.quickhackType === "breach") {
+      const connection = activeConnection(actor, result.targetActorUuid, result.connectionId, combat);
+      if (!connection) throw Error("The connection ended before the breach completed.");
+      const target = await fromUuid(result.targetActorUuid) as Actor | null;
+      const ice = selfIce(target ?? undefined, connection.breachCleared ?? 0);
+      // Expected progress makes repeated messages and simultaneous attempts idempotent.
+      if (connection.breachResults?.includes(message.id!)) return;
+      if (result.success && ice.blocked && result.breachCleared === (connection.breachCleared ?? 0)) {
+        const path = `flags.${MODULE}.quickhackConnections.${keyFor(actor.uuid,result.targetActorUuid)}`;
+        await combat.update({[path + ".breachCleared"]: ice.cleared + 1,
+          [path + ".breachResults"]: [...connection.breachResults ?? [], message.id!]});
+      }
+      return;
+    }
     if (request.quickhackType === "awareness") {
       const connection = activeConnection(actor,result.targetActorUuid,result.connectionId,combat);
       if (!connection) return;
@@ -72,7 +90,7 @@ async function connect(request: ConnectRequest) {
     // Each result can establish a connection only once; old cards never reopen ejected links.
     if (foundry.utils.getProperty(message, `flags.${MODULE}.quickhack.connectionRecorded`)) return;
     const connection: Connection = { ...encounterRef(combat,result.combatScene,result.combatTokens), id: message.id!, sourceActorUuid: actor.uuid, targetActorUuid: result.targetActorUuid,
-      sourceTokenUuid: result.sourceTokenUuid, targetTokenUuid: result.targetTokenUuid, state: "active", connectedAt: Number(message.timestamp) };
+      sourceTokenUuid: result.sourceTokenUuid, targetTokenUuid: result.targetTokenUuid, state: "active", breachCleared: 0, breachResults: [], connectedAt: Number(message.timestamp) };
     connection.awareness = mergeAwareness(connection,result);
     const previous = connectionFor(actor, result.targetActorUuid,combat);
     if (previous && previous.id !== connection.id && previous.connectedAt >= connection.connectedAt) return;
@@ -84,7 +102,7 @@ async function connect(request: ConnectRequest) {
 export async function establishConnection(message: ChatMessage) {
   if (!enabled()) return;
   requireCombatSocket();
-  const request: ConnectRequest = { quickhackType: resultFlag(message)?.type === "quickhack" ? "awareness" : "connect", id: foundry.utils.randomID(), messageId: message.id!, requesterId: game.user!.id };
+  const request: ConnectRequest = { quickhackType: resultFlag(message)?.type === "breach" ? "breach" : resultFlag(message)?.type === "quickhack" ? "awareness" : "connect", id: foundry.utils.randomID(), messageId: message.id!, requesterId: game.user!.id };
   if (primaryGM()) return connect(request);
   if (!game.users!.some(user => user.active && user.isGM)) throw new Error("An active GM is required to track Jack-In connections.");
   await new Promise<void>((resolve, reject) => {
@@ -136,7 +154,7 @@ export function registerConnections() {
     if (!payload || !enabled()) return;
     if (payload.quickhackType === "disconnect" && primaryGM()) {
       void disconnect(payload).then(() => sendReply(payload), error => sendReply(payload, String(error)));
-    } else if ((payload.quickhackType === "connect" || payload.quickhackType === "awareness") && primaryGM()) {
+    } else if ((payload.quickhackType === "connect" || payload.quickhackType === "awareness" || payload.quickhackType === "breach") && primaryGM()) {
       void connect(payload).then(() => sendReply(payload), error => sendReply(payload, String(error)));
     } else if (payload.quickhackType === "connected" && payload.requesterId === game.user!.id) {
       const gm = electedGM();
@@ -149,4 +167,16 @@ export function registerConnections() {
 }
 function sendReply(request: ConnectRequest | DisconnectRequest, error?: string) {
   game.socket!.emit(channel, { quickhackType: "connected", id: request.id, requesterId: request.requesterId, gmId: game.user!.id, error });
+}
+
+/** Manual adjudication uses the same connection and serialized combat writes. */
+export async function overrideBreach(source: Actor, target: Actor, cleared: number) {
+  if (!game.user?.isGM || !Number.isInteger(cleared)) return;
+  const combat = sceneEncounter(), original = activeConnection(source, target.uuid, undefined, combat);
+  if (!combat || !original) throw Error("An active connection is required.");
+  await serialized(combat, async () => {
+    const connection = activeConnection(source, target.uuid, original.id, combat);
+    if (!connection || resolveEncounter(connection)?.uuid !== combat.uuid) throw Error("The connection changed.");
+    await combat.update({[`flags.${MODULE}.quickhackConnections.${keyFor(source.uuid,target.uuid)}.breachCleared`]: selfIce(target, cleared).cleared});
+  });
 }

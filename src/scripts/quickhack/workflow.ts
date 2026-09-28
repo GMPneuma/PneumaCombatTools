@@ -11,6 +11,8 @@ import { requestEffect } from "./effects.js";
 import { activeConnection, establishConnection, isEjected } from "./connections.js";
 import { hasQuickhackSight } from "./sight.js";
 
+import {selfIce} from "./self-ice.js";
+
 export const actorQuickhacks = (actor: Actor) => {
   const items = [...actor.items] as unknown as QuickhackItem[];
   return availableQuickhacks(items, mode(), enabled()).map(hack => ({
@@ -28,7 +30,7 @@ export function validTokens(source: Token, target: Token) {
   return isWithinJackInRange(canvas.grid.measurePath([source.center, target.center], {}).distance / distance);
 }
 const pending = new Set<string>();
-export async function executeQuickhack(source: Token, target: Token, id: string) {
+export async function executeQuickhack(source: Token, target: Token, id: string, skipDialog = false) {
   try { requireCombatSocket(); } catch (error) { ui.notifications!.error((error as Error).message); return; }
   if (!validTokens(source, target)) {
     if (enabled()) ui.notifications!.warn("QuickHack requires an owned Netrunner token and another visible target within 25 squares.");
@@ -45,23 +47,44 @@ export async function executeQuickhack(source: Token, target: Token, id: string)
   if (id !== "jack-in" && !connection) { ui.notifications!.warn("An active Jack-In connection to this target is required. Start combat to track connections."); return; }
   if (id === "jack-in" && connection) { ui.notifications!.info("Already jacked into this target."); return; }
   if (combat && id === "jack-in" && !game.users!.some(user => user.isGM && user.active)) { ui.notifications!.warn("An active GM is required to track Jack-In connections."); return; }
+  const connectionId = connection?.id;
+  const breachCleared = connection?.breachCleared ?? 0;
+  const ice = selfIce(target.actor!, breachCleared);
+  const breach = id === "breach";
+  if (id !== "jack-in" && !breach && ice.blocked) { ui.notifications!.warn("Breach all Self-ICE Passwalls before QuickHacking."); return; }
+  if (breach && !ice.blocked) { ui.notifications!.info("No Passwalls remain."); return; }
   const hack = getQuickhack(id);
-  if (id !== "jack-in" && (!hack || !actorQuickhacks(actor).some(entry => entry.id === id))) {
+  if (id !== "jack-in" && !breach && (!hack || !actorQuickhacks(actor).some(entry => entry.id === id))) {
     ui.notifications!.warn("This QuickHack is unavailable under the current rules mode."); return;
   }
   pending.add(actor.uuid);
   try {
     const combatUuid = combat?.uuid;
-    const valid = () => resolveEncounter(encounter)?.uuid === combatUuid && validTokens(source, target) && hasQuickhackSight(source, target) && (id === "jack-in" ? !isEjected(actor, target.actor!.uuid,combat) : !!activeConnection(actor, target.actor!.uuid, connection!.id,combat) && actorQuickhacks(actor).some(entry => entry.id === id));
+    const valid = () => {
+      if (resolveEncounter(encounter)?.uuid !== combatUuid || !validTokens(source, target) || !hasQuickhackSight(source, target)) return false;
+      if (id === "jack-in") return !isEjected(actor, target.actor!.uuid, combat);
+      const current = activeConnection(actor, target.actor!.uuid, connectionId, combat);
+      if (!current) return false;
+      const currentIce = selfIce(target.actor!, current.breachCleared ?? 0);
+      if (breach) return currentIce.blocked && (current.breachCleared ?? 0) === breachCleared && currentIce.dv === ice.dv;
+      return !currentIce.blocked && actorQuickhacks(actor).some(entry => entry.id === id);
+    };
     const role = roleFor(actor)!;
     if (!Number.isFinite(Number(foundry.utils.getProperty(role, "system.rank")))) throw new Error(label("Error.InterfaceUnreadable", { actor: actor.name! }));
-    const roll = await nativeQuickhackRoll(actor, role, hack ? `${hack.name} · DV${hack.dv}` : label("Roll.JackInCardTitle"),
-      actor.hasPlayerOwner ? publicAudience() : gmAudience(), valid, source, false);
+    const roll = await nativeQuickhackRoll(actor, role, breach ? `Breach Passwall · DV${ice.dv} · 1 Net Action` : hack ? `${hack.name} · DV${hack.dv}` : label("Roll.JackInCardTitle"),
+      actor.hasPlayerOwner ? publicAudience() : gmAudience(), valid, source, false, skipDialog);
     if (!roll || !valid()) return;
     const scenario = { sourceIsPlayer: actor.hasPlayerOwner, targetIsPlayer: target.actor!.hasPlayerOwner };
     const base = { ...encounter, combatUuid, sourceActorUuid: actor.uuid, targetActorUuid: target.actor!.uuid,
       sourceTokenUuid: source.document.uuid, targetTokenUuid: target.document.uuid };
-    if (hack) {
+    if (breach) {
+      const success = isQuickhackSuccessful(roll.total, ice.dv);
+      const data: QuickhackResult = {...base, type: "breach", connectionId,
+        breachCleared, success, alerted: false, audience: actor.hasPlayerOwner ? "sourceOwners" : "gm", revealAttacker: true};
+      const message = await postResult(source, target, data, `Breach Passwall · DV${ice.dv}`, success ? "Passwall breached" : "Breach failed",
+        `<p>1 Net Action — spend manually. ${ice.cleared + (success ? 1 : 0)}/${ice.walls} Passwalls cleared.</p>`, roll.content);
+      if (message && valid()) await establishConnection(message);
+    } else if (hack) {
       const success = isQuickhackSuccessful(roll.total, hack.dv);
       const alreadyAware=!!connection?.awareness?.alerted;
       const alerted = alreadyAware||isQuickhackTargetAlerted({ success, silentOnSuccess: hack.silentOnSuccess, targetIsPlayer: scenario.targetIsPlayer });

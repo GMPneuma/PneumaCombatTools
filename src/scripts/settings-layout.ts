@@ -5,7 +5,7 @@ const groups = [
   { id: "combat", title: "Attack & Damage Cards", keys: ["routeSheetAttacks", "hideAttackWeapon", "showArmorControls", "maNoAblation", "reportWeaponReloads"] },
   { id: "evasion", title: "Evasion & Area Attacks", keys: ["evasionEligibility", "configureEvasion", "npcAutoEvasion", "areaSettingsMenu"] },
   { id: "movement", title: "Movement & Initiative", keys: ["movementTracking", "pneumaHomebrew"] },
-  { id: "turn-marker", title: "Animated Turn Indicator", keys: ["turnMarkerSettings", "turnMarkerEnabled", "turnMarkerForceDefault", "turnMarkerStyle", "turnMarkerColor", "turnMarkerThickness", "turnMarkerDistance", "turnMarkerOpacity", "turnMarkerSpeed", "turnMarkerDisplay"] },
+  { id: "turn-marker", title: "Turn Indicator", keys: ["turnMarkerSettings", "turnMarkerEnabled", "turnMarkerForceDefault", "turnMarkerStyle", "turnMarkerColor", "turnMarkerThickness", "turnMarkerDistance", "turnMarkerOpacity", "turnMarkerSpeed", "turnMarkerDisplay", "nextTurnMarker", "turnPopups", "notificationSounds"] },
   { id: "injuries", title: "Injuries & Effects", keys: ["criticalInjuries", "injuryTurnEndReminder", "empBehaviorMenu", "customStatusesMenu"] },
   { id: "quickhack", title: "QuickHack", keys: ["quickhackEnabled", "quickhackMode", "quickhackMessages"] },
   { id: "combat-bar", title: "Combat Bar", keys: [...COMBAT_BAR_SETTING_KEYS,"combatBarSettings"] },

@@ -12,7 +12,7 @@ function fixture(){
 }
 test('player-owned tokens are always self; GM can target another token while acting as one',()=>{
  const f=fixture(),other={isOwner:true};assert(isSelfCTH(f.token,other));assert(!isSelfCTH({isOwner:false},f.token));
- game.user.isGM=true;assert(isSelfCTH(f.token,f.token));assert(isSelfCTH(f.token,undefined));assert(!isSelfCTH(other,f.token));
+ game.user.isGM=true;assert(!isSelfCTH(f.token,undefined));assert(!isSelfCTH(f.token,f.token));f.token.controlled=true;assert(isSelfCTH(f.token,f.token));assert(isSelfCTH(f.token,undefined));assert(!isSelfCTH(other,f.token));f.token.controlled=false;assert(!isSelfCTH(f.token,undefined));game.user.isGM=false;assert(isSelfCTH(f.token,undefined));
 });
 test('speedware requires installed, non-EMP cyberware; native source supports renamed items',()=>{
  const f=fixture();assert(hasSpeedware(f.token.actor));f.item.flags={'pneuma-combattools':{itemMarkers:{disabled:{label:'Disabled'}}}};assert(!hasSpeedware(f.token.actor));f.item.flags={};f.item.system.isInstalledInActor=false;assert(!hasSpeedware(f.token.actor));

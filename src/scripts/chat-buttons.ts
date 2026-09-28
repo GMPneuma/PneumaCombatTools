@@ -1,6 +1,6 @@
 /** Shared presentation for Combat Tools chat controls only. Native roll links stay untouched. */
 const controls=[
-  ".pneuma-defense-controls button", ".pneuma-result-damage", ".pneuma-apply-damage", ".pneuma-apply-critical",
+  ".pneuma-defense-controls button", ".pneuma-evasion-override", ".pneuma-result-damage", ".pneuma-apply-damage", ".pneuma-apply-critical",
   ".pneuma-damage-status-slot", ".pneuma-damage-recovery-controls button", ".pneuma-quickhack-actions button",
   ".pneuma-grapple-controls button", "[data-aoe-action]", "[data-instant-action]", "[data-emp-select]",
   "[data-ribs-apply]", ".pneuma-manual-controls button", ".pneuma-group-action button", ".pneuma-half-armor", ".pneuma-interact-armor"
@@ -23,7 +23,7 @@ function decorate(node:HTMLElement):void {
   node.dataset.chatKind=node.matches(".pneuma-half-armor, .pneuma-interact-armor")?"toggle":cancel?"cancel":recovery?"recovery":"action";
   if(!iconOnly&&node.dataset.chatKind!=="toggle"&&!node.querySelector("i,img,svg")) {
     const icon=document.createElement("i");icon.setAttribute("aria-hidden","true");
-    const name=cancel?"fa-xmark":recovery?"fa-wrench":/evade/i.test(text)?"fa-person-running":/apply.*damage|apply to/i.test(text)?"fa-bolt":/damage/i.test(text)?"fa-droplet":/resist/i.test(text)?"fa-shield-halved":/roll/i.test(text)?"fa-dice":/injury/i.test(text)?"fa-heart-crack":/choose/i.test(text)?"fa-list-check":"fa-arrow-right";
+    const name=cancel?"fa-xmark":recovery?"fa-wrench":/evade|evasion/i.test(text)?"fa-person-running":/apply.*damage|apply to/i.test(text)?"fa-bolt":/damage/i.test(text)?"fa-droplet":/resist/i.test(text)?"fa-shield-halved":/roll/i.test(text)?"fa-dice":/injury/i.test(text)?"fa-heart-crack":/choose/i.test(text)?"fa-list-check":"fa-arrow-right";
     icon.className="fas "+name+" pneuma-chat-action-icon";node.prepend(icon);
   }
   const busy=clicked.has(node)&&disabled(node);

@@ -2,6 +2,7 @@ import { requireCombatSocket } from "./socket-health.js";
 const HUD_MODULE = "pneuma-combattools";
 const HUD_CHANNEL = "module." + HUD_MODULE;
 export interface HUDMessageOptions {
+  suppressDefaultSound?: boolean;
   source: string;
   id?: string;
   text: string;
@@ -13,7 +14,7 @@ export interface HUDMessageOptions {
   actor?: string;
   chatMessage?: string;
 }
-export interface HUDNotice { source: string; id: string; text: string; expires: number; mode?: "flash" | "queued"; actor?:string; chatMessage?:string }
+export interface HUDNotice { suppressDefaultSound?:boolean; source: string; id: string; text: string; expires: number; mode?: "flash" | "queued"; actor?:string; chatMessage?:string }
 type HUDWire = { kind: "hud-message"; action: "send" | "remove"; recipients: string[]; notice: HUDNotice };
 const notices = new Map<string, HUDNotice>();
 let notifyHUD = () => {};
@@ -21,8 +22,8 @@ let notifyFlash = (_notice: HUDNotice, _remove = false) => {};
 let expiryTimer: ReturnType<typeof setTimeout> | undefined;
 export const hudMessageKey = (message: Pick<HUDNotice, "source" | "id">) => JSON.stringify([message.source, message.id]);
 function validPart(value: unknown): value is string { return typeof value === "string" && value.length > 0 && value.length <= 100; }
-const validContext=(message:{actor?:unknown;chatMessage?:unknown})=>(message.actor===undefined||typeof message.actor==="string"&&message.actor.length>0&&message.actor.length<=200)&&(message.chatMessage===undefined||validPart(message.chatMessage));
-const context=(message:HUDMessageOptions|HUDNotice)=>({...(message.actor?{actor:message.actor}:{}),...(message.chatMessage?{chatMessage:message.chatMessage}:{})});
+const validContext=(message:{actor?:unknown;chatMessage?:unknown;suppressDefaultSound?:unknown})=>(message.suppressDefaultSound===undefined||typeof message.suppressDefaultSound==="boolean")&&(message.actor===undefined||typeof message.actor==="string"&&message.actor.length>0&&message.actor.length<=200)&&(message.chatMessage===undefined||validPart(message.chatMessage));
+const context=(message:HUDMessageOptions|HUDNotice)=>({... (message.suppressDefaultSound?{suppressDefaultSound:true}:{}),...(message.actor?{actor:message.actor}:{}),...(message.chatMessage?{chatMessage:message.chatMessage}:{})});
 function refreshMessages() {
   if (expiryTimer) clearTimeout(expiryTimer);
   let next = Infinity;

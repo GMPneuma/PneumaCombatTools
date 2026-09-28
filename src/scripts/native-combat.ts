@@ -1,6 +1,6 @@
 import { checkedLuck } from "./evasion-rules.js";
 export interface NativeRoll {
-  rollTitle: string; rollCard: string; resultTotal: number; luck: number; formula?: string;
+  skillName?: string; rollTitle: string; rollCard: string; resultTotal: number; luck: number; formula?: string;
   mods: { id?: string; value: number; source: string }[];
   entityData?: { actor: string; token: string; item: string; tokens: string[] };
   criticalCard?: boolean; location?: string; isAimed?: boolean; isAutofire?: boolean; autofireMultiplier?: number; autofireMultiplierMax?: number; _roll?: Roll; _critRoll?: Roll;
@@ -68,12 +68,12 @@ export function registerEvasionDialog(): void {
   });
 }
 export async function evasionDialog(roll: NativeRoll, actor: Actor, item: Item,
-  penalty: number, fee: number): Promise<boolean> {
+  penalty: number, fee: number, skipDialog = false): Promise<boolean> {
   if (penalty) roll.addMod([{ id: "pneuma-ranged-evasion", source: "Additional ranged evasion", value: penalty }]);
   dialogNotes.set(roll, { penalty, fee });
   try {
-    // Always show the required cost, independent of Ctrl-to-skip preferences.
-    return await roll.handleRollDialog({ type: "pneuma-evasion", ctrlKey: false, metaKey: false }, actor, item);
+    // Shift-click accepts the displayed cost; native validation and modifiers remain.
+    return await roll.handleRollDialog({ type: "pneuma-evasion", ctrlKey: skipDialog, metaKey: false }, actor, item);
   } finally { dialogNotes.delete(roll); }
 }
 export async function spendBonusLuck(actor: Actor, bonus: number): Promise<void> {
@@ -85,10 +85,11 @@ export async function spendBonusLuck(actor: Actor, bonus: number): Promise<void>
 const smokeModId="heavilyObscured-coreBook";
 const smokeRolls=new WeakSet<NativeRoll>();
 export async function smokeAttackDialog(roll:NativeRoll,actor:Actor,item:Item,event:unknown,obscured:boolean):Promise<boolean> {
-  if(!obscured)return roll.handleRollDialog(event,actor,item);
+  const skipDialog = !!(event as {shiftKey?:boolean})?.shiftKey;
+  if(!obscured)return roll.handleRollDialog(skipDialog ? {type:"pneuma-fast",ctrlKey:true,metaKey:false} : event,actor,item);
   if(!roll.mods.some(mod=>mod.id===smokeModId))roll.addMod([{id:smokeModId,source:"Smoke",value:-4}]);
   smokeRolls.add(roll);
-  try{return await roll.handleRollDialog({type:"pneuma-smoke",ctrlKey:false,metaKey:false},actor,item);}
+  try{return await roll.handleRollDialog({type:"pneuma-smoke",ctrlKey:skipDialog,metaKey:false},actor,item);}
   finally{smokeRolls.delete(roll);}
 }
 interface AttackChoice { unaware: boolean; improvised: boolean; improvisedDice?: number }
@@ -183,7 +184,7 @@ export async function attackDialog(roll: NativeRoll, actor: Actor, item: Item, e
   if (game.user?.isGM || improvised) attackChoices.set(roll, choice);
   try {
     const confirmed = await smokeAttackDialog(roll, actor, item, game.user?.isGM || improvised
-      ? { type: "pneuma-attack", ctrlKey: false, metaKey: false } : event, obscured);
+      ? { type: "pneuma-attack", ctrlKey: false, metaKey: false, shiftKey: !improvised && !!(event as {shiftKey?:boolean})?.shiftKey } : event, obscured);
     if (confirmed && improvised && choice.improvisedDice === undefined)
       throw new Error("Choose improvised damage from 1d6 to 6d6 before attacking.");
     return { confirmed, unaware: !!game.user?.isGM && choice.unaware,

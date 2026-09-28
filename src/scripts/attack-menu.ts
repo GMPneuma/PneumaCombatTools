@@ -59,7 +59,7 @@ export async function attackFromHUD(attacker: Token, target: Token, itemId: stri
     const kind=areaKind(nativeItem, mode);
     if (kind) {
       const { startAreaAttack } = await import("./aoe/workflow.js");
-      await startAreaAttack(attacker,target,itemId,mode);return;
+      await startAreaAttack(attacker,target,itemId,mode,!!event.shiftKey);return;
     }
     if(mode==="aimed"&&areaKind(nativeItem,"attack"))throw Error("Area attacks cannot make aimed shots.");
   }

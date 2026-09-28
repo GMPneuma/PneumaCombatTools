@@ -77,7 +77,7 @@ export function registerTurnMarker(){
   game.settings!.register(M,"turnMarkerDistance",{name:"Indicator Scale",hint:"Adjusts the indicator perimeter around the token. Higher values extend it farther beyond the token edge.",scope:"world",config:false,type:Number,default:8,range:{min:0,max:50,step:1},onChange:refreshTurnMarker});
   game.settings!.register(M,"turnMarkerOpacity",{name:"Indicator opacity",scope:"world",config:false,type:Number,default:.85,range:{min:.5,max:1,step:.05},onChange:refreshTurnMarker});
   game.settings!.register(M,"turnMarkerSpeed",{name:"Indicator speed",hint:"1 is one cycle every four seconds. 0 is static.",scope:"world",config:false,type:Number,default:1,range:{min:0,max:2,step:.25},onChange:refreshTurnMarker});
-  game.settings!.register(M,"turnMarkerDisplay",{name:"Animated Turn Indicator Display",scope:"client",config:true,type:String,default:window.matchMedia?.("(prefers-reduced-motion: reduce)").matches?"static":"animated",choices:{animated:"Animated",static:"Static"},onChange:refreshTurnMarker});
+  game.settings!.register(M,"turnMarkerDisplay",{name:"Turn Indicator Display",scope:"client",config:true,type:String,default:window.matchMedia?.("(prefers-reduced-motion: reduce)").matches?"static":"animated",choices:{animated:"Animated",static:"Static"},onChange:refreshTurnMarker});
   for(const event of ["updateUser","createUser","deleteUser","updateActor","updateToken","canvasReady","createCombat","updateCombat","deleteCombat","createCombatant","updateCombatant","deleteCombatant"])Hooks.on(event,refreshTurnMarker);
   Hooks.on("ready",async()=>{
     if(game.settings!.get(M,"turnMarkerDisplay")==="off"){

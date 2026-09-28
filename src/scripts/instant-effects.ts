@@ -89,7 +89,7 @@ async function resolveInstant(s:InstantState,req:InstantRequest,user:User,save:(
   }catch(error){s.state="review";await save();throw error;}
 }
 type Send=(req:InstantRequest)=>Promise<unknown>;
-export async function rollInstant(s:InstantState,send:Send,rollMode="roll") {
+export async function rollInstant(s:InstantState,send:Send,rollMode="roll",skipDialog=false) {
   const nonce=foundry.utils.randomID();await send({action:"claim",nonce});let committed=false;
   try {
     const actor=await fromUuid(s.actor) as Actor|null;if(!actor)throw Error("Target unavailable.");
@@ -97,7 +97,7 @@ export async function rollInstant(s:InstantState,send:Send,rollMode="roll") {
     const item=actor.items.find(i=>String(i.type)==="skill"&&i.name?.toLowerCase()===name.toLowerCase()) as RollItem|undefined;
     if(!item)throw Error(name+" skill is missing.");
     let roll=item.createRoll("skill",actor);
-    if(!await roll.handleRollDialog({type:"pneuma-instant",ctrlKey:false,metaKey:false},actor,item))return;
+    if(!await roll.handleRollDialog({type:"pneuma-instant",ctrlKey:skipDialog,metaKey:false},actor,item))return;
     checkedLuck(Number(foundry.utils.getProperty(actor,"system.stats.luck.value")),0,roll.luck);
     roll=await item.confirmRoll(roll);await spendBonusLuck(actor,roll.luck);await rollHidden(roll);
     await send({action:"commit",nonce,total:roll.resultTotal,html:await nativeCard(roll)});committed=true;
@@ -111,7 +111,7 @@ export async function bindInstantControls(root:HTMLElement,state:(scope:string)=
     if(!s||!actor||!game.user!.isGM&&(!actor.isOwner||["skip","reset","review"].includes(a))){b.remove();continue;}
     if((a==="wake"||a==="extinguish")&&!hasInstantCondition(actor,a==="wake"?"sleep":"fire")){b.remove();continue;}
     b.addEventListener("click",async event=>{event.preventDefault();event.stopPropagation();if(b.disabled)return;b.disabled=true;
-      try {if(a==="roll")await rollInstant(s,req=>send(scope,req),rollMode);else await send(scope,{action:a});}
+      try {if(a==="roll")await rollInstant(s,req=>send(scope,req),rollMode,event.shiftKey);else await send(scope,{action:a});}
       catch(e){ui.notifications!.error((e as Error).message);}finally{b.disabled=false;}
     });
   }

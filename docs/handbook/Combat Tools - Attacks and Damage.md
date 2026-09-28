@@ -29,7 +29,7 @@ Reload and Change Ammo use native CPR behavior and do not themselves start an at
 
 ## Damage card controls
 
-- **Roll damage:** ordinary click uses the normal path; Shift-click opens native options.
+- **Roll damage:** ordinary click opens native roll options; Shift-click rolls immediately.
 - **Recorded target:** applies to the exchange's intended recipient.
 - **To selected target:** explicit alternate recipient; tracked exchanges require that recipient in the original encounter. Applied recipients appear on the card.
 - **Add Effects:** three attachment slots with supported Instant Effects, critical injuries, drugs, pharma and miscellaneous entries.
