@@ -22,7 +22,7 @@ export const actorQuickhacks = (actor: Actor) => {
   }));
 };
 export function validTokens(source: Token, target: Token) {
-  if (!enabled() || !source.actor || !target.actor || !canOperate(source.actor)
+  if (!enabled() || !source.actor || !target.actor || ["container", "blackIce", "demon"].includes(String(source.actor.type)) || ["container", "blackIce", "demon"].includes(String(target.actor.type)) || !canOperate(source.actor)
     || source === target || !target.isVisible || !roleFor(source.actor)
     || canvas.tokens?.get(source.id!) !== source || canvas.tokens?.get(target.id!) !== target) return false;
   const distance = Number(canvas.scene?.grid.distance);

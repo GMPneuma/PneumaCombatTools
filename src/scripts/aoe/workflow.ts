@@ -1,3 +1,4 @@
+import {nativeItemMatches, findNativeItem} from "../native-lookup.js";
 import {attackTitle,attackHeading} from "../attack-title.js";
 import {inlineRoll} from "../inline-roll.js";
 import { primaryGM as gm, escapeHTML as esc } from "../shared.js";
@@ -313,6 +314,7 @@ function send(message:string,action:string,extra:Partial<Request>={}) {
 }
 const starting=new Set<string>();
 export async function startAreaAttack(source:Token,target:Token,itemId:string,mode:string,skipDialog=false) {
+  if([source,target].some(token=>["container", "blackIce", "demon"].includes(String(token.actor?.type))))return;
   const actor=source.actor, original=actor?.items.get(itemId) as AreaWeapon|undefined;
   if(!actor||!original||!owns(actor)||starting.has(actor.uuid))return;
   const kind=areaKind(original,mode);if(!kind)return;
@@ -321,7 +323,7 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
   const ammoType=String(String(original.type)==="ammo"?foundry.utils.getProperty(original,"system.type")??"":original._getLoadedAmmoProp?.("type")??"");
   const variety=String(original.type)==="ammo"?"grenade":String(original._getLoadedAmmoProp?.("variety")??(foundry.utils.getProperty(original,"system.weaponType")==="rocketLauncher"?"rocket":"grenade"));
   const profile=kind==="explosive"?ammoProfile(ammoType,variety):undefined;
-  if(ammoType==="smart"&&profile&&!actor.items.some(i=>String(i.type)==="cyberware"&&i.name?.toLowerCase().includes("targeting scope")&&!!(foundry.utils.getProperty(i,"system.isInstalledInActor")??foundry.utils.getProperty(i,"system.isInstalled"))&&!empDisabled(i)))throw Error("Smart rockets require installed, operational Targeting Scope cyberware.");
+  if(ammoType==="smart"&&profile&&!actor.items.some(i=>nativeItemMatches(i,"Targeting Scope")&&!!(foundry.utils.getProperty(i,"system.isInstalledInActor")??foundry.utils.getProperty(i,"system.isInstalled"))&&!empDisabled(i)))throw Error("Smart rockets require installed, operational Targeting Scope cyberware.");
   starting.add(actor.uuid);
   try {
     const scene=canvas.scene!.id!,s=areaSettings();
@@ -397,7 +399,7 @@ async function respond(message:ChatMessage,data:AreaAttack,row:TargetRow,automat
   let committed=false;
   try {
     const actor=await actorAt(row.uuid), name=data.kind==="suppression"?"Concentration":"Evasion";
-    const item=actor.items.find(i=>String(i.type)==="skill"&&i.name?.toLowerCase()===name.toLowerCase()) as RollItem|undefined;
+    const item=findNativeItem(actor.items,name) as RollItem|undefined;
     if(!item)throw Error(name+" skill is missing.");
     let roll=item.createRoll("skill",actor);
     if(data.kind!=="suppression"&&data.settings.evadePenalty)roll.addMod([{value:data.settings.evadePenalty,source:"Area evasion homebrew"}]);

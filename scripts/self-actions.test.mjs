@@ -18,3 +18,5 @@ test('MA Recovery uses trained Martial Art, beats DV13 strictly, and stands up o
   skill.system.skillType='generic';assert.equal(hasMartialArts(actor),false);
  }
 });
+
+test('MA Recovery appears only while prone with a trained martial art',async()=>{const {selfActions}=await import('../dist/scripts/self-actions.js');globalThis.game={settings:{get:()=>false}};const actor={items:[{type:'skill',system:{skillType:'martialArt',level:1}}],effects:[]};assert.equal(selfActions(actor).some(a=>a.action==='recovery'),false);actor.effects.push({statuses:new Set(['prone'])});assert.equal(selfActions(actor).some(a=>a.action==='recovery'),true);actor.items[0].system.level=0;assert.equal(selfActions(actor).some(a=>a.action==='recovery'),false);});

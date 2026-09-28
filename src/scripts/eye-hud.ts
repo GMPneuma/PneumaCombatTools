@@ -42,6 +42,7 @@ const dismissedLegacyMessages = new Set<string>();
 let hoveredHUDToken: Token | undefined;
 let attachments: HTMLElement | undefined;
 export function hasBiomonitor(actor: Actor): boolean {
+  if (["container", "blackIce", "demon"].includes(String(actor.type))) return false;
   return Array.from(actor.items).some(item => {
     const system = item.system as unknown as { isInstalledInActor?: boolean; isInstalled?: boolean };
     const source = String(foundry.utils.getProperty(item, "flags.core.sourceId") ?? foundry.utils.getProperty(item, "_stats.compendiumSource") ?? "");
@@ -101,10 +102,11 @@ let queued = false;
 const ATTACK_NOTICE_SOURCE="pneuma-combattools.attack";
 function actorInFocus(): Actor | undefined {
   const tokens = canvas.tokens?.controlled ?? [];
-  if (tokens.length === 1 && tokens[0]?.actor?.isOwner) return tokens[0].actor;
+  if (tokens.length === 1 && tokens[0]?.actor?.isOwner) return ["container", "blackIce", "demon"].includes(String(tokens[0].actor.type)) ? undefined : tokens[0].actor;
   if (game.user?.isGM) return;
-  const character = game.user?.character;
-  const owned = (canvas.tokens?.placeables ?? []).filter(token => token.actor?.isOwner);
+  const assigned = game.user?.character;
+  const character = ["container", "blackIce", "demon"].includes(String(assigned?.type)) ? undefined : assigned;
+  const owned = (canvas.tokens?.placeables ?? []).filter(token => token.actor?.isOwner && !["container", "blackIce", "demon"].includes(String(token.actor.type)));
   // Players with one owned scene token need not also configure a User Character.
   if (!character) return owned.length === 1 ? owned[0]!.actor ?? undefined : undefined;
   // Unlinked tokens carry their own HP, connections and attack recipient UUID.

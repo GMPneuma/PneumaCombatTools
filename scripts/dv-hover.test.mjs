@@ -109,6 +109,12 @@ test('hover lifecycle, table precedence, range boundaries, updates and stale asy
   fire('hoverToken', target, true);
   await settle();
   assert.equal(children.length, 1);
+  for(const type of ['container','blackIce','demon']) {
+    source.actor.type='character';target.actor={type};fire('hoverToken', target, true);await settle();
+    assert.equal(children.length,0,type+' targets have no DV hover');
+    target.actor={type:'mook'};source.actor.type=type;fire('hoverToken', target, true);await settle();
+    assert.equal(children.length,0,type+' sources have no DV hover');
+  }
   fire('canvasTearDown');
   assert.equal(children.length, 0);
 });

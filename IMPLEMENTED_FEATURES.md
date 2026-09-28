@@ -1,5 +1,9 @@
 # Combat Tools feature inventory
 
+Non-character actor exclusion (released in 0.9.4, 2026-09-28): native container, Black ICE, and Demon actors bypass Combat Tools CTH menus and HUD positioning, EKG/DV hover, Biomonitor focus, movement tracking, turn indicators/alerts, character roll shortcuts, and attack/quickhack entry points. AoE target collection already excludes these types. Native controls remain available. Automated checks cover all three excluded actor types for hover and GM/player right-click behavior; live Foundry verification remains pending.
+
+Translation-safe native lookups (released in 0.9.4, 2026-09-28): native ranged DV tables, including thrown grenades, resolve by verified CPR v0.92.4 document IDs before English table names. World tables and configured custom compendiums retain precedence, and DV caching remains. Evasion, Concentration, Brawling, Cybertech, Resist Torture/Drugs, Netrunner, and Targeting Scope use compendium source identity with name fallbacks; supported skills also accept system-localized names. Native critical-injury tables and injury pack selection use stable identities. Custom tables retain their existing name-based behavior. Self-ICE and other unverified/custom item names remain unchanged. Automated lookup and HUD checks pass; live Babele/Foundry verification remains pending.
+
 AoE Reset Player Action (2026-09-28, released in 0.9.3): after a target responds, the row replaces its GM exclude/affected override with a labeled GM reset. Reset clears the response roll/reservation and Cover Up selection, recreates untouched instant choices, and restores the original response controls. It removes only Prone created by this row and uses existing suppression-source cleanup. Other targets and shared attack/damage rolls remain unchanged. Reset is blocked after movement, per-target damage, or effect application begins. Previously spent Luck is not refunded; reset is not a resource rollback.
 
 Speed Heal status restored to the native token status picker under Pharmaceuticals (2026-09-27, released in 0.9.3). Uses the existing status ID and icon.
@@ -301,3 +305,9 @@ Self-ICE (released in 0.9.3): installed, functional cyberware named Self-ICE sup
 Self CTH cleanup (released in 0.9.3): removed the Toggle Alert HUD bell button and its click handler. Biomonitor visibility remains controlled through its existing settings.
 
 Review corrections (released in 0.9.3): QuickHack/Jack-In/Breach rolls validate and deduct selected LUCK through the shared native-roll helper; cancelled or stale dialogs do not spend it. Breach validation captures original connection ID and cleared-wall count before rolling. Every ROLL-menu favorite has a compact remove control independent of the selected actor, including deleted, renamed or non-rollable abilities.
+
+Self Actions placement (released in 0.9.4): Escape from a grab now appears in Self Actions. Other grapple actions remain in Close Combat; its self-HUD icon is omitted when empty. Escape retains its existing roll, Shift-click and permission behavior.
+
+Self Actions visibility (released in 0.9.4): MA Recovery is shown only while prone with a trained Martial Art. Re-roll Initiative is shown only with the homebrew enabled, owned token, functional installed speedware, and an existing initiative in a started scene encounter.
+
+Self-action reporting (released in 0.9.4): successful Extinguish posts a concise actor-attributed chat message from Self Actions or Biomonitor controls, respecting the current chat roll mode. Repeated/no-op clicks and failed clears do not post a success report. Existing roll cards and grapple action reports remain the reports for those actions.

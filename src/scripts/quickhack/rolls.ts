@@ -1,3 +1,4 @@
+import {findNativeItem} from "../native-lookup.js";
 import { rollHidden, nativeCard, spendBonusLuck, type NativeRoll, type RollItem } from "../native-combat.js";
 import { MODULE } from "./availability.js";
 import { enabled } from "./settings.js";
@@ -5,7 +6,7 @@ import { enabled } from "./settings.js";
 export interface Audience { whisper: string[]; blind: boolean }
 export const gmAudience = (): Audience => ({ whisper: ChatMessage.getWhisperRecipients("GM").map(user => user.id), blind: true });
 export const publicAudience = (): Audience => ({ whisper: [], blind: false });
-export const roleFor = (actor: Actor) => actor.items.find(item => String(item.type) === "role" && item.name?.trim().toLowerCase() === "netrunner") as RollItem | undefined;
+export const roleFor = (actor: Actor) => findNativeItem(actor.items,"Netrunner") as RollItem | undefined;
 export const canOperate = (actor: Actor, user: User = game.user!) => user.isGM || actor.testUserPermission(user, "OWNER");
 export async function nativeQuickhackRoll(actor: Actor, item: RollItem, title: string, audience: Audience,
   validate = () => enabled(), sourceToken?: Token, publish = true, skipDialog = false) {

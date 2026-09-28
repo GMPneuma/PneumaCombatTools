@@ -41,7 +41,8 @@ export function toggleRollFavorite(actor: Actor, favorite: RollFavorite): Promis
   return updateFavorites(favorites => {
     const index = favorites.findIndex(f => sameFavorite(f, favorite));
     if (index >= 0) { favorites.splice(index, 1); return; }
-    if (!actor.isOwner) throw Error("You do not control this character.");
+    if (["container", "blackIce", "demon"].includes(String(actor.type))) throw Error("Select a character token first.");
+  if (!actor.isOwner) throw Error("You do not control this character.");
     const current = favoriteChoice(actor, favorite);
     if (!current) throw Error("This ability has no native roll or is no longer available.");
     if (favorites.length >= 3) throw Error("Choose at most 3 favorites across Skills and Role Abilities. Remove a star first.");
@@ -49,6 +50,7 @@ export function toggleRollFavorite(actor: Actor, favorite: RollFavorite): Promis
   });
 }
 export async function rollFavorite(actor: Actor, favorite: RollFavorite, skipDialog = false): Promise<void> {
+  if (["container", "blackIce", "demon"].includes(String(actor.type))) throw Error("Select a character token first.");
   if (!actor.isOwner) throw Error("You do not control this character.");
   const current = favoriteChoice(actor, favorite);
   if (!current) throw Error("This ability is no longer available.");

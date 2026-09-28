@@ -1,5 +1,7 @@
 # Combat Tools chat-card styling contract
 
+Container, Black ICE, and Demon actor tokens retain their native HUD template, controls, and positioning. Combat Tools does not append self or targeted menu controls to these HUDs. Existing character/mook HUD selectors and card markup are unchanged.
+
 Character-sheet attack routing (unreleased, off by default) reuses the existing single-target and area card renderers. It adds no card markup, CSS classes, state selectors or controls; all existing card visibility and styling contracts apply.
 
 Targeted HUD menus: `.pneuma-target-menu.pneuma-combat-menu.pneuma-panel` replaces the former `.status-effects` root class. Combat Tools explicitly supplies absolute positioning, top alignment, content-box sizing, pointer events, and hidden visibility until `.active`. Width remains 230px. The Monk-specific `!important` override is removed. Native status pickers and self-action flyouts remain separate.
@@ -187,3 +189,5 @@ The single-target `.pneuma-evasion-override` is included in the shared chat-butt
 ## Self-ICE breach
 
 Breach results reuse `.pneuma-quickhack-card`, its native `.rollcard` and `.cpr-block` classes, heading, roll, and result sections. `data-state="success"`/`"failure"` tracks the Interface outcome. Detail reports cleared/total walls and the manually spent one-Net-Action cost. No effect or ejection controls are added. Cards go to source owners plus GMs (NPC rolls to GMs). Existing selectors remain. Example: `.pneuma-quickhack-card[data-state="success"] .pneuma-quickhack-detail`. The target HUD uses its existing `.combat-weapon-name` controls for Breach and the GM progress override; QuickHack buttons remain disabled until all walls clear.
+
+Non-roll self-action reports use a plain paragraph `.pneuma-self-action-report` within the native chat message, with an escaped actor name and native speaker/roll-mode visibility. Extinguish reports only after fire clears, with no extra buttons or card sections. Example: `.message-content .pneuma-self-action-report`. Existing roll and grapple cards are unchanged.

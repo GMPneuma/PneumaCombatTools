@@ -20,7 +20,7 @@ try{
  const stubs=names.map(name=>`const ${name}=()=>{};`).join('\n')+'\nconst DEFAULT_ICON_COLOR="#ffc36a",installIconColorNormalization=()=>{},tokenEncounter=()=>game.combat,displayedEncounter=()=>game.combat;const openTurnMarkerSettings=token=>{window.animationOpened=true;window.indicatorToken=token;},registerQuickhack=()=>{},bindWeaponAmmo=()=>{},decorateItemList=()=>{},connectionFor=()=>undefined,quickhackEnabled=()=>true,forceOutEntries=()=>[{messageId:"intrusion",label:"Eject Netrunner"}],attackEntries=()=>[],thrownEntries=()=>[],grenadeEntries=()=>window.grenades??[],grappleMenu=()=>window.grappleActions??[],useGrapple=async(s,t,a)=>{window.grappleUsed=a;},trackingCombat=()=>undefined,selfActions=()=>[],performSelfAction=async()=>{},canWake=()=>false,hasQuickhackSight=()=>true,actorQuickhacks=()=>[];';
  const eligibility=(await readFile('dist/scripts/attack-menu.js','utf8')).match(/export function canShowQuickhack[\s\S]*?\n}/)[0];
  const emp=(await readFile('dist/scripts/effect-duration.js','utf8'))+'\n'+(await readFile('dist/scripts/emp-rules.js','utf8')).replace(/^import .*;\s*/gm,''),self=(await readFile('dist/scripts/self-cth.js','utf8')).replace(/^import .*;\s*/gm,'');
- await page.addScriptTag({type:'module',content:eligibility+'\n'+emp+'\n'+(await readFile('dist/scripts/quickhack/self-ice.js','utf8')).replace(/^import .*;\s*/gm,'')+'\n'+self+'\n'+stubs+'\n'+main+'\nhooks.init.forEach(fn=>fn());window.loaded=true;'});await page.waitForFunction(()=>window.loaded);
+ await page.addScriptTag({type:'module',content:(await readFile('dist/scripts/native-lookup.js','utf8'))+'\n'+eligibility+'\n'+emp+'\n'+(await readFile('dist/scripts/quickhack/self-ice.js','utf8')).replace(/^import .*;\s*/gm,'')+'\n'+self+'\n'+stubs+'\n'+main+'\nhooks.init.forEach(fn=>fn());window.loaded=true;'});await page.waitForFunction(()=>window.loaded);
  await page.evaluate(()=>{
   window.own=Object.assign(new CONFIG.Token.objectClass(),{isOwner:true,isVisible:true,controlled:true,actor:{uuid:'Actor.own',isOwner:true,items:[{type:'cyberware',name:'Kerenzikov',system:{isInstalledInActor:true}}]},document:{uuid:'Token.own'}});
   window.enemy=Object.assign(new CONFIG.Token.objectClass(),{isOwner:false,isVisible:true,actor:{uuid:'Actor.enemy',isOwner:false,items:[]},document:{uuid:'Token.enemy'}});
@@ -50,9 +50,11 @@ try{
  await page.evaluate(()=>{settings.pneumaHomebrew=false;});await page.locator('[data-self-initiative]').dispatchEvent('click');assert.equal(await page.evaluate(()=>rolls.length),1);
  await page.evaluate(()=>{canvas.tokens.controlled=[own];return show(enemy);});assert.equal(await page.locator('[data-combat-action]').count(),3);assert.equal(await page.locator('[data-self-initiative]').count(),0);
  await page.evaluate(()=>{document.querySelector("#token-hud").innerHTML='<div class="col right"></div>';window.grappleActions=[{action:"escape",label:"Escape — Attacker"}];return show(own);});
- assert.equal(await page.locator('[data-self-close-toggle]').count(),1);
- await page.locator('[data-self-close-toggle]').dispatchEvent('click');
- assert.equal(await page.locator('[data-self-close-menu]').isVisible(),true);
+ assert.equal(await page.locator('[data-self-close-toggle]').count(),0);
+ await page.locator('[data-self-actions-toggle]').dispatchEvent('click');
+ assert.equal(await page.locator('[data-self-actions-menu]').isVisible(),true);
+ assert.equal(await page.locator('[data-self-actions-menu] [data-self-grapple="escape"]').count(),1);
+ assert.equal(await page.locator('[data-self-actions-menu] .combat-empty').count(),0);
  assert.equal(await page.locator('[data-self-grapple]').innerText(),'Escape — Attacker');
  await page.locator('[data-self-grapple]').click();assert.equal(await page.evaluate(()=>grappleUsed),'escape');
  await page.evaluate(()=>{window.grappleActions=[{action:"choke",label:"Choke — Defender",disabled:true}];return show(own);});
@@ -108,5 +110,11 @@ try{
  assert.equal(await page.locator('[data-quickhack-id="overheat"]').isDisabled(),true);
  assert.equal(await page.locator('[data-quickhack-id="breach"]').count(),1);
  assert.equal(await page.locator('[data-breach-override]').count(),1);
+ for(const type of ['container','blackIce','demon'])for(const gm of [false,true])for(const shift of [false,true]) {
+  await page.evaluate(async({gm,shift,type})=>{game.user.isGM=gm;own.actor.type=type;canvas.tokens.controlled=[own];document.querySelector('#token-hud').innerHTML='<div class="col right"></div><button data-native>Native</button>';await show(own,shift);},{gm,shift,type});
+  assert.equal(await page.evaluate(()=>hud.template),'native');
+  assert.equal(await page.locator('[data-self-cth], [data-combat-action]').count(),0);
+  assert.equal(await page.locator('[data-native]').count(),1);
+ }
  console.log('Self CTH browser checks passed: own-token replacement, native controls retained, setting toggle, Shift-right-click, D10 native reroll and target actions.');
 }finally{await browser.close();}

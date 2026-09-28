@@ -1,3 +1,4 @@
+import {nativeDVIds} from "./native-lookup.js";
 import { distanceWithElevation, equippedRanges, parseDV, dvTone, type RangeItem } from "./dv-data.js";
 
 declare global {
@@ -24,7 +25,7 @@ function clear() {
 
 function attacker() {
   const controlled = canvas.tokens?.controlled ?? [];
-  return controlled.length === 1 && controlled[0]?.actor?.isOwner ? controlled[0] : undefined;
+  return controlled.length === 1 && controlled[0]?.actor?.isOwner && !["container", "blackIce", "demon"].includes(String(controlled[0].actor.type)) ? controlled[0] : undefined;
 }
 
 export async function getTable(name: string): Promise<RollTable | undefined> {
@@ -39,7 +40,8 @@ export async function getTable(name: string): Promise<RollTable | undefined> {
   if (!pending) {
     pending = (async () => {
       const index = await pack.getIndex();
-      const entry = index.find(entry => entry.name === name);
+      const nativeId = pack.collection === "cyberpunk-red-core.internal_dv-tables" ? nativeDVIds[name] : undefined;
+      const entry = (nativeId ? index.find(entry => entry._id === nativeId) : undefined) ?? index.find(entry => entry.name === name);
       return entry ? await pack.getDocument(entry._id) as RollTable | undefined : undefined;
     })();
     tableCache.set(key,pending);
@@ -66,7 +68,7 @@ async function refresh() {
   const current = ++revision;
   const target = hovered;
   const source = attacker();
-  if (!game.settings!.get(MODULE_ID, "hoverDV") || !target?.isVisible || target.isPreview ||
+  if (!game.settings!.get(MODULE_ID, "hoverDV") || !target?.isVisible || ["container", "blackIce", "demon"].includes(String(target.actor?.type)) || target.isPreview ||
     !source || source === target || canvas.activeLayer !== canvas.tokens) {clear();return;}
   const distance = distanceWithElevation(canvas.grid!.measurePath([source.center, target.center], {}).distance,
     source.document.elevation, target.document.elevation);

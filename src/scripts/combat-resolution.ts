@@ -1,3 +1,4 @@
+import {findNativeItem} from "./native-lookup.js";
 import {attackTitle,attackHeading} from "./attack-title.js";
 import { allActors, primaryGM as electedGM, escapeHTML as escape } from "./shared.js";
 import {prepareBowAttack} from "./bow-loading.js";
@@ -337,9 +338,7 @@ async function respond(message: ChatMessage, evade: boolean, automatic = false, 
   if (!claim) return;
   try {
     const actor = await tokenActor(data.defender);
-    const name = game.i18n!.localize("CPR.global.itemType.skill.evasion");
-    const skill = actor.items.find(item => String(item.type) === "skill"
-      && (item.name === name || item.name?.toLowerCase() === "evasion")) as RollItem | undefined;
+    const skill = findNativeItem(actor.items, "Evasion") as RollItem | undefined;
     if (!skill) throw new Error("The defender has no Evasion skill item.");
     const roll = skill.createRoll("skill", actor);
     if(automatic){if(!automaticNPCEvasion(actor)||claim.offer.penalty||claim.offer.cost)throw Error("Automatic evasion requires RAW rules.");roll.luck=0;}
@@ -360,6 +359,7 @@ async function respond(message: ChatMessage, evade: boolean, automatic = false, 
   }
 }
 export async function startCombatExchange(attacker: Token, target: Token, itemId: string, mode: AttackMode, event: JQuery.ClickEvent, thrown?: { item: RollItem; source: object; improvised: boolean }): Promise<void> {
+  if ([attacker, target].some(token => ["container", "blackIce", "demon"].includes(String(token.actor?.type)))) return;
   requireCombatSocket();
   if (!authority()) throw new Error("An active GM is required for combat resolution.");
   const combat = combatForAttack(attacker, target);

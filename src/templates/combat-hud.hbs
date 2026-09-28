@@ -26,8 +26,9 @@
     <strong class="combat-heading">Self Actions</strong>
     <ul>
       {{#if selfInitiative.show}}<li><button type="button" class="combat-weapon-name" data-self-initiative title="{{selfInitiative.title}}" aria-disabled="{{selfInitiative.disabled}}" {{#if selfInitiative.disabled}}disabled{{/if}}><i class="fas fa-dice-d10" aria-hidden="true"></i><span>Re-roll Initiative</span></button></li>{{/if}}
+      {{#each selfEscapes}}<li><button type="button" class="combat-weapon-name" data-self-grapple="{{action}}" title="{{title}}" {{#if disabled}}disabled{{/if}}><i class="fas fa-hand-back-fist" aria-hidden="true"></i><span>{{label}}</span></button></li>{{/each}}
       {{#each selfActions}}<li><button type="button" class="combat-weapon-name" data-self-action="{{action}}" data-message="{{message}}" {{#if disabled}}disabled title="Not currently prone"{{/if}}><i class="fas {{icon}}" aria-hidden="true"></i><span>{{label}}</span></button></li>{{/each}}
-      {{#unless selfInitiative.show}}{{#unless selfActions.length}}<li class="combat-empty">No self actions available.</li>{{/unless}}{{/unless}}
+      {{#unless selfInitiative.show}}{{#unless selfActions.length}}{{#unless selfEscapes.length}}<li class="combat-empty">No self actions available.</li>{{/unless}}{{/unless}}{{/unless}}
     </ul>
   </section>
 {{else}}

@@ -19,7 +19,7 @@ interface NativeUtils { GetEventDatum(event: JQuery.ClickEvent, key: string): st
 /** An explicit token sheet never silently switches to another copy of the actor. */
 export function sheetAttacker(sheet: AttackSheet): Token | undefined {
   const actor = sheet.actor;
-  if (!actor.isOwner || !canvas.tokens) return;
+  if (!actor.isOwner || ["container", "blackIce", "demon"].includes(String(actor.type)) || !canvas.tokens) return;
   const valid = (token: Token) => token.actor?.uuid === actor.uuid && token.can(game.user!, "control");
   const explicit = sheet.token ?? (actor.isToken ? actor.token : null);
   if (explicit) {
@@ -50,7 +50,7 @@ export function installSheetAttackRouting(sheetClass: NativeSheetClass, utils: N
     const targets = [...game.user!.targets];
     if (targets.length > 1) return wrapped(event);
     const target = targets[0];
-    if (target && (target === attacker || !target.actor || !target.isVisible || canvas.tokens?.get(target.id) !== target))
+    if (target && (target === attacker || !target.actor || ["container", "blackIce", "demon"].includes(String(target.actor.type)) || !target.isVisible || canvas.tokens?.get(target.id) !== target))
       return wrapped(event);
     if (!target && !areaKind(item, mode)) return wrapped(event);
     // The existing dispatcher owns ammo, rolls and placement. Never fall back after it starts.

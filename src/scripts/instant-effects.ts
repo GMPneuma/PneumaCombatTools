@@ -1,3 +1,4 @@
+import {findNativeItem} from "./native-lookup.js";
 import {registerConditionCardRefresh} from "./pending-card-refresh.js";
 import {inlineRoll} from "./inline-roll.js";
 import {actorEncounter,encounterRef,resolveEncounter,type EncounterRef} from "./encounter.js";
@@ -94,7 +95,7 @@ export async function rollInstant(s:InstantState,send:Send,rollMode="roll",skipD
   try {
     const actor=await fromUuid(s.actor) as Actor|null;if(!actor)throw Error("Target unavailable.");
     const name=instantEffects[s.id].skill;
-    const item=actor.items.find(i=>String(i.type)==="skill"&&i.name?.toLowerCase()===name.toLowerCase()) as RollItem|undefined;
+    const item=findNativeItem(actor.items,name) as RollItem|undefined;
     if(!item)throw Error(name+" skill is missing.");
     let roll=item.createRoll("skill",actor);
     if(!await roll.handleRollDialog({type:"pneuma-instant",ctrlKey:skipDialog,metaKey:false},actor,item))return;

@@ -11,6 +11,7 @@ function committedPosition(doc:TokenDocument){
 }
 declare global {interface SettingConfig {"pneuma-combattools.movementTracking":boolean}}
 export function movementTurn(doc:TokenDocument):{combat:Combat;turn:string}|undefined {
+  if(["container", "blackIce", "demon"].includes(String(doc.actor?.type)))return;
   const combat=barCombat(doc.parent?.id);
   if(!combat)return;
   const participant=combat.combatants.find(c=>c.tokenId===doc.id);if(!participant)return;

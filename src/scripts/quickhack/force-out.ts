@@ -1,3 +1,4 @@
+import {findNativeItem} from "../native-lookup.js";
 import { primaryGM as electedGM } from "../shared.js";
 import {resolveEncounter} from "../encounter.js";
 import { requireCombatSocket } from "../socket-health.js";
@@ -58,7 +59,7 @@ export async function beginForceOut(message: Pick<ChatMessage,"id">, skipDialog 
     const context = await contextFor(message.id!);
     if (!context || !canOperate(context.target)) return;
     if (!game.users!.some(user => user.isGM && user.active)) { ui.notifications!.warn(label("ForceOut.ActiveGmRequired")); return; }
-    const concentration = context.target.items.find(item => String(item.type) === "skill" && item.name?.trim().toLowerCase() === "concentration") as RollItem | undefined;
+    const concentration = findNativeItem(context.target.items,"Concentration") as RollItem | undefined;
     if (!concentration) throw new Error(label("Error.ConcentrationMissing"));
     const roll = await nativeQuickhackRoll(context.target, concentration, label("ForceOut.ResultTitle"), delivery(context.result.audience, context.source, context.target), () => enabled() && resultConnectionValid(context.source, {...context.result, connectionId:context.connectionId}), undefined, false, skipDialog);
     if (!roll || !enabled()) return;

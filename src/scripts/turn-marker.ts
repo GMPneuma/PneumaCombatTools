@@ -36,7 +36,7 @@ export function refreshTurnMarker(){
   const token=targetId?canvas.tokens?.get(targetId):undefined;
   const profile=preview?.profile??(game.settings!.get(M,"turnMarkerForceDefault")?viewerDefaultIndicator():viewedTokenIndicator(token?.document));
   const style=profile.turnMarkerStyle,display=game.settings!.get(M,"turnMarkerDisplay");
-  if(!token||token.destroyed||token.isPreview||!token.visible
+  if(!token||["container", "blackIce", "demon"].includes(String(token.actor?.type))||token.destroyed||token.isPreview||!token.visible
     ||(preview?(token.document!==preview.token||(!game.user?.isGM&&!token.isOwner)):(combatant?.sceneId!==canvas.scene?.id||!combatant?.visible))
     ||(!game.user?.isGM&&(token.document.hidden||token.document.isSecret))||style==="off"||display==="off") {clear();return;}
   const saved=profile.turnMarkerColor,color=Number.parseInt((/^#[0-9a-f]{6}$/i.test(saved??"")?saved!:DEFAULT_COLOR).slice(1),16);

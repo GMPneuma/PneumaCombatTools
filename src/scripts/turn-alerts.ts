@@ -22,7 +22,7 @@ export function refreshNextTurnMarker():void {
   const token=next?.tokenId?canvas.tokens?.get(next.tokenId):undefined;
   if(!canvas.ready||!canvas.app||!game.settings!.get(M,"turnMarkerEnabled")||!game.settings!.get(M,"nextTurnMarker")
     ||game.settings!.get(M,"turnMarkerDisplay")==="off"||!next?.visible||next.sceneId!==canvas.scene?.id
-    ||!token||token.destroyed||token.isPreview||!token.visible||(!game.user?.isGM&&(token.document.hidden||token.document.isSecret))){clearNextMarker();return;}
+    ||!token||["container", "blackIce", "demon"].includes(String(token.actor?.type))||token.destroyed||token.isPreview||!token.visible||(!game.user?.isGM&&(token.document.hidden||token.document.isSecret))){clearNextMarker();return;}
   const grid=Number(canvas.scene!.grid.size)||100,key=[token.w,token.h,grid].join(":");
   if(marker?.token!==token||marker.key!==key||marker.art.destroyed){
     clearNextMarker();const art=new PIXI.Container();
@@ -49,7 +49,7 @@ export function refreshNextTurnMarker():void {
 }
 const seen=new Map<string,string>();
 const turnKey=(combat:Combat)=>[combat.started,combat.round,combat.turn,combat.combatant?.id].join(":");
-const owned=(row:Combatant|undefined)=>!!row?.visible&&!!row.actor?.testUserPermission(game.user!,"OWNER")
+const owned=(row:Combatant|undefined)=>!!row?.visible&&!["container", "blackIce", "demon"].includes(String(row.actor?.type))&&!!row.actor?.testUserPermission(game.user!,"OWNER")
   &&!row.token?.hidden&&!row.token?.isSecret;
 export function notifyTurnChange(combat:Combat):void {
   const key=turnKey(combat),previous=seen.get(combat.id!);seen.set(combat.id!,key);

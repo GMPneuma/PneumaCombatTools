@@ -1,5 +1,6 @@
 import {forceOutEntries, beginForceOut} from "./quickhack/force-out.js";
-import {clearInstantCondition} from "./instant-lifetime.js";
+import {escapeHTML} from "./shared.js";
+import {clearInstantCondition,hasInstantCondition} from "./instant-lifetime.js";
 
 let closeStatusMenu: (() => void) | undefined;
 export function closeStatusActions(): void { closeStatusMenu?.(); }
@@ -49,8 +50,17 @@ export function bindStatusActions(container: HTMLElement, actor: Actor, refresh:
   });
 }
 function reportStatusError(error: unknown): void { ui.notifications!.error(error instanceof Error ? error.message : String(error)); }
+const extinguishing = new Set<string>();
 export async function extinguishStatus(actor: Actor): Promise<void> {
-  if (actor.isOwner) await clearInstantCondition(actor, "fire");
+  if (!actor.isOwner || !hasInstantCondition(actor, "fire") || extinguishing.has(actor.uuid)) return;
+  extinguishing.add(actor.uuid);
+  try {
+    await clearInstantCondition(actor, "fire");
+    if (hasInstantCondition(actor, "fire")) return;
+    const data = {content: '<p class="pneuma-self-action-report">' + escapeHTML(actor.name ?? "Character") + ' extinguishes the flames on themselves.</p>', speaker: ChatMessage.getSpeaker({actor})};
+    ChatMessage.applyRollMode(data as never, game.settings!.get("core", "rollMode") as never);
+    await ChatMessage.create(data);
+  } finally { extinguishing.delete(actor.uuid); }
 }
 export async function ejectStatus(actor: Actor, messageId: string, skipDialog = false): Promise<void> {
   if (!actor.isOwner || !forceOutEntries(actor).some(row => row.messageId === messageId)) return;

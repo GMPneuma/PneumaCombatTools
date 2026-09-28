@@ -8,14 +8,16 @@ export const hasMartialArts=(actor:Actor)=>actor.items.some(item=>String(item.ty
 const proneIds=()=>["prone",masterStatuses.find(s=>s.name==="Prone")!.id];
 const isProne=(actor:Actor)=>Array.from(actor.allApplicableEffects?.()??actor.effects).some(effect=>!effect.disabled&&!effect.isSuppressed&&proneIds().some(id=>effect.statuses.has(id)));
 export function selfActions(actor:Actor){
+  if(["container", "blackIce", "demon"].includes(String(actor.type)))return [];
   return [
     ...(hasInstantCondition(actor,"fire")?[{action:"extinguish",label:"Extinguish",icon:"fa-fire-extinguisher",disabled:false}]:[]),
     ...forceOutEntries(actor).map(row=>({action:"eject",message:row.messageId,label:"Eject Netrunner — "+row.name,icon:"fa-plug-circle-xmark",disabled:false})),
-    ...(hasMartialArts(actor)?[{action:"recovery",label:"MA Recovery",icon:"fa-person-arrow-up-from-line",disabled:!isProne(actor)}]:[])
+    ...(hasMartialArts(actor)&&isProne(actor)?[{action:"recovery",label:"MA Recovery",icon:"fa-person-arrow-up-from-line",disabled:false}]:[])
   ];
 }
 const recovering=new Set<string>();
 export async function performSelfAction(actor:Actor,action:string,message?:string,skipDialog=false):Promise<void>{
+  if(["container", "blackIce", "demon"].includes(String(actor.type)))return;
   if(!actor.isOwner)throw Error("You do not control this character.");
   if(action==="extinguish"){if(hasInstantCondition(actor,"fire"))await extinguishStatus(actor);}
   else if(action==="eject"){if(!message)throw Error("Choose a connected Netrunner.");await ejectStatus(actor,message,skipDialog);}

@@ -31,7 +31,7 @@ function position(){
 }
 function refresh(){
   const target=hovered;
-  if(!target?.actor||!target.isVisible||target.isPreview||canvas.activeLayer!==canvas.tokens||!permitted()){clear();return;}
+  if(!target?.actor||["container", "blackIce", "demon"].includes(String(target.actor.type))||!target.isVisible||target.isPreview||canvas.activeLayer!==canvas.tokens||!permitted()){clear();return;}
   const hp=Number(foundry.utils.getProperty(target.actor,"system.derivedStats.hp.value"));
   const max=Number(foundry.utils.getProperty(target.actor,"system.derivedStats.hp.max"));
   const state=Number.isFinite(hp)&&Number.isFinite(max)&&max>0?vitalState(hp,max):"unknown";

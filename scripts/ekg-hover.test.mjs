@@ -47,5 +47,8 @@ try{
  await page.evaluate(()=>{target.actor.items=[];hooks.deleteItem.forEach(fn=>fn({parent:target.actor}));});assert.equal(await panel.count(),0,'Removing target Biomonitor refreshes visibility');
  await page.evaluate(()=>{canvas.tokens.controlled=[];hooks.controlToken.forEach(fn=>fn());});assert.equal(await panel.count(),1);
  await page.evaluate(()=>hooks.hoverToken.forEach(fn=>fn(target,false)));assert.equal(await panel.count(),0);
+ for(const type of ['container','blackIce','demon']) {
+  await page.evaluate(type=>{target.actor.type=type;values.alwaysShowEKG=true;hooks.hoverToken.forEach(fn=>fn(target,true));},type);assert.equal(await panel.count(),0,type+' never shows EKG, including with world override');
+ }
  console.log('Hover EKG browser checks passed: Medtech gating, GM override, all health states, stable animation, placement, visibility, ownership selection and hover cleanup.');
 }finally{await browser.close();}

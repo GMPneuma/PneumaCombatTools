@@ -4,7 +4,7 @@ const MODULE="pneuma-combattools";
 declare global {interface SettingConfig {"pneuma-combattools.pneumaHomebrew":boolean}}
 /** GM ownership covers every token: retain target actions when acting as a different token. */
 export function isSelfCTH(token:Token|undefined,attacker:Token|undefined):boolean {
-  return !!token?.isOwner&&(!game.user?.isGM||(token.controlled&&(!attacker||attacker===token)));
+  return !["container", "blackIce", "demon"].includes(String(token?.actor?.type))&&!!token?.isOwner&&(!game.user?.isGM||(token.controlled&&(!attacker||attacker===token)));
 }
 export function hasSpeedware(actor:Actor|undefined):boolean {
   return !!actor?.items.some(item=>{
@@ -22,11 +22,11 @@ function participant(token:Token,combat=displayedEncounter(token.document.parent
 export function selfInitiativeControl(token:Token){
   const enabled=game.settings!.get(MODULE,"pneumaHomebrew")&&token.isOwner&&hasSpeedware(token.actor??undefined);
   const available=enabled&&!!participant(token);
-  return {show:enabled,disabled:!available,title:available?"Re-roll Initiative — uses your Action (Pneuma HomeBrew)":"Re-roll Initiative — requires an existing initiative in started combat; uses your Action"};
+  return {show:available,disabled:!available,title:available?"Re-roll Initiative — uses your Action (Pneuma HomeBrew)":"Re-roll Initiative — requires an existing initiative in started combat; uses your Action"};
 }
 const pending=new Set<string>();
 export async function rerollSelfInitiative(token:Token){
-  if(!selfInitiativeControl(token).show)throw Error("Initiative reroll requires Pneuma HomeBrew, token ownership and installed functional speedware.");
+  if(!game.settings!.get(MODULE,"pneumaHomebrew")||!token.isOwner||!hasSpeedware(token.actor??undefined))throw Error("Initiative reroll requires Pneuma HomeBrew, token ownership and installed functional speedware.");
   const entry=participant(token,tokenEncounter(token.document.parent?.id,[token.document.uuid]));if(!entry)throw Error("Start combat and roll initiative before using the speedware reroll.");
   const key=entry.combat.uuid+":"+entry.combatant.id;
   if(pending.has(key))return;

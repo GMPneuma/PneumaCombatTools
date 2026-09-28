@@ -21,7 +21,7 @@ test('speedware requires installed, non-EMP cyberware; native source supports re
 });
 test('control visibility, combat prerequisites, setting and permission are rechecked on click',async()=>{
  const f=fixture();assert.equal(selfInitiativeControl(f.token).show,true);assert.equal(selfInitiativeControl(f.token).disabled,false);
- f.combatant.initiative=null;assert.equal(selfInitiativeControl(f.token).disabled,true);await assert.rejects(rerollSelfInitiative(f.token),/Start combat/);
+ f.combatant.initiative=null;assert.equal(selfInitiativeControl(f.token).show,false);assert.equal(selfInitiativeControl(f.token).disabled,true);await assert.rejects(rerollSelfInitiative(f.token),/Start combat/);
  f.combatant.initiative=12;game.settings.get=()=>false;assert.equal(selfInitiativeControl(f.token).show,false);await assert.rejects(rerollSelfInitiative(f.token),/requires/);
  game.settings.get=()=>true;f.token.isOwner=false;await assert.rejects(rerollSelfInitiative(f.token),/ownership/);
 });
@@ -43,3 +43,5 @@ test('NPC automation requires opt-in and RAW, never player-owned actors',async()
 });
 
 test('nonparticipant HUD remains usable but reroll fails clearly',async()=>{const f=fixture();f.combat.combatants=[];assert.equal(selfInitiativeControl(f.token).disabled,true);await assert.rejects(rerollSelfInitiative(f.token),/participating tokens/);});
+
+test('initiative entry is hidden without combat participation or working installed speedware',()=>{const f=fixture();assert.equal(selfInitiativeControl(f.token).show,true);f.item.system.isInstalledInActor=false;assert.equal(selfInitiativeControl(f.token).show,false);f.item.system.isInstalledInActor=true;f.combat.started=false;assert.equal(selfInitiativeControl(f.token).show,false);f.combat.started=true;f.combat.combatants=[];assert.equal(selfInitiativeControl(f.token).show,false);});

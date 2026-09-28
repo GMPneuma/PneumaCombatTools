@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.9.4 - 2026-09-28
+
+- Fix native ranged DV table lookup under translation, including thrown grenades, using verified document IDs while preserving custom/world table overrides.
+- Prefer source identities for supported skills, Netrunner, Targeting Scope, and native critical-injury tables/packs, retaining name fallbacks.
+- Exclude Containers, Black ICE, and Demons from Combat Tools token interactions, hover displays, movement tracking, turn indicators/alerts, roll shortcuts, and attack/QuickHack routing. Native controls remain available.
+- Move grab Escape into Self Actions. Hide MA Recovery unless prone and trained; show initiative reroll only when its homebrew and token requirements are met.
+- Report successful Extinguish actions to chat, respecting roll visibility and preventing duplicate/no-op reports.
+
+Validation: production build and strict type checks; 456 automated tests passed, four skipped; CTH and EKG browser checks passed for all three excluded actor types. Live Foundry multiplayer and Babele verification remain pending.
+
+Automated Animations integration is not included in this release.
+
+
 ## 0.9.3 - 2026-09-28
 
 - Add Self-ICE Passwalls: native Interface breach checks at DV6/8/10, per-connection progress, blocked QuickHacks until cleared, and a GM progress override. Reconnecting resets progress. Requires installed functional cyberware named Self-ICE; Net Actions are manually spent.

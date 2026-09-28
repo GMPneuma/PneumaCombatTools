@@ -1,3 +1,4 @@
+import {findNativeItem} from "../native-lookup.js";
 import { primaryGM as gm, escapeHTML } from "../shared.js";
 import {tokenEncounter,encounterRef,resolveEncounter,requireParticipants,type EncounterRef} from "../encounter.js";
 import {updateTouchesPath} from "../update-path.js";
@@ -260,8 +261,7 @@ async function request(data: Omit<GrappleRequest,"grappleType"|"request"|"user">
   });
 }
 async function brawling(actor: Actor, skipDialog = false): Promise<SkillResult | undefined> {
-  const name = game.i18n!.localize("CPR.global.itemType.skill.brawling");
-  const item = actor.items.find(i => String(i.type) === "skill" && ["brawling",name.toLowerCase()].includes(i.name?.toLowerCase() ?? "")) as RollItem | undefined;
+  const item = findNativeItem(actor.items,"Brawling") as RollItem | undefined;
   if (!item) throw new Error("Character has no native Brawling skill.");
   if (foundry.utils.getProperty(item,"system.stat") !== "dex") throw new Error("Brawling must use DEX. Correct the native skill before rolling.");
   let roll = item.createRoll("skill",actor);

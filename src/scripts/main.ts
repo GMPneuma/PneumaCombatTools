@@ -63,9 +63,9 @@ const MODULE_ID = "pneuma-combattools";
 const TEMPLATE = `modules/${MODULE_ID}/templates/combat-hud.hbs`;
 const label = (key: string) => game.i18n!.localize(`PNEUMA_COMBAT_TOOLS.${key}`);
 let selection: { target: Token; attacker: Token | undefined; combatOnly?: boolean; anchor: { x: number; y: number } } | undefined;
-const isStandalone = (token: Token) => !isSelfCTH(token, selection?.target === token ? selection.attacker : selectedAttacker()) && (!!game.user?.isGM || !token.isOwner || (selection?.target === token && !!selection.combatOnly));
+const isStandalone = (token: Token) => !["container", "blackIce", "demon"].includes(String(token.actor?.type)) && !isSelfCTH(token, selection?.target === token ? selection.attacker : selectedAttacker()) && (!!game.user?.isGM || !token.isOwner || (selection?.target === token && !!selection.combatOnly));
 const selectedAttacker = () => {
-  const tokens = canvas.tokens!.controlled.filter(token => token.actor?.isOwner);
+  const tokens = canvas.tokens!.controlled.filter(token => token.actor?.isOwner && !["container", "blackIce", "demon"].includes(String(token.actor.type)));
   return tokens.length === 1 ? tokens[0] : undefined;
 };
 
@@ -143,7 +143,7 @@ Hooks.once("init", () => {
     private combatClick = false;
 
     private canOpenCombatMenu() {
-      return canvas.activeLayer === canvas.tokens && this.isVisible && !this.isPreview && !!this.actor
+      return canvas.activeLayer === canvas.tokens && this.isVisible && !this.isPreview && !!this.actor && !["container", "blackIce", "demon"].includes(String(this.actor.type))
         && canvas.controls?.ruler?.state !== Ruler.STATES.MEASURING;
     }
 
@@ -190,6 +190,7 @@ Hooks.once("init", () => {
       const token = this.object;
       if (!token || !this.element.length) return;
       super.setPosition();
+      if (["container", "blackIce", "demon"].includes(String(token.actor?.type))) return;
       const oneByOne = token.document.width === 1 && token.document.height === 1;
       const anchor = !oneByOne && selection?.target === token ? selection.anchor : token.center;
       // #hud already follows canvas zoom. Cancel it once for the entire Token HUD.
@@ -203,9 +204,11 @@ Hooks.once("init", () => {
         .toggleClass("pneuma-tight-hud", game.settings!.get(MODULE_ID, "tightHUD"));
     }
     override getData(options = {}) {
+      if (["container", "blackIce", "demon"].includes(String(this.object?.actor?.type))) return super.getData(options);
       const attacker = selection && selection.target === this.object ? selection.attacker : selectedAttacker();
       const selfCTH = isSelfCTH(this.object ?? undefined, attacker);
-      if (selfCTH) return {...super.getData(options), standalone: false, selfCTH: true, grappleActions:grappleMenu(this.object??undefined,this.object??undefined), selfInitiative: selfInitiativeControl(this.object!), selfActions:selfActions(this.object!.actor!), selfThrown:[...thrownEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[]),...grenadeEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[])]};
+      const selfGrapple = selfCTH ? grappleMenu(this.object ?? undefined, this.object ?? undefined) : [];
+      if (selfCTH) return {...super.getData(options), standalone: false, selfCTH: true, grappleActions:selfGrapple.filter(row=>row.action!=="escape"), selfEscapes:selfGrapple.filter(row=>row.action==="escape"), selfInitiative: selfInitiativeControl(this.object!), selfActions:selfActions(this.object!.actor!), selfThrown:[...thrownEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[]),...grenadeEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[])]};
       const connection = attacker?.actor && this.object?.actor ? connectionFor(attacker.actor, this.object.actor.uuid) : undefined;
       const ice = selfIce(this.object?.actor ?? undefined, connection?.breachCleared ?? 0);
       const sight = !!attacker && !!this.object && quickhackEnabled() && hasQuickhackSight(attacker, this.object);
@@ -249,7 +252,7 @@ Hooks.once("init", () => {
 
 Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalone: boolean; selfCTH?: boolean; attackTitle: string; quickhackStatus: string }) => {
   const token = hud.object;
-  if (game.system!.id !== "cyberpunk-red-core" || !token?.actor) return;
+  if (game.system!.id !== "cyberpunk-red-core" || !token?.actor || ["container", "blackIce", "demon"].includes(String(token.actor.type))) return;
   if (!data.standalone) {
     const controls = await renderTemplate(TEMPLATE, data);
     if (hud.object !== token || hud.element[0] !== html[0]) return;

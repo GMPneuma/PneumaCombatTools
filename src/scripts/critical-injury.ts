@@ -1,3 +1,4 @@
+import {nativeCriticalTable} from "./native-lookup.js";
 import type { Exchange } from "./combat-resolution.js";
 import type { NativeRoll } from "./native-combat.js";
 
@@ -44,10 +45,11 @@ export async function applyCriticalInjury(data: Exchange, targetUuid: string): P
   const tablePack = game.settings!.get("cyberpunk-red-core", "criticalInjuryRollTableCompendium" as never) as string;
   if (!game.packs!.get(tablePack)) throw new Error("The configured critical injury table compendium is unavailable.");
   await game.packs!.get(tablePack)!.getIndex();
-  if (!game.packs!.get(tablePack)!.index.find(entry => entry.name === tableName))
+  const native = await nativeCriticalTable(tablePack, criticalLocation(data));
+  if (!native && !game.packs!.get(tablePack)!.index.find(entry => entry.name === tableName))
     throw new Error("The configured compendium has no " + tableName + " table.");
-  const table = await utils.GetCompendiumDoc(tablePack, tableName);
-  const injuryPack = utils.GetCompendiumIdByLabel(tableName);
+  const table = native ?? await utils.GetCompendiumDoc(tablePack, tableName);
+  const injuryPack = native ? "cyberpunk-red-core.core_critical-injuries-" + criticalLocation(data) : utils.GetCompendiumIdByLabel(tableName);
   if (!table || !injuryPack) throw new Error("The native " + tableName + " table or injury compendium is unavailable.");
   await game.packs!.get(injuryPack)?.getIndex();
   await sheet._drawCriticalInjuryTable(table, injuryPack, 0);

@@ -1,3 +1,4 @@
+import {findNativeItem} from "./native-lookup.js";
 import { areaKind } from "./aoe/weapon.js";
 import { gunAmmo, ammoBlocks } from "./weapon-ammo.js";
 import { grappleWeaponBlocked } from "./grapple/state.js";
@@ -13,7 +14,7 @@ export interface MenuWeapon extends EquipmentItem {
 }
 /** Launcher ownership is not a RAW requirement. */
 export function canShowQuickhack(items: MenuWeapon[]) {
-  return items.some(item => item.type === "role" && item.name?.trim().toLowerCase() === "netrunner");
+  return !!findNativeItem(items,"Netrunner");
 }
 export function attackEntries(items: MenuWeapon[]) {
   return availableWeapons(items).filter(item => !isQuickhackLauncher(item)
@@ -43,7 +44,7 @@ const rolling = new Set<string>();
 export async function attackFromHUD(attacker: Token, target: Token, itemId: string, mode: AttackMode,
   event: JQuery.ClickEvent) {
   const actor = attacker.actor;
-  if (!actor?.isOwner || !target.isVisible || !target.actor
+  if (!actor?.isOwner || ["container", "blackIce", "demon"].includes(String(actor.type)) || !target.isVisible || !target.actor || ["container", "blackIce", "demon"].includes(String(target.actor.type))
     || canvas.tokens?.get(attacker.id) !== attacker || canvas.tokens.get(target.id) !== target
     || !attacker.can(game.user!, "control")) return;
   const items = Array.from(actor.items) as unknown as MenuWeapon[];

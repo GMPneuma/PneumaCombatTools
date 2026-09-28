@@ -1,3 +1,4 @@
+import {nativeCriticalTable, findNativeItem} from "./native-lookup.js";
 import {removeRollFavorite, rollFavorites, sameFavorite, toggleRollFavorite, rollFavorite, type RollFavorite} from "./roll-favorites.js";
 import { primaryGM as authority } from "./shared.js";
 import { MANUAL_MODULE as M, manualEscape as esc, manualNumber, groupContent, type ManualCard, type InjuryResult } from "./manual-roll-state.js";
@@ -50,9 +51,10 @@ async function injuryTable(location: "body" | "head") {
   const tablePack = game.packs!.get(pack);
   if (!tablePack) throw Error("The configured critical injury table compendium is unavailable.");
   await tablePack.getIndex();
-  if (!tablePack.index.find(entry=>entry.name===name)) throw Error("The configured compendium has no " + name + " table.");
-  const table = await utils.GetCompendiumDoc(pack,name) as RollTable;
-  const items = utils.GetCompendiumIdByLabel(name);
+  const native = await nativeCriticalTable(pack, location);
+  if (!native && !tablePack.index.find(entry=>entry.name===name)) throw Error("The configured compendium has no " + name + " table.");
+  const table = native ?? await utils.GetCompendiumDoc(pack,name) as RollTable;
+  const items = native ? "cyberpunk-red-core.core_critical-injuries-" + location : utils.GetCompendiumIdByLabel(name);
   if (!table || !items) throw Error("The configured critical injury table or compendium is unavailable.");
   await game.packs!.get(items)?.getIndex();
   return {table,items,utils};
@@ -267,7 +269,7 @@ async function statPrompt() {
   const tokens=canvas.tokens?.controlled ?? [];
   if(tokens.length>1)throw Error("Select only one token for a STAT roll.");
   const actor=tokens.length ? tokens[0]!.actor : game.user?.character;
-  if(!actor?.isOwner)throw Error("Select a token you own or assign your player character first.");
+  if(!actor?.isOwner||["container", "blackIce", "demon"].includes(String(actor.type)))throw Error("Select a token you own or assign your player character first.");
   const stats=["int","ref","dex","tech","cool","will","move","body","luck","emp"];
   const current=(source:Actor,stat:string):number=>{
     const native=source as Actor & {getStat(name:string):number};
@@ -359,10 +361,9 @@ export async function manualEvasion(skipDialog = false): Promise<void> {
   const selected = canvas.tokens?.controlled ?? [];
   if (selected.length !== 1 || !selected[0]?.actor) throw Error("Select one character token first.");
   const actor = selected[0].actor;
+  if (["container", "blackIce", "demon"].includes(String(actor.type))) throw Error("Select a character token first.");
   if (!actor.isOwner) throw Error("You do not control this character.");
-  const name = game.i18n!.localize("CPR.global.itemType.skill.evasion");
-  const skill = actor.items.find(item => String(item.type) === "skill"
-    && (item.name === name || item.name?.toLowerCase() === "evasion"));
+  const skill = findNativeItem(actor.items, "Evasion");
   if (!skill) throw Error("This character has no native Evasion skill.");
   const sheet = actor.sheet as ActorSheet & { _onRoll?(event: unknown): Promise<void> };
   if (!sheet?._onRoll) throw Error("The character sheet does not provide CPR's native roll handler.");
@@ -373,7 +374,7 @@ export async function manualEvasion(skipDialog = false): Promise<void> {
 }
 async function characterRollPrompt(kind: "skill" | "roleAbility") {
   const selected=canvas.tokens?.controlled??[];
-  if(selected.length!==1||!selected[0]?.actor)throw Error("Select one character token first.");
+  if(selected.length!==1||!selected[0]?.actor||["container", "blackIce", "demon"].includes(String(selected[0].actor.type)))throw Error("Select one character token first.");
   const actor=selected[0].actor;
   if(!actor.isOwner)throw Error("You do not control this character.");
   type Choice={item:Item;name:string;subtype?:string;hasRoll:boolean;rank:number;stat?:string};
@@ -451,7 +452,7 @@ export function openManualRolls(anchor = document.querySelector<HTMLElement>("[d
   const favorites=rollFavorites();
   if(favorites.length)sections.push(favorites.map((favorite,index)=>["favorite-"+index,favorite.name,"fa-star",async event=>{
     const selected=canvas.tokens?.controlled??[];
-    if(selected.length!==1||!selected[0]?.actor)throw Error("Select one character token first.");
+    if(selected.length!==1||!selected[0]?.actor||["container", "blackIce", "demon"].includes(String(selected[0].actor.type)))throw Error("Select one character token first.");
     const actor=selected[0].actor;
     await rollFavorite(actor,favorite,event.shiftKey);
   }]));
