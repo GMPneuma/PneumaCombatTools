@@ -5,7 +5,7 @@ registerHooks({resolve(s,c,next){
   if(s==='/systems/cyberpunk-red-core/modules/extern/cpr-dice-handler.js')return {shortCircuit:true,url:'data:text/javascript,'+encodeURIComponent('export default {handle3dDice:(roll,mode)=>game.dice3d.showForRoll(roll,game.user,true,globalThis.audience,mode==="blindroll")}')};
   return next(s,c);
 }});
-import {showDiceAs} from '../dist/scripts/native-combat.js';
+import {nativeAPI,showDiceAs} from '../dist/scripts/native-combat.js';
 function setup(){
   const gm={id:'gm'},attacker={id:'attacker'},defender={id:'defender'},calls=[],finish=[];
   globalThis.audience=['allowed-recipient'];
@@ -20,6 +20,7 @@ function setup(){
 const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
 test('simultaneous replays use distinct roller styles and preserve all visibility arguments',async()=>{
   const c=setup(),attack={face:10},defense={face:7};
+  await nativeAPI(); // Wait for module loading, whose microtask timing differs across Node versions.
   const pending=Promise.all([showDiceAs(attack,'roll','attacker'),showDiceAs(defense,'blindroll','defender')]);
   await flush();
   assert.deepEqual(c.calls,[[attack,c.attacker,true,audience,false],[defense,c.defender,true,audience,true]]);
