@@ -3,7 +3,7 @@ import {actorEncounter,encounterEpoch} from "./encounter.js";
 import {effectDuration,durationExpired,hasDuration} from "./effect-duration.js";
 import {masterStatuses} from "./status-catalog.js";
 import {applyCombatStatus, syncActorStatuses} from "./status-sync.js";
-import {empGM} from "./emp-state.js";
+import {empGM,empWork} from "./emp-state.js";
 const M="pneuma-combattools", key="flags."+M+".instantLifetime";
 interface Lifetime {kind:"injury"|"sleep"|"fire";expires?:number;lastTurn?:string}
 const life=(doc:object)=>foundry.utils.getProperty(doc,key) as Lifetime|undefined;
@@ -21,6 +21,7 @@ export async function clearCombatSpeedheal(combat:Combat):Promise<void> {
   const saved=foundry.utils.getProperty(combat,speedhealKey) as string[]|undefined;
   for(const uuid of saved??[]){
     const effect=await fromUuid(uuid) as ActiveEffect|null;
+    if(effect?.parent&&Array.from(game.combats??[]).some(c=>c.id!==combat.id&&c.started&&c.combatants.some(p=>p.actor?.uuid===effect.parent!.uuid)))continue;
     if(effect&&isSpeedheal(effect))await effect.delete();
   }
   if(saved?.length&&game.combats?.get(combat.id!)===combat)
@@ -108,9 +109,13 @@ export async function expireInstantActor(actor:Actor,now=game.time!.worldTime) {
 
 /** Native durations are enough to qualify; manually applied effects are included. */
 export async function finishTimedEffects(combat:Combat) {
-  await clearCombatSpeedheal(combat);
+  const failures:string[]=[];
+  try{await clearCombatSpeedheal(combat);}catch(error){failures.push("Speedheal: "+(error as Error).message);}
   const participants=new Set(Array.from(combat.combatants??[]).map(c=>c.actor?.uuid));
   for(const actor of actors()) {
+    // Linked actors may still be participating in another scene's encounter.
+    if(Array.from(game.combats??[]).some(c=>c.id!==combat.id&&c.started&&c.combatants.some(p=>p.actor?.uuid===actor.uuid)))continue;
+    try{
     const belongs=(effect:ActiveEffect)=>{
       const linked=foundry.utils.getProperty(effect,"flags."+M+".endWithCombat") as string|undefined ?? effect.duration?.combat;
       const id=typeof linked==="string"?linked:linked?.id;
@@ -135,7 +140,22 @@ export async function finishTimedEffects(combat:Combat) {
       changed=true;
     }
     if(changed)await syncActorStatuses(actor);
+    }catch(error){failures.push(`${actor.name}: ${(error as Error).message}`);}
   }
+  if(failures.length)throw Error(failures.join("; "));
+}
+
+/** Reconcile explicit combat links after a missed end hook; untracked statuses stay untouched. */
+export async function reconcileEndedEffects(){
+  const ids=new Set<string>();
+  for(const actor of actors())for(const effect of allEffects(actor)){
+    const link=foundry.utils.getProperty(effect,"flags."+M+".endWithCombat") as string|undefined??effect.duration?.combat;
+    const id=typeof link==="string"?link:link?.id;
+    if(id&&!game.combats?.get(id)?.started)ids.add(id);
+  }
+  const errors:string[]=[];
+  for(const id of ids)try{await finishTimedEffects({id,combatants:[]} as unknown as Combat);}catch(error){errors.push((error as Error).message);}
+  if(errors.length)throw Error(errors.join("; "));
 }
 
 let work:Promise<unknown>=Promise.resolve();
@@ -173,7 +193,7 @@ export function registerInstantLifetimes() {
   const refresh=()=>{
     for(const a of actors())rememberHP(a);
     for(const c of game.combats??[])rememberCombat(c);
-    enqueue(async()=>{for(const a of actors()){await migrateInstantActor(a);await expireInstantActor(a);}});
+    enqueue(async()=>{await reconcileEndedEffects();for(const a of actors()){await migrateInstantActor(a);await expireInstantActor(a);}});
   };
   Hooks.once("ready",refresh);Hooks.on("canvasReady",refresh);
   Hooks.on("createActor",rememberHP);Hooks.on("createToken",(t:TokenDocument)=>{if(t.actor)rememberHP(t.actor);});
@@ -186,10 +206,21 @@ export function registerInstantLifetimes() {
   Hooks.on("preUpdateActor",rememberHP);
   Hooks.on("updateActor",(a:Actor)=>{const before=hpValues.get(a.uuid),after=Number(foundry.utils.getProperty(a,"system.derivedStats.hp.value"));hpValues.set(a.uuid,after);if(before!==undefined&&after<before)enqueue(()=>clearInstantCondition(a,"sleep"));});
   Hooks.on("createCombat",rememberCombat);Hooks.on("preUpdateCombat",rememberCombat);
-  Hooks.on("deleteCombat",(c:Combat)=>{previous.delete(c.id!);enqueue(()=>finishTimedEffects(c));});
+  const finish=(c:Combat)=>{
+    const affected=[...new Set([...Array.from(c.combatants??[]).flatMap(p=>p.actor?[p.actor.uuid]:[]),...actors().filter(a=>allEffects(a).some(e=>{const link=foundry.utils.getProperty(e,"flags."+M+".endWithCombat")??e.duration?.combat;return (typeof link==="string"?link:(link as Combat|undefined)?.id)===c.id;})).map(a=>a.uuid)])];
+    enqueue(async()=>{
+      if(game.combats?.get(c.id!)?.started)return;
+      try{await finishTimedEffects(c);}finally{
+        await empWork(async()=>{});
+        const {waitGrappleCleanup}=await import("./grapple/workflow.js");await waitGrappleCleanup();
+        Hooks.callAll("pneumaCombatCleanupFinished",c,affected);
+      }
+    });
+  };
+  Hooks.on("deleteCombat",(c:Combat)=>{previous.delete(c.id!);finish(c);});
   Hooks.on("updateCombat",(c:Combat)=>{
     const p=previous.get(c.id!);rememberCombat(c);
-    if(p?.started&&!c.started){enqueue(()=>finishTimedEffects(c));return;}
+    if(p?.started&&!c.started){finish(c);return;}
     if(!p?.started||!c.started)return;
     const nextRound=(c.round??0)>p.round;
     if(!nextRound && !((c.round??0)===p.round&&(c.turn??0)>p.turn))return;

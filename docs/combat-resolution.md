@@ -35,4 +35,4 @@ Implementation: [combat-resolution.ts](../src/scripts/combat-resolution.ts), [da
 
 ## Small native-sheet conveniences
 
-Shift-click the head/body armor-ablation arrow to restore one SP using CPR's existing reverse-ablation method. This requires an editable owned sheet. The optional Martial Arts no-ablation setting keeps half-SP handling while suppressing ablation on managed damage. Hide attack weapon names presents generic attack categories on Combat Tools cards. Implementation: [armor-shortcut.ts](../src/scripts/armor-shortcut.ts), [main.ts](../src/scripts/main.ts).
+Shift-click the head/body armor-ablation arrow to restore one SP using CPR's existing reverse-ablation method. This requires an editable owned sheet. The optional Martial Arts no-ablation setting keeps half-SP handling while suppressing ablation on managed damage. Hide attack weapon names for NPCs presents generic attack categories only for attackers without a player owner. Player-owned attackers retain their weapon names, even when the GM rolls for them. Implementation: [armor-shortcut.ts](../src/scripts/armor-shortcut.ts), [main.ts](../src/scripts/main.ts).

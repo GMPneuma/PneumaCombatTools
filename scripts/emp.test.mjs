@@ -2,7 +2,7 @@ import {installMockLibWrapper} from "./lib-wrapper-fixture.mjs";
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {empDisabled,eligibleEmpItems,randomEmp,expandEmp,empReferences} from '../dist/scripts/emp-rules.js';
-import {applyEmpSelection,finishEmp,reconcileEmp} from '../dist/scripts/emp-state.js';
+import {applyEmpSelection,finishEmp,reconcileEmp,cleanupEndedEmp} from '../dist/scripts/emp-state.js';
 const module='pneuma-combattools',key=`flags.${module}`;
 const get=(o,p)=>p.split('.').reduce((v,k)=>v?.[k],o);
 const collection=rows=>Object.assign(rows,{get:id=>rows.find(r=>r.id===id)});
@@ -23,6 +23,17 @@ function fixture(){
  globalThis.fromUuid=async uuid=>uuid===actor.uuid?actor:null;
  return {actor,arm,weapon,cosmetic,eye,combat,request,policy,gm,player};
 }
+
+test('GM cleanup restores ended equipment causes but preserves live timers and refuses active participants',async()=>{
+ const f=fixture();f.combat.started=false;f.combat.combatants=[];game.time={worldTime:100};
+ await f.arm.update({[key+'.empCombats']:['c'],[key+'.timedDisables']:{old:{source:'emp',duration:{combat:'missing',rounds:20,startTime:99}},live:{source:'emp',duration:{seconds:100,startTime:99}}}});
+ await cleanupEndedEmp(f.actor);
+ assert.deepEqual(empReferences(f.arm),[]);
+ assert.equal(get(f.arm,key+'.timedDisables.old'),undefined);
+ assert(get(f.arm,key+'.timedDisables.live'));
+ f.combat.started=true;f.combat.combatants=[{actor:f.actor}];
+ await assert.rejects(cleanupEndedEmp(f.actor),/started encounter/);
+});
 test('eligibility honors installation, foundation policy, immunity, carried electronics',()=>{
  const f=fixture();f.actor.items.push({id:'radio',name:'Radio',type:'gear',system:{isElectronic:true,equipped:'carried'}},{id:'stored',name:'Stored',type:'gear',system:{isElectronic:true,equipped:'owned'}});
  assert.deepEqual(eligibleEmpItems(f.actor.items,{...f.policy,foundational:false,immune:['cosmetic']}).map(i=>i.id),['weapon','radio']);

@@ -1,4 +1,5 @@
 import { checkedLuck } from "./evasion-rules.js";
+import { registerNativeWrapper } from "./native-wrappers.js";
 export interface NativeRoll {
   skillName?: string; rollTitle: string; rollCard: string; resultTotal: number; luck: number; formula?: string;
   mods: { id?: string; value: number; source: string }[];
@@ -19,6 +20,25 @@ interface NativeAPI {
 }
 let api: Promise<NativeAPI> | undefined;
 const hiddenDice = new WeakSet<Roll>();
+const diceUsers = new WeakMap<Roll, User>();
+const styledDiceAPIs = new WeakSet<object>();
+/** Keep CPR's audience/visibility handling, replacing only the replay's DSN user. */
+export async function showDiceAs(roll: Roll, mode: string, userId?: string): Promise<void> {
+  const { Dice } = await nativeAPI();
+  const user = (userId ? game.users?.get(userId) : undefined) as User | undefined;
+  const dice3d = (game as unknown as {dice3d?: {showForRoll: (...args: unknown[]) => unknown}}).dice3d;
+  if (user && game.modules?.get("dice-so-nice")?.active && dice3d?.showForRoll) {
+    if (!styledDiceAPIs.has(dice3d)) {
+      registerNativeWrapper(dice3d, "showForRoll", function(wrapped, die: Roll, originalUser: User, ...args) {
+        return wrapped(die, diceUsers.get(die) ?? originalUser, ...args);
+      }, "WRAPPER");
+      styledDiceAPIs.add(dice3d);
+    }
+    diceUsers.set(roll, user);
+  }
+  try { await Dice.handle3dDice(roll, mode); }
+  finally { diceUsers.delete(roll); }
+}
 export async function nativeAPI(): Promise<NativeAPI> {
   api ??= (async () => {
     const path = "/systems/cyberpunk-red-core/modules/extern/cpr-dice-handler.js";
@@ -44,9 +64,16 @@ export async function rollHidden(roll: NativeRoll): Promise<void> {
 export function diceJSON(roll: NativeRoll): string[] {
   return [roll._roll, roll._critRoll].filter((die): die is Roll => !!die).map(die => JSON.stringify(die.toJSON()));
 }
+/** Stable presentation identity; no roll evaluation or DSN coordination. */
+const rollIds = new WeakMap<object, string>();
+export function markRollResult(html: string, roll: object): string {
+  let id = rollIds.get(roll);
+  if (!id) { id = foundry.utils.randomID(); rollIds.set(roll, id); }
+  return html.replace(/^(\s*<[\w-]+)/, `$1 data-pneuma-roll-result="${id}"`);
+}
 export async function nativeCard(roll: NativeRoll): Promise<string> {
   roll.criticalCard = roll.wasCritical();
-  return renderTemplate(roll.rollCard, roll);
+  return markRollResult(await renderTemplate(roll.rollCard, roll), roll);
 }
 const dialogNotes = new WeakMap<NativeRoll, { penalty: number; fee: number }>();
 export function registerEvasionDialog(): void {

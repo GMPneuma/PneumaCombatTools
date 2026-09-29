@@ -19,6 +19,13 @@ test("movement shortfall is optional and cannot exceed next-turn budget",()=>{
  assert.deepEqual(chargeMovement(3,0,12,5,true),{spent:3,debt:2});
  assert.throws(()=>chargeMovement(0,10,12,3,true),/next turn/);
 });
+
+test("Prone rejects escape before any movement charge or relocation",async()=>{
+ const f=fixture();f.token.actor=f.token.document.actor;
+ f.token.actor.effects=[{statuses:new Set(['prone'])}];
+ for(const costs of [false,true])await assert.rejects(moveEvader(f.token,{x:250,y:50},costs,true,'prone'),/Get Up/);
+ assert.deepEqual(f.token.center,{x:50,y:50});assert.deepEqual(f.participant.flags,{});assert.deepEqual(f.token.document.flags,{});
+});
 test("evasion cost is recorded once and debt reduces the next turn",async()=>{
  const f=fixture();await f.participant.update({'flags.pneuma-combattools.aoeMovement':{turn:"1",spent:10,debt:0}});
  await moveEvader(f.token,{x:250,y:50},true,true,"escape");

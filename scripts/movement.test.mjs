@@ -35,10 +35,27 @@ function fixture(){
  globalThis.canvas={grid:{size:100,type:1},scene};globalThis.CONST={GRID_TYPES:{SQUARE:1}};
  globalThis.game={combat,combats:Object.assign(new Map([['c',combat]]),{find(fn){return [...this.values()].find(fn);}}),user:{id:'gm'},users:[{id:'gm',active:true,isGM:true}],settings:{register(){},get:()=>true}};
  registerMovement();
- function commit(changes,options={}){for(const fn of hooks.preUpdateToken)fn(doc,changes,options);for(const [key,value]of Object.entries(changes)){if(key==='flags.pneuma-combattools.movement')doc.flags={'pneuma-combattools':{movement:value}};else {doc[key]=value;if(key in doc._source)doc._source[key]=value;}}return options;}
+ function commit(changes,options={}){for(const fn of hooks.preUpdateToken)if(fn(doc,changes,options)===false)return false;for(const [key,value]of Object.entries(changes)){if(key==='flags.pneuma-combattools.movement')doc.flags={'pneuma-combattools':{movement:value}};else {doc[key]=value;if(key in doc._source)doc._source[key]=value;}}return options;}
  doc.update=async(changes,options)=>commit(changes,options);
  return {doc,token,combat,hooks,commit};
 }
+
+test('Prone blocks player movement and Reset independently of counters; standing and GM corrections work',()=>{
+ const f=fixture();
+ f.doc.actor={effects:[{statuses:new Set(['prone'])}]};
+ f.doc.object=undefined;
+ globalThis.ui={notifications:{warn(){}}};
+ game.user.isGM=false;
+ game.settings.get=()=>false;
+ for(const [changes,options] of [[{x:100},{}],[{y:100},{}],[{elevation:10},{}],[{x:100},{pneumaMovementReset:true}],[{x:100},{pneumaAreaMove:true}]]){
+   assert.equal(f.commit(changes,options),false);
+   assert.deepEqual(f.doc._source,{x:0,y:0,elevation:5});
+ }
+ assert.notEqual(f.commit({name:'renamed'}),false);
+ game.user.isGM=true;assert.notEqual(f.commit({x:100}),false);
+ game.user.isGM=false;f.doc.actor.effects=[];assert.notEqual(f.commit({x:200}),false);
+ assert.equal(f.doc.x,200);
+});
 test('accepted updates atomically persist movement, signed AoE deltas, reset and turn rollover',async()=>{
  const f=fixture();assert.equal(f.commit({x:100}).pneumaMoveDelta,2);assert.equal(currentMovement(f.doc).spent,1);
  assert.equal(f.commit({y:100}).pneumaMoveDelta,0);assert.equal(currentMovement(f.doc).spent,1);

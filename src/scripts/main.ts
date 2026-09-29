@@ -1,3 +1,6 @@
+import {registerDamageReversal} from "./damage-reversal.js";
+import {registerChatResultDelay} from "./chat-result-delay.js";
+import {registerStatusCleanup} from "./status-cleanup.js";
 import {selfIce} from "./quickhack/self-ice.js";
 import {overrideBreach} from "./quickhack/connections.js";
 import {selfActions,performSelfAction} from "./self-actions.js";
@@ -72,11 +75,14 @@ const selectedAttacker = () => {
 Hooks.once("init", () => {
   if (game.system!.id !== "cyberpunk-red-core") return;
   registerSocketHealth();
+  registerChatResultDelay();
   registerAmmoChat();
   registerSheetAttacks();
   registerManualRolls();
   registerHalfArmor();
   registerChatButtons();
+  registerDamageReversal();
+  registerStatusCleanup();
   registerSelfCTH();
   registerQuickhack(() => { const target = canvas.tokens?.hud?.object ?? undefined; const source = selection && selection.target === target ? selection.attacker : selectedAttacker(); return {source, target, self:isSelfCTH(target,source)}; });
   registerGrapple();

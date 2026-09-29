@@ -219,8 +219,11 @@ try {
   const render=async()=>{root.innerHTML=areaContent(data);for(const fn of hooks.renderChatMessage??[])await fn(message,{0:root,find:s=>({toArray:()=>[...root.querySelectorAll(s)]})});};
   await render();
   const reset=root.querySelector('[data-aoe-action="reset"]');
-  if(!reset||!reset.textContent.includes('Reset')||reset.textContent.includes('Player Action')||reset.disabled)throw Error('Missing labeled GM reset');
+  if(!reset||reset.textContent.trim()||!reset.querySelector('.fa-rotate-left')||reset.title!=='Reset Player Action'||reset.getAttribute('aria-label')!=='Reset Player Action'||reset.disabled)throw Error('Missing compact GM reset');
   if(root.querySelector('[data-aoe-action="exclude"], [data-aoe-action="forcehit"]'))throw Error('Old GM override remains after response');
+  reset.append(document.createTextNode(' Reset'));
+  const {styleChatButtons}=await import('/scripts/chat-buttons.js');styleChatButtons(root);
+  if(reset.textContent.trim()||!getComputedStyle(reset,'::before').content.includes('GM'))throw Error('Reset must keep GM badge and icon without Reset text, including saved cards');
   for(const kind of ['explosive','suppression'])for(const width of [260,310,380]){
     data.kind=kind;row.coverUp=kind==='explosive';root.style.width=width+'px';await render();
     await new Promise(resolve=>requestAnimationFrame(resolve));
@@ -239,6 +242,27 @@ try {
   if(heading.title!==data.exchange.title||getComputedStyle(heading).textOverflow!=='ellipsis'||heading.scrollWidth<=heading.clientWidth)throw Error('Long heading must truncate with full tooltip');
   game.user={id:'def',isGM:false};await render();
   if(root.querySelector('[data-aoe-action="reset"]'))throw Error('Player sees GM reset');
+ });
+ await page.evaluate(async()=>{
+  const {createInstantCard,renderInstantEffects}=await import('/scripts/instant-effects.js');
+  const root=document.querySelector('#card');game.user={id:'gm',isGM:true};
+  let serial=0;foundry.utils.randomID=()=>String(++serial);
+  message.whisper=[];message.blind=false;
+  message.update=async changes=>{for(const [key,value]of Object.entries(changes)){let out=message;const parts=key.split('.');for(const part of parts.slice(0,-1))out=out[part]??={};out[parts.at(-1)]=structuredClone(value);}};
+  const actor={uuid:'Actor.poison',name:'Poison <target>',isOwner:true};fromUuid=async()=>actor;
+  await createInstantCard(actor,'poison',message,{combatId:null});
+  await createInstantCard({...actor,uuid:'Actor.other',name:'Other'},'biotoxin',message,{combatId:null});
+  const entries=Object.values(message.flags['pneuma-combattools'].attachedEffects);
+  entries[0].effect.state='resisted';entries[0].effect.total=17;
+  root.innerHTML='<div class="message-content"><div class="original-attack">Attack and damage</div></div>';
+  for(let i=0;i<2;i++)await renderInstantEffects(message,{0:root});
+  if(root.querySelectorAll('.pneuma-attached-effects').length!==2||!root.querySelector('.original-attack'))throw Error('Attached effects lost or duplicated original card');
+  if(root.querySelector('.pneuma-attached-effects h4').textContent!=='Poison <target> — Effects'||root.querySelector('.pneuma-attached-effects target'))throw Error('Effect target escaping');
+  if(!root.textContent.includes('Resisted')||!root.querySelector('[data-instant-action="roll"]'))throw Error('Independent effect states');
+  root.innerHTML='<div class="original-attack">Updated damage</div>';await renderInstantEffects(message,{0:root});
+  if(root.querySelectorAll('.pneuma-attached-effects').length!==2)throw Error('Effects did not survive parent content update');
+  game.user={id:'player',isGM:false};message.blind=true;root.innerHTML='';await renderInstantEffects(message,{0:root});
+  if(root.querySelector('.pneuma-attached-effects'))throw Error('Blind effect leaked');
  });
  console.log("AoE browser checks passed: owner controls, Cover Up hiding, compact escaped markup, wall-polygon preview, place/cancel cleanup.");
 }finally{await browser.close();}

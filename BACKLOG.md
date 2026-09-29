@@ -1,241 +1,307 @@
-# Combat Tools roadmap and backlog
+# Combat Tools backlog
 
-AoE Reset Player Action (2026-09-28, unreleased): after a target responds, the row replaces its GM exclude/affected override with a labeled GM reset. Reset clears the response roll/reservation and Cover Up selection, recreates untouched instant choices, and restores the original response controls. It removes only Prone created by this row and uses existing suppression-source cleanup. Other targets and shared attack/damage rolls remain unchanged. Reset is blocked after movement, per-target damage, or effect application begins. Previously spent Luck is not refunded; reset is not a resource rollback.
+Updated: 2026-09-29
 
-Speed Heal status restored to the native token status picker under Pharmaceuticals (2026-09-27, unreleased). Uses the existing status ID and icon.
+Edit each **Status** directly. Priorities are initial suggestions, not an agreed work order.
 
-## Character-sheet attack routing — implemented locally, 2026-09-26
+**Priority:** High = address next; Medium = useful, can wait; Low = optional improvement.\
+**Status:** Idea = needs discussion; Ready = defined and available to pick up; In progress = work started; Blocked = cannot proceed; Done = completion criteria met; Dropped = no longer planned.
 
-Optional character-sheet attack routing (unreleased): **Route character-sheet attacks through Combat Tools**, under Attack & Damage Cards, is a world setting and defaults OFF. Supported native weapon attack clicks preserve fire mode and use the existing dispatcher. Explicit token sheets retain their token; actor-directory sheets use one controlled matching token or one unambiguous scene token. Ordinary attacks require one visible target; area weapons can open placement without a target. Disabled routing, unsupported actions, absent GM, or ambiguous context retain native behavior. Once routed, cancellation/errors never replay a native attack. Hand grenades retain their HUD flow. Automated routing tests pass; live multiplayer verification remains pending.
+Keep IDs permanent. Add new items by copying an entry. Move finished or dropped items to the bottom and record a date and outcome. Listing work does not authorize implementation. Live verification means checking the actual Foundry world; automated checks alone do not satisfy it.
 
-Indicator setting label renamed to “Indicator Scale”; saved values and sizing behavior are unchanged.
+This remains the master feature roadmap. The [complete previous backlog](docs/history/backlog-before-standard-template-2026-09-29.md) preserves every original request, revision and completion note; the [earlier roadmap](docs/history/pre-0.8.0-refresh/BACKLOG.md) preserves older history. Source manifest: 0.9.5. Historical version/unreleased labels are not current release verification. Existing uncommitted gameplay work was not evaluated or changed by this documentation task.
 
-Grenade placement cleanup (local): native Token HUD clears when area placement begins, including GM scatter placement. Hidden attack templates and grid highlights also disable rendering so GM visibility refreshes cannot restore them. Missed-blast instructions are shortened and the crosshair button reads “Place New Target Center.” Automated placement/visibility and scattered-card completion checks added; live Foundry validation remains pending.
+## Open items
 
-Cover/terrain notice simplified as requested: “GM resolves all aspects of cover and terrain.” Mechanics unchanged.
+### BL-001 — Verify live combat workflows
 
-## Authorized cleanup pass — implemented locally, 2026-09-26
+**Priority:** High\
+**Status:** Ready
 
-- Shared HTML escaping, stable primary-GM selection, and UUID-deduplicated world/synthetic actor enumeration. Status authority retains its owner fallback.
-- EMP indexes affected actors, batches refresh work, and ignores unrelated combat writes. Full startup reconciliation remains. EMP chat cards refresh only for changed/removed requests or changed combat availability.
-- AoE uses the shared pending-card tracker, seeded once at ready and maintained by message events; item/effect changes no longer scan chat history.
-- Removed the obsolete EMP configuration dialog, thrown-name suffix helper, unused Quickhack audience helper, two obsolete translations, and five unused imports/parameters. Moved test-only overlap geometry into a fixture; the EMP browser fixture now exercises the supported creation API.
-- Removed only the unread `evasionFlatPenalty` registration/type. The active `evasionHomebrew.rule = "flat"` still applies -4. Other legacy evasion readers, saved HUD message compatibility, and intentional test reset helpers remain.
+**Problem:** Source and browser checks leave actual multi-client integration unverified.
 
-This supersedes the remaining cleanup candidates in the historical 2026-09-20 audit. Automated checks cover batching, expiration, pending-card indexing, and request/removal refreshes; live Foundry multiplayer validation remains pending. No release performed.
+**Desired result:** Record an integrated live-world pass with the supported module combination.
 
-## Incoming Attack queue standardization — implemented locally
+**Done when:**
 
-Removed the legacy card-derived attack alert map and startup scan. New incoming attacks enter the shared HUD queue once, retaining actor scope and card navigation. Clear removes that queue entry; updates/reselection/reload cannot rebuild old notices. Resolution/deletion removes any remaining notice. This completes the previously incomplete queue standardization; attack resolution data stays on cards, notification state does not.
+- [ ] Test multiple clients/GMs, linked/unlinked actors, scene changes and encounter end/reset/deletion.
+- [ ] Verify native dialogs, attack/evasion/damage, status cleanup and theme combinations.
+- [ ] Check sheet attack routing, AoE reset/placement, smoke, QuickHacks, EMP, bow loading and ammunition controls.
+- [ ] Verify current turn indicators, HUDs, roll shortcuts and alerts as GM and player.
+- [ ] Record versions, results and remaining failures; do not equate automated checks with live acceptance.
 
-## Cyberpunk Animated Turn Indicators — implemented locally
+**Notes:** Previous backlog: Open work and dated feature verification notes.
 
-Approved Segmented HUD and Scanner, plus the later Radial Circuit request (center-to-edge circuit paths with outward lights). Original GM appearance controls and omitted distance are superseded: all players and GMs now have client-local Color, Thickness (up to 10), Distance, Opacity, Speed and style controls. Self-CTH gear → Animated Turn Indicator opens live settings with no Save requirement. The repeated radial circuit is superseded by four independently routed, overlapping quadrants with sixteen traces and small packets. Local Animated/Static/Off choice. Native token rendering and active-scene encounter selection; cached geometry with capped animation updates and teardown cleanup. Original Target Lock and perimeter Circuit Trace proposals are not implemented. Build, lifecycle tests and PIXI rendering checks pass; live-world performance and visual acceptance remain open. Existing Monk combat highlight must be disabled separately to avoid double markers.
+### BL-002 — Investigate actor and token naming differences
 
-## Suppression/choking markers and Manual Rolls — implemented locally
+**Priority:** Medium\
+**Status:** Ready
 
-Failed Concentration now applies Suppressed; GM exclusion/reset removes only that response's marker. The later expiry request supersedes manual clearing: each new combat suppression expires at the end of the affected character's next turn, including next round if applied during their current turn. Combat reset/deletion and participant removal also clear its timed effects; outside combat there is no turn timer. Cover movement remains manual. Choke applies Choking 1/2 as the sequence advances; grapple release/break/end now clears all Choking 1/2 effects, including manual markers, superseding the earlier preserve-manual-marker behavior. Unconscious remains separate. The token status menu hides the three wounded states, Speed Heal and Quick Fix without deleting their definitions or changing automation.
+**Problem:** The existing backlog retains questions about token names, actor names, older cards and scene changes.
 
-Manual Rolls now has the requested General Roll / STAT, Skill, Role / Damage, Critical Injury sections. GM Group Check remains in a separate final section. Skill/Role dropdowns have been superseded by scrollable lists showing current sheet values and separate View and Roll buttons on every row. Nonrolling abilities disable Roll. View opens the native item sheet; Roll uses the selected token's native CPR sheet handler. Values refresh after actor/item/effect changes. Build and browser fixture verification complete; live Foundry verification remains open.
+**Desired result:** Determine whether differences are presentation-only or identify a reproducible targeting problem.
 
-Combat menu width — fixed locally: dedicated pneuma-target-menu class replaces native status-effects reuse. This supersedes and removes the Monk-specific width override. Browser regression covers menu visibility and 230px width alongside native/Monk status-picker styles.
+**Done when:**
 
-## Hover EKG contrast — local preview
+- [ ] Compare displayed names and referenced Actor/token identities on current and historical cards.
+- [ ] Check native undo after scene changes and record actual affected documents.
 
-Added a 65% black backing confined to the EKG footprint, reduced to 105×30 (75% size), and a subtle waveform shadow. Awaiting user visual review on bright maps.
+**Notes:** Previous backlog: Actor/token identity. Differing labels alone do not establish wrong-target mutations.
 
-## Blank icon color — included in 0.8.6
+### BL-003 — Reproduce missing residual smoke
 
-Address the GM settings-save validation failure: normalize blank icon color to amber (`#ffc36a`) before native validation and use an amber default for both the picker and HUD, including existing null values, without overwriting chosen colors. Preserve existing valid colors and other settings. Automated regression coverage passes; live verification pending.
+**Priority:** Medium\
+**Status:** Ready
 
-## Authorized encounter consistency — included in 0.8.4, 2026-09-24
+**Problem:** An earlier report of missing residual smoke remains unverified despite passing fixtures.
 
-Use one active, started encounter per action scene; require participating tokens; retain the selected encounter through responses, movement and effects; reject ambiguous selection and invalidated actions. Clean environment assumed. Shared lookup and regression coverage implemented; live multiplayer verification remains open. See [encounter selection](docs/encounters.md).
+**Desired result:** Confirm the behavior in a real vision/fog scene.
 
-Current source: 0.8.0, reviewed 2026-09-23. This is a status record, not authorization to implement new work. The [complete former roadmap](docs/history/pre-0.8.0-refresh/BACKLOG.md) preserves original wording, intermediate decisions and dated investigations. This document supersedes its conflicting status labels.
+**Done when:**
 
-## Original requests: current disposition
+- [ ] Record scene vision/fog settings and smoke lifetime/visibility.
+- [ ] Reproduce removal/restoration and expiry; distinguish hidden smoke from a missing template.
+- [ ] Fix only a demonstrated defect, with regression coverage.
 
-| Request | Status in 0.8.0 | Remaining boundary |
-| --- | --- | --- |
-| Target DV on hover | Implemented, including elevation and optional Autofire | Native equipment/data and scene visibility still govern availability. |
-| Target right-click actions | Implemented; native HUD retained | General character-sheet replacement remains outside scope. |
-| Prevent movement | Implemented GM movement modes | No general action budget or automatic Run spending. |
-| Evasion / combined attack resolution | Implemented | Native attack calculates first; result/dice remain visually withheld until response. This supersedes delaying the actual roll. |
-| Poison/Biotoxin and related effects | Implemented reusable resolver and native outcome reporting | Biological eligibility and unsupported sources remain adjudicated. |
-| QuickHacks | Implemented connection/detection/ejection and supported effects | Manual hacks/custom hacks and Net Action spending remain below. |
-| Grenades/rockets/shells/throws | Implemented | Cover/terrain destruction and unknown special ammunition remain manual. GM scatter supersedes random scatter. |
-| Penalty-producing visual effects | Smoke and conditions supported | General sensory/visibility interactions remain open. Screen overlays moved out of this module. |
-| Combat tracker conveniences | Combat bar, visibility, initiative, movement modes, scrolling implemented | Unspecified additional carousel-style features are not implied commitments. |
-| Cyberware disablement/restoration | EMP and source-specific timed disablement implemented | Additional source integrations require explicit scope; out-of-combat EMP is unsupported. |
+**Notes:** Previous backlog: Smoke.
 
-## Completed additions
+### BL-004 — Define smoke and sensory exceptions
 
-- Grappling with self-HUD follow-ups, preserved chat history, defender Escape and establishing-turn restrictions.
-- Both Foreign Object injuries reuse Broken Ribs movement-damage flow; injury guidance, MOVE floor, Cracked Skull correction and advisory next-turn reminders.
-- Configurable EMP selection, eligibility/weight, hardened draws, Internal Frame MOVE/action options, source-specific durations and overlapping restoration.
-- Manual roll menu, group requests, STAT checks, custom dice, common damage/effect controls and selected-target application history.
-- Combat bar four-way dock/layout choice, large portraits, scrolling, end-turn/native initiative controls and minimized Players list.
-- Crew Tools shortcut integration, standalone left docking, player default-character focus, status menus, notifications and message API v2.
-- Settings grouping, compact subforms, shared chat-button styling, stable hover geometry and standard Critical Success/Failure terminology.
-- Duplicate QuickHack validation reduced without removing checks; connection awareness stored on Combat; focused status refreshes and turn/round lifetime work.
+**Priority:** Medium\
+**Status:** Idea
 
-## Open work and verification
+**Problem:** Cyberware-dependent visibility and conditional immunity remain manual; automatic smoke penalties were subsequently implemented.
 
-| Area | Remaining work | Status |
-| --- | --- | --- |
-| Live integration | Multiple clients/GMs, linked/unlinked actors, scene changes, native dialogs/undo, status cleanup, theme combinations | Verification, not a claim of a confirmed bug. |
-| Actor/token identity | Token-name vs actor-name presentation; old native cards and undo after scene changes | Retain investigation; do not infer wrong-target mutations from differing labels. |
-| Smoke | Reproduce earlier missing residual smoke report in a real vision/fog scene | Open live report; automated smoke fixtures are passing. |
-| Smoke/senses | Automatic smoke penalties, cyberware-dependent visibility and conditional immunity | Deferred mechanics. |
-| QuickHack | Puppet/Lure decisions, physical Shard Ejection, custom hacks, Net Action spending, Neuroport automation | Manual/deferred; current catalog is not complete automation. Self-ICE/Passwall breach implemented; Net Action spending remains manual. |
-| Status mechanics | Per-condition context, treatment/healing, unsupported drug/pharma behavior and outside-source integration | See current [coverage audit](docs/status-mechanics-audit.md). |
-| EMP timing | Ordinary EMP remains combat-end based; no outside-combat EMP selection | Intentional current boundary; exact timed ordinary EMP requires a new decision. |
-| Native undo | Secondary instant effects/statuses/smoke are not a universal transaction rollback | Manual review; investigate concrete failures before broad changes. |
-| Item markers | General user management/lifetimes beyond subsystem-owned cleanup | Deferred; generic API remains visual-only. |
-| Legacy QuickHack content | Old folders/gear cleanup was held until at least 0.8.0 | Still not authorized automatically by reaching that version. |
-| Documentation translations | Current guides describe English UI and native CPR structures | No translation release claimed. |
+**Desired result:** Specify only the additional equipment/sensory behavior that is wanted.
 
-## Revised, moved or canceled
+**Done when:**
 
-- Current Action window: canceled permanently; use HUD and chat cards.
-- General action-economy enforcement: excluded. Injury reminders do not spend/block Actions. Existing grapple/frame and explicit GM movement restrictions remain.
-- Separate combat-resolution master switch: removed; combat cards are the module's central workflow.
-- Early top-edge auto-hide combat-bar proposal: superseded by current bottom-left/top-right docking. No separate top-center auto-hide mode.
-- Neural Intrusion screen glitches and personal visual-effect toggle: moved to PneumaVisualTools. Combat Tools retains detection/status/ejection and an API/hook.
-- Fire-screen experiment: canceled and removed. Native On Fire mechanics and Extinguish remain.
-- Test status HUD and one-time chat-history awareness migration: removed.
-- Incendiary behavior: retain native damaging/penetration-triggered ignition; prior request to change it was explicitly withdrawn.
-- Whole-sheet replacement, automatic item transfers, broad inventory repair/migrations and anti-cheat architecture: outside approved scope.
+- [ ] Choose supported senses/equipment and explicit exceptions.
+- [ ] Preserve the existing attack-time penalty and Ignore smoke override.
 
-## Verification record
+**Notes:** The later Automatic smoke obscuration entry supersedes the old claim that all automatic penalties are deferred.
 
-0.8.0: production build and 326 checks passed; four tests requiring native Foundry fixtures skipped. Three browser fixtures passed on rerun after supplying local library paths. Live Foundry multiplayer remains separate. The current refresh changes documentation only; it is not a new release or a gameplay change.
+### BL-005 — Define remaining QuickHack mechanics
 
-Self-HUD menu correction: Close Combat and thrown flyouts share attack-option styling and remain outside icon-column flow; disabled actions remain visibly muted.
+**Priority:** Medium\
+**Status:** Idea
 
-Combat-bound cyberware disablements now clear on combat end/reset/deletion, including timed Microwaver and QuickHack causes. Startup cleanup removes stranded causes from ended/deleted encounters. Other ongoing combat causes and native disabled states are preserved. Automated regression coverage; live Foundry verification pending.
+**Problem:** Puppet/Lure decisions, physical Shard Ejection, custom hacks, Net Action spending and Neuroport automation remain manual or deferred.
 
-Self-CTH Close Combat and Thrown Weapons & Grenades flyouts now use the shared `.combat-heading` and list rows, with grapple icons, item artwork and the native improvised-weapon icon. Enabled CTH menu buttons share hover/focus background and inset outline tokens (`--pneuma-menu-hover-background`, `--pneuma-menu-hover-outline`) without changing layout; disabled actions remain dim. Existing action selectors are unchanged.
+**Desired result:** Agree which workflows should be supported and their rules.
 
-Automatic smoke obscuration: Combat Tools attacks check the attacker-center to target-center line against active saved smoke footprints; blast attacks use the chosen impact point. Crossing smoke adds the native −4 obscured-task modifier once. The attack dialog offers “Ignore smoke” for equipment or GM rulings, and native roll details retain the modifier. This runs at attack preparation, not continuously; it does not infer vision-equipment capabilities or vertical smoke volume.
+**Done when:**
 
-Unreleased fix: cyberleg/internal-frame and QuickHack movement penalties now include native CPR per-change metadata; existing module penalty effects repair during reconciliation. This prevents the native modifier reader from failing on missing `changes` flags. Live affected-character verification pending.
+- [ ] Record a separate decision for each listed mechanic.
+- [ ] Implement and verify only specifically approved workflows.
 
-Disabled cyberlimbs derive their state from combat/item disablement records. Only the mechanical MOVE penalty appears as an actor effect; redundant no-modifier limb effects from older versions are removed during reconciliation without clearing item causes or unrelated effects.
+**Notes:** Previous backlog: QuickHack. Self-ICE/Passwall breach is already implemented.
 
-AoE re-placement: missed aim templates are gray and inactive while waiting for the GM landing point. `.pneuma-aoe-reposition` explains the state and placement bounds; the existing scatter action now reads “Place landing point.” A pointer-transparent `.pneuma-area-placement` status panel keeps placement/cancel instructions visible. The moving preview retains its color; accepting replaces the original template at the actual landing point.
+### BL-006 — Revisit interrupted QuickHack recovery
 
-Disablement audit fixes: active native leg-injury modifiers (including renamed native items) offset the cyberleg penalty; disabled/suppressed effects do not. Generic Disabled labels are display-only, including for evasion. Module-owned aggregate limb/frame penalties restore automatically while their item/combat causes remain active, including after manual effect deletion or disabling. Internal-frame policies derive from combat requests and item causes; legacy empty frame markers are removed. CPR modifier metadata repairs also cover Slow and Impair Movement.
+**Priority:** Low\
+**Status:** Idea
 
-### Bow loading flow — implemented locally, 2026-09-24
+**Problem:** The chat-card audit's GM recovery recommendation was explicitly deferred.
 
-Approved target-aware bow ammunition prompt, native loading and remembered attached ammo selection implemented with regression coverage. No separate Fire last type button. Covers native bow/crossbow weapon type. Live verification pending.
+**Desired result:** Keep the deferred request visible until a new decision is made.
 
-- EMP settings streamlined: grouped selection controls, collapsible protection and frame options (open when configured), and conditional numeric fields. Existing behavior and saved values retained.
+**Done when:**
 
-## Weapon ammunition controls — included in 0.8.5
+- [ ] Decide whether to reopen audit F2.
+- [ ] If reopened, define safe handling of partially applied effects before retries.
 
-Combat-only player reload/ammo-change chat reporting implemented through native CPR methods, including sheet and CTH actions. GM world toggle enabled by default; bows and characters without player owners excluded; GM actions for player-owned characters included. Cancelled/no-op actions remain silent and nested reloads do not duplicate messages. Live verification pending.
+**Notes:** docs/chat-card-audit-2026-09-26.md and previous backlog. No recovery implementation authorized by this entry.
 
-Approved targeted-weapon reload UI: disable Autofire/Suppressive below 10 rounds; empty guns replace attack icons with native Reload/Change Ammo icons and disable attacks; right-click weapon names toggles these icon sets in the same row on loaded guns. This supersedes the extra row of text buttons. Preserve bow loading. Exotic burst costs defer to core support. Automated and rendered fixture verification do not establish live multiplayer verification.
+### BL-007 — Define additional condition mechanics
 
-## Animated Turn Indicator concept expansion — implemented locally
-Approved all static concepts: revised four-quadrant circuit, four general effects (Glitch Frame, Signal Echo, Data Stream, Arc Discharge), and one for every role (Rockerboy, Solo, Netrunner, Tech, Medtech, Media, Exec, Lawman, Fixer, Nomad). All now animate using cached PIXI geometry and existing client settings. Segmented HUD and Scanner remain, for 17 styles total. Role assignment is manual. Rendered dark/light previews and lifecycle checks pass; in-world visual approval and low-end performance remain open.
+**Priority:** Medium\
+**Status:** Idea
 
-## Shared default and personal indicators — implemented locally
-The former viewer-local appearance model is superseded by Default Indicator (GM world settings) and My Indicator (shared User flag). NPCs and characters without an owner override inherit Default Indicator. Character assignment wins over shared ownership; owner fallback is stable and includes offline players. All viewers resolve the same profile. Personal reset returns to inheritance; local Animated/Static/Off remains independent. Two-button live editor and profile/permission tests pass; live multiplayer verification remains open.
+**Problem:** Treatment/healing context, unsupported pharma/drugs and outside-source integration are not universally automated.
 
-## Indicator viewer preferences — implemented locally
-Added User Turn indicator master switch and Use default for everyone. Both are client-scoped and save immediately. Off hides NPC and personal indicators and stops animation; force-default ignores every personal override only for that viewer, without deleting it. Existing local Static/Off display choices remain compatible.
+**Desired result:** Choose concrete condition workflows that add useful automation.
 
-## Role indicator refinements — implemented locally
-Medtech upper-right red blinking dot, visible Solo bracket/scan motion, fixed blue/red Lawman, and fixed green → yellow → orange → red Nomad speed arc are implemented. These explicit accents supersede the earlier uniform configurable-color behavior. Cached rendering and role-specific regression checks cover colors and motion; live-world visual acceptance remains open.
+**Done when:**
 
-Correction to role refinements: the blinking red dot belongs to Media, superseding the earlier Medtech request. Media now has that fixed-red recording light. Medtech Vital Trace is replaced by Trauma Scan: a medical cross badge below the portrait, segmented diagnostic arcs and scanning probes; no EKG waveform. Saved medtech style selection is retained.
+- [ ] Identify each proposed source, condition and native workflow.
+- [ ] Define treatment/removal and outside-module interactions.
+- [ ] Verify only approved additions against native behavior.
 
-Nomad direction correction: reversed both arc and tick colors so the RPM scale advances clockwise from green through yellow/orange to red, matching the needle’s increasing-angle sweep.
+**Notes:** docs/status-mechanics-audit.md. Custom markers do not imply mechanics.
 
-Indicator Distance range revised from 0–100 to 0–50, including normalization of older default and personal values when displayed.
+### BL-008 — Decide ordinary EMP timing changes
 
-Arc Discharge redesign — implemented locally: supersedes the three long wire-like spokes with six close perimeter contacts, short forked discharge paths, staggered flashes and occasional simultaneous arcs. All routes are cached; visual/runtime fixtures verify dark/light rendering, inactive paths, changing active positions and no frame geometry rebuilding. Live visual acceptance remains open.
+**Priority:** Low\
+**Status:** Idea
 
-Indicator range revision: Speed maximum reduced to 2; Opacity minimum raised to 50% (maximum 100%). Applies to controls and existing saved profiles at render time.
+**Problem:** Ordinary EMP uses combat-end timing and has no outside-combat selection.
 
-Fixer redesign — implemented locally: the Exchange contact graph is superseded by Eurobuck Flow, with a currency display and circulating banknotes. Existing fixer style key is retained.
+**Desired result:** Retain that boundary unless a different duration/workflow is explicitly chosen.
 
-Role visual revision: Medtech’s busy Trauma Scan design is simplified to the medical cross and two slow brackets; removed diagnostic arcs, ticks and enclosing badge. Tech Diagnostic Bus is superseded by Toolworks: rotating cogs and a wrench, with no network traces. Both remain compatible with saved style selections.
+**Done when:**
 
-Netrunner redesign — implemented locally: Quadrant Circuit becomes Netrunner — Quadrant Circuit, superseding Packet Route. Removed the duplicate general-style entry; 16 choices remain. Old circuit settings remain compatible through normalized profile reads and GM world-default migration.
+- [ ] Record a decision on exact timing and outside-combat support.
 
-Indicator settings access correction — implemented locally: registered the full Animated Turn Indicator editor as an unrestricted native Configure Settings submenu, grouped with the indicator settings. Players can access My Indicator without selecting a token.
+**Notes:** Previous backlog: EMP timing; intentional boundary, not a confirmed defect.
 
-## Per-token Animated Turn Indicator — implemented locally
-Approved GM-only This Token mode with Use inherited settings. Store appearance on the individual scene token, ahead of player and default profiles. Existing viewer master and force-default preferences still win. GM shortcuts cover self and targeted tokens; Configure Settings captures one selected token. Tests verify independent shared-actor NPCs, reset/permissions and stable editing context. Live-world verification remains open.
+### BL-009 — Verify limits of damage undo
 
-- Implemented: temporary local Animated Turn Indicator preview while editing, including outside combat and out of turn. Restore normal combat rendering on close; preserve viewer master/display preferences. Supersedes requiring the edited token to be the active combatant for visual feedback.
+**Priority:** Medium\
+**Status:** Ready
 
-- Implemented revision: display preferences only in main Configure Settings; appearance profiles only behind Configure. GM This Token follows newly selected tokens and updates the override label. Supersedes earlier duplicated display/appearance controls in both surfaces.
+**Problem:** The prior roadmap does not promise universal rollback of secondary effects, statuses or smoke; local damage-reversal work now exists.
 
-- Implemented: each player may customize Default Indicator for their own view, with Use GM Default restoring world inheritance. Use Default for Everyone uses that viewer default; My Indicator remains a separate shared character profile. Supersedes the player read-only Default Indicator tab.
+**Desired result:** Document the actual supported reversal behavior and remaining manual steps.
 
-- Corrected My Indicator inheritance: Use My Default Indicator follows that player's default, including the shared appearance of their character; it no longer skips directly to the GM default. This supersedes the prior owner-default isolation for inherited My Indicator only.
+**Done when:**
 
-- Implemented: remove redundant Off from Animated Turn Indicator Display; master Use Turn Indicator controls visibility. Existing Off values migrate to master disabled. Supersedes the earlier three-choice display dropdown.
+- [ ] Review the in-progress damage-reversal work before proposing duplicate changes.
+- [ ] Verify supported reversal and secondary-effect behavior in a live world.
+- [ ] Record concrete failures and unsupported cases without blindly retrying damage.
 
-- Implemented approved settings cleanup: Combat Bar, Biomonitor and Token HUD configuration submenus; QuickHack rules plus messages in one editor; combined Hover DV selector; requested naming/hint corrections and contextual position-conflict notice. Movement placement, contextual house rules and existing setting scopes preserved. Supersedes suggestions to relocate movement, group house rules or split display/world categories, which the user rejected.
+**Notes:** Previous backlog: Native undo. Existing uncommitted damage-reversal changes are outside this documentation task.
 
-- Implemented final indicator revision: replace Glitch Frame with Vector Wake; green-bottom/red-top Rockerboy levels; redesign TECH and MedTech; enlarge Media recording dot and add red LIVE text; Exec inbox plus org chart. Supersedes previous Glitch Frame, minimal MedTech and simple Exec art. Saved style keys remain compatible.
+### BL-010 — Define general item-marker management
 
-- Implemented superseding indicator revision: approved TECH diagnostic overlay replaces tool silhouettes; MedTech cross is always red; Exec corporate authority crest/rank/command design replaces inbox and org chart. Saved style keys remain unchanged.
+**Priority:** Low\
+**Status:** Idea
 
-- Implemented: compact resistance rows (e.g. Poison DV13) with a shield Resist icon; all GM-only chat actions and explicit overrides share a normal background, red outline and GM badge, and black action text; hover/focus switches to charcoal with light action text across combat, damage, area effects, instant effects, grapple, EMP, and manual/group checks. Existing permissions remain unchanged. Build/browser fixtures verify presentation; live Foundry validation remains pending.
+**Problem:** General marker management and lifetimes beyond subsystem cleanup are deferred.
 
-- Implemented: GM Remove smoke / Restore smoke toggles the saved smoke template visibility and attack obscuration together. Hidden smoke imposes no automatic attack penalty; restored, unexpired smoke does. The original lifetime continues while removed; expired/deleted smoke cannot be restored.
+**Desired result:** Decide whether any additional user-facing marker workflow is needed.
 
-- Implemented: other-token right-click HUD offers Wake using action when the selected owned character is conscious and the target is Unconscious. The GM applies native Unconscious removal; Prone remains. Touching range and action expenditure remain player/GM adjudicated.
+**Done when:**
 
-- Implemented: personal EKG pause/resume also controls the viewer's hover EKG, including an already visible trace, newly hovered tokens, and health-state redraws. The existing session-local preference remains local to the viewer.
+- [ ] Define management actions and lifetimes, or retain the visual-only API boundary.
 
-- Implemented: per-target resistance, Evasion/Concentration, and instant damage rolls show compact clickable totals beside their outcome/pending action. Native roll HTML is retained inside a collapsed disclosure. Manual group checks already retain clickable totals.
+**Notes:** Previous backlog: Item markers.
 
-- Fixed: combat end/reset/deletion clears temporary injury items and their status markers (Teargas Damaged Eye, Flashbang Eye/Ear, Sonic Shock Ear), while permanent injuries and other encounters remain. Existing native round/time expiry remains. Reapplication also repairs a missing marker for a pre-existing permanent injury. Biomonitor condition checks verify affected-actor display and cleanup; live verification pending.
+### BL-011 — Decide legacy QuickHack content cleanup
 
-## Chat-card audit — 2026-09-26
-Completed the source/browser review of every chat publication family; see [audit](docs/chat-card-audit-2026-09-26.md). Open recommendations: current-condition Wake/Extinguish availability, interrupted QuickHack GM review, stale injury-warning controls, reload and injury-specific CSS identifiers. Optional native header consistency and explicit QuickHack reroll wording remain recommendations, not implemented features. Updated all current Mermaid flows and regenerated the browser diagrams. No gameplay changes made in this audit.
+**Priority:** Low\
+**Status:** Idea
 
-- Implemented audit F1/F3/F4: condition-aware Wake/Extinguish controls and stale-request rejection; current-injury/combat-epoch availability for movement warnings with batched card refresh; scoped reload notice, injury-kind and QuickHack error identifiers. Historical results and native card styling remain. QuickHack recovery (F2) explicitly deferred by user; its behavior is unchanged.
+**Problem:** Old folder/gear cleanup was held until at least 0.8.0 but was never automatically authorized.
 
-AoE reset presentation: icon plus **Reset**, inline in the original player-response controls; tooltip/accessible label remains **Reset Player Action**.
+**Desired result:** Decide exactly which obsolete content, if any, should be removed.
 
-AoE long response descriptions (Cover Up and suppression) use a full-width `.pneuma-aoe-response-description` below the player line so they cannot push Reset onto a separate line.
+**Done when:**
 
-Cover Up homebrew: double ablation applies to all equipped head and body armor, including blocked hits. Settings and the damage receipt state this explicitly; shields retain native damage handling.
+- [ ] Identify obsolete content and distinguish it from user-created items.
+- [ ] Record a specific cleanup decision before removing anything.
 
-AoE headings use the weapon/item name alone, retaining only the Suppressive Fire suffix. Automatic Blast, Shells and ammunition-effect heading labels are removed; effect mechanics and per-target details are unchanged.
+**Notes:** Previous backlog: Legacy QuickHack content. Reaching the old version threshold is not approval.
 
-Attack titles: hidden names use weapon/melee type, Martial Arts, Grenade or Rocket. Visible names use the weapon name, actual martial-arts roll skill, or grenade ammunition type. Suppressive Fire retains its suffix. `.pneuma-attack-name` truncates visually with a full-title hover tooltip.
+### BL-012 — Choose documentation translation scope
 
-Critical Injury application buttons use the cracked-heart icon (`fa-heart-crack`) instead of dice; tooltip and action remain unchanged.
+**Priority:** Low\
+**Status:** Idea
 
-Damage-recipient rows place damage and critical-injury buttons together before `.pneuma-damage-recipient-label`. The alternate recipient label is **token** (formerly “to selected target”); action tooltips retain precise selected-token wording.
+**Problem:** Current guides describe English UI and native CPR structures.
 
-- Implemented (unreleased): skip ranged defense prompts for ineligible PCs/NPCs, show "Target cannot evade", and provide a GM "Allow evasion" exception before damage/follow-up effects start. Reuses existing eligibility and native Evasion; live Foundry verification pending.
+**Desired result:** Decide target languages and maintenance ownership before translation.
 
-- Implemented (unreleased): Shift-click bypasses optional roll dialogs across Combat Tools roll controls. Required setup remains; normal damage clicks open roll options. Supersedes the prior Shift-to-open damage-roll convention. Automated checks are separate from live Foundry verification.
+**Done when:**
 
-- Implemented (unreleased): Manual Rolls > Damage/Critical Injury section includes Evasion as an owned-token native skill-roll fallback, with Shift-click direct rolling and manual adjudication.
+- [ ] Choose languages and guides, or mark this idea Dropped.
+- [ ] If approved, verify translated instructions against the actual UI.
 
-- Implemented (unreleased): personal player Favorite stars for skills/role abilities, three combined maximum, with direct shortcuts at the bottom of Manual Rolls. Stored on the user, never per token or character.
+**Notes:** Previous backlog: Documentation translations.
 
-- Implemented (unreleased): GM Group Check has three persistent vertical + slots for common skills; populated slots select the skill without scrolling the dropdown, and × clears a slot.
+### BL-013 — Review remaining chat-card recommendations
 
-- Implemented (unreleased): track Speedheal statuses applied during combat on the Combat document and remove the recorded effects when combat ends or is deleted.
+**Priority:** Low\
+**Status:** Idea
 
-- Implemented (unreleased): subtle next-turn pulsing marker, popup-only current/next player turn alerts, and optional local current-turn sound. Uses existing flash text without adding HUD message-list entries.
+**Problem:** Optional native header consistency and explicit QuickHack reroll wording remain audit recommendations.
 
-- Implemented (unreleased): exactly two generated notification sound defaults, GM-configurable path/volume, recipient-local playback; current-turn thunk replaces the earlier generic optional client sound and does not stack with the message cue.
+**Desired result:** Decide whether either presentation change is useful.
 
-- Implemented (unreleased): Self Actions menu on self CTH replaces initiative icon; includes eligible speedware initiative reroll, conditional Extinguish/Eject Netrunner and MA Recovery for any Martial Art skill 1+.
+**Done when:**
 
-- MA Recovery correction: supersedes the initial no-roll behavior. Native Martial Art roll must beat DV13 for a free Get Up; otherwise Get Up costs an Action. Both completed results remove Prone; cancel does not.
+- [ ] Review the remaining recommendations against current cards.
+- [ ] Record decisions and update the styling documentation for any approved changes.
+
+**Notes:** Previous backlog: Chat-card audit. F1/F3/F4 are already recorded as implemented.
+
+### BL-014 — Review indicator visuals and hover EKG
+
+**Priority:** Medium\
+**Status:** Ready
+
+**Problem:** Indicator visual acceptance/performance and the hover EKG bright-map preview remain open in the previous roadmap.
+
+**Desired result:** Record visual acceptance and performance in the actual world.
+
+**Done when:**
+
+- [ ] Check current styles on bright and dark maps and at practical token sizes.
+- [ ] Verify default, personal and per-token profiles across viewers.
+- [ ] Check lower-end animation performance and the hover EKG contrast.
+
+**Notes:** Previous backlog: indicator revisions and Hover EKG contrast. Later designs supersede earlier concepts.
+
+## Done or dropped
+
+Existing implemented work, verification records and exact superseding decisions are preserved in the [previous backlog](docs/history/backlog-before-standard-template-2026-09-29.md) and [feature inventory](IMPLEMENTED_FEATURES.md). They have not been relabeled as live-verified.
+
+### BL-015 — Keep screen effects in Visual Tools
+
+**Priority:** Low\
+**Status:** Done
+
+**Problem:** Screen presentation needed separate ownership from combat mechanics.
+
+**Desired result:** Visual Tools owns Neural Intrusion screen effects; Combat Tools retains detection, status, ejection and integration hooks.
+
+**Done when:**
+
+- [x] Ownership is recorded as moved in the existing roadmap.
+
+**Closed:** Recorded before 2026-09-29; exact completion date not established here.\
+**Outcome:** Recorded as moved in the previous backlog. Live integration verification remains BL-001.
+
+### BL-016 — Canceled and excluded designs
+
+**Priority:** Low\
+**Status:** Dropped
+
+**Problem:** Superseded requests must remain visible so they are not accidentally reintroduced.
+
+**Desired result:** Preserve the previous scope decisions.
+
+**Done when:**
+
+- [x] Current Action window, general action-economy enforcement, separate resolution master switch, old top-center auto-hide bar, fire-screen experiment, test status HUD, one-time awareness migration and withdrawn incendiary changes remain canceled/superseded.
+- [x] Whole-sheet replacement, automatic item transfers, broad inventory repair/migrations and anti-cheat architecture remain outside approved scope.
+
+**Closed:** Recorded before 2026-09-29; individual decisions remain in the previous backlog.\
+**Outcome:** Existing HUD/cards and native incendiary behavior remain the recorded direction; no gameplay changes made here.
+
+### BL-017 — GM post-combat status cleanup
+
+**Priority:** Medium
+**Status:** Implemented; live verification pending
+
+**Problem:** Missed cleanup can leave combat statuses on actors after an encounter ends.
+
+**Desired result:** GM-only end-of-combat chat button and manually accessible Clean Status Effects window, preserving permanent critical injuries by default and allowing explicit removal.
+
+**Done when:**
+
+- [x] GM chat button and module-settings entry open a current-state review.
+- [x] Ended/expired effects are distinguished from untracked statuses; active-combat actors are blocked.
+- [x] Temporary injuries can clear; permanent injuries require inclusion and source-item removal.
+- [x] Partial failures are reported; equipment disablements use source-aware cleanup.
+- [x] Automatic cleanup continues across actor failures and reconciles explicit stale combat links.
+- [ ] Verify reset/delete, GM whisper, linked/unlinked tokens and native window operation in live Foundry.
+
+### BL-018 — Configurable chat result delay
+
+**Priority:** Low\
+**Status:** Done (implementation and automated checks; live multiplayer check remains under BL-001)
+
+**Requested behavior:** Optional delay before chat-card roll results appear, configured by the GM for all clients.
+
+**Outcome (2026-09-29, unreleased):** Added Chat result delay under Attack & Damage Cards: 0–5 seconds in half-second steps, default disabled. New module-rendered results wait locally; previous card content remains visible with controls remaining clickable. Existing history does not wait again. Direct native sheet rolls retain CPR behavior. The agreed fixed pause supersedes DSN animation-completion synchronization; no animation-completion guarantee is made.

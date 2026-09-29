@@ -15,13 +15,81 @@ const {instantEffects,ammoProfile}=await import('../dist/scripts/instant-catalog
 const {handleInstant,newInstant,instantContent}=await import('../dist/scripts/instant-effects.js');
 const {temporaryInjury,expireInstantActor,sleepTarget,clearInstantCondition,igniteTarget,burnTurn,registerInstantLifetimes,finishTimedEffects}=await import('../dist/scripts/instant-lifetime.js');
 const {damageStatusChoices,validateDamageStatuses}=await import('../dist/scripts/damage-status.js');
+const {cleanupRows,applyCleanup,postCleanupNotice,resetCleanupNotice}=await import('../dist/scripts/status-cleanup.js');
+
+test('cleanup protects injuries, death and addiction; supports deliberate injury-item removal',async()=>{
+ const f=setup();await temporaryInjury(f.actor,'Damaged Eye');
+ const [permanent]=await f.actor.createEmbeddedDocuments('Item',[{name:'Broken Arm',type:'criticalInjury'}]);
+ const [prone,dead,addiction]=await f.actor.createEmbeddedDocuments('ActiveEffect',[
+  {name:'Prone',statuses:['prone']},{name:'Dead',statuses:['dead']},{name:'Addiction',statuses:['custom-addiction']}
+ ]);
+ game.time.worldTime=200;
+ const rows=cleanupRows();
+ assert(rows.find(r=>r.name==='Damaged Eye').selected);
+ assert(rows.find(r=>r.id===permanent.uuid).blocked);
+ assert(!rows.find(r=>r.id===prone.uuid).selected);
+ assert(rows.find(r=>r.id===dead.uuid).blocked);assert(rows.find(r=>r.id===addiction.uuid).blocked);
+ await applyCleanup({},rows.filter(r=>r.selected).map(r=>r.id));
+ assert.deepEqual([...f.actor.items].map(i=>i.name),['Broken Arm']);
+ await applyCleanup({},[permanent.uuid]);assert(f.actor.items.has(permanent.id));
+ await applyCleanup({},[permanent.uuid],true);assert.equal(f.actor.items.size,0);
+ await applyCleanup({},[prone.uuid]);assert(!f.actor.effects.has(prone.id));
+ assert(f.actor.effects.has(dead.id));assert(f.actor.effects.has(addiction.id));
+});
+
+test('cleanup rescans, honors scope and blocks actors in any started encounter',async()=>{
+ const f=setup();const [effect]=await f.actor.createEmbeddedDocuments('ActiveEffect',[{name:'Orphan',flags:{'pneuma-combattools':{endWithCombat:'gone'}}}]);
+ assert(cleanupRows().find(r=>r.id===effect.uuid).selected);
+ assert.equal(cleanupRows({actors:[]}).length,0);
+ const c={id:'other-scene',started:true,active:false,combatants:[{actor:f.actor}]};game.combats.set(c.id,c);
+ assert(cleanupRows().every(r=>r.blocked));
+ assert.match((await applyCleanup({},[effect.uuid])).join(' '),/skipped/);assert(f.actor.effects.has(effect.id));
+ game.combats.clear();await applyCleanup({},[effect.uuid]);assert.equal(f.actor.effects.size,0);
+ assert.match((await applyCleanup({},[effect.uuid])).join(' '),/Already cleared/);
+ game.user=f.owner;await assert.rejects(applyCleanup({},[]),/Only a GM/);
+});
+
+test('cleanup reports partial failures and disables timed item effects without removing inventory',async()=>{
+ const f=setup();const [drug]=await f.actor.createEmbeddedDocuments('Item',[{name:'Medication',type:'drug'}]);
+ const itemEffect=new Doc({name:'Temporary medication',duration:{seconds:5,startTime:0}},drug);drug.effects.set(itemEffect.id,itemEffect);
+ f.actor.allApplicableEffects=function*(){yield* this.effects;yield* drug.effects;};
+ const [bad,good]=await f.actor.createEmbeddedDocuments('ActiveEffect',[{name:'Bad',duration:{seconds:1,startTime:0}},{name:'Good',duration:{seconds:1,startTime:0}}]);
+ const remove=f.actor.deleteEmbeddedDocuments.bind(f.actor);f.actor.deleteEmbeddedDocuments=async(type,ids)=>{if(ids.includes(bad.id))throw Error('write failed');return remove(type,ids);};
+ const results=await applyCleanup({},[bad.uuid,good.uuid,itemEffect.uuid]);
+ assert.match(results[0],/FAILED/);assert(!f.actor.effects.has(good.id));assert.equal(itemEffect.disabled,true);assert(f.actor.items.has(drug.id));
+});
+
+test('automatic cleanup continues after actor failure and repairs missing-combat links on reconciliation',async()=>{
+ const f=setup(),other=new Actor();game.actors.push(other);
+ await f.actor.createEmbeddedDocuments('ActiveEffect',[{name:'Bad',flags:{'pneuma-combattools':{endWithCombat:'gone'}}}]);
+ await other.createEmbeddedDocuments('ActiveEffect',[{name:'Good',flags:{'pneuma-combattools':{endWithCombat:'gone'}}},{name:'Untracked',statuses:['prone']}]);
+ f.actor.deleteEmbeddedDocuments=async()=>{throw Error('write failed');};
+ const {reconcileEndedEffects}=await import('../dist/scripts/instant-lifetime.js');
+ await assert.rejects(reconcileEndedEffects(),/write failed/);
+ assert.deepEqual([...other.effects].map(e=>e.name),['Untracked']);
+});
+
+test('automatic cleanup leaves actors in another started encounter untouched',async()=>{
+ const f=setup();await f.actor.createEmbeddedDocuments('ActiveEffect',[{name:'Old effect',flags:{'pneuma-combattools':{endWithCombat:'gone'}}}]);
+ game.combats.set('new',{id:'new',started:true,combatants:[{actor:f.actor}]});
+ await finishTimedEffects({id:'gone',combatants:[]});assert.equal(f.actor.effects.size,1);
+});
+
+test('cleanup notice whispers only GMs and retains actor scope after combat deletion',async()=>{
+ const f=setup(),messages=[];globalThis.ChatMessage={create:async data=>messages.push(data)};
+ const c={id:'notice',name:'Encounter <one>',combatants:[{actor:f.actor}]};resetCleanupNotice(c);
+ await postCleanupNotice(c);await postCleanupNotice(c);
+ assert.equal(messages.length,1);assert.deepEqual(messages[0].whisper,['gm']);
+ assert.match(messages[0].content,/Encounter &lt;one&gt;/);
+ assert.deepEqual(messages[0].flags['pneuma-combattools'].statusCleanup.actors,[f.actor.uuid]);
+});
 function setup(){
  const gm={id:'gm',isGM:true,active:true},owner={id:'owner',isGM:false,active:true},actor=new Actor();
  globalThis.canvas={scene:{id:'s'}};
  globalThis.game={user:gm,users:new Collection([[gm.id,gm],[owner.id,owner]]),time:{worldTime:100},settings:{get:()=>''},i18n:{localize:s=>s},actors:[actor],scenes:[],combats:new Collection(),packs:{get:pack=>({getDocument:async id=>{const s=masterStatuses.find(s=>s.binding?.pack===pack&&s.binding.itemId===id);return {type:'criticalInjury',toObject:()=>({_id:id,name:s.name,type:'criticalInjury',effects:[],system:{}})}}})}};
  globalThis.fromUuid=async uuid=>uuid===actor.uuid?actor:null;globalThis.CONFIG={statusEffects:[{id:'prone',name:'Prone'}]};globalThis.diceModes=[];
  globalThis.Roll=class {constructor(formula){this.formula=formula}async evaluate(){this.total=this.formula==='3d6'?12:8;return this}async render(){return '<div>'+this.total+'</div>'}};
- globalThis.ui={notifications:{error:m=>{throw Error(m)}}};globalThis.hooks={};globalThis.Hooks={on:(n,f)=>{(hooks[n]??=[]).push(f)},once:(n,f)=>{(hooks[n]??=[]).push(f)}};
+ globalThis.ui={notifications:{error:m=>{throw Error(m)}}};globalThis.hooks={};globalThis.Hooks={on:(n,f)=>{(hooks[n]??=[]).push(f)},once:(n,f)=>{(hooks[n]??=[]).push(f)},callAll:(n,...args)=>{for(const fn of hooks[n]??[])fn(...args);}};
  let saves=0;return {actor,gm,owner,save:async()=>{saves++},saves:()=>saves};
 }
 async function resist(f,id,total){const s=newInstant(id,f.actor.uuid,f.actor.name);await handleInstant(s,{action:'claim',nonce:'n'},f.owner,f.save);await handleInstant(s,{action:'commit',nonce:'n',total,html:'<div>native</div>'},f.owner,f.save);return s}
@@ -124,7 +192,7 @@ test('Microwaver dispatches once after a hit, preserves privacy, and skips misse
  Object.assign(m.flags['pneuma-combattools'].exchange,{state:'resolved',hit:false});await dispatchMicrowaver(m);assert.equal(made.length,0);
  m.flags['pneuma-combattools'].exchange.hit=true;
  await Promise.all([dispatchMicrowaver(m),dispatchMicrowaver(m)]);await dispatchMicrowaver(m);
- assert.equal(made.length,1);assert.deepEqual(made[0].whisper,['gm']);assert.equal(made[0].blind,true);assert.equal(made[0].flags['pneuma-combattools'].instant.effect.id,'microwaver');
+ assert.equal(made.length,0);assert.deepEqual(m.whisper,['gm']);assert.equal(m.blind,true);const attached=Object.values(m.flags['pneuma-combattools'].attachedEffects);assert.equal(attached.length,1);assert.equal(attached[0].effect.id,'microwaver');assert.equal(attached[0].effect.sourceMessage,'attack');
 });
 
 test('expiration checks departing actor, round participants and out-of-combat time only',async()=>{
@@ -249,4 +317,22 @@ test('Speedheal records exact effect UUIDs on Combat and cleans only recorded ma
  const other={id:'other',flags:{},update:async()=>{throw Error('Disabled effect must not enroll');}};
  await trackSpeedheal(effect,other);
  game.combats.clear();effect.disabled=false;await clearCombatSpeedheal(combat);assert.equal(removed.length,2);
+});
+
+
+test('attached poison resolves on its parent without replacing damage or sibling effects',async()=>{
+ const f=setup();const {createInstantCard,handleInstantRequest}=await import('../dist/scripts/instant-effects.js');
+ globalThis.ChatMessage={create:async()=>{throw Error('Must not create a separate message')}};
+ const parent={id:'parent',content:'Original damage',blind:false,whisper:[],flags:{'pneuma-combattools':{manualRoll:{kind:'damage',rollMode:'selfroll',damage:{status:'applied'}}}},async update(changes){for(const [key,value]of Object.entries(changes))set(this,key,structuredClone(value));}};
+ game.messages=new Map([[parent.id,parent]]);
+ await createInstantCard(f.actor,'poison',parent,{combatId:null});await createInstantCard(f.actor,'biotoxin',parent,{combatId:null});
+ const scopes=Object.keys(parent.flags['pneuma-combattools'].attachedEffects),scope=scopes[0];
+ const wire={instantType:'request',id:'wire',message:parent.id,user:'owner',scope};
+ await handleInstantRequest({...wire,request:{action:'claim',nonce:'one'}});
+ await handleInstantRequest({...wire,request:{action:'commit',nonce:'one',total:99,html:'<p>Resistance</p>'}});
+ const cards=parent.flags['pneuma-combattools'].attachedEffects;
+ assert.equal(cards[scope].effect.state,'resisted');assert.equal(cards[scope].rollMode,'selfroll');assert.equal(cards[scopes[1]].effect.state,'pending');
+ assert.equal(parent.content,'Original damage');assert.equal(parent.flags['pneuma-combattools'].manualRoll.damage.status,'applied');
+ await assert.rejects(handleInstantRequest({...wire,scope:scopes[1],request:{action:'apply'}}),/Resolve the resistance/);
+ parent.blind=true;await assert.rejects(handleInstantRequest({...wire,request:{action:'claim',nonce:'two'}}),/not visible/);
 });

@@ -1,3 +1,4 @@
+import {canRenderCombatCard} from "./card-structure.js";
 import { allActors, escapeHTML as esc } from "./shared.js";
 import { registerEmpRefresh } from "./emp-refresh.js";
 import { updateTouchesPath } from "./update-path.js";
@@ -51,7 +52,7 @@ export async function chooseEmp(combat:Combat,request:EmpRequest) {
   }},cancel:{label:"Cancel"}},default:"cancel"},{width:460});
   dialog.render(true);
 }
-export async function createEmp(actor:Actor,options:Pick<EmpRequest,"count"|"chooser"|"mode"|"policy"> & Partial<Pick<EmpRequest,"source"|"sourceActor"|"seconds"|"origin">>, encounter?:Partial<EncounterRef>) {
+export async function createEmp(actor:Actor,options:Pick<EmpRequest,"count"|"chooser"|"mode"|"policy"> & Partial<Pick<EmpRequest,"source"|"sourceActor"|"seconds"|"origin">>, encounter?:Partial<EncounterRef>, sourceMessage?:ChatMessage) {
   const combat=encounter?resolveEncounter(encounter):actorEncounter(actor);
   if (!game.user!.isGM||!combat?.started) throw Error("A GM must start combat before creating an EMP effect.");
   if (!Number.isInteger(options.count)||options.count<1||options.count>50) throw Error("EMP count must be between 1 and 50.");
@@ -67,7 +68,8 @@ export async function createEmp(actor:Actor,options:Pick<EmpRequest,"count"|"cho
   const chooser=request.sourceActor?await fromUuid(request.sourceActor) as Actor|null:actor;
   await combat.update({[`flags.${MODULE}.empRequests.${request.id}`]:request});
   const recipients=game.users!.filter(u=>u.isGM||(request.chooser==="player"&&!!chooser?.testUserPermission(u,"OWNER"))).map(u=>u.id!);
-  const message=await ChatMessage.create({content:`<div class="pneuma-emp-card"><strong>${esc(disableLabel(request.source))} — ${esc(actor.name)}</strong><p>${request.method==="shortlist"?"Player chooses from a saved shortlist":empRandomSelection(request)?"Random selection":request.chooser==="player"?(request.sourceActor?"Netrunner chooses":"Owner chooses"):"GM chooses"}: ${request.count} item(s). Disabled ${request.seconds?"for "+request.seconds+" seconds":"until combat ends"}.</p><button type="button" data-emp-select>Choose affected items</button></div>`,whisper:recipients,flags:{[MODULE]:{emp:{combat:combat.id,request:request.id}}}} as never);
+  const message=sourceMessage??await ChatMessage.create({content:`<div class="pneuma-emp-card"><strong>${esc(disableLabel(request.source))} — ${esc(actor.name)}</strong><p>${request.method==="shortlist"?"Player chooses from a saved shortlist":empRandomSelection(request)?"Random selection":request.chooser==="player"?(request.sourceActor?"Netrunner chooses":"Owner chooses"):"GM chooses"}: ${request.count} item(s). Disabled ${request.seconds?"for "+request.seconds+" seconds":"until combat ends"}.</p><button type="button" data-emp-select>Choose affected items</button></div>`,whisper:recipients,flags:{[MODULE]:{emp:{combat:combat.id,request:request.id}}}} as never);
+  if(sourceMessage)await sourceMessage.update({[`flags.${MODULE}.attachedEmp.${request.id}`]:{combat:combat.id,request:request.id}});
   if(message)await combat.update({[`flags.${MODULE}.empRequests.${request.id}.message`]:message.id});
   if(request.chooser!=="player")await chooseEmp(combat,request);
   return request;
@@ -100,20 +102,35 @@ export function registerEmp() {
       for(const actor of allActors())if(actor.items.some(item=>!!foundry.utils.getProperty(item,"flags.pneuma-combattools.timedDisables")||foundry.utils.getProperty(item,`flags.${MODULE}.empCombats`)))actor.prepareData();
     }).catch(report);
   });
-  Hooks.on("renderChatMessage",(message:ChatMessage,html:JQuery)=>{
-    const ref=foundry.utils.getProperty(message,`flags.${MODULE}.emp`) as {combat:string;request:string}|undefined;
-    if(!ref)return;
-    const combat=game.combats?.get(ref.combat) as Combat|undefined,request=combat&&empRequests(combat)[ref.request];
-    const button=html[0]?.querySelector<HTMLButtonElement>("[data-emp-select]");if(!button)return;
-    button.dataset.gmOnly=String(request?.chooser!=="player");
-    button.disabled=!combat?.started||!request||request.state!=="pending";
-    html[0]?.querySelectorAll(".pneuma-emp-result").forEach(el=>el.remove());
-    const names=request?.method==="shortlist"&&!game.user?.isGM?request.selectedNames:request?.affectedNames;
-    if(request?.state==="applied"&&!names?.length){const result=document.createElement("p");result.className="pneuma-emp-result";result.textContent="No items disabled.";button.before(result);}
-    if(request?.resistedNames?.length){const result=document.createElement("p");result.className="pneuma-emp-result";result.textContent="Hardened — unaffected: "+request.resistedNames.join(", ");button.before(result);}
-    if(names?.length){const result=document.createElement("p");result.className="pneuma-emp-result";result.textContent="Disabled: "+names.join(", ");button.before(result);}
-    if(button.disabled)button.textContent=combat?.started&&request?.state==="applied"?disableLabel(request.source)+" applied":"Combat ended";
-    button.addEventListener("click",()=>{if(combat&&request)void chooseEmp(combat,request);});
+  Hooks.on("renderChatMessage",async(message:ChatMessage,html:JQuery)=>{
+    const outer=html[0];if(!outer||!canRenderCombatCard(message))return;
+    outer.querySelectorAll('.pneuma-attached-emp').forEach(node=>node.remove());
+    const single=foundry.utils.getProperty(message,`flags.${MODULE}.emp`) as {combat:string;request:string}|undefined;
+    const attached=foundry.utils.getProperty(message,`flags.${MODULE}.attachedEmp`) as Record<string,{combat:string;request:string}>|undefined;
+    for(const ref of [...(single?[single]:[]),...Object.values(attached??{})]){
+      const combat=game.combats?.get(ref.combat) as Combat|undefined,request=combat&&empRequests(combat)[ref.request];
+      let root=outer;
+      if(ref!==single){
+        if(!request)continue;
+        const actor=await fromUuid(request.actor) as Actor|null;
+        const chooser=request.sourceActor?await fromUuid(request.sourceActor) as Actor|null:actor;
+        if(!game.user?.isGM&&(request.chooser!=="player"||!chooser?.isOwner))continue;
+        root=document.createElement('section');root.className='pneuma-attached-emp pneuma-emp-card';
+        root.innerHTML='<h4>'+esc(disableLabel(request.source))+' — '+esc(actor?.name??'Target')+'</h4><button type="button" data-emp-select>Choose affected items</button>';
+        (outer.querySelector('.message-content')??outer).append(root);
+      }
+      const button=root.querySelector<HTMLButtonElement>("[data-emp-select]");if(!button)continue;
+      button.dataset.gmOnly=String(request?.chooser!=="player");
+      button.disabled=!combat?.started||!request||request.state!=="pending";
+      root.querySelectorAll(".pneuma-emp-result").forEach(el=>el.remove());
+      const names=request?.method==="shortlist"&&!game.user?.isGM?request.selectedNames:request?.affectedNames;
+      if(request?.state==="applied"&&!names?.length){const result=document.createElement("p");result.className="pneuma-emp-result";result.textContent="No items disabled.";button.before(result);}
+      if(request?.resistedNames?.length){const result=document.createElement("p");result.className="pneuma-emp-result";result.textContent="Hardened — unaffected: "+request.resistedNames.join(", ");button.before(result);}
+      if(names?.length){const result=document.createElement("p");result.className="pneuma-emp-result";result.textContent="Disabled: "+names.join(", ");button.before(result);}
+      if(button.disabled)button.textContent=combat?.started&&request?.state==="applied"?disableLabel(request.source)+" applied":"Combat ended";
+      button.addEventListener("click",()=>{if(combat&&request)void chooseEmp(combat,request);});
+
+    }
   });
   const cardStates = new Map<string, Map<string, { message?: string; signature: string }>>();
   const snapshot = (combat: Combat) => new Map(Object.values(empRequests(combat)).map(request =>

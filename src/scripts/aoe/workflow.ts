@@ -20,7 +20,7 @@ import { areaKind, confirmAreaRoll, type AreaKind, type AreaWeapon } from "./wea
 import { polygon, evadeAllowed, winsAreaDefense, type Area, type Point } from "./geometry.js";
 import { placeArea, clippedPoints, templateData, areaCoverage } from "./placement.js";
 import { requireCombatSocket } from "../socket-health.js";
-import { smokeAttackDialog, diceJSON, nativeAPI, nativeCard, rollHidden, spendBonusLuck, type RollItem } from "../native-combat.js";
+import { smokeAttackDialog, diceJSON, showDiceAs, nativeCard, rollHidden, spendBonusLuck, type RollItem } from "../native-combat.js";
 import { thrownRollItem, improvisedSource } from "../thrown-weapons.js";
 import { getTable } from "../dv-hover.js";
 import { parseDV } from "../dv-data.js";
@@ -114,7 +114,7 @@ export function areaContent(data:AreaAttack):string {
     ${r.state==="waiting"&&!r.damage?btn("exclude","fa-user-slash","GM: exclude target (cover / not on foot)",r.uuid):""}
 
     ${r.state==="other"?btn("hit","fa-check","GM: affected",r.uuid)+btn("miss","fa-xmark","GM: unaffected",r.uuid):""}
-    ${r.state!=="waiting"?btn("reset","fa-rotate-left","Reset Player Action",r.uuid,"Reset"):""}
+    ${r.state!=="waiting"?btn("reset","fa-rotate-left","Reset Player Action",r.uuid):""}
     ${r.state==="miss"&&data.kind!=="suppression"&&r.total!==undefined&&!r.moved?btn("move","fa-person-walking","Move outside AoE",r.uuid):""}
     ${r.state==="hit"&&data.exchange.damage?.result ? btn("apply","fa-bolt",r.damage?.recordedApplied?"Damage applied":"Apply shared damage (Shift: options)",r.uuid):""}
     ${r.damage&&["review","applying"].includes(r.damage.status)?btn("damageResolved","fa-check-double","GM: mark resolved after checking damage",r.uuid):""}
@@ -163,8 +163,7 @@ async function save(message:ChatMessage,data:AreaAttack) {
 }
 async function revealAttackDice(data:AreaAttack):Promise<void> {
   if(!data.exchange.dice.length)return;
-  const {Dice}=await nativeAPI();
-  for(const json of data.exchange.dice)await Dice.handle3dDice(Roll.fromJSON(json) as Roll,data.exchange.rollMode);
+  for(const json of data.exchange.dice)await showDiceAs(Roll.fromJSON(json) as Roll,data.exchange.rollMode,data.exchange.roller);
 }
 const pending=new Map<string,{resolve:()=>void;reject:(e:Error)=>void;timer:ReturnType<typeof setTimeout>}>();
 let queue:Promise<unknown>=Promise.resolve();
@@ -179,6 +178,7 @@ export async function handleAreaRequest(req:Request) {
   const row=data.rows.find(r=>r.uuid===req.target);
   if(req.action==="instant") {
     if(!row?.instant||row.state!=="hit"||!req.instantRequest||data.phase!=="responses")throw Error("Instant effect unavailable.");
+    row.instant.sourceMessage=message.id!;
     await handleInstant(row.instant,req.instantRequest,user,()=>save(message,data),data.exchange.rollMode);return;
   }
   if(req.action==="removeSmoke") {
@@ -227,10 +227,10 @@ export async function handleAreaRequest(req:Request) {
           row.instant=newInstant("incendiary",row.actor,row.name,rowEncounter(data,row.uuid));
           if(!row.damage.penetrated){row.instant.state="skipped";row.instant.summary="No penetrating damage";}
         }
-        await save(message,data);});
+        await save(message,data);},message);
     } else {
       if(!["damageClaim","damageRelease","damageCommit","damageReset","damageStatuses"].includes(req.damageRequest.action))throw Error("Invalid shared damage action.");
-      await handleDamage(req.damageRequest,user,data.exchange,()=>save(message,data));
+      await handleDamage(req.damageRequest,user,data.exchange,()=>save(message,data),message);
     }
     return;
   }
@@ -377,10 +377,10 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
         await spendBonusLuck(actor,retry.luck);await rollHidden(retry);roll=retry;
       } else {firstAttackHTML="";firstAttackDice=[];}
     }
-    const title=attackTitle(original,game.settings!.get(MODULE,"hideAttackWeapon"),roll.skillName,ammoType)+(kind==="suppression"?" — Suppressive Fire":"");
+    const title=attackTitle(original,game.settings!.get(MODULE,"hideAttackWeapon") && !actor.hasPlayerOwner,roll.skillName,ammoType)+(kind==="suppression"?" — Suppressive Fire":"");
     roll.rollTitle=title;
     const exchange:Exchange={...encounter,attacker:source.document.uuid,attackerName:source.name??"",defender:source.document.uuid,defenderActor:actor.uuid,defenderName:source.name??"",
-      ranged:true,category:"Ranged",title,total:roll.resultTotal,html:(firstAttackHTML?"<div class=\"pneuma-smart-first\">"+firstAttackHTML+"</div>":"")+await nativeCard(roll),dice:[...firstAttackDice,...diceJSON(roll)],dv,
+      ranged:true,category:"Ranged",title,total:roll.resultTotal,html:(firstAttackHTML?"<div class=\"pneuma-smart-first\">"+firstAttackHTML+"</div>":"")+await nativeCard(roll),dice:[...firstAttackDice,...diceJSON(roll)],dv,roller:game.user!.id!,
       state:"resolved",hit:true,weaponId:itemId,attackMode:"attack",weaponType:String(foundry.utils.getProperty(original,"system.weaponType")),
       criticalMethod:kind==="explosive"?(String(original.type)!=="ammo"&&foundry.utils.getProperty(original,"system.weaponType")==="rocketLauncher"?"Rocket":"Grenade"): "Ranged",
       location:"body",...(kind==="shell"?{damageFormula:"3d6"}:{}),rollMode:game.settings!.get("core","rollMode")??"roll",...(thrownSource?{thrownSource}: {})};

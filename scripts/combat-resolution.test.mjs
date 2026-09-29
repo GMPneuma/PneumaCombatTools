@@ -48,6 +48,8 @@ test("native dialog receives named modifier, forces confirmation, and cancel spe
 
 // Mock the native rendering boundary here; real capture/markup is covered in browser checks.
 registerHooks({ resolve(specifier, context, nextResolve) {
+ if (specifier === "/systems/cyberpunk-red-core/modules/extern/cpr-dice-handler.js")
+  return {url:"data:text/javascript,"+encodeURIComponent('export default {handle3dDice:(roll,mode)=>globalThis.animationHandler(roll,mode)}'),shortCircuit:true};
  if (specifier === "./damage-application.js" && context.parentURL?.endsWith("/damage-flow.js"))
   return {url:"data:text/javascript,"+encodeURIComponent('export async function captureDamageApplication(actor,name,location,id,apply){await apply(actor);return ["<div>native summary</div>"];}'),shortCircuit:true};
  return nextResolve(specifier,context);
@@ -85,6 +87,25 @@ function message(id,combatId="combat") {
 }
 const request=(id,action,extra={})=>serialized({id:Math.random()+"",user:"owner",message:id,action,...extra});
 const defense=()=>({total:18,html:"defense",dice:[],bonus:1,fee:2,penalty:0});
+
+test("attack and evasion animations start together without blocking resolution or replaying revealed attacks",async()=>{
+  globalThis.Roll={fromJSON:JSON.parse};
+  for(const attackRevealed of [false,true]){
+    setup();const msg=message("animations"),starts=[],complete=[];
+    const data=get(msg,"flags.pneuma-combattools.exchange");
+    data.attackRevealed=attackRevealed;data.dice=[JSON.stringify({face:10}),JSON.stringify({face:4})];
+    globalThis.animationHandler=(roll,mode)=>{starts.push({roll,mode});return new Promise(resolve=>complete.push(resolve));};
+    const claim=await request(msg.id,"claim");
+    await request(msg.id,"commit",{nonce:claim.nonce,defense:{...defense(),dice:[JSON.stringify({face:7})]}});
+    await new Promise(setImmediate);
+    assert.equal(get(msg,"flags.pneuma-combattools.exchange.state"),"resolved","combat resolves while animations are pending");
+    assert.equal(get(msg,"flags.pneuma-combattools.exchange.defense.roller"),'owner','GM saves the actual responding user');
+    assert.deepEqual(starts.map(s=>s.roll.face),attackRevealed?[7]:[10,4,7],"every eligible die starts before any animation finishes");
+    assert(starts.every(s=>s.mode==='roll'));
+    complete.forEach(resolve=>resolve());await new Promise(setImmediate);
+    assert.equal(starts.length,attackRevealed?1:3,"no duplicate playback");
+  }
+});
 test("coordinator serializes competing defender responses and cancel releases without spending",async()=>{
   setup();message("a");message("b");
   const attempts=await Promise.allSettled([request("a","claim"),request("b","claim")]);

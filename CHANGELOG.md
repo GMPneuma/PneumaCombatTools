@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.9.5 - 2026-09-29
+
+- Add a GM-controlled chat result delay from 0–5 seconds in half-second increments, disabled by default. Existing card controls remain clickable during the pause.
+- Submit attack and evasion dice animations together for Dice So Nice simultaneous playback. Preserve the original roller's dice style when the GM replays attacks, AoE attacks, and evasion responses.
+- Keep damage-added effects, resistance results, and linked EMP/QuickHack controls on the originating card, with independent per-target state.
+- Limit Reverse Damage to once per application and show a persistent Damage reversed indicator.
+- Restrict weapon-name hiding to NPC attackers; player-owned attackers retain their weapon names.
+- Compact AoE Reset to the GM badge and reset icon.
+- Add Get Up for prone characters without Martial Arts and fix native Prone status removal. Block player movement while prone, retain spent movement, and preserve GM repositioning.
+- Add GM status cleanup after combat and through module settings, including expired effects, equipment disablements, and orphaned grapples, with protections for active encounters and permanent conditions.
+- Exclude containers from the Combat Bar and retain participant identities on grapple follow-up cards for Visual Tools portraits.
+- Update the feature inventory, card documentation, and backlog.
+
+Validation: production build and strict type checks; 485 automated tests passed, four skipped. Targeted browser fixtures cover chat delay, damage/reversal, AoE, EMP, movement, status cleanup, and settings. Live Foundry multiplayer and DSN rendering remain unverified. Automated Animations integration is not included.
+
 ## 0.9.4 - 2026-09-28
 
 - Fix native ranged DV table lookup under translation, including thrown grenades, using verified document IDs while preserving custom/world table overrides.

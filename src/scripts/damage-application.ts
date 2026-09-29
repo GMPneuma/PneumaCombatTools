@@ -18,7 +18,7 @@ function installDamageCapture(chat: NativeDamageChat) {
 }
 
 /** Repack the native result and breakdown; no damage formula is calculated here. */
-export function compactDamageApplication(html: string, name: string, location: string, id: string): string {
+export function compactDamageApplication(html: string, name: string, location: string, id: string, actorUuid?:string): string {
   const doc = new DOMParser().parseFromString(html, "text/html");
   const number = doc.querySelector<HTMLElement>('[data-action="toggleVisibility"][data-visible-element="d6-data-details"]');
   const details = doc.querySelector<HTMLElement>(".d6-data-details");
@@ -36,6 +36,8 @@ export function compactDamageApplication(html: string, name: string, location: s
   const undo = doc.querySelector('[data-action="reverseDamage"]');
   if (undo) details.append(undo);
   const card = doc.createElement("div"); card.className = "rollcard pneuma-damage-applied";
+  card.dataset.damageInstance=id;
+  if(actorUuid)card.dataset.damageActor=actorUuid;
   card.append(row, details);
   return card.outerHTML;
 }
@@ -82,7 +84,7 @@ export async function captureWithChat(chat: NativeDamageChat, actor: Actor, name
     if (!captured.length) throw new Error("Native damage applied without a captured result. Check the recipient before continuing.");
     return await Promise.all(captured.map(async (data, index) => compactDamageApplication(
       await renderTemplate("systems/cyberpunk-red-core/templates/chat/cpr-damage-application-card.hbs", data),
-      name, data.location ?? location, id + "-" + index)+(data.pneumaCrackedSkull?'<p class="pneuma-injury-damage">Cracked Skull: penetrating headshot damage ×3; bonus damage unchanged.</p>':"")+(coverUp?'<p class="pneuma-cover-up-damage">Cover Up: armor SP ×2; all worn head and body armor ablates ×2, including blocked damage.</p>':"")));
+      name, data.location ?? location, id + "-" + index, actor.uuid)+(data.pneumaCrackedSkull?'<p class="pneuma-injury-damage">Cracked Skull: penetrating headshot damage ×3; bonus damage unchanged.</p>':"")+(coverUp?'<p class="pneuma-cover-up-damage">Cover Up: armor SP ×2; all worn head and body armor ablates ×2, including blocked damage.</p>':"")));
   } finally {
     damageCaptures.delete(view);
   }

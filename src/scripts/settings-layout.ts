@@ -2,11 +2,11 @@ const MODULE = "pneuma-combattools";
 export const COMBAT_BAR_SETTING_KEYS = ["combatBar", "combatBarDock", "combatBarSize", "combatBarOrientation", "combatBarNameOnly", "combatBarDefaultMovement"] as const;
 /** Order existing native rows; settings remain registered under their original keys/scopes. */
 const groups = [
-  { id: "combat", title: "Attack & Damage Cards", keys: ["routeSheetAttacks", "hideAttackWeapon", "showArmorControls", "maNoAblation", "reportWeaponReloads"] },
+  { id: "combat", title: "Attack & Damage Cards", keys: ["routeSheetAttacks", "hideAttackWeapon", "chatResultDelay", "showArmorControls", "maNoAblation", "reportWeaponReloads"] },
   { id: "evasion", title: "Evasion & Area Attacks", keys: ["evasionEligibility", "configureEvasion", "npcAutoEvasion", "areaSettingsMenu"] },
   { id: "movement", title: "Movement & Initiative", keys: ["movementTracking", "pneumaHomebrew"] },
   { id: "turn-marker", title: "Turn Indicator", keys: ["turnMarkerSettings", "turnMarkerEnabled", "turnMarkerForceDefault", "turnMarkerStyle", "turnMarkerColor", "turnMarkerThickness", "turnMarkerDistance", "turnMarkerOpacity", "turnMarkerSpeed", "turnMarkerDisplay", "nextTurnMarker", "turnPopups", "notificationSounds"] },
-  { id: "injuries", title: "Injuries & Effects", keys: ["criticalInjuries", "injuryTurnEndReminder", "empBehaviorMenu", "customStatusesMenu"] },
+  { id: "injuries", title: "Injuries & Effects", keys: ["criticalInjuries", "injuryTurnEndReminder", "empBehaviorMenu", "customStatusesMenu", "statusCleanup"] },
   { id: "quickhack", title: "QuickHack", keys: ["quickhackEnabled", "quickhackMode", "quickhackMessages"] },
   { id: "combat-bar", title: "Combat Bar", keys: [...COMBAT_BAR_SETTING_KEYS,"combatBarSettings"] },
   { id: "token-hud", title: "Token HUD & Targeting", keys: ["tokenHUDSettings", "hoverDV", "hoverAutofire", "alwaysShowEKG"] },

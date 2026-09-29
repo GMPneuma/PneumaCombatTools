@@ -41,6 +41,18 @@ test('combat rows use actor portraits and exactly the native tracker visibility'
  game.user=f.gm;f.participant.visible=true;assert.equal(barEntries()[0].hidden,true);
  game.user=f.player;f.participant.hidden=false;f.participant.visible=false;assert.deepEqual(barEntries(),[]);
 });
+
+test('containers never appear for players or GMs, inside or outside combat',()=>{
+ const f=fixture();f.actor.type='container';f.token.document.actor=f.actor;
+ for(const user of [f.player,f.gm]){
+  game.user=user;
+  f.combat.started=true;assert.deepEqual(barEntries(),[]);
+  f.participant.actor=null;assert.deepEqual(barEntries(),[],'token actor fallback excludes containers');
+  f.participant.actor=f.actor;
+  f.combat.started=false;assert.deepEqual(barEntries(),[]);
+ }
+ f.actor.type='character';assert.equal(barEntries().length,1);
+});
 test('hidden or unseen scene tokens remain listed when native tracker permits them',()=>{
  const f=fixture();f.token.document.hidden=true;assert.equal(barEntries().length,1);
  f.token.document.hidden=false;f.token.isVisible=false;assert.equal(barEntries().length,1);

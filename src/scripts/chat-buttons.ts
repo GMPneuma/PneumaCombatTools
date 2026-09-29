@@ -2,7 +2,7 @@
 const controls=[
   ".pneuma-defense-controls button", ".pneuma-evasion-override", ".pneuma-result-damage", ".pneuma-apply-damage", ".pneuma-apply-critical",
   ".pneuma-damage-status-slot", ".pneuma-damage-recovery-controls button", ".pneuma-quickhack-actions button",
-  ".pneuma-grapple-controls button", "[data-aoe-action]", "[data-instant-action]", "[data-emp-select]",
+  ".pneuma-grapple-controls button", "[data-aoe-action]", "[data-instant-action]", "[data-emp-select]", "[data-status-cleanup]",
   "[data-ribs-apply]", ".pneuma-manual-controls button", ".pneuma-group-action button", ".pneuma-half-armor", ".pneuma-interact-armor"
 ].join(",");
 const observed=new WeakSet<HTMLElement>();
@@ -10,6 +10,11 @@ const clicked=new WeakSet<HTMLElement>();
 const disabled=(node:HTMLElement)=>node.matches(":disabled,[aria-disabled=\"true\"]");
 function decorate(node:HTMLElement):void {
   node.classList.add("pneuma-chat-button");
+  // Saved chat cards may still contain the old visible Reset label.
+  if(node.dataset.aoeAction==="reset"&&(node.textContent?.trim()||!node.querySelector(".fa-rotate-left"))){
+    const icon=document.createElement("i");icon.className="fas fa-rotate-left";icon.setAttribute("aria-hidden","true");
+    node.replaceChildren(icon);
+  }
   const text=node.textContent?.trim()??"",action=node.dataset.aoeAction??node.dataset.instantAction??node.dataset.quickhackAction??"";
   const gmOnly=node.dataset.gmOnly==="true"
     || !!node.dataset.aoeAction && ["show","removeSmoke","scatter","hit","miss","exclude","forcehit","add","reset","damageReset","damageResolved","effectsResolved"].includes(action)

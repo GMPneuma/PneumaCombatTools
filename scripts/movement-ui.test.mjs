@@ -4,6 +4,7 @@ const {chromium}=await import(process.env.PNEUMA_PLAYWRIGHT_MODULE);
 const browser=await chromium.launch({channel:'msedge',headless:true});
 try {
  const page=await browser.newPage({viewport:{width:900,height:700}});
+ page.on('pageerror',error=>{throw error;});
  // Document hooks coalesce rendering into the next animation frame.
  const evaluate=page.evaluate.bind(page);
  page.evaluate=async (...args)=>{const result=await evaluate(...args);await evaluate(()=>new Promise(requestAnimationFrame));return result;};
@@ -28,11 +29,11 @@ try {
   const doc={id:'t',uuid:'Scene.scene.Token.t',parent:scene,x:400,y:300,elevation:5,flags:{'pneuma-combattools':{movement:record}}};
   // This HUD fixture applies positions immediately; animation/source divergence is covered in movement.test.mjs.
   Object.defineProperty(doc,'_source',{get:()=>({x:doc.x,y:doc.y,elevation:doc.elevation})});
-  token.document=doc;token.actor={system:{derivedStats:{walk:{value:12}}}};token.w=100;token.h=100;token.isOwner=true;token.isPreview=false;
+  token.document=doc;token.actor={effects:[],system:{derivedStats:{walk:{value:12}}}};doc.actor=token.actor;token.w=100;token.h=100;token.isOwner=true;token.isPreview=false;
   token.tooltip={text:'',style:{}};token.getCenterPoint=p=>({x:p.x+50,y:p.y+50});token.checkCollision=()=>false;doc.object=token;
   window.movementEnabled=true;window.movementSetting=undefined;window.writes=[];doc.update=async(data,options)=>{
    writes.push({data,options});if(window.rejectNext){window.rejectNext=false;throw Error('Update rejected');}
-   for(const fn of hooks.preUpdateToken)fn(doc,data,options);
+   for(const fn of hooks.preUpdateToken)if(fn(doc,data,options)===false)return;
    for(const [key,value]of Object.entries(data)){if(key==='flags.pneuma-combattools.movement')doc.flags['pneuma-combattools'].movement=value;else doc[key]=value;}
    token.position.set(doc.x,doc.y);for(const fn of hooks.updateToken)fn(doc);return doc;
   };
@@ -41,8 +42,8 @@ try {
   window.CONST={GRID_TYPES:{SQUARE:1}};window.ui={notifications:{error:text=>window.error=text,warn:text=>window.error=text}};
   window.game={combat,combats:Object.assign(new Map([['c',combat]]),{find(fn){return [...this.values()].find(fn);}}),user:{id:'gm',isGM:true},users:[{id:'gm',active:true,isGM:true}],settings:{register:(_module,key,config)=>{if(key==='movementTracking')window.movementSetting=config;},get:()=>window.movementEnabled}};
  });
- const rules=(await readFile('dist/scripts/combat-bar-state.js','utf8')).replace('const MODULE = '+JSON.stringify('pneuma-combattools')+';','')+'\n'+await readFile('dist/scripts/movement-rules.js','utf8');
- const movement=(await readFile('dist/scripts/movement.js','utf8')).replace(/^import .*;\s*/gm,'');
+ const rules=await readFile('dist/scripts/encounter.js','utf8')+'\n'+(await readFile('dist/scripts/combat-bar-state.js','utf8')).replace(/^import .*;\s*/gm,'').replace('const MODULE = '+JSON.stringify('pneuma-combattools')+';','')+'\n'+await readFile('dist/scripts/movement-rules.js','utf8');
+ const movement=await readFile('dist/scripts/status-catalog.js','utf8')+'\n'+(await readFile('dist/scripts/prone.js','utf8')).replace(/^import .*;\s*/gm,'')+'\n'+(await readFile('dist/scripts/movement.js','utf8')).replace(/^import .*;\s*/gm,'');
  await page.addScriptTag({type:'module',content:rules+'\nconst grappleFor=()=>undefined;const movementEntry=()=>undefined;const areaSettings=()=>({evadeMove:false});\n'+movement+'\nregisterMovement();hooks.refreshToken.forEach(fn=>fn(token));'});
  const counter=page.locator('.pneuma-movement-hud input'),reset=page.getByRole('button',{name:'Reset',exact:true});
  await reset.waitFor();assert.equal(await page.evaluate(()=>oldArrowReachable),false,'Original token-child arrow must reproduce the missed hit');
@@ -50,6 +51,13 @@ try {
  await page.evaluate(()=>{movementEnabled=false;movementSetting.onChange();});assert.equal(await page.locator('.pneuma-movement-hud').count(),0);
  await page.evaluate(()=>{movementEnabled=true;movementSetting.onChange();});
  assert.equal(await counter.inputValue(),'3 / 6');assert.equal(await counter.evaluate(n=>getComputedStyle(n).fontSize),'24px');
+ await page.evaluate(()=>{token.actor.effects=[{statuses:new Set(['prone'])}];hooks.createActiveEffect.forEach(fn=>fn());});
+ assert.equal(await counter.inputValue(),'0/0');assert.equal(await reset.isVisible(),false);
+ assert.equal(await page.locator('.pneuma-movement-run').isVisible(),false);
+ await page.evaluate(async()=>{game.user.isGM=false;token.actor.hasPlayerOwner=true;await doc.update({x:500},{});});
+ assert.equal(await page.evaluate(()=>doc.x),400);assert.equal(await counter.inputValue(),'0/0');
+ await page.evaluate(()=>{game.user.isGM=true;token.actor.effects=[];hooks.deleteActiveEffect.forEach(fn=>fn());writes.length=0;});
+ assert.equal(await counter.inputValue(),'3 / 6');assert.equal(await reset.isVisible(),true);
  // Inspect rendered bounds before the deferred redraw: animation must never carry the origin along.
  assert.deepEqual(await page.evaluate(()=>{
   const marker=canvas.tokens.children.find(c=>c.name==='pneuma-movement');

@@ -1,0 +1,17 @@
+<form autocomplete="off">
+  <p><strong>{{label}}</strong></p>
+  <p>Actors in any started encounter are blocked. Linked tokens share their actor's effects. Permanent critical injuries are preserved unless included below.</p>
+  <div class="form-group"><label for="pneuma-cleanup-injuries">Include permanent critical injuries</label><input id="pneuma-cleanup-injuries" type="checkbox" name="includeInjuries" {{checked includeInjuries}}></div>
+  <p class="notes">Removing a critical injury removes its injury item and mechanics. Untracked effects require manual selection. Dead, addictions and active grapples remain protected.</p>
+  <div style="max-height:380px;overflow:auto">
+    {{#each rows}}
+    <div class="form-group">
+      <label><input type="checkbox" name="effects" value="{{id}}" {{checked selected}} {{#if blocked}}disabled{{/if}}> <strong>{{actor}}</strong> — {{name}}</label>
+      <p class="notes">{{reason}}. {{operation}}.</p>
+    </div>
+    {{/each}}
+    {{#if empty}}<p>No status effects found in this scope.</p>{{/if}}
+  </div>
+  {{#if results}}<h3>Cleanup results</h3><ul>{{#each results}}<li>{{this}}</li>{{/each}}</ul>{{/if}}
+  <footer class="sheet-footer flexrow"><button type="button" data-cleanup-refresh><i class="fas fa-sync"></i> Refresh</button><button type="submit"><i class="fas fa-broom"></i> Clear Selected</button></footer>
+</form>

@@ -23,7 +23,7 @@ try {
   const users=Object.assign([gm,owner],{get:id=>[gm,owner].find(u=>u.id===id)});
   window.game={user:gm,users,combat,combats:new Map([['c',combat]]),settings:{register:(_m,k,c)=>settingConfigs[k]=c,registerMenu:(_m,k,c)=>menus[k]=c,get:(_m,k)=>k==='empBehavior'?behavior:''},messages:new Map()};
   window.fromUuid=async()=>actor;window.messages=[];
-  window.ChatMessage={create:async data=>{const message={...data,id:'m'+messages.length};messages.push(message);game.messages.set(message.id,message);return message;}};
+  window.ChatMessage={create:async data=>{const message={...data,visible:true,isContentVisible:true,id:'m'+messages.length};messages.push(message);game.messages.set(message.id,message);return message;}};
   window.ui={notifications:{info:text=>{window.info=text;},warn:text=>{window.warning=text;},error:text=>{window.failure=text;}}};
   window.Dialog=class{constructor(data){this.data=data;}render(){document.querySelector('.dialog')?.remove();const root=document.createElement('section');root.className='dialog';root.innerHTML=this.data.content;for(const [id,config]of Object.entries(this.data.buttons)){const button=document.createElement('button');button.dataset.button=id;button.textContent=config.label;button.onclick=()=>config.callback?.([root]);root.append(button);}document.body.append(root);return this;}};
   window.wrap=element=>({0:element,length:element?1:0,find:selector=>wrap(element?.querySelector(selector)),first(){return this;},append(node){element?.append(node);}});
@@ -137,5 +137,19 @@ try {
  assert.equal(await page.evaluate(()=>settingsApp.getData().profiles[1].method),'shortlist');
  const denied=await page.evaluate(async()=>{game.user=owner;try{await settingsApp._updateObject(new Event('submit'),{});return false}catch{return true}});
  assert(denied);
+ await page.evaluate(async()=>{
+  game.user=gm;actor.isOwner=true;behavior={};combat.started=true;
+  const source={id:'parent',visible:true,isContentVisible:true,whisper:[],blind:false,flags:{},async update(changes){for(const [path,value]of Object.entries(changes)){let out=this;const parts=path.split('.');for(const part of parts.slice(0,-1))out=out[part]??={};out[parts.at(-1)]=structuredClone(value);}}};
+  game.messages.set(source.id,source);const before=messages.length;
+  const req=await createEmp(actor,{count:1,chooser:'player',mode:'equal',policy:{foundational:true,cascade:true,electronics:false,immune:[]}},undefined,source);
+  if(messages.length!==before||!source.flags['pneuma-combattools'].attachedEmp[req.id])throw Error('EMP spawned a separate card');
+  const root=document.createElement('div');root.innerHTML='<div class="message-content"><p>Original attack</p></div>';document.body.append(root);
+  const render=async()=>{for(const fn of hooks.renderChatMessage)await fn(source,wrap(root));};
+  await render();await render();
+  if(root.querySelectorAll('.pneuma-attached-emp').length!==1||!root.textContent.includes('Original attack'))throw Error('EMP duplicated or replaced parent');
+  const saved=combat.flags['pneuma-combattools'].empRequests[req.id];saved.state='applied';saved.affectedNames=['Disabled arm'];await render();
+  if(!root.textContent.includes('Disabled: Disabled arm')||!root.querySelector('[data-emp-select]').disabled)throw Error('EMP result not inline');
+  game.user={id:'stranger',isGM:false};actor.isOwner=false;await render();if(root.querySelector('.pneuma-attached-emp'))throw Error('EMP chooser leaked');
+ });
  console.log('EMP browser checks passed: settings template/save, chooser methods, fixed shortlist, limited player visibility, permissions, native configuration and ended card.');
 } finally {await browser.close();}

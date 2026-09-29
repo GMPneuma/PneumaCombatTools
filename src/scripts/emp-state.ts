@@ -100,6 +100,15 @@ export async function reconcileEmp() {
     for (const request of Object.values(empRequests(combat))) if (request.selected && request.state === "pending") await applyEmpSelection(combat,request.id,request.selected,game.user!);
   }
 }
+/** Actor-scoped repair for the GM cleanup window; preserve live disablement causes. */
+export async function cleanupEndedEmp(actor:Actor) {
+  if(Array.from(game.combats??[]).some(c=>c.started&&c.combatants.some(p=>p.actor?.uuid===actor.uuid)))throw Error("Actor is in a started encounter.");
+  const refs=new Set(Array.from(actor.items).flatMap(empReferences));
+  for(const effect of actor.effects){const id=foundry.utils.getProperty(effect,path+".empCombat");if(typeof id==="string")refs.add(id);}
+  for(const item of actor.items)for(const entry of Object.values(timedDisables(item))){const id=typeof entry.duration.combat==="string"?entry.duration.combat:entry.duration.combat?.id;if(id)refs.add(id);}
+  for(const id of refs)if(!game.combats?.get(id)?.started){await removeReferences(actor,id);await expireDisablements(actor,id);}
+  await expireDisablements(actor);
+}
 /** Reuse CPR suppression, preserving every native effect's disabled state and item installation. */
 export async function installEmpNativeGuards() {
   const effect = CONFIG.ActiveEffect.documentClass.prototype as ActiveEffect & {determineSuppression():void;system:{isSuppressed:boolean}};

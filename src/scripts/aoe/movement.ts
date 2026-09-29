@@ -2,6 +2,7 @@ import { primaryGM as electedGM } from "../shared.js";
 import {tokenEncounter,displayedEncounter,encounterRef,type EncounterRef,resolveEncounter} from "../encounter.js";
 import {areaSettings,MODULE} from "./settings.js";
 import type {Point} from "./geometry.js";
+import {isProne} from "../prone.js";
 interface Movement {turn:string;spent:number;debt:number;escape?:{id:string;cost:number}}
 const key="aoeMovement";
 let queue:Promise<unknown>=Promise.resolve();
@@ -32,6 +33,7 @@ export function distanceMoved(a:Point,b:Point):number {
 /** The caller validates coverage/walls; token movement and its receipt share one update. */
 export async function moveEvader(token:Token,point:Point,costs:boolean,borrow:boolean,receipt:string, encounter?:Partial<EncounterRef>) {
   return movementWork(async()=>{
+    if(token.actor&&isProne(token.actor))throw Error("Prone: Get Up before moving.");
     const entry=movementEntry(token.document,encounter?resolveEncounter(encounter)??null:tokenEncounter(token.document.parent?.id,[token.document.uuid]));
     if(costs&&!entry)throw Error("Start/select this token's combat to track evasion MOVE.");
     const prior=foundry.utils.getProperty(token.document,`flags.${MODULE}.aoeEscape`) as {id:string;cost:number}|undefined;

@@ -107,7 +107,7 @@ export function recordedDamageApplied(data: Exchange): boolean {
 }
 /** Called only by the existing serialized GM coordinator. */
 export async function handleDamage(request: DamageRequest, user: User, data: Exchange,
-  save: () => Promise<void>): Promise<void> {
+  save: () => Promise<void>, sourceMessage?: ChatMessage): Promise<void> {
   if(data.combatId===undefined&&request.encounter)Object.assign(data,request.encounter);
   if(data.combatId!==undefined)resolveEncounter(data);
   if (data.state !== "resolved") throw new Error("Damage requires a resolved attack.");
@@ -209,7 +209,7 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
       const instant=id.startsWith("instant:")?id.slice(8):"";
       if(instantId(instant)) {
         const visibility={blind:data.rollMode==="blindroll",whisper:["gmroll","blindroll"].includes(data.rollMode??"")?game.users!.filter(u=>u.isGM).map(u=>u.id!):data.rollMode==="selfroll"?[user.id!]:[]} as ChatMessage;
-        await createInstantCard(actor,instant,visibility,data.combatId!==undefined?encounterRef(resolveEncounter(data),data.combatScene,data.combatTokens):undefined);
+        await createInstantCard(actor,instant,sourceMessage??visibility,data.combatId!==undefined?encounterRef(resolveEncounter(data),data.combatScene,data.combatTokens):undefined);
       } else await applyCombatStatus(actor, id,data.combatId!==undefined?resolveEncounter(data)??null:undefined,true);
     }
   } catch (error) {

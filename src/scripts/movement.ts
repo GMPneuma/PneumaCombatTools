@@ -4,6 +4,7 @@ import {grappleFor} from "./grapple/state.js";
 import {movementEntry} from "./aoe/movement.js";
 import {areaSettings} from "./aoe/settings.js";
 import {barCombat} from "./combat-bar-state.js";
+import {isProne} from "./prone.js";
 const MODULE="pneuma-combattools",flag=`flags.${MODULE}.movement`;
 // Prepared coordinates can follow token animation; source coordinates are the committed destination.
 function committedPosition(doc:TokenDocument){
@@ -49,8 +50,9 @@ function draw(token:Token,previewRecord?:MoveRecord){
   if(token.destroyed||!active()){clear(token);return;}
   const context=movementTurn(doc);
   if(!token.visible||!token.actor||(!game.user?.isGM&&!token.actor.hasPlayerOwner)||!context){clear(token);return;}
-  const record=previewRecord??(token.isPreview?nextRecord(token,doc,{x:token.document.x,y:token.document.y}):currentMovement(doc,context));
-  if(!record||record.hidden){clear(token);return;}
+  const prone=isProne(token.actor);
+  const record=previewRecord??(prone?(currentMovement(doc,context)??initial(doc)):token.isPreview?nextRecord(token,doc,{x:token.document.x,y:token.document.y}):currentMovement(doc,context));
+  if(!record||record.hidden&&!prone){clear(token);return;}
   // Native HUD HTML lives outside Token's restricted PIXI hit area and follows canvas pan/zoom.
   const host=canvas.hud?.element[0]??document.getElementById("hud");
   if(!host)return;
@@ -82,30 +84,35 @@ function draw(token:Token,previewRecord?:MoveRecord){
   display.container.renderable=token.renderable;
   const perSpace=metersPerSpace(),entry=areaSettings().evadeMove?movementEntry(doc):undefined;
   const nativeWalk=foundry.utils.getProperty(token.actor,"system.derivedStats.walk.value");
-  const maxMeters=Math.max(0,Number(nativeWalk??Number(foundry.utils.getProperty(token.actor,"system.stats.move.value"))*2)||0);
-  const spent=entry?entry.current.spent/perSpace+(token.isPreview?record.spent-(currentMovement(doc)?.spent??0):0):record.spent;
+  const maxMeters=prone?0:Math.max(0,Number(nativeWalk??Number(foundry.utils.getProperty(token.actor,"system.stats.move.value"))*2)||0);
+  const spent=prone?0:entry?entry.current.spent/perSpace+(token.isPreview?record.spent-(currentMovement(doc)?.spent??0):0):record.spent;
   const n=(value:number)=>Number(value.toFixed(2));
   const top=token.tooltip?.text ? Math.min(-8,token.tooltip.y-token.tooltip.height-4) : -8;
-  const stateKey=[spent,maxMeters,perSpace,token.x,token.y,token.w,token.h,top,token.isOwner,token.isPreview,record.start.x,record.start.y].join(":");
+  const stateKey=[prone,spent,maxMeters,perSpace,token.x,token.y,token.w,token.h,top,token.isOwner,token.isPreview,record.start.x,record.start.y].join(":");
   if(display.stateKey===stateKey)return;
   display.stateKey=stateKey;
-  const label=`${n(spent)} / ${n(maxMeters/perSpace)}`;
+  const label=prone?"0/0":`${n(spent)} / ${n(maxMeters/perSpace)}`;
   if(display.label.value!==label)display.label.value=label;
   const running=spent*perSpace>maxMeters+0.001;
   const exceeded=spent*perSpace>maxMeters*2+0.001;
   display.hud.classList.toggle("is-running",running);
   display.hud.classList.toggle("is-over-budget",exceeded);
   display.run.hidden=!running;
-  display.label.title=exceeded?"Exceeds Move + Run allowance. Run uses your Action.":running?"Run uses your Action for additional movement.":"Normal movement allowance.";
+  display.label.title=prone?"Prone: Get Up before moving.":exceeded?"Exceeds Move + Run allowance. Run uses your Action.":running?"Run uses your Action for additional movement.":"Normal movement allowance.";
   display.hud.style.left=`${token.x+token.w/2}px`;
   display.hud.style.top=`${token.y+top}px`;
-  display.reset.hidden=!token.isOwner||token.isPreview;
+  display.reset.hidden=prone||!token.isOwner||token.isPreview;
   const markerKey=[record.start.x,record.start.y,token.w,token.h].join(":");
   if(display.markerKey!==markerKey){display.markerKey=markerKey;display.marker.clear().lineStyle(2,0xffffff,0.45).drawRect(record.start.x,record.start.y,token.w,token.h);}
 }
 export function registerMovement(){
   game.settings!.register(MODULE,"movementTracking",{name:"Enable movement counters",hint:"GM world setting: enable or disable movement tracking, counters, start markers, and Reset controls for everyone. Player-owned counters are shared; NPC counters are GM-only. Does not block excess movement.",scope:"world",config:true,type:Boolean,default:true,onChange:()=>{for(const token of canvas.tokens?.placeables??[])draw(token);}});
   Hooks.on("preUpdateToken",(doc:TokenDocument,changes:Record<string,unknown>,options:Record<string,unknown>)=>{
+    if(doc.actor&&isProne(doc.actor)&&!game.user?.isGM&&(["x","y","elevation"] as const).some(key=>key in changes&&Number(changes[key])!==doc._source[key])){
+      if(doc.object)draw(doc.object);
+      ui.notifications!.warn("Prone: Get Up before moving.");
+      return false;
+    }
     if(options.pneumaMovementReset||!active()||!("x" in changes||"y" in changes)||!doc.object)return;
     const from=committedPosition(doc);
     const to={x:Number(changes.x??from.x),y:Number(changes.y??from.y)};
@@ -145,6 +152,7 @@ export function registerMovement(){
   Hooks.on("updateToken",(doc:TokenDocument)=>{if(doc.object)enqueue(doc.object);});
   Hooks.on("controlToken",(token:Token)=>enqueue(token));
   Hooks.on("updateActor",(actor:Actor)=>{for(const token of canvas.tokens?.placeables??[])if(token.actor?.uuid===actor.uuid)enqueue(token);});
+  for(const hook of ["createActiveEffect","updateActiveEffect","deleteActiveEffect"])Hooks.on(hook,()=>{for(const token of canvas.tokens?.placeables??[])enqueue(token);});
   Hooks.on("updateUser",()=>refreshTurns(true));
   Hooks.on("destroyToken",(token:Token)=>{queued.delete(token);clear(token);});
   Hooks.on("canvasTearDown",()=>{queued.clear();turns.clear();for(const token of displays.keys())clear(token);});

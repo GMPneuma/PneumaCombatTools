@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {chokeDamage,nextChoke,visibleChoke,winsGrab} from '../dist/scripts/grapple/rules.js';
 import {grappleHUD,grappleMenu,grappleWeaponBlocked} from '../dist/scripts/grapple/state.js';
-import {handleGrappleRequest,registerGrapple,grappleContent,useGrapple,renderGrapple} from '../dist/scripts/grapple/workflow.js';
+import {handleGrappleRequest,registerGrapple,grappleContent,useGrapple,renderGrapple,cleanupEndedGrapple} from '../dist/scripts/grapple/workflow.js';
 const M='pneuma-combattools';
 const get=(o,p)=>p.split('.').reduce((v,k)=>v?.[k],o);
 function merge(a,b){for(const [k,v] of Object.entries(b)){if(k.startsWith('-=')){delete a[k.slice(2)];continue;}if(v&&typeof v==='object'&&!Array.isArray(v)){a[k]??={};merge(a[k],v);}else a[k]=structuredClone(v);}return a;}
@@ -45,6 +45,19 @@ test('Choke preserves the printed strict thresholds, not <= shortcuts',()=>{
  assert.throws(()=>chokeDamage(NaN,6,1));
  assert.equal(winsGrab(15,15),false);
 });
+
+test('GM cleanup ends only stale combat grapples and restores both penalties and token scale',async()=>{
+ const f=setup();await f.hold();
+ await assert.rejects(cleanupEndedGrapple(f.actors[0],'g'),/still active/);
+ f.combat.started=false;
+ const other={id:'other',started:true,combatants:[{actor:f.actors[1]}]};game.combats.set('other',other);
+ await assert.rejects(cleanupEndedGrapple(f.actors[0],'g'),/participant/);
+ game.combats.delete('other');
+ await cleanupEndedGrapple(f.actors[0],'g');
+ assert.equal(f.actors[0].effects.length,0);assert.equal(f.actors[1].effects.length,0);
+ assert.equal(f.tokens[1].texture.scaleX,1);assert.equal(f.tokens[1].texture.scaleY,1);
+ assert.equal(f.read().state,'ended');
+});
 test('Consecutive-round tracking rejects duplicate/backward rounds and resets gaps/encounters',()=>{
  const one=nextChoke(undefined,'combat',1),two=nextChoke(one,'combat',2);
  assert.equal(two.count,2);assert.equal(nextChoke(two,'combat',3).count,3);
@@ -62,7 +75,7 @@ test('Hold adds native -2 effects, roles, HUD names and two-handed restrictions;
  assert.deepEqual(grappleMenu(f.tokens[2].object,f.tokens[0].object).map(r=>r.action),['break']);
  assert.equal(grappleWeaponBlocked(a,{system:{handsReq:2}}),true);assert.equal(grappleWeaponBlocked(a,{system:{handsReq:1}}),false);
  b.effects.push({id:'existing',statuses:new Set(),flags:{},changes:[]});
- await f.request('release');assert.equal(a.effects.length,0);assert.deepEqual(b.effects.map(e=>e.id),['existing']);assert.equal(grappleHUD(b).length,0);
+ await f.request('release');assert.ok([...f.messages.values()].some(m=>m.flags?.[M]?.grappleParticipants?.target?.token===f.tokens[1].uuid),'follow-up retains target portrait identity');assert.equal(a.effects.length,0);assert.deepEqual(b.effects.map(e=>e.id),['existing']);assert.equal(grappleHUD(b).length,0);
 });
 test('Choke applies HP once, shows attacker and defender counters, and third round sets unconscious',async()=>{
  const f=setup();await f.hold();const [a,b]=f.actors;

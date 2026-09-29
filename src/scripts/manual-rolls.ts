@@ -1,4 +1,5 @@
 import {nativeCriticalTable, findNativeItem} from "./native-lookup.js";
+import {markRollResult} from "./native-combat.js";
 import {removeRollFavorite, rollFavorites, sameFavorite, toggleRollFavorite, rollFavorite, type RollFavorite} from "./roll-favorites.js";
 import { primaryGM as authority } from "./shared.js";
 import { MANUAL_MODULE as M, manualEscape as esc, manualNumber, groupContent, type ManualCard, type InjuryResult } from "./manual-roll-state.js";
@@ -136,7 +137,7 @@ export async function handleManualRequest(wire: Pick<Wire,"message" | "user" | "
   if (!actor || !actor.testUserPermission(user,"OWNER")) throw Error("Select a token you own, or ask the GM to apply this roll.");
   if (req.action === "damage" && data.kind === "damage" && req.damage?.action === "damageApply") {
     const ex=exchange(data,token!.uuid);
-    await handleDamage({...req.damage,targetUuid:token!.uuid,application:"selected"},user,ex,()=>save(message,data));
+    await handleDamage({...req.damage,targetUuid:token!.uuid,application:"selected"},user,ex,()=>save(message,data),message);
   } else if (req.action === "injury") {
     if (data.kind === "damage" && (data.damage?.result?.sixes ?? 0) < 2) throw Error("This damage roll does not qualify for a critical injury.");
     if (data.injuryBusy) throw Error("Injury application is in progress or needs GM review.");
@@ -254,7 +255,7 @@ async function basePrompt() {
     if(custom){
       const count=manualNumber(value(fields,"customDice"),"Dice",1,20),sides=manualNumber(value(fields,"customSides"),"Sides",1,100);
       const roll=await new Roll(count+"d"+sides+(modifier>=0?"+":"")+modifier).evaluate();
-      const message={content:'<section class="pneuma-custom-roll-card"><strong>'+esc(title)+'</strong>'+await roll.render()+'</section>',speaker:ChatMessage.getSpeaker()};
+      const message={content:markRollResult('<section class="pneuma-custom-roll-card"><strong>'+esc(title)+'</strong>'+await roll.render()+'</section>',roll),speaker:ChatMessage.getSpeaker()};
       ChatMessage.applyRollMode(message as never,mode as never);await ChatMessage.create(message as never);
       const {Dice}=await nativeAPI();await Dice.handle3dDice(roll,mode);
     } else {

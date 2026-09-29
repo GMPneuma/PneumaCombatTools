@@ -47,7 +47,7 @@ export interface BarEntry {
 export function barEntries(combat = barCombat()): BarEntry[] {
   const user = game.user;
   if (!user || !canvas.ready) return [];
-  if (combat) return combat.turns.filter(combatant => combatant.visible).map(combatant => ({
+  if (combat) return combat.turns.filter(combatant => combatant.visible && String((combatant.actor ?? combatant.token?.actor)?.type) !== "container").map(combatant => ({
     id: combatant.id!, name: combatant.name ?? combatant.actor?.name ?? "Combatant",
     img: combatant.actor?.img || "icons/svg/mystery-man.svg",
     token: combatant.sceneId === canvas.scene?.id ? combatant.token?.object ?? undefined : undefined,
@@ -56,7 +56,7 @@ export function barEntries(combat = barCombat()): BarEntry[] {
   }));
 
   return (canvas.tokens?.placeables ?? []).filter(token => {
-    if (!token.actor || token.isPreview) return false;
+    if (!token.actor || String(token.actor.type) === "container" || token.isPreview) return false;
     if (!user.isGM) return token.isOwner && !token.document.hidden && token.isVisible;
     return game.users?.some(player => player.active && !player.isGM && token.actor!.testUserPermission(player, "OWNER"));
   }).map(token => ({

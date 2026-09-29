@@ -80,7 +80,8 @@ async function save(scene: Scene, g: Grapple) {
       else if(g.state==="active")changes["flags."+MODULE+".grappleHistory"]={...g};
       const previous=property<Grapple>(message,"grapple");
       if(history&&previous?.revision!==g.revision&&!g.operation){
-        await ChatMessage.create({content:grappleContent(g),speaker:message.speaker,whisper:message.whisper,blind:message.blind} as never);
+        await ChatMessage.create({content:grappleContent(g),speaker:message.speaker,whisper:message.whisper,blind:message.blind,
+          flags:{[MODULE]:{grappleParticipants:{source:g.source,target:g.target}}}} as never);
       }
       await message.update(changes);
       // Completed history belongs in chat, not in the encounter active-state map.
@@ -133,6 +134,19 @@ async function end(scene: Scene, g: Grapple, note: string, endedBy?: string) {
   const ended: Grapple = {...g,state:"ended",note,revision:g.revision+1,...(endedBy ? {endedBy} : {})}; delete ended.choke; delete ended.operation;
   await save(scene,ended);
 }
+/** GM repair of a saved grapple whose combat has ended; retain native placement restoration. */
+export async function cleanupEndedGrapple(actor:Actor,id:string){
+  if(!game.user?.isGM)throw Error("Only a GM can clean grapples.");
+  await serialized(async()=>{
+    const g=actorGrapples(actor).find(g=>g.id===id);
+    if(!g)return;
+    if(!g.combat||game.combats?.get(g.combat)?.started)throw Error("This grapple is still active.");
+    if(Array.from(game.combats??[]).some(c=>c.started&&c.combatants.some(p=>[g.source.actor,g.target.actor].includes(p.actor?.uuid??""))))throw Error("A grapple participant is in a started encounter.");
+    const scene=game.scenes?.get(g.scene) as Scene|undefined;if(!scene)throw Error("Grapple scene is unavailable.");
+    await end(scene,g,"Grapple ended: GM status cleanup.");
+  });
+}
+export async function waitGrappleCleanup(){await serialized(async()=>{});}
 function activeCombat(scene:Scene,g:Grapple):Combat|undefined {
   return g.combatId!==undefined?resolveEncounter(g):tokenEncounter(scene.id,[g.source.token,g.target.token]);
 }

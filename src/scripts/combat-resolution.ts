@@ -15,7 +15,7 @@ import { resolutionSection, rollOutcomeClass } from "./card-structure.js";
 import { damageContent, handleDamage, renderDamage, type DamageState, type DamageRequest } from "./damage-flow.js";
 import { homebrew, automaticNPCEvasion } from "./evasion-settings.js";
 import { checkedLuck, evasionButtonLabel, evasionOffer, type EvasionOffer } from "./evasion-rules.js";
-import { attackDialog, registerAttackDialog, diceJSON, evasionDialog, nativeAPI, nativeCard, registerEvasionDialog, rollHidden, spendBonusLuck,
+import { attackDialog, registerAttackDialog, diceJSON, evasionDialog, showDiceAs, nativeCard, registerEvasionDialog, rollHidden, spendBonusLuck,
   type RollItem } from "./native-combat.js";
 import { distanceWithElevation, parseDV } from "./dv-data.js";
 import { getTable } from "./dv-hover.js";
@@ -29,8 +29,9 @@ declare global {
   }
 }
 interface Usage { round: string; used: number; lastPayment?: string }
-interface Defense { total: number; html: string; dice: string[]; bonus: number; fee: number; penalty: number }
+interface Defense { roller?: string; total: number; html: string; dice: string[]; bonus: number; fee: number; penalty: number }
 export interface Exchange extends Partial<EncounterRef> {
+  roller?: string;
   cannotEvade?: string; evasionOverride?: boolean; attackRevealed?: boolean;
   disableSource?: "microwaver";
   areaAmmo?: {type:string;variety:string};
@@ -180,10 +181,10 @@ async function writeExchange(message: ChatMessage, data: Exchange): Promise<void
 }
 async function revealDice(data: Exchange): Promise<void> {
   if (!data.dice.length && !data.defense?.dice.length) return;
-  const { Dice } = await nativeAPI();
-  for (const json of [...(data.attackRevealed ? [] : data.dice), ...(data.defense?.dice ?? [])]) {
-    await Dice.handle3dDice(Roll.fromJSON(json) as Roll, data.rollMode);
-  }
+  await Promise.all([
+    ...(data.attackRevealed ? [] : data.dice).map(json => showDiceAs(Roll.fromJSON(json) as Roll, data.rollMode, data.roller)),
+    ...(data.defense?.dice ?? []).map(json => showDiceAs(Roll.fromJSON(json) as Roll, data.rollMode, data.defense?.roller)),
+  ]);
 }
 async function finish(message: ChatMessage, data: Exchange, actor: Actor): Promise<void> {
   const defense = data.defense;
@@ -228,7 +229,7 @@ export async function handleCombatRequest(request: Request): Promise<Claim | und
     if (!user.isGM && (message.blind || (message.whisper.length && !message.whisper.includes(user.id) && message.author?.id !== user.id)))
       throw new Error("This is a private exchange.");
     const data = foundry.utils.deepClone(stored);
-    await handleDamage(request as DamageRequest, user, data, () => writeExchange(message, data));
+    await handleDamage(request as DamageRequest, user, data, () => writeExchange(message, data), message);
     return;
   }
   const actor = await tokenActor(stored.defender);
@@ -295,7 +296,7 @@ export async function handleCombatRequest(request: Request): Promise<Claim | und
     throw new Error("Invalid Evasion result.");
   try { checkedLuck(Number(foundry.utils.getProperty(actor, "system.stats.luck.value")), defense.fee, defense.bonus); }
   catch (error) { throw new Error("Review evasion: " + (error as Error).message); }
-  data.defense = defense; data.round = claim.round; data.state = "applying";
+  data.defense = {...defense, roller: user.id!}; data.round = claim.round; data.state = "applying";
   // Persist the exact roll before charging: a retry finishes it without another roll or payment.
   await writeExchange(message, data);
   await finish(message, data, actor);
@@ -399,11 +400,11 @@ export async function startCombatExchange(attacker: Token, target: Token, itemId
   await rollHidden(roll);
   roll.entityData = { actor: actor.id!, token: attacker.id, item: itemId, tokens: [target.id] };
   if (mode === "aimed") await actor.update({ "flags.cyberpunk-red-core.aimedLocation": roll.location } as Parameters<Actor["update"]>[0]);
-  const title = attackTitle(item,game.settings!.get(MODULE, "hideAttackWeapon"),roll.skillName);
+  const title = attackTitle(item,game.settings!.get(MODULE, "hideAttackWeapon") && !actor.hasPlayerOwner,roll.skillName);
   roll.rollTitle = title;
   const data: Exchange = { ...encounterRef(combat,attacker.document.parent?.id,[attacker.document.uuid,target.document.uuid]), ...(!thrown&&isMicrowaver(item)?{disableSource:"microwaver" as const}:{}), weaponType: type, ...(thrown ? { thrownSource: thrown.source, improvised: thrown.improvised, improvisedDice: choice.improvisedDice } : {}), criticalMethod: type === "grenadeLauncher" ? "Grenade" : type === "rocketLauncher" ? "Rocket" : undefined, weaponId: itemId, attackMode: mode, location: roll.location, unaware: choice.unaware, combatId, combatEpoch, attacker: attacker.document.uuid, defender: target.document.uuid, defenderActor: target.actor!.uuid,
     attackerName: attacker.name ?? "", defenderName: target.name ?? "", ranged, category, title, dv,
-    total: roll.resultTotal, html: await nativeCard(roll), dice: diceJSON(roll),
+    total: roll.resultTotal, html: await nativeCard(roll), dice: diceJSON(roll), roller: game.user!.id!,
     rollMode: game.settings!.get("core", "rollMode") ?? "roll", state: "waiting" };
   skipUnavailableEvasion(data, target.actor!, combat);
   if (choice.unaware) { data.state = "resolved"; data.hit = !ranged || data.total > dv!; }
@@ -449,7 +450,7 @@ export function decorateCombatMessage(root: HTMLElement, data: Exchange): void {
 }
 export function registerCombatResolution(): void {
   for (const [key, name, hint, value] of [
-    ["hideAttackWeapon", "Hide attack weapon names", "Show weapon types, melee types, Martial Arts, Grenade or Rocket instead of weapon names.", false],
+    ["hideAttackWeapon", "Hide attack weapon names for NPCs", "For attackers without a player owner, show weapon types, melee types, Martial Arts, Grenade or Rocket instead of weapon names. Player-owned attackers always show their weapon names.", false],
   ] as const) game.settings!.register(MODULE, key, { name, hint, scope: "world", config: true, type: Boolean, default: value });
   registerEvasionDialog();
   registerAttackDialog();
