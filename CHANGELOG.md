@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.6 - 2026-09-29
+
+- Fix dice-handler lookup on Forge to target CPR's loaded CDN instance, preventing native dice animations from escaping Combat Tools suppression before saved-result replay.
+- Keep long weapon names within chat cards so dice totals remain visible; retain full-name tooltips.
+- Fix dice-style test synchronization on Node 22 in GitHub CI.
+
+Validation: production build and strict type checks; 489 automated tests passed, four skipped. Browser regression checks cover long weapon names. Live Forge dice-animation verification remains pending. The reported Forge sound-path issue is not addressed in this release.
+
 ## 0.9.5 - 2026-09-29
 
 - Add a GM-controlled chat result delay from 0–5 seconds in half-second increments, disabled by default. Existing card controls remain clickable during the pause.

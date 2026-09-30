@@ -173,6 +173,8 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 .pneuma-defense-result { margin-top: 6px; }
 .pneuma-evasion-note { font-weight: bold; padding: 4px; }
 /* Combat exchange structure only; ordinary native chat cards are unchanged. */
+.pneuma-combat-message .rollcard { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.pneuma-combat-message .rollcard > :is(.rollcard-top, .rollcard-bottom) { min-width: 0; }
 .pneuma-attack-result .pneuma-attack-subtitle {
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   grid-template-areas: "subtitle-center subtitle-2-center"; align-items: center;

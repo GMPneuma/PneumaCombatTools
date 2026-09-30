@@ -1,5 +1,9 @@
 # Combat Tools feature inventory
 
+Forge dice-handler lookup (released in 0.9.6): resolve CPR's dice handler from the running system script URL, falling back to recorded resource URLs and then the standard local path. This targets the same handler instance on Forge's CDN so native-animation suppression applies before Combat Tools replays saved results. Automated checks cover separate CDN/local instances, critical dice, replay, unrelated rolls, and missing resource history; live Forge verification remains pending.
+
+Long weapon-name layout (released in 0.9.6): constrain native roll-card grid tracks inside Combat Tools messages so long titles truncate within the card instead of pushing dice totals outside it. Existing full-name tooltips remain. Browser regression checks cover spaced and unbroken names at narrow and wide chat widths.
+
 Roller-specific DSN styles (released in 0.9.5): saved attack rolls (including AoE) and evasion responses retain the initiating user's ID. GM replay passes that user to Dice So Nice for appearance while leaving CPR's audience, blind-roll and synchronization arguments intact. Simultaneous attack/evasion dice retain independent styles. GM-made rolls use the GM style; old cards and missing users fall back to native playback. Non-DSN integrations retain native behavior. Automated identity and visibility-argument checks pass; live DSN rendering remains unverified.
 
 Concurrent exchange dice playback (released in 0.9.5): attack and evasion dice animations are submitted together, allowing Dice So Nice's simultaneous-roll setting to combine them. Already-revealed attacks are not replayed. Combat resolution remains independent of animation completion, with playback errors still reported. Automated coverage verifies concurrent submission, original faces/roll mode, and no duplicate playback; live DSN verification remains pending.

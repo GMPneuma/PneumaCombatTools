@@ -39,9 +39,26 @@ export async function showDiceAs(roll: Roll, mode: string, userId?: string): Pro
   try { await Dice.handle3dDice(roll, mode); }
   finally { diceUsers.delete(roll); }
 }
+/** Reuse CPR's module identity: Forge's CDN import is distinct from the local URL. */
+export function nativeDiceHandlerURL(): string {
+  const systemPath = "/systems/cyberpunk-red-core/";
+  const handlerPath = "modules/extern/cpr-dice-handler.js";
+  // Script elements survive resource-timing buffer eviction and identify the running system.
+  for (const script of Array.from(globalThis.document?.querySelectorAll?.<HTMLScriptElement>("script[type='module'][src]") ?? [])) {
+    const url = new URL(script.src);
+    if (url.pathname.includes(systemPath) && url.pathname.endsWith("/cpr.js")) {
+      return new URL(handlerPath, url).href;
+    }
+  }
+  for (const entry of globalThis.performance?.getEntriesByType("resource") ?? []) {
+    const url = new URL(entry.name);
+    if (url.pathname.includes(systemPath) && url.pathname.endsWith("/" + handlerPath)) return entry.name;
+  }
+  return systemPath + handlerPath;
+}
 export async function nativeAPI(): Promise<NativeAPI> {
   api ??= (async () => {
-    const path = "/systems/cyberpunk-red-core/modules/extern/cpr-dice-handler.js";
+    const path = nativeDiceHandlerURL();
     const Dice = (await import(path)).default as NativeAPI["Dice"];
     const original = Dice.handle3dDice;
     Dice.handle3dDice = function(roll, mode) {
