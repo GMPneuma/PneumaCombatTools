@@ -20,7 +20,7 @@ import { areaKind, confirmAreaRoll, type AreaKind, type AreaWeapon } from "./wea
 import { polygon, evadeAllowed, winsAreaDefense, type Area, type Point } from "./geometry.js";
 import { placeArea, clippedPoints, templateData, areaCoverage } from "./placement.js";
 import { requireCombatSocket } from "../socket-health.js";
-import { smokeAttackDialog, diceJSON, showDiceAs, nativeCard, rollHidden, spendBonusLuck, type RollItem } from "../native-combat.js";
+import { smokeAttackDialog, diceJSON, showSavedDice, messageDiceAudience, nativeCard, rollHidden, spendBonusLuck, type RollItem } from "../native-combat.js";
 import { thrownRollItem, improvisedSource } from "../thrown-weapons.js";
 import { getTable } from "../dv-hover.js";
 import { parseDV } from "../dv-data.js";
@@ -159,11 +159,11 @@ async function save(message:ChatMessage,data:AreaAttack) {
   data.resolutionComplete=resolved;
   await message.update({content:areaContent(data),[`flags.${MODULE}.aoe`]:data} as Parameters<ChatMessage["update"]>[0]);
   // Persist first: later saves and chat rerenders must never repeat the animation.
-  if(reveal)void revealAttackDice(data).catch(error=>console.warn(MODULE,"Area attack dice display failed",error));
+  if(reveal)void revealAttackDice(data,message).catch(error=>console.warn(MODULE,"Area attack dice display failed",error));
 }
-async function revealAttackDice(data:AreaAttack):Promise<void> {
+async function revealAttackDice(data:AreaAttack,message:ChatMessage):Promise<void> {
   if(!data.exchange.dice.length)return;
-  for(const json of data.exchange.dice)await showDiceAs(Roll.fromJSON(json) as Roll,data.exchange.rollMode,data.exchange.roller);
+  await showSavedDice(data.exchange.dice,data.exchange.rollMode,data.exchange.roller,messageDiceAudience(message));
 }
 const pending=new Map<string,{resolve:()=>void;reject:(e:Error)=>void;timer:ReturnType<typeof setTimeout>}>();
 let queue:Promise<unknown>=Promise.resolve();
@@ -179,7 +179,7 @@ export async function handleAreaRequest(req:Request) {
   if(req.action==="instant") {
     if(!row?.instant||row.state!=="hit"||!req.instantRequest||data.phase!=="responses")throw Error("Instant effect unavailable.");
     row.instant.sourceMessage=message.id!;
-    await handleInstant(row.instant,req.instantRequest,user,()=>save(message,data),data.exchange.rollMode);return;
+    await handleInstant(row.instant,req.instantRequest,user,()=>save(message,data),data.exchange.rollMode,messageDiceAudience(message));return;
   }
   if(req.action==="removeSmoke") {
     if(!user.isGM||data.ammoType!=="smoke")throw Error("GM only.");
@@ -407,7 +407,8 @@ async function respond(message:ChatMessage,data:AreaAttack,row:TargetRow,automat
     else if(!await roll.handleRollDialog({ctrlKey:skipDialog,metaKey:false,type:"pneuma-area"},actor,item))return;
     checkedLuck(Number(foundry.utils.getProperty(actor,"system.stats.luck.value")),0,roll.luck);
     if(data.kind!=="suppression"){const blocked=evasionBlocked(actor);if(blocked)throw Error(blocked);}
-    roll=await item.confirmRoll(roll);await spendBonusLuck(actor,roll.luck);await roll.roll();
+    roll=await item.confirmRoll(roll);await spendBonusLuck(actor,roll.luck);await rollHidden(roll);
+    await showSavedDice(diceJSON(roll),data.exchange.rollMode,game.user!.id,messageDiceAudience(message));
     roll.entityData={actor:actor.id!,token:row.uuid.split(".").at(-1)!,item:item.id!,tokens:[]};
     await send(message.id!,"commit",{target:row.uuid,nonce,total:roll.resultTotal,html:await nativeCard(roll)});committed=true;
   } finally {if(!committed)await send(message.id!,"release",{target:row.uuid,nonce});}
@@ -522,7 +523,7 @@ export function registerAreaAttacks() {
   }));
   Hooks.on("renderChatMessage",async(message:ChatMessage,html:JQuery)=>{
     const data=flag(message);if(!data||!canRenderCombatCard(message))return;
-    if(html[0])await bindInstantControls(html[0],scope=>data.rows.find(r=>r.uuid===scope)?.instant,(scope,instantRequest)=>send(message.id!,"instant",{target:scope,instantRequest}),data.exchange.rollMode);
+    if(html[0])await bindInstantControls(html[0],scope=>data.rows.find(r=>r.uuid===scope)?.instant,(scope,instantRequest)=>send(message.id!,"instant",{target:scope,instantRequest}),data.exchange.rollMode,messageDiceAudience(message));
     // Shared roll only: controls stay by targets; application results follow the roll.
     html.find<HTMLElement>('.pneuma-aoe-card > .pneuma-damage-result > [data-pneuma-section="damage-apply"], .pneuma-aoe-card > .pneuma-damage-result > .pneuma-resolution-recovery-slot').toArray().forEach(node=>node.remove());
     // Also update previously saved AoE cards without replacing their native dice nodes.

@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
+import {registerHooks} from 'node:module';
+registerHooks({resolve(specifier,context,next){
+ if(specifier==='/systems/cyberpunk-red-core/modules/extern/cpr-dice-handler.js')return {shortCircuit:true,url:'data:text/javascript,export default {handle3dDice:async(roll,mode)=>globalThis.grappleAnimations.push({roll,mode})}'};
+ return next(specifier,context);
+}});
 import {chokeDamage,nextChoke,visibleChoke,winsGrab} from '../dist/scripts/grapple/rules.js';
 import {grappleHUD,grappleMenu,grappleWeaponBlocked} from '../dist/scripts/grapple/state.js';
 import {handleGrappleRequest,registerGrapple,grappleContent,useGrapple,renderGrapple,cleanupEndedGrapple} from '../dist/scripts/grapple/workflow.js';
@@ -239,6 +244,34 @@ test('HUD Release, Choke and Throw execute without any roll or opposed response'
   assert.equal(f.actors[1].system.derivedStats.hp.value,action==='release'?30:24);
   assert.doesNotMatch(grappleContent(g),/pneuma-grapple-rolls/);
   assert.equal(g.attack.total,15);assert.equal(g.defense.total,10);
+ }
+});
+
+test('Grab, Escape and Break save native main/critical dice and replay both sides only after resolution',async()=>{
+ for(const action of ['grab','escape','break']){
+  const f=setup();globalThis.grappleAnimations=[];globalThis.Roll={fromJSON:JSON.parse};
+  if(action!=='grab')await f.hold();
+  const source=action==='escape'?f.tokens[1]:action==='break'?f.tokens[2]:f.tokens[0];
+  const target=action==='grab'?f.tokens[1]:f.tokens[0];
+  source.actor.system.stats.luck={value:5};game.settings={get:()=> 'selfroll'};
+  globalThis.renderTemplate=async()=>'<div class="rollcard">native Brawling</div>';
+  const {nativeAPI}=await import('../dist/scripts/native-combat.js');const {Dice}=await nativeAPI();
+  const item={type:'skill',name:'Brawling',system:{stat:'dex'},
+   createRoll(){return {luck:0,resultTotal:15,rollCard:'native',wasCritical:()=>true,handleRollDialog:async()=>true,
+    async roll(){this._roll={toJSON:()=>({total:10})};await Dice.handle3dDice(this._roll);this._critRoll={toJSON:()=>({total:5})};await Dice.handle3dDice(this._critRoll);}};},confirmRoll:async roll=>roll};
+  source.actor.items=[item];
+  await useGrapple(source.object,target.object,action,true);
+  assert.equal(grappleAnimations.length,0,'initial roll is withheld');
+  const message=[...f.messages.values()].at(-1),g=message.flags[M].grapple;
+  assert.equal(g.state,'waiting');assert.deepEqual(g.attack.dice,[JSON.stringify({total:10}),JSON.stringify({total:5})]);
+  assert.equal(g.attack.roller,'gm');assert.equal(g.rollMode,'selfroll');
+  const claim=await f.request('claim',g.id);
+  await f.request('respond',g.id,{claim,result:{total:11,html:'<div>Defense</div>',dice:[JSON.stringify({total:1}),JSON.stringify({total:4})]}});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(grappleAnimations.map(entry=>entry.roll.total),[10,5,1,4]);assert(grappleAnimations.every(entry=>entry.mode==='selfroll'));
+  assert.match(message.content,/native Brawling/);assert.match(message.content,/Defense/);
+  await assert.rejects(f.request('respond',g.id,{claim,result:f.result(11)}));
+  assert.equal(grappleAnimations.length,4,'retry cannot replay a resolved exchange');
  }
 });
 

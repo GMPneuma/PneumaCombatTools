@@ -15,7 +15,7 @@ test('QuickHack filters HUD events, batches updates, and refreshes only changed 
  const f=fixture('dist/scripts/quickhack/integration.js',{
  MODULE:'m',enabled:()=>on,registerQuickhackSheet(){},registerQuickhackSettings:fn=>settingsChange=fn,
  clearForceOut(){},ActorSheet:class{},canvas:{scene:{id:'scene'},tokens:{hud:{rendered:true,render:()=>hudRenders++,clear(){}}}},
- game:{user:{isGM:false},ready:false},ui:{windows:{},chat:{render:()=>assert.fail('Whole chat refresh'),updateMessage:m=>updated.push(m.id)}},
+ game:{user:{isGM:false},ready:false},ui:{windows:{},chat:{element:{find:()=>({length:1})},render:()=>assert.fail('Whole chat refresh'),updateMessage:m=>updated.push(m.id)}},
  foundry:{utils:{getProperty:get,flattenObject:o=>o}},resultFlag:m=>m.result,
  resultConnectionValid:(_a,r)=>on&&states[r.connectionId],context:()=>view
  });

@@ -1,6 +1,11 @@
 globalThis.Hooks ??= {once(){},on(){}};
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import {registerHooks} from "node:module";
+registerHooks({resolve(specifier,context,next){
+ if(specifier==="/systems/cyberpunk-red-core/modules/extern/cpr-dice-handler.js")return {shortCircuit:true,url:'data:text/javascript,export default {handle3dDice:async()=>{}}'};
+ return next(specifier,context);
+}});
 globalThis.FormApplication = class {};
 const { availableQuickhacks, MODULE, LEGACY_MODULE } = await import("../dist/scripts/quickhack/availability.js");
 const { QUICKHACKS } = await import("../dist/scripts/quickhack/catalog.js");
@@ -47,7 +52,7 @@ function fixture({combat=true,mode="raw"}={}) {
  let serial=0;
  const docs=new Map(); const cards=[]; const notices=[];
  globalThis.CONFIG={Canvas:{polygonBackends:{sight:{testCollision:()=>false}}}};
- const state={enabled:true,mode,rolls:0,total:1,onDialog:()=>{},writes:0,routing:{}};
+ const state={enabled:true,mode,rolls:0,total:1,onDialog:()=>{},writes:0,routing:{},messageUpdates:[]};
  globalThis.foundry={utils:{getProperty:get,randomID:()=>String(++serial),mergeObject:(a,b)=>({...a,...b})}};
  globalThis.ui={notifications:{warn:t=>notices.push(t),error:t=>notices.push(t),info:t=>notices.push(t)}};
  const gm={id:"gm",isGM:true,active:true};
@@ -58,7 +63,7 @@ function fixture({combat=true,mode="raw"}={}) {
  globalThis.renderTemplate=async()=>'<div class="rollcard"><div class="rollcard-top">native</div></div>';
  globalThis.Roll=class {async evaluate(){this.total=5;return this;}};
  globalThis.ChatMessage={getSpeaker:()=>({}),getWhisperRecipients:()=>[gm],create:async data=>{
-   const message={...data,id:`message${++serial}`,timestamp:serial,author:gm,async update(changes){for(const [key,value] of Object.entries(changes))put(this,key,value);}};
+   const message={...data,id:`message${++serial}`,timestamp:serial,author:gm,async update(changes,options){state.messageUpdates.push({changes,options});for(const [key,value] of Object.entries(changes))put(this,key,value);}};
    cards.push(message);return message;
  }};
  const role={id:"role",type:"role",name:"Netrunner",system:{rank:4},createRoll(){return {rollTitle:"",rollCard:"native",resultTotal:state.total,async handleRollDialog(){await state.onDialog();return true;},async roll(){state.rolls++;},wasCritical:()=>false};},async confirmRoll(roll){return roll;}};
@@ -215,6 +220,14 @@ test("Jack-In publishes a single combined native roll and result with the connec
  assert.match(f.cards[0].content,/pneuma-quickhack-roll/);assert.match(f.cards[0].content,/native/);assert.match(f.cards[0].content,/pneuma-quickhack-outcome/);
  assert.equal(connectionFor(f.source,f.target.uuid).id,f.cards[0].id);
 });
+test("Jack-In connection bookkeeping does not trigger another native chat render",async()=>{
+ const f=fixture();await executeQuickhack(f.a,f.b,"jack-in");
+ assert.equal(f.cards.length,1);
+ const updates=f.state.messageUpdates.filter(update=>Object.keys(update.changes).some(key=>key.endsWith('.connectionRecorded')));
+ assert.equal(updates.length,0);
+ assert.equal(activeConnection(f.source,f.target.uuid)?.id,f.cards[0].id);
+});
+
 test("QuickHack publishes one combined card after Jack-In",async()=>{
  const f=fixture();await executeQuickhack(f.a,f.b,"jack-in");f.state.total=1;
  await executeQuickhack(f.a,f.b,"short-circuit");assert.equal(f.cards.length,2);

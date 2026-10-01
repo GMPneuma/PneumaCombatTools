@@ -93,10 +93,11 @@ async function connect(request: ConnectRequest) {
       sourceTokenUuid: result.sourceTokenUuid, targetTokenUuid: result.targetTokenUuid, state: "active", breachCleared: 0, breachResults: [], connectedAt: Number(message.timestamp) };
     connection.awareness = mergeAwareness(connection,result);
     const previous = connectionFor(actor, result.targetActorUuid,combat);
-    if (previous && previous.id !== connection.id && previous.connectedAt >= connection.connectedAt) return;
+    if (previous?.id === connection.id || previous && previous.connectedAt >= connection.connectedAt) return;
     // Encounter-owned state survives reloads without leaking restrictions into a new combat.
     if (previous?.id !== connection.id) await combat.update({ ["flags." + MODULE + ".quickhackConnections." + keyFor(actor.uuid, result.targetActorUuid)]: connection });
-    await message.update({ ["flags." + MODULE + ".quickhack.connectionRecorded"]: true });
+    // The encounter's connection ID already records this result. Avoid a
+    // redundant message flag update: Foundry v12 rerenders even with render:false.
   });
 }
 export async function establishConnection(message: ChatMessage) {

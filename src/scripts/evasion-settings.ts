@@ -3,6 +3,7 @@ export type EvasionAllowance = "unlimited" | "limited" | "luckEach" | "luckAfter
 type Qualifier = { qualifies: boolean; free: boolean; stacks: boolean };
 export interface EvasionHomebrew {
   reflex: Qualifier; coprocessor: Qualifier; solo: Qualifier;
+  anyone?: Qualifier;
   rule: "flat" | "cumulative" | "luckEach" | "luckAfterFree" | "noAdditional";
   luckCost: number;
 }
@@ -22,16 +23,17 @@ declare global {
 }
 const MODULE = "pneuma-combattools";
 const label = (key: string) => game.i18n!.localize("PNEUMA_COMBAT_TOOLS." + key);
-const rows = ["reflex", "coprocessor", "solo"] as const;
+const rows = ["reflex", "coprocessor", "solo", "anyone"] as const;
 const rules = { flat: "EvasionRuleFlat", cumulative: "EvasionRuleCumulative",
   luckAfterFree: "EvasionRuleLuckAfterFree", noAdditional: "EvasionRuleNoAdditional" } as const;
 
 function normalizeHomebrew(data: EvasionHomebrew): EvasionHomebrew {
+  data = { ...data, anyone: data.anyone ?? { qualifies: false, free: false, stacks: false } };
   if (data.rule !== "luckEach") return data;
   // Legacy pay-every-time is equivalent to paid extras with no free grants.
   const clearFree = (qualifier: Qualifier) => ({ ...qualifier, free: false, stacks: false });
   return { ...data, rule: "luckAfterFree", reflex: clearFree(data.reflex),
-    coprocessor: clearFree(data.coprocessor), solo: clearFree(data.solo) };
+    coprocessor: clearFree(data.coprocessor), solo: clearFree(data.solo), anyone: clearFree(data.anyone!) };
 }
 
 export function homebrew(): EvasionHomebrew {

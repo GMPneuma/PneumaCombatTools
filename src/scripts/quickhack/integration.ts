@@ -41,12 +41,15 @@ function refreshCards(force = false) {
     const force = forceCards; forceCards = false;
     for (const entry of cards.values()) {
       const result = resultFlag(entry.message);
-      if (!result) {if(force && entry.message.visible && (!entry.message.blind || game.user?.isGM))void ui.chat?.updateMessage(entry.message,false);continue;}
+      const mounted = !!ui.chat?.element?.find(`[data-message-id="${entry.message.id}"]`).length;
+      if (!result) {if(force && mounted && entry.message.visible && (!entry.message.blind || game.user?.isGM))void ui.chat?.updateMessage(entry.message,false);continue;}
       const valid = resultConnectionValid({uuid:result.sourceActorUuid} as Actor,
         {...result,connectionId:result.type === "jackIn" ? entry.message.id! : result.connectionId});
       if (force || entry.valid !== valid) {
         entry.valid = valid;
-        if (entry.message.visible && (!entry.message.blind || game.user?.isGM)) void ui.chat?.updateMessage(entry.message, false);
+        // updateMessage inserts a missing card. Leave initial insertion to
+        // Foundry; renderChatMessage checks current connection state.
+        if (mounted && entry.message.visible && (!entry.message.blind || game.user?.isGM)) void ui.chat?.updateMessage(entry.message, false);
       }
     }
   });

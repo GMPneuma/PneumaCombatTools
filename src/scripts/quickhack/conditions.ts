@@ -4,10 +4,10 @@ import {effectDuration} from "../effect-duration.js";
 import {temporaryInjury,sleepTarget} from "../instant-lifetime.js";
 import {applyCombatStatus} from "../status-sync.js";
 import {masterStatuses} from "../status-catalog.js";
-import {nativeAPI} from "../native-combat.js";
+import {showDiceAs,type DiceAudience} from "../native-combat.js";
 const M="pneuma-combattools";
 const status=(name:string)=>{const entry=masterStatuses.find(s=>s.name===name);if(!entry)throw Error("Missing native status: "+name);return entry.id;};
-export async function applyQuickhackCondition(actor:Actor,id:string,rollMode="roll",combat:Combat|null|undefined=actorEncounter(actor)):Promise<number|undefined> {
+export async function applyQuickhackCondition(actor:Actor,id:string,rollMode="roll",combat:Combat|null|undefined=actorEncounter(actor),audience?:DiceAudience):Promise<number|undefined> {
   if(id==="overheat") {await applyCombatStatus(actor,status("On Fire (Strong)"),combat);return;}
   if(id==="sonic-shock") {
     await temporaryInjury(actor,"Damaged Ear",combat);
@@ -20,7 +20,7 @@ export async function applyQuickhackCondition(actor:Actor,id:string,rollMode="ro
   if(id==="system-reset") {await sleepTarget(actor,combat);return;}
   if(id!=="slow"&&id!=="impair-movement")return;
   let amount=1;
-  if(id==="slow") {const roll=await new Roll("1d6").evaluate();amount=roll.total!;const {Dice}=await nativeAPI();await Dice.handle3dDice(roll,rollMode);}
+  if(id==="slow") {const roll=await new Roll("1d6").evaluate();amount=roll.total!;await showDiceAs(roll,rollMode,game.user!.id,audience);}
   const old=actor.effects.find(e=>foundry.utils.getProperty(e,"flags."+M+".quickhackEffect")===id);
   // Refresh this hack's duration; keep the stronger penalty instead of stacking identical hacks.
   const penalty=Math.max(amount,old&&!old.disabled?Number(foundry.utils.getProperty(old,"flags."+M+".quickhackAmount"))||0:0);

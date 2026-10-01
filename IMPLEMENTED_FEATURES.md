@@ -343,3 +343,19 @@ Prone movement: player token position/elevation updates are blocked while Prone,
 
 Self-action reporting (released in 0.9.4): successful Extinguish posts a concise actor-attributed chat message from Self Actions or Biomonitor controls, respecting the current chat roll mode. Repeated/no-op clicks and failed clears do not post a success report. Existing roll cards and grapple action reports remain the reports for those actions.
 - Grapple release/choke/throw follow-up cards retain participant UUIDs in presentation-only `grappleParticipants` metadata, allowing Visual Tools to resolve defender portraits without reactivating grapple controls.
+
+### Anyone Can Dodge Bullets qualifier
+- Homebrew ranged evasion includes an unrestricted Anyone Can Dodge Bullets row using the existing Qualifies / One Free Evasion / Stacks controls.
+- Qualifies plus One Free Evasion grants anyone one free attempt per combat round regardless of REF, Co-Processor or Solo ability; non-stacking grants share an allowance. The configured additional-evasion rule applies afterward.
+- Off by default, including existing saved configurations. RAW/disabled modes and other workflow restrictions remain unchanged.
+
+Jack-In chat-render correction (released in 0.9.7): connection tracking uses the encounter's saved result ID instead of a redundant connectionRecorded message update. Connection/control refreshes do not insert cards whose native initial rendering is still pending. Existing legacy receipt flags remain respected. Delayed-insertion regression and QuickHack workflow/browser checks pass; live Foundry verification pending.
+
+Combat Tools owns the active-grapple explanation as a separate bulleted section and updates it during native card rendering. Visual Tools only positions the existing section; its note observer and content adapter have been removed.
+
+### Dice playback corrections (released in 0.9.7)
+- Grab, Escape and Break Grapple save native Brawling main/critical dice and replay both opposed results together after the response is accepted. Waiting attacks stay withheld; card refreshes, Hold, Take Object, Choke, Throw and Release do not replay those rolls. Older cards without saved dice do not invent rolls.
+- Dice playback follows the originating card's exact whisper/blind audience. GM replay preserves player self-roll recipients and each roller's Dice So Nice style. AoE Evasion/Concentration, QuickHack/Breach/ejection, attached resistance/damage and Slow use card visibility rather than the responding client's current core roll mode.
+- Damage and Group Check commit retries retain the evaluated dice and original audience, then animate once after a successful commit without rolling or spending LUCK again.
+- Jack-In WILL defense, hidden NPC QuickHack/Interface rolls and automatic/NPC QuickHack damage remain animation-free. Cancelled dialogs do not animate.
+- Build, automated regressions and browser fixtures verify these paths; live Foundry multiplayer and DSN rendering remain pending.

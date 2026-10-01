@@ -8,7 +8,7 @@ import {instantEffects,instantId,type InstantId,escapeInstant as esc} from "./in
 import {hasInstantCondition,temporaryInjury,sleepTarget,igniteTarget,clearInstantCondition,registerInstantLifetimes} from "./instant-lifetime.js";
 import {empGM} from "./emp-state.js";
 import {createEmp} from "./emp.js";
-import {nativeCard,rollHidden,nativeAPI,diceJSON,spendBonusLuck,type RollItem} from "./native-combat.js";
+import {nativeCard,rollHidden,showDiceAs,showSavedDice,messageDiceAudience,diceJSON,spendBonusLuck,type DiceAudience,type RollItem} from "./native-combat.js";
 import {markRollResult} from "./native-combat.js";
 import {checkedLuck} from "./evasion-rules.js";
 import {requireCombatSocket} from "./socket-health.js";
@@ -33,11 +33,11 @@ export function instantContent(s:InstantState,scope="") {
 }
 /** Same serialized GM path for area rows and ad-hoc effect cards. */
 const actorWork=new Map<string,Promise<unknown>>();
-export function handleInstant(s:InstantState,req:InstantRequest,user:User,save:()=>Promise<unknown>,rollMode="roll"):Promise<void> {
-  const next=(actorWork.get(s.actor)??Promise.resolve()).catch(()=>{}).then(()=>resolveInstant(s,req,user,save,rollMode));
+export function handleInstant(s:InstantState,req:InstantRequest,user:User,save:()=>Promise<unknown>,rollMode="roll",audience?:DiceAudience):Promise<void> {
+  const next=(actorWork.get(s.actor)??Promise.resolve()).catch(()=>{}).then(()=>resolveInstant(s,req,user,save,rollMode,audience));
   actorWork.set(s.actor,next);void next.finally(()=>{if(actorWork.get(s.actor)===next)actorWork.delete(s.actor);}).catch(()=>{});return next;
 }
-async function resolveInstant(s:InstantState,req:InstantRequest,user:User,save:()=>Promise<unknown>,rollMode:string) {
+async function resolveInstant(s:InstantState,req:InstantRequest,user:User,save:()=>Promise<unknown>,rollMode:string,audience?:DiceAudience) {
   if(game.user?.id!==empGM()?.id)throw Error("An active GM is required.");
   const actor=await fromUuid(s.actor) as Actor|null;
   if(!actor||!user.isGM&&!actor.testUserPermission(user,"OWNER"))throw Error("Only the target owner or GM can resolve this effect.");
@@ -71,7 +71,7 @@ async function resolveInstant(s:InstantState,req:InstantRequest,user:User,save:(
   if((s.id==="emp"||s.id==="microwaver")&&!combat?.started)throw Error("Start combat before applying "+instantEffects[s.id].name+".");
   if(e.damage&&s.damage===undefined) {
     const roll=await new Roll(e.damage).evaluate();s.damage=roll.total!;s.damageHTML=markRollResult(await roll.render(),roll);await save();
-    const {Dice}=await nativeAPI();await Dice.handle3dDice(roll,rollMode);
+    await showDiceAs(roll,rollMode,game.user!.id,audience);
   }
   s.state="applying";await save();
   try {
@@ -91,7 +91,7 @@ async function resolveInstant(s:InstantState,req:InstantRequest,user:User,save:(
   }catch(error){s.state="review";await save();throw error;}
 }
 type Send=(req:InstantRequest)=>Promise<unknown>;
-export async function rollInstant(s:InstantState,send:Send,rollMode="roll",skipDialog=false) {
+export async function rollInstant(s:InstantState,send:Send,rollMode="roll",skipDialog=false,audience?:DiceAudience) {
   const nonce=foundry.utils.randomID();await send({action:"claim",nonce});let committed=false;
   try {
     const actor=await fromUuid(s.actor) as Actor|null;if(!actor)throw Error("Target unavailable.");
@@ -103,10 +103,10 @@ export async function rollInstant(s:InstantState,send:Send,rollMode="roll",skipD
     checkedLuck(Number(foundry.utils.getProperty(actor,"system.stats.luck.value")),0,roll.luck);
     roll=await item.confirmRoll(roll);await spendBonusLuck(actor,roll.luck);await rollHidden(roll);
     await send({action:"commit",nonce,total:roll.resultTotal,html:await nativeCard(roll)});committed=true;
-    const {Dice}=await nativeAPI();for(const json of diceJSON(roll))await Dice.handle3dDice(Roll.fromJSON(json) as Roll,rollMode);
+    await showSavedDice(diceJSON(roll),rollMode,game.user!.id,audience);
   }finally{if(!committed)await send({action:"release",nonce});}
 }
-export async function bindInstantControls(root:HTMLElement,state:(scope:string)=>InstantState|undefined,send:(scope:string,req:InstantRequest)=>Promise<unknown>,rollMode="roll") {
+export async function bindInstantControls(root:HTMLElement,state:(scope:string)=>InstantState|undefined,send:(scope:string,req:InstantRequest)=>Promise<unknown>,rollMode="roll",audience?:DiceAudience) {
   for(const b of Array.from(root.querySelectorAll<HTMLButtonElement>("[data-instant-action]"))) {
     const attached=b.closest(".pneuma-attached-effects");
     if(attached&&attached!==root)continue;
@@ -115,7 +115,7 @@ export async function bindInstantControls(root:HTMLElement,state:(scope:string)=
     if(!s||!actor||!game.user!.isGM&&(!actor.isOwner||["skip","reset","review"].includes(a))){b.remove();continue;}
     if((a==="wake"||a==="extinguish")&&!hasInstantCondition(actor,a==="wake"?"sleep":"fire")){b.remove();continue;}
     b.addEventListener("click",async event=>{event.preventDefault();event.stopPropagation();if(b.disabled)return;b.disabled=true;
-      try {if(a==="roll")await rollInstant(s,req=>send(scope,req),rollMode,event.shiftKey);else await send(scope,{action:a});}
+      try {if(a==="roll")await rollInstant(s,req=>send(scope,req),rollMode,event.shiftKey,audience);else await send(scope,{action:a});}
       catch(e){ui.notifications!.error((e as Error).message);}finally{b.disabled=false;}
     });
   }
@@ -139,7 +139,7 @@ export async function handleInstantRequest(w:Wire) {
   if(w.scope&&!/^[a-zA-Z0-9]+$/.test(w.scope))throw Error("Invalid effect reference.");
   if(message&&user&&!user.isGM&&(message.blind||message.whisper.length&&!message.whisper.includes(user.id!)&&message.author?.id!==user.id))throw Error("This card is not visible to you.");
   if(!message||!user||!saved||!instantId(saved.effect.id))throw Error("Effect unavailable.");const data=foundry.utils.deepClone(saved);
-  await handleInstant(data.effect,w.request,user,()=>w.scope?message.update({["flags."+M+".attachedEffects."+w.scope]:data}):message.update({content:'<section class="rollcard pneuma-instant-card"><h3>'+esc(data.effect.name)+'</h3>'+instantContent(data.effect)+'</section>',["flags."+M+".instant"]:data} as never),data.rollMode);
+  await handleInstant(data.effect,w.request,user,()=>w.scope?message.update({["flags."+M+".attachedEffects."+w.scope]:data}):message.update({content:'<section class="rollcard pneuma-instant-card"><h3>'+esc(data.effect.name)+'</h3>'+instantContent(data.effect)+'</section>',["flags."+M+".instant"]:data} as never),data.rollMode,messageDiceAudience(message));
 }
 function send(message:string,request:InstantRequest,scope?:string) {
   requireCombatSocket();const gm=empGM();if(!gm)throw Error("An active GM is required.");
@@ -184,13 +184,13 @@ export function registerInstantEffects() {
 export async function renderInstantEffects(message:ChatMessage,html:JQuery):Promise<void>{
     const root=html[0];if(!root||!canRenderCombatCard(message))return;
     const data=foundry.utils.getProperty(message,"flags."+M+".instant") as EffectCard|undefined;
-    if(data)await bindInstantControls(root,()=>data.effect,(_scope,req)=>send(message.id!,req),data.rollMode);
+    if(data)await bindInstantControls(root,()=>data.effect,(_scope,req)=>send(message.id!,req),data.rollMode,messageDiceAudience(message));
     root.querySelectorAll('.pneuma-attached-effects').forEach(node=>node.remove());
     const attached=foundry.utils.getProperty(message,"flags."+M+".attachedEffects") as Record<string,EffectCard>|undefined;
     for(const [scope,card] of Object.entries(attached??{})){
       const section=document.createElement('section');section.className='pneuma-attached-effects rollcard';
       section.innerHTML='<h4>'+esc(card.effect.name)+' — Effects</h4>'+instantContent(card.effect,scope);
       (root.querySelector('.message-content')??root).append(section);
-      await bindInstantControls(section,()=>card.effect,(_scope,req)=>send(message.id!,req,scope),card.rollMode);
+      await bindInstantControls(section,()=>card.effect,(_scope,req)=>send(message.id!,req,scope),card.rollMode,messageDiceAudience(message));
     }
 }

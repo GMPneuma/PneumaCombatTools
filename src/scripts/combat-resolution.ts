@@ -15,7 +15,7 @@ import { resolutionSection, rollOutcomeClass } from "./card-structure.js";
 import { damageContent, handleDamage, renderDamage, type DamageState, type DamageRequest } from "./damage-flow.js";
 import { homebrew, automaticNPCEvasion } from "./evasion-settings.js";
 import { checkedLuck, evasionButtonLabel, evasionOffer, type EvasionOffer } from "./evasion-rules.js";
-import { attackDialog, registerAttackDialog, diceJSON, evasionDialog, showDiceAs, nativeCard, registerEvasionDialog, rollHidden, spendBonusLuck,
+import { attackDialog, registerAttackDialog, diceJSON, evasionDialog, showDiceAs, messageDiceAudience, nativeCard, registerEvasionDialog, rollHidden, spendBonusLuck,
   type RollItem } from "./native-combat.js";
 import { distanceWithElevation, parseDV } from "./dv-data.js";
 import { getTable } from "./dv-hover.js";
@@ -179,11 +179,11 @@ async function writeExchange(message: ChatMessage, data: Exchange): Promise<void
     changes["flags." + MODULE + ".exchange.-=damage"] = null;
   await message.update(changes);
 }
-async function revealDice(data: Exchange): Promise<void> {
+async function revealDice(data: Exchange, message?: ChatMessage): Promise<void> {
   if (!data.dice.length && !data.defense?.dice.length) return;
   await Promise.all([
-    ...(data.attackRevealed ? [] : data.dice).map(json => showDiceAs(Roll.fromJSON(json) as Roll, data.rollMode, data.roller)),
-    ...(data.defense?.dice ?? []).map(json => showDiceAs(Roll.fromJSON(json) as Roll, data.rollMode, data.defense?.roller)),
+    ...(data.attackRevealed ? [] : data.dice).map(json => showDiceAs(Roll.fromJSON(json) as Roll, data.rollMode, data.roller,message && messageDiceAudience(message))),
+    ...(data.defense?.dice ?? []).map(json => showDiceAs(Roll.fromJSON(json) as Roll, data.rollMode, data.defense?.roller,message && messageDiceAudience(message))),
   ]);
 }
 async function finish(message: ChatMessage, data: Exchange, actor: Actor): Promise<void> {
@@ -216,7 +216,7 @@ async function finish(message: ChatMessage, data: Exchange, actor: Actor): Promi
   claims.delete(claimKey(data, actor));
   if (flag<string>(actor, "evasionPayment") === message.id)
     await actor.update({ ["flags." + MODULE + ".-=evasionPayment"]: null });
-  void revealDice(data).catch(error => console.warn(MODULE, "Dice display failed", error));
+  void revealDice(data,message).catch(error => console.warn(MODULE, "Dice display failed", error));
 }
 export async function handleCombatRequest(request: Request): Promise<Claim | undefined> {
   if (!trackingReady) throw new Error("Evasion tracking migration is not finished. Wait and retry; reload if migration reported an error.");
@@ -411,12 +411,12 @@ export async function startCombatExchange(attacker: Token, target: Token, itemId
   const messageData = { content: exchangeContent(data), speaker: ChatMessage.getSpeaker({ actor, token: attacker.document }),
     flags: { [MODULE]: { exchange: data } } } as Parameters<typeof ChatMessage.applyRollMode>[0];
   ChatMessage.applyRollMode(messageData, data.rollMode as "roll");
-  await ChatMessage.create(messageData);
+  const message = await ChatMessage.create(messageData);
   if (thrown && !thrown.improvised) {
     const original = actor.items.get(itemId);
     if (original) await setItemMarker(original, "used", { label: "Used" });
   }
-  if (data.state === "resolved") void revealDice(data).catch(error => console.warn(MODULE, error));
+  if (data.state === "resolved") void revealDice(data,message ?? undefined).catch(error => console.warn(MODULE, error));
 }
 /** Resetting a Combat removes only its transient counters; deselecting it must not. */
 export function resetCombatTracking(_combat: Combat, changes: Record<string, unknown>): void {

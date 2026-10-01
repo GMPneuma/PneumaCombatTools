@@ -77,5 +77,14 @@ try {
  }
  await page.evaluate(()=>{delete g.defense;g.state='waiting';const root=document.querySelector('#card');root.innerHTML=grappleContent(g);renderGrapple(message,wrap(root));});
  assert.equal(await page.locator('.pneuma-roll-winner,.pneuma-roll-loser').count(),0);
+ const activeNote='Grapple active: −2 Actions; no two-handed weapons. Grabbing hand occupied. Held token follows the grappler; defender cannot use Move Action.';
+ await page.evaluate(note=>{g.state='active';g.note=note;const root=document.querySelector('#card');root.innerHTML=grappleContent(g);renderGrapple(message,wrap(root));renderGrapple(message,wrap(root));},activeNote);
+ assert.equal(await page.locator('.pneuma-grapple-explanation').count(),1);
+ assert.equal(await page.locator('.pneuma-grapple-explanation li').count(),5);
+ assert.equal(await page.locator('.pneuma-grapple-note').isVisible(),false);
+ assert.equal(await page.locator('.pneuma-grapple-card + .pneuma-grapple-explanation').count(),1);
+ await page.evaluate(()=>{g.note='Released';renderGrapple(message,wrap(document.querySelector('#card')));});
+ assert.equal(await page.locator('.pneuma-grapple-explanation').count(),0);
+ assert.equal(await page.locator('.pneuma-grapple-note').isVisible(),true);
  console.log('Grapple chat dice browser checks passed: both hook orders, preserved nodes/listeners, repeated renders, state changes, privacy and fresh message render.');
 }finally{await browser.close();}

@@ -8,7 +8,7 @@ export function evasionOffer(ranged: boolean, mode: "raw" | "none" | "custom", r
   if (mode === "none") return { ...result, allowed: false, reason: "Ranged evasion is disabled" };
   if (mode === "raw") return facts.ref >= 8 || facts.coprocessor ? result
     : { ...result, allowed: false, reason: "Requires REF 8+ or an installed Reflex Co-Processor" };
-  const qualified = [facts.ref >= 8 && rules.reflex, facts.coprocessor && rules.coprocessor, facts.solo && rules.solo]
+  const qualified = [facts.ref >= 8 && rules.reflex, facts.coprocessor && rules.coprocessor, facts.solo && rules.solo, rules.anyone]
     .filter((row): row is EvasionHomebrew["reflex"] => !!row && row.qualifies);
   if (!qualified.length) return { ...result, allowed: false, reason: "No qualifying ranged-evasion ability" };
   if (!inCombat) return { ...result, allowed: false, reason: "Start combat to track homebrew evasions by round" };

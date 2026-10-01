@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.9.7 - 2026-10-01
+
+- Fix missing Dice So Nice playback for Grab, Escape and Break Grapple; replay both saved opposed rolls, including critical dice, after resolution.
+- Match dice playback to chat-card visibility across attacks, area responses, QuickHacks, resistance, effects and damage. Preserve original roller styles and private/self-roll recipients. Jack-In WILL defense and intentionally hidden NPC rolls remain hidden.
+- Replay saved damage and Group Check dice after successful commit retries without rerolling or spending LUCK again.
+- Prevent duplicate Jack-In card rendering during connection updates.
+- Add the disabled-by-default Anyone Can Dodge Bullets homebrew qualifier with configurable qualification, free evasion and stacking.
+- Present active grapple explanations as a separate bulleted section.
+
+Validation: production build and strict type checks; 504 automated tests passed, four skipped. Five browser fixtures passed. Live Foundry multiplayer and actual DSN rendering remain unverified.
+
+
 ## 0.9.6 - 2026-09-29
 
 - Fix dice-handler lookup on Forge to target CPR's loaded CDN instance, preventing native dice animations from escaping Combat Tools suppression before saved-result replay.

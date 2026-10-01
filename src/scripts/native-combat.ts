@@ -21,23 +21,52 @@ interface NativeAPI {
 let api: Promise<NativeAPI> | undefined;
 const hiddenDice = new WeakSet<Roll>();
 const diceUsers = new WeakMap<Roll, User>();
+export interface DiceAudience { whisper: string[]; blind: boolean }
+export function messageDiceAudience(message: {whisper?: readonly unknown[]; blind?: boolean}): DiceAudience {
+  const whisper = (message.whisper ?? []).map(value => typeof value === "string" ? value
+    : value && typeof value === "object" && "id" in value ? value.id : undefined)
+    .filter((id): id is string => typeof id === "string");
+  return {whisper,blind:!!message.blind};
+}
+const diceAudiences = new WeakMap<Roll, DiceAudience>();
 const styledDiceAPIs = new WeakSet<object>();
-/** Keep CPR's audience/visibility handling, replacing only the replay's DSN user. */
-export async function showDiceAs(roll: Roll, mode: string, userId?: string): Promise<void> {
+/** Card recipients take precedence over the replaying client's current roll mode. */
+export async function showDiceAs(roll: Roll, mode: string, userId?: string, audience?: DiceAudience): Promise<void> {
   const { Dice } = await nativeAPI();
   const user = (userId ? game.users?.get(userId) : undefined) as User | undefined;
   const dice3d = (game as unknown as {dice3d?: {showForRoll: (...args: unknown[]) => unknown}}).dice3d;
-  if (user && game.modules?.get("dice-so-nice")?.active && dice3d?.showForRoll) {
+  if (!audience && userId && (mode === "selfroll" || mode === "gmroll")) {
+    const recipients = mode === "selfroll" ? [userId]
+      : [...Array.from(game.users?.values() ?? []).filter(user => user.isGM).map(user => user.id!), userId];
+    audience = { whisper: [...new Set(recipients)], blind: false };
+  }
+  if ((audience || user && game.modules?.get("dice-so-nice")?.active) && dice3d?.showForRoll) {
     if (!styledDiceAPIs.has(dice3d)) {
       registerNativeWrapper(dice3d, "showForRoll", function(wrapped, die: Roll, originalUser: User, ...args) {
+        const visibility = diceAudiences.get(die);
+        if (visibility) {
+          const recipients = visibility.blind
+            ? (visibility.whisper.length ? visibility.whisper : Array.from(game.users?.values() ?? []).map(user => user.id!))
+              .filter(id => game.users?.get(id)?.isGM)
+            : visibility.whisper;
+          // DSN uses null for public synchronization, and "blind" suppresses only
+          // the invoking client's animation. Remote visibility is the recipient list.
+          args[1] = recipients.length || visibility.blind ? recipients : null;
+          args[2] = visibility.blind ? !recipients.includes(game.user!.id)
+            : recipients.length > 0 && !recipients.includes(game.user!.id);
+        }
         return wrapped(die, diceUsers.get(die) ?? originalUser, ...args);
       }, "WRAPPER");
       styledDiceAPIs.add(dice3d);
     }
-    diceUsers.set(roll, user);
+    if (user && game.modules?.get("dice-so-nice")?.active) diceUsers.set(roll, user);
+    if (audience) diceAudiences.set(roll, audience);
   }
   try { await Dice.handle3dDice(roll, mode); }
-  finally { diceUsers.delete(roll); }
+  finally { diceUsers.delete(roll); diceAudiences.delete(roll); }
+}
+export async function showSavedDice(dice: string[], mode: string, userId?: string, audience?: DiceAudience): Promise<void> {
+  await Promise.all(dice.map(json => showDiceAs(Roll.fromJSON(json) as Roll, mode, userId, audience)));
 }
 /** Reuse CPR's module identity: Forge's CDN import is distinct from the local URL. */
 export function nativeDiceHandlerURL(): string {

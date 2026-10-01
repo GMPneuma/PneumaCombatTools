@@ -6,7 +6,7 @@ import { MANUAL_MODULE as M, manualEscape as esc, manualNumber, groupContent, ty
 import { damageContent, handleDamage, renderDamage, selectedDamageTarget, damageValues, type DamageRequest } from "./damage-flow.js";
 import { validateDamageStatuses } from "./damage-status.js";
 import { damageSixes } from "./critical-injury.js";
-import { nativeCard, rollHidden, nativeAPI, diceJSON, spendBonusLuck, type NativeRoll, type RollItem } from "./native-combat.js";
+import { nativeCard, rollHidden, nativeAPI, diceJSON, showSavedDice, messageDiceAudience, spendBonusLuck, type DiceAudience, type NativeRoll, type RollItem } from "./native-combat.js";
 import { canRenderCombatCard } from "./card-structure.js";
 import { requireCombatSocket } from "./socket-health.js";
 import type { Exchange } from "./combat-resolution.js";
@@ -20,7 +20,7 @@ const state = (message: ChatMessage) => foundry.utils.getProperty(message, flag)
 const report = (error: unknown) => ui.notifications!.error((error as Error).message ?? String(error));
 let queue: Promise<unknown> = Promise.resolve();
 const pending = new Map<string, {resolve(): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout>}>();
-const retry = new Map<string, Request>();
+const retry = new Map<string, {request: Request; dice: string[]; mode: string; roller: string; audience: DiceAudience}>();
 async function nativeRolls() {
   const path = "/systems/cyberpunk-red-core/modules/rolls/cpr-rolls.js";
   return await import(path) as { CPRRoll: new(title: string, formula: string) => ManualNativeRoll; CPRDamageRoll: new(title: string, formula: string, weapon: string) => ManualNativeRoll; CPRTableRoll: new(title: string, roll: Roll, template: string) => ManualNativeRoll };
@@ -156,7 +156,7 @@ function send(message: string, request: Request): Promise<void> {
 }
 async function rollGroup(message: ChatMessage, data: ManualCard, rowId: string, skipDialog = false) {
   const key=message.id+":"+rowId,previous=retry.get(key);
-  if(previous){await send(message.id!,previous);retry.delete(key);return;}
+  if(previous){await send(message.id!,previous.request);retry.delete(key);await showSavedDice(previous.dice,previous.mode,previous.roller,previous.audience);return;}
   const row=data.rows!.find(row=>row.user===rowId)!;
   const actor=await fromUuid(row.actor) as Actor | null;
   if(!actor?.isOwner)throw Error("You do not own this character.");
@@ -169,7 +169,8 @@ async function rollGroup(message: ChatMessage, data: ManualCard, rowId: string, 
     if(!await roll.handleRollDialog({type:"pneuma-group",ctrlKey:skipDialog,metaKey:false},actor,item))return;
     roll=await item.confirmRoll(roll);await spendBonusLuck(actor,roll.luck);await rollHidden(roll);rolled=true;
     const commit:Request={action:"commit",row:rowId,nonce,total:roll.resultTotal,html:await nativeCard(roll)};
-    retry.set(key,commit);await send(message.id!,commit);retry.delete(key);await showDice(roll,data.rollMode);
+    const playback={request:commit,dice:diceJSON(roll),mode:data.rollMode,roller:game.user!.id,audience:messageDiceAudience(message)};
+    retry.set(key,playback);await send(message.id!,commit);retry.delete(key);await showSavedDice(playback.dice,playback.mode,playback.roller,playback.audience);
   } finally {if(!rolled)await send(message.id!,{action:"release",row:rowId,nonce});ui.chat?.updateMessage(message);}
 }
 function addButton(parent: HTMLElement, label: string, run: (event: MouseEvent)=>Promise<unknown>, className="") {

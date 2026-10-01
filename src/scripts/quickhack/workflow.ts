@@ -1,5 +1,6 @@
 import {tokenEncounter,encounterRef,resolveEncounter} from "../encounter.js";
 import { requireCombatSocket } from "../socket-health.js";
+import { showSavedDice, messageDiceAudience } from "../native-combat.js";
 import { availableQuickhacks, quickhackId, MODULE, type QuickhackItem } from "./availability.js";
 import { getQuickhack } from "./catalog.js";
 import { enabled, label, mode, routing } from "./settings.js";
@@ -72,7 +73,7 @@ export async function executeQuickhack(source: Token, target: Token, id: string,
     const role = roleFor(actor)!;
     if (!Number.isFinite(Number(foundry.utils.getProperty(role, "system.rank")))) throw new Error(label("Error.InterfaceUnreadable", { actor: actor.name! }));
     const roll = await nativeQuickhackRoll(actor, role, breach ? `Breach Passwall · DV${ice.dv} · 1 Net Action` : hack ? `${hack.name} · DV${hack.dv}` : label("Roll.JackInCardTitle"),
-      actor.hasPlayerOwner ? publicAudience() : gmAudience(), valid, source, false, skipDialog);
+      actor.hasPlayerOwner ? publicAudience() : gmAudience(), valid, source, false, skipDialog, false);
     if (!roll || !valid()) return;
     const scenario = { sourceIsPlayer: actor.hasPlayerOwner, targetIsPlayer: target.actor!.hasPlayerOwner };
     const base = { ...encounter, combatUuid, sourceActorUuid: actor.uuid, targetActorUuid: target.actor!.uuid,
@@ -84,6 +85,7 @@ export async function executeQuickhack(source: Token, target: Token, id: string,
       const message = await postResult(source, target, data, `Breach Passwall · DV${ice.dv}`, success ? "Passwall breached" : "Breach failed",
         `<p>1 Net Action — spend manually. ${ice.cleared + (success ? 1 : 0)}/${ice.walls} Passwalls cleared.</p>`, roll.content);
       if (message && valid()) await establishConnection(message);
+      if (message && actor.hasPlayerOwner && !message.blind) void showSavedDice(roll.dice,"roll",roll.roller,messageDiceAudience(message)).catch(error=>console.warn(MODULE,"QuickHack dice display failed",error));
     } else if (hack) {
       const success = isQuickhackSuccessful(roll.total, hack.dv);
       const alreadyAware=!!connection?.awareness?.alerted;
@@ -95,6 +97,7 @@ export async function executeQuickhack(source: Token, target: Token, id: string,
       const message = await postResult(source, target, data, `${hack.name} · DV${hack.dv}`, label(success ? "Quickhack.SuccessShort" : "Quickhack.FailureShort"), detail, roll.content);
       if (message && combatUuid) await establishConnection(message);
       if (message && success && valid()) await requestEffect(message);
+      if (message && actor.hasPlayerOwner && !message.blind) void showSavedDice(roll.dice,"roll",roll.roller,messageDiceAudience(message)).catch(error=>console.warn(MODULE,"QuickHack dice display failed",error));
     } else {
       const automatic = !!roleFor(target.actor!);
       const will = Number(foundry.utils.getProperty(target.actor!, "system.stats.will.value"));
@@ -107,6 +110,7 @@ export async function executeQuickhack(source: Token, target: Token, id: string,
       const message = await postResult(source, target, data, label("Roll.JackInCardTitle"), label(alerted ? "Result.DetectedShort" : "Result.UndetectedShort"),
         route.showTotals ? `<p>${label("Result.ContestSummary", { interface: roll.total, will: automatic ? label("Result.Automatic") : willTotal })}</p>` : "", roll.content);
       if (combatUuid && message && valid()) await establishConnection(message);
+      if (message && actor.hasPlayerOwner && !message.blind) void showSavedDice(roll.dice,"roll",roll.roller,messageDiceAudience(message)).catch(error=>console.warn(MODULE,"QuickHack dice display failed",error));
     }
   } catch (error) {
     console.error(MODULE, error); ui.notifications!.error(error instanceof Error ? error.message : "QuickHack failed.");

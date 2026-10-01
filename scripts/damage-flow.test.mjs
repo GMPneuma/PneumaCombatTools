@@ -491,6 +491,7 @@ try {
    const item={id:"weapon",createRoll:()=>roll,confirmRoll:async value=>value};
    window.fromUuid=async()=>({actor:{id:"actor",items:{get:()=>item}}});
    window.nativeAPI=async()=>({Dice:{handle3dDice:async()=>{}}});
+   window.showSavedDice=async()=>{};window.messageDiceAudience=message=>({whisper:message.whisper??[],blind:!!message.blind});
    window.rollHidden=async()=>{rolled++;};window.diceJSON=()=>[];
    window.nativeCard=async()=>'<a data-action="applyDamage" data-total-damage="10" data-damage-location="body"></a>';
    const data={...window.damageFixture,attackMode:"attack",location:"body"};

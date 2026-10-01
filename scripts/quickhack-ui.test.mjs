@@ -40,6 +40,39 @@ try {
  assert.equal(await page.locator('.pneuma-quickhack-actions button').count(),2);
  await page.setViewportSize({width:380,height:700});
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ // Delayed native insertion: a connection update must not start a second insert.
+ const refreshRace=await page.evaluate(async()=>{
+  const frames=[];window.requestAnimationFrame=fn=>{frames.push(fn);return frames.length;};
+  foundry.utils.flattenObject=object=>object;
+  window.canvas={};window.ui={chat:{element:{find:selector=>({length:document.querySelectorAll(selector).length})}}};
+  let refreshes=0;
+  ui.chat.updateMessage=async message=>{
+   refreshes++;
+   const existing=document.querySelector(`[data-message-id="${message.id}"]`);
+   await Promise.resolve();
+   if(!existing){const node=document.createElement('li');node.dataset.messageId=message.id;document.body.append(node);}
+  };
+  const result={...message, id:'delayed-jack-in',visible:true,blind:false,
+   flags:{'pneuma-combattools':{quickhack:{...message.flags['pneuma-combattools'].quickhack,type:'jackIn'}}}};
+  for(const callback of hooks.createChatMessage)await callback(result);
+  const combat=game.combats.get('c');
+  const key=encodeURIComponent('Actor.a|Actor.b').replaceAll('.','%2E');
+  combat.flags['pneuma-combattools'].quickhackConnections[key].id=result.id;
+  for(const callback of hooks.updateCombat)await callback(combat,{'flags.pneuma-combattools.quickhackConnections':{}});
+  for(const frame of frames.splice(0))frame();
+  await Promise.resolve();
+  const before=refreshes;
+  // Finish Foundry's pending initial insertion.
+  const original=document.createElement('li');original.dataset.messageId=result.id;document.body.append(original);
+  const count=document.querySelectorAll(`[data-message-id="${result.id}"]`).length;
+  // Later invalidation of an existing card still refreshes it.
+  combat.flags['pneuma-combattools'].quickhackConnections[key].state='disconnected';
+  for(const callback of hooks.updateCombat)await callback(combat,{'flags.pneuma-combattools.quickhackConnections':{}});
+  for(const frame of frames.splice(0))frame();
+  await Promise.resolve();
+  return {before,count,after:refreshes};
+ });
+ assert.deepEqual(refreshRace,{before:0,count:1,after:1});
  // Existing controls are blocked immediately, even before the chat rerender completes.
  const blocked=await page.evaluate(()=>{
   enabled=false;let reached=false;const button=document.querySelector('[data-quickhack-action]');

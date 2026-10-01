@@ -4,7 +4,7 @@ import {tokenEncounter,encounterRef,resolveEncounter,requireParticipants,type En
 import {updateTouchesPath} from "../update-path.js";
 import { requireCombatSocket } from "../socket-health.js";
 import { rollOutcomeClass, styleOpposedRolls } from "../card-structure.js";
-import { nativeCard, rollHidden, spendBonusLuck, type RollItem } from "../native-combat.js";
+import { nativeCard, rollHidden, diceJSON, showSavedDice, messageDiceAudience, spendBonusLuck, type RollItem } from "../native-combat.js";
 import { masterStatuses } from "../status-catalog.js";
 import { chokeDamage, nextChoke, visibleChoke, winsGrab } from "./rules.js";
 import { MODULE, grappleActionBlocked, property, grapples, grappleFor, actorGrapples, type Grapple, type Participant, type SkillResult } from "./state.js";
@@ -49,10 +49,15 @@ function checkedResult(result?: SkillResult): SkillResult {
   if (!result || !Number.isFinite(result.total) || typeof result.html !== "string") throw new Error("Missing Brawling roll.");
   return result;
 }
+function grappleExplanation(note: string): string {
+  if (!/^Grapple active:/i.test(note)) return "";
+  const rules = note.replace(/^Grapple active:\s*/i, "").split(/;\s*|\.\s+/).filter(Boolean);
+  return `<section class="pneuma-grapple-explanation"><strong>Grapple active</strong><ul>${rules.map(rule => `<li>${escapeHTML(rule.replace(/\.$/, ""))}</li>`).join("")}</ul></section>`;
+}
 export function grappleContent(g: Grapple): string {
   const sourceWins = !!g.defense && winsGrab(g.attack.total,g.defense.total);
   const rolls = g.defense && !g.lastAction ? `<div class="pneuma-grapple-rolls"><div class="${rollOutcomeClass(sourceWins)}">${g.attack.html}</div><div class="${rollOutcomeClass(!sourceWins)}">${g.defense.html}</div></div>` : "";
-  return `<section class="pneuma-grapple-card" data-state="${g.state}"><div class="rollcard"><div class="rollcard-top"><div class="cpr-block"><strong>${g.lastAction ? {release:"Release",choke:"Choke",throw:"Throw"}[g.lastAction] : g.purpose === "break" ? "Break Grapple" : "Grab"}: ${escapeHTML(g.source.name)} → ${escapeHTML(g.target.name)}</strong></div></div><div class="rollcard-bottom"><p class="pneuma-grapple-note">${escapeHTML(g.note)}</p>${rolls}<div class="pneuma-grapple-controls"></div></div></div></section>`;
+  return `<section class="pneuma-grapple-card" data-state="${g.state}"><div class="rollcard"><div class="rollcard-top"><div class="cpr-block"><strong>${g.lastAction ? {release:"Release",choke:"Choke",throw:"Throw"}[g.lastAction] : g.purpose === "break" ? "Break Grapple" : "Grab"}: ${escapeHTML(g.source.name)} → ${escapeHTML(g.target.name)}</strong></div></div><div class="rollcard-bottom"><p class="pneuma-grapple-note"${grappleExplanation(g.note) ? " hidden" : ""}>${escapeHTML(g.note)}</p>${rolls}<div class="pneuma-grapple-controls"></div></div></div></section>${grappleExplanation(g.note)}`;
 }
 function findRecord(scene: Scene, id: string): Grapple | undefined {
   return grapples(scene).find(g => g.id === id) ?? property<Grapple>(game.messages?.find(m => {
@@ -167,7 +172,7 @@ export async function handleGrappleRequest(r: GrappleRequest): Promise<string | 
     if (r.action === "startBreak" && (!broken || broken.source.token !== target.uuid)) throw new Error("Target is no longer grappling anyone.");
     if (r.action === "start" && (actorGrapples(source.actor!).length || actorGrapples(target.actor!).length)) throw new Error("A character is already grappling. Resolve that grapple first.");
     g = {id:r.id,revision:0,scene:r.scene,source:participant(source),target:participant(target),purpose:r.action === "start" ? "grab" : "break",
-      ...(broken && r.action === "startBreak" ? {breaks:broken.id} : {}),state:"waiting",attack:checkedResult(r.result),note:"Waiting for opposed Brawling."};
+      ...(broken && r.action === "startBreak" ? {breaks:broken.id} : {}),state:"waiting",attack:{...checkedResult(r.result),roller:r.user},rollMode:r.rollMode ?? "roll",note:"Waiting for opposed Brawling."};
     const combat = r.encounter?resolveEncounter(r.encounter):activeCombat(scene,g);
     if(combat)requireParticipants(combat,[g.source.token,g.target.token]);
     Object.assign(g,encounterRef(combat,scene.id,[g.source.token,g.target.token]));
@@ -200,7 +205,7 @@ export async function handleGrappleRequest(r: GrappleRequest): Promise<string | 
     if (!claim || claim.id !== r.claim || claim.user !== user.id) throw new Error("This response is no longer reserved. Roll again.");
     if (r.action === "unclaim") { claims.delete(key); return; }
     validatePair(scene,source,target);
-    const defense = checkedResult(r.result), success = winsGrab(g.attack.total,defense.total);
+    const defense = {...checkedResult(r.result),roller:r.user}, success = winsGrab(g.attack.total,defense.total);
     if (g.purpose === "break" && success) {
       const broken = findRecord(scene,g.breaks ?? "");
       if (!broken || broken.source.token !== target.uuid || broken.state !== "active" && broken.endedBy !== g.id) throw new Error("The original grapple has ended.");
@@ -210,7 +215,13 @@ export async function handleGrappleRequest(r: GrappleRequest): Promise<string | 
     const attempt = g.purpose === "grab" ? "Grab" : findRecord(scene,g.breaks ?? "")?.target.token === g.source.token ? "Escape" : "Break Grapple";
     const next: Grapple = {...g,defense,revision:g.revision+1,state:success && g.purpose === "grab" ? "choice" : "ended",
       note:success ? g.purpose === "grab" ? "Grab succeeded. Choose Hold Target or Take Held Object." : "Grapple broken." : `${attempt} failed. Ties favor the responding character.`};
-    await save(scene,next); claims.delete(key); return;
+    await save(scene,next); claims.delete(key);
+    const message = game.messages?.get(g.message ?? "");
+    const audience = message ? messageDiceAudience(message) : undefined;
+    void Promise.all([showSavedDice(g.attack.dice ?? [],g.rollMode ?? "roll",g.attack.roller,audience),
+      showSavedDice(defense.dice ?? [],g.rollMode ?? "roll",defense.roller,audience)])
+      .catch(error => console.warn(MODULE,"Grapple dice display failed",error));
+    return;
   }
   if (!owns(source.actor!,user)) throw new Error("Only the grappler's owner or GM can use this action.");
   if (r.action === "hold" || r.action === "take") {
@@ -283,7 +294,7 @@ async function brawling(actor: Actor, skipDialog = false): Promise<SkillResult |
   roll = await item.confirmRoll(roll);
   await spendBonusLuck(actor,Number(roll.luck) || 0);
   await rollHidden(roll);
-  return {total:Number(roll.resultTotal),html:await nativeCard(roll)};
+  return {total:Number(roll.resultTotal),html:await nativeCard(roll),dice:diceJSON(roll),roller:game.user!.id};
 }
 const localBusy = new Set<string>();
 export async function useGrapple(source: Token, target: Token, action: string, skipDialog = false) {
@@ -342,6 +353,14 @@ export function renderGrapple(message: ChatMessage, html: JQuery) {
   const history=property<Grapple>(message,"grappleHistory")??g;
   card.attr("data-state",history.state);
   card.find(".pneuma-grapple-note").text(history.note);
+  const cardNode = card[0];
+  const noteNode = cardNode?.querySelector<HTMLElement>(".pneuma-grapple-note");
+  const explanation = grappleExplanation(history.note);
+  if (noteNode) noteNode.hidden = !!explanation;
+  const previousExplanation = cardNode?.nextElementSibling;
+  if (previousExplanation?.classList.contains("pneuma-grapple-explanation")) previousExplanation.remove();
+  if (explanation) cardNode?.insertAdjacentHTML("afterend", explanation);
+
   // Also decorate older saved cards in place; ties belong to the responding Brawling roll.
   const rolls = card[0]?.querySelector<HTMLElement>(".pneuma-grapple-rolls");
   if (history.lastAction) rolls?.remove();

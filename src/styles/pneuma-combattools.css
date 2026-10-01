@@ -1040,3 +1040,8 @@ i.pneuma-neural-plug::before { content: ""; display: inline-block; width: 1em; h
 .pneuma-roll-favorite-row { display: flex; align-items: stretch; }
 .pneuma-roll-favorite-row > [data-roll-choice] { flex: 1; min-width: 0; }
 .pneuma-roll-favorite-row > .pneuma-roll-favorite-remove { width: 28px; flex: 0 0 28px; justify-content: center; padding: 0; }
+
+/* Grapple rules are a separate native module section, independent of skins. */
+.pneuma-grapple-note[hidden] { display: none !important; }
+.pneuma-grapple-explanation { padding: 8px; margin-top: 8px; border-top: 1px solid var(--cpr-background-chat-card-block, var(--color-border-light-primary)); }
+.pneuma-grapple-explanation ul { margin: 6px 0 0; padding-left: 20px; list-style: disc; }

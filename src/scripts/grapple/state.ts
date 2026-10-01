@@ -2,13 +2,14 @@ import type {EncounterRef} from "../encounter.js";
 import { visibleChoke, type ChokeSequence } from "./rules.js";
 export const MODULE = "pneuma-combattools";
 export interface Participant { token: string; actor: string; name: string }
-export interface SkillResult { total: number; html: string }
+export interface SkillResult { total: number; html: string; dice?: string[]; roller?: string }
 export interface Grapple extends Partial<EncounterRef> {
   id: string; revision: number; scene: string; combat?: string; message?: string;
   source: Participant; target: Participant;
   state: "waiting" | "choice" | "active" | "ended";
   purpose: "grab" | "break"; breaks?: string; endedBy?: string;
   attack: SkillResult; defense?: SkillResult; note: string; choke?: ChokeSequence;
+  rollMode?: string;
   establishedRound?: number;
   lastAction?: "release" | "choke" | "throw";
   tokenPlacement?: { scaleX: number; scaleY: number };

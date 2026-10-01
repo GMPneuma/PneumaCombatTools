@@ -4,6 +4,7 @@ const {chromium}=await import(process.env.PNEUMA_PLAYWRIGHT_MODULE||'playwright'
 const browser=await chromium.launch({channel:'msedge',headless:true});
 try {
  const page=await browser.newPage({viewport:{width:450,height:800}});
+ page.on('pageerror',error=>console.error(error));
  await page.setContent('<main><div id="chat-controls"><i class="fa-dice-d20"></i></div><div id="cards"></div></main>');
  await page.addStyleTag({content:await readFile('dist/styles/pneuma-combattools.css','utf8')});
  await page.addStyleTag({content:'body{background:#ddd;font:14px Arial;padding:12px} .rollcard{padding:8px;border:1px solid #888;margin:8px 0} button{cursor:pointer} h3{margin:4px 0}'});
@@ -30,6 +31,7 @@ try {
   window.facesQueue=[];
   window.Roll=class {constructor(formula){this.formula=formula;this._formula=formula;}async evaluate(){const faces=facesQueue.shift();if(!faces)throw Error('Unexpected extra dice');this.total=faces.reduce((a,b)=>a+b,0)+Number(/[+-]\d+$/.exec(this.formula)?.[0]??0);this.terms=[{formula:this.formula,total:this.total,faces:Number(this.formula.split('d')[1]),results:faces.map(result=>({result}))}];this.dice=this.terms;return this;}async render(){return '<div class="dice-roll">'+this.formula+' = '+this.total+'</div>';}static fromJSON(s){return JSON.parse(s)}};
   window.rollHidden=roll=>roll.roll();window.diceJSON=()=>[];window.nativeAPI=async()=>({Dice:DiceHandler});window.spendBonusLuck=async()=>{};
+  window.showSavedDice=async()=>{};window.messageDiceAudience=message=>({whisper:message.whisper??[],blind:!!message.blind});
   window.nativeCard=async roll=>{window.lastRoll=roll;return '<div class="rollcard"><h3>'+roll.rollTitle+'</h3><b>'+roll.resultTotal+'</b></div>';};
   window.damageValues=()=>({total:12,bonus:0,location:'body',ignorePercent:lastRoll.rollCardExtraArgs.ignoreArmorPercent,ablation:lastRoll.rollCardExtraArgs.ablationValue});
   window.damageSixes=roll=>roll.faces.filter(n=>n===6).length;
@@ -42,6 +44,12 @@ try {
  for(const [file,names] of [['half-armor','armorIgnorePercent,halfArmorControl,halfArmorSelected,interactArmorSelected,bindHalfArmor,registerHalfArmor'],['manual-roll-state','MANUAL_MODULE,manualEscape,manualNumber,groupOutcome,groupContent']]) {
   const code=(await readFile('dist/scripts/'+file+'.js','utf8')).replace(/^import .*$/gm,'').replace(/^export \{ escapeHTML as manualEscape \} from .*;$/gm,'');await page.addScriptTag({type:'module',content:code+'\nObject.assign(window,{'+names+'});'});
  }
+ const favoriteSource=(await readFile('dist/scripts/roll-favorites.js','utf8')).replace(/^import .*$/gm,'');
+ await page.addScriptTag({type:'module',content:'const M=MANUAL_MODULE;\n'+favoriteSource+'\nObject.assign(window,{rollFavorites,sameFavorite,toggleRollFavorite,removeRollFavorite,rollFavorite});'});
+ const lookupSource=await readFile('dist/scripts/native-lookup.js','utf8');
+ await page.addScriptTag({type:'module',content:lookupSource+'\nObject.assign(window,{findNativeItem,nativeCriticalTable});'});
+ const presentationSource=(await readFile('dist/scripts/native-combat.js','utf8')).replace(/^import .*$/gm,'');
+ await page.addScriptTag({type:'module',content:presentationSource+'\nObject.assign(window,{markRollResult,messageDiceAudience});'});
  await page.waitForFunction(()=>window.groupContent&&window.manualNativeClasses);
  const sharedDamage=await readFile('dist/scripts/damage-flow.js','utf8');
  await page.addScriptTag({type:'module',content:'const retry=new Map();'+sharedDamage.slice(sharedDamage.indexOf('export async function renderDamage('))+'\nwindow.renderDamage=renderDamage;'});
@@ -106,7 +114,7 @@ try {
   const clickList=async selector=>{holder.querySelector(selector).click();await new Promise(resolve=>setTimeout(resolve,0));};
   await characterRollPrompt('skill');holder.innerHTML=dialog.content;dialog.render([holder]);
   check(!holder.querySelector('select')&&holder.querySelectorAll('tbody tr').length===1,'skill list replaces dropdown');
-  check([...holder.querySelectorAll('tbody td')].slice(1,4).map(td=>td.textContent).join(',')==='4,2,13','native level modifier and base');
+  check([...holder.querySelectorAll('tbody td')].slice(2,5).map(td=>td.textContent).join(',')==='4,2,13','native level modifier and base');
   await clickList('[data-action=view]');check(viewedSkill,'skill view opens item');
   await clickList('[data-action=roll]');check(nativeEvent.itemId==='skill'&&nativeEvent.rollType==='skill','native skill roll delegation');
   skill.system.level=5;for(const callback of hooks.updateItem)callback({...skill,parent:actor});check(dialog.content.includes('<td>14</td>'),'values refresh after item update');
@@ -134,7 +142,7 @@ try {
   const damage=created.flags['pneuma-combattools'].manualRoll;damage.damage.result.values.ignorePercent=0;damage.damage.result.values.interactArmor=true;
   const dm={...message,id:'damage',flags:{'pneuma-combattools':{manualRoll:damage}}};game.messages.set('damage',dm);
   cards.innerHTML=manualContent(damage);bindManualCard(dm,cards);bindHalfArmor(cards);check(cards.querySelectorAll('.pneuma-damage-status-slot').length===3,'three effect slots');
-  cards.querySelector('.pneuma-half-armor').click();check(cards.querySelectorAll('.pneuma-damage-status-slot').length===3,'shared three effect slots');check(cards.querySelector('.pneuma-damage-recipient').textContent.trim()==='to selected target','shared recipient label');cards.querySelector('.pneuma-apply-damage').click();await new Promise(resolve=>setTimeout(resolve,20));check(applied.halfArmor===true,'half armor passed to apply');
+  cards.querySelector('.pneuma-half-armor').click();check(cards.querySelectorAll('.pneuma-damage-status-slot').length===3,'shared three effect slots');check(cards.querySelector('.pneuma-damage-recipient').textContent.trim()==='token','shared recipient label');cards.querySelector('.pneuma-apply-damage').click();await new Promise(resolve=>setTimeout(resolve,20));check(applied.halfArmor===true,'half armor passed to apply');
   await handleManualRequest({message:'damage',user:'gm',request:{action:'effects',effects:['prone']}});check(dm.flags['pneuma-combattools'].manualRoll.damage.statusEffects[0]==='prone','effects saved');
   cards.insertAdjacentHTML('beforeend','<div class="rollcard" id="native"><a data-action="applyDamage" data-ignore-armor-percent="0">Native apply damage</a></div>');bindHalfArmor(cards);bindHalfArmor(cards);
   const native=document.querySelector('#native');check(native.querySelectorAll('button').length===2,'no duplicate button');native.querySelector('.pneuma-half-armor').click();check(native.querySelector('a').dataset.ignoreArmorPercent==='50','native toggle');native.querySelector('.pneuma-half-armor').click();check(native.querySelector('a').dataset.ignoreArmorPercent==='0','native restore');

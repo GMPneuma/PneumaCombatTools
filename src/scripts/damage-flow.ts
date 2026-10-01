@@ -11,7 +11,7 @@ import { captureDamageApplication } from "./damage-application.js";
 import { applyCriticalInjury, damageSixes, hasCriticalInjury, criticalLocation } from "./critical-injury.js";
 import { chooseDamageStatuses, damageStatusChoices, validateDamageStatuses } from "./damage-status.js";
 import { resolutionSection } from "./card-structure.js";
-import { diceJSON, nativeAPI, rollHidden, nativeCard, type NativeRoll, type RollItem } from "./native-combat.js";
+import { diceJSON, showSavedDice, messageDiceAudience, rollHidden, nativeCard, type DiceAudience, type NativeRoll, type RollItem } from "./native-combat.js";
 import type { Exchange } from "./combat-resolution.js";
 
 export interface DamageValues {
@@ -220,11 +220,14 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
   if (application === "recorded") damage.recordedApplied = true;
   damage.status = "applied"; await save();
 }
-const retry = new Map<string, { nonce: string; damage: DamageResult }>();
+const retry = new Map<string, { result: { nonce: string; damage: DamageResult }; dice: string[]; mode: string; roller: string; audience?: DiceAudience }>();
 type Send = (action: DamageRequest["action"], extra?: Partial<DamageRequest>) => Promise<unknown>;
 export async function rollDamage(id: string, data: Exchange, send: Send, skipDialog = false): Promise<void> {
   const previous = retry.get(id);
-  if (previous) { await send("damageCommit", previous); retry.delete(id); return; }
+  if (previous) {
+    await send("damageCommit", previous.result); retry.delete(id);
+    await showSavedDice(previous.dice,previous.mode,previous.roller,previous.audience); return;
+  }
   const nonce = foundry.utils.randomID();
   await send("damageClaim", { nonce });
   try {
@@ -243,10 +246,11 @@ export async function rollDamage(id: string, data: Exchange, send: Send, skipDia
     roll.entityData = { actor: actor.id!, token: data.attacker.split(".").at(-1)!, item: item.id!, tokens: [] };
     const html = await nativeCard(roll);
     const result = { nonce, damage: { ammoType:(roll as NativeRoll & {rollCardExtraArgs?:{ammoType?:string}}).rollCardExtraArgs?.ammoType, html, values: damageValues(html), sixes: damageSixes(roll) } };
-    retry.set(id, result);
+    const message = game.messages?.get(id);
+    const playback = {result,dice:diceJSON(roll),mode:data.rollMode,roller:game.user!.id,audience:message && messageDiceAudience(message)};
+    retry.set(id, playback);
     await send("damageCommit", result); retry.delete(id);
-    const { Dice } = await nativeAPI();
-    for (const json of diceJSON(roll)) await Dice.handle3dDice(Roll.fromJSON(json) as Roll, data.rollMode);
+    await showSavedDice(playback.dice,playback.mode,playback.roller,playback.audience);
   } finally {
     if (!retry.has(id)) await send("damageRelease", { nonce });
   }

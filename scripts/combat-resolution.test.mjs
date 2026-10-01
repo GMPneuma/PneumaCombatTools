@@ -597,3 +597,19 @@ test("Shift-click skips native evasion and GM attack dialogs while retaining cos
  await evasionDialog(roll,actor,{},0,0);assert.equal(events.at(-1).ctrlKey,false);
  await assert.rejects(attackDialog(roll,actor,{}, {shiftKey:true},true),/Choose improvised damage/);assert.equal(events.at(-1).ctrlKey,false);
 });
+
+test('Anyone Can Dodge Bullets grants a shared free allowance without actor prerequisites',()=>{
+ const low={ref:2,coprocessor:false,solo:false,luck:0};
+ const config={...rules('noAdditional'),anyone:q(true,true)};
+ assert.equal(evasionOffer(true,'custom',rules(),low,0,true).allowed,false);
+ assert.equal(evasionOffer(true,'custom',config,low,0,true).free,1);
+ assert.equal(evasionOffer(true,'custom',config,low,1,true).allowed,false);
+ assert.equal(evasionOffer(true,'custom',{...config,rule:'cumulative'},low,1,true).penalty,-1);
+ assert.equal(evasionOffer(true,'custom',config,low,0,false).allowed,false);
+ assert.equal(evasionOffer(true,'raw',config,low,0,true).allowed,false);
+ assert.equal(evasionOffer(true,'none',config,low,0,true).allowed,false);
+ assert.equal(evasionOffer(true,'custom',{...config,anyone:q(false,true)},low,0,true).allowed,false);
+ const withRef={...config,reflex:q(true,true)};
+ assert.equal(evasionOffer(true,'custom',withRef,facts,0,true).free,1);
+ assert.equal(evasionOffer(true,'custom',{...withRef,reflex:q(true,true,true)},facts,0,true).free,2);
+});

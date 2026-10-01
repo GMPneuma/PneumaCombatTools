@@ -1,3 +1,4 @@
+import {messageDiceAudience} from "../native-combat.js";
 import {resolveEncounter} from "../encounter.js";
 import {createEmp} from "../emp.js";
 import {applyQuickhackCondition} from "./conditions.js";
@@ -64,7 +65,7 @@ export async function resolveEffect(messageId: string, requesterId: string) {
       const request = await createEmp(target,{source:hack.id,sourceActor:source.uuid,origin:message.uuid??message.id!,seconds:60,count:hack.id==="short-circuit"?3:1,chooser:hack.id==="short-circuit"?"gm":"player",mode:"equal",policy:{foundational:true,cascade:hack.id==="cyberware-malfunction",electronics:false,immune:[]}},result,message);
       if (!request) {await effectSummary(message, "No eligible cyberware to disable.");return;}
     }
-    const amount=await applyQuickhackCondition(target,hack.id,message.blind?"blindroll":message.whisper.length?"gmroll":"roll",resolveEncounter(result));
+    const amount=await applyQuickhackCondition(target,hack.id,message.blind?"blindroll":message.whisper.length?"gmroll":"roll",resolveEncounter(result),messageDiceAudience(message));
     if(amount!==undefined)details.amount=amount;
     await effectSummary(message, label(key, details));
   } catch (error) {
