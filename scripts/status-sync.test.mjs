@@ -34,14 +34,14 @@ function setup(){
  globalThis.game={user:{id:"gm",isGM:true},users:{filter:fn=>[{id:"gm",isGM:true,active:true},{id:"owner",active:true}].filter(fn)},settings:{get:()=>null,storage:{get:()=>new Map()}},
  packs:{get:pack=>({getDocument:async id=>{
    const status=masterStatuses.find(s=>s.binding?.pack===pack&&s.binding.itemId===id);
-   return {type:status.binding.kind==="injury"?"criticalInjury":"drug",toObject:()=>({_id:id,name:status.binding.itemName,type:status.binding.kind==="injury"?"criticalInjury":"drug",system:{},effects:status.binding.kind==="effect"?status.binding.effectNames.map(name=>({name,disabled:true,changes:[{key:"native",value:1}]})):[{name:"Native MOVE penalty",changes:[{key:"system.stats.move.value",value:-4}]}]})};
+   return {type:status.binding.kind==="injury"?"criticalInjury":"drug",toObject:()=>({_id:id,name:status.binding.itemName,type:status.binding.kind==="injury"?"criticalInjury":"drug",system:{},effects:status.binding.kind==="effect"?[...new Set(masterStatuses.filter(s=>s.binding?.pack===pack&&s.binding.itemId===id).flatMap(s=>s.binding.effectNames??[]))].map(name=>({name,disabled:true,changes:[{key:"native",value:1}]})):[{name:"Native MOVE penalty",changes:[{key:"system.stats.move.value",value:-4}]}]})};
  }})}};
  globalThis.ui={notifications:{error:message=>{throw Error(message);}}};
  return new Actor();
 }
 test("catalog includes six pharmacy additions and retains 22 native injury bindings",()=>{
- assert.equal(masterStatuses.length,71);assert.equal(masterStatuses.filter(s=>s.binding?.kind==="injury").length,22);
- assert.equal(new Set(masterStatuses.map(s=>s.id)).size,71);
+ assert.equal(masterStatuses.length,75);assert.equal(masterStatuses.filter(s=>s.binding?.kind==="injury").length,22);
+ assert.equal(new Set(masterStatuses.map(s=>s.id)).size,75);
  setup();assert.equal(configuredStatuses().filter(s=>s.name==="In Jail").length,1);
 });
 test("existing native injury produces a marker with no duplicate modifier",async()=>{
@@ -160,5 +160,16 @@ test('pharmacy menu statuses enable native primary effects and retain stock on r
   const actor=setup(),status=masterStatuses.find(s=>s.name===name);
   await marker(actor,status);await syncActorStatuses(actor);
   assert.equal(actor.items.size,0);assert.equal(actor.effects.size,1);
+ }
+});
+
+test('each new street-drug addiction toggles its native effect and retains drug stock',async()=>{
+ for(const name of ['Berserker','Prime Time','Sixgun','Timewarp']) {
+  const actor=setup(),status=masterStatuses.find(s=>s.name===name+' Addiction');
+  const [item]=await actor.createEmbeddedDocuments('Item',[{name,type:'drug',effects:[{name:name+' Addiction',disabled:true}]}]);
+  await marker(actor,status);await syncActorStatuses(actor,[status.id]);
+  assert.equal(actor.items.size,1);assert.equal([...item.effects][0].disabled,false);
+  actor.effects.clear();await syncActorStatuses(actor,[status.id]);
+  assert.equal(actor.items.size,1);assert.equal([...item.effects][0].disabled,true);
  }
 });

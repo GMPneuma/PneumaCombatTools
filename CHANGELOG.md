@@ -3,6 +3,7 @@
 ## 0.9.9 - 2026-10-02
 
 - Add Berserker, Prime Time, Sixgun and Timewarp under Drugs, and Sedative and Veritas under Pharmaceuticals. Reuse native primary effects where available; Berserker and Sedative are status markers.
+- Add native addiction controls for Berserker, Prime Time, Sixgun and Timewarp; alphabetize entries in every status subsection. Use the native white Berserker status icon and red addiction icon.
 - Preserve addiction effects during automatic combat cleanup, stale-encounter reconciliation, expiry and manual cleanup, including addiction-primary variants and renamed markers.
 - Mark attack, AoE and grapple cards as rollsRevealed after saved dice playback; mark QuickHack result cards for dice-reveal compatibility.
 

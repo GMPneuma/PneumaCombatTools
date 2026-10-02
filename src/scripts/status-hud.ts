@@ -16,6 +16,8 @@ export function groupStatusHUD(root: HTMLElement, statuses: StatusDefinition[]):
     const grid = document.createElement("div"); grid.className = "pneuma-status-grid";
     details.append(summary, grid); tray.append(details); groups.set(group!, grid);
   }
+  const nameOf=(icon:HTMLElement)=>statuses.find(status=>status.id===icon.dataset.statusId)?.name??icon.title;
+  icons.sort((a,b)=>nameOf(a).localeCompare(nameOf(b),"en",{sensitivity:"base"}));
   for (const icon of icons) {
     const id = icon.dataset.statusId;
     const status = statuses.find(status => status.id === id);

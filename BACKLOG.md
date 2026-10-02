@@ -317,3 +317,5 @@ Reverse Damage is GM-only. Combat cleanup clears participant Prone regardless of
 ## Release record — 0.9.9 (2026-10-02)
 
 Added six Hornet’s Pharmacy statuses, preserved addiction effects during cleanup and updated dice-reveal compatibility. Live checks remain under BL-001.
+
+0.9.9 replacement (2026-10-02): added the four native drug addiction entries, alphabetical status subsection ordering and white Berserker primary icon.

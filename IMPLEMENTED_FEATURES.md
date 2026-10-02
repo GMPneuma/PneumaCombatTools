@@ -369,3 +369,7 @@ Prone cleanup (released in 0.9.8): ending, resetting or deleting an encounter cl
 Hornet’s Pharmacy statuses (released in 0.9.9): Berserker, Prime Time, Sixgun and Timewarp appear under Drugs; Sedative and Veritas under Pharmaceuticals. Prime Time, Sixgun, Timewarp and Veritas reuse native CPR compendium effects. Berserker and Sedative are status markers because the native items provide no primary mechanical effect. No drug formulas or addiction mechanics are added.
 
 Addiction cleanup protection (released in 0.9.9): automatic encounter end/reset/delete, stale-encounter reconciliation and expiry preserve addiction effects and markers, including native addiction-primary variants. Manual cleanup uses the same protection. Addiction treatment remains deliberate.
+
+Drug menu completion (released in 0.9.9): Berserker, Prime Time, Sixgun and Timewarp now have separate native addiction controls, alongside the existing drug/addiction pairs. Every status subsection, including the general/custom grid, sorts by status name. Native nodes and click/right-click handlers are retained. Pharmaceuticals remain separate.
+
+Berserker icon correction (released in 0.9.9): the primary status uses CPR’s white `status/beserker.svg` icon; its addiction uses the native red addiction icon.

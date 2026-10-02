@@ -4,9 +4,69 @@
 export interface StatusDefinition { id: string; name: string; img: string; group: "head" | "body" | "general" | "custom" | "pharma" | "drugs"; binding?: { kind: "injury" | "effect"; pack: string; itemId: string; itemName: string; effectNames?: string[] } }
 export const masterStatuses: StatusDefinition[] = [
 {
+  "id": "pneuma-berserker-addiction",
+  "name": "Berserker Addiction",
+  "img": "systems/cyberpunk-red-core/icons/compendium/status/beserker_addiction.svg",
+  "group": "drugs",
+  "binding": {
+    "kind": "effect",
+    "pack": "cyberpunk-red-core.dlc_hornets-pharmacy",
+    "itemId": "lzmfwfxPjDjYE1nM",
+    "itemName": "Berserker",
+    "effectNames": [
+      "Berserker Addiction"
+    ]
+  }
+},
+{
+  "id": "pneuma-prime-time-addiction",
+  "name": "Prime Time Addiction",
+  "img": "systems/cyberpunk-red-core/icons/compendium/status/prime_time_addiction.svg",
+  "group": "drugs",
+  "binding": {
+    "kind": "effect",
+    "pack": "cyberpunk-red-core.dlc_hornets-pharmacy",
+    "itemId": "RZ7P9nSOB21pfiaI",
+    "itemName": "Prime Time",
+    "effectNames": [
+      "Prime Time Addiction"
+    ]
+  }
+},
+{
+  "id": "pneuma-sixgun-addiction",
+  "name": "Sixgun Addiction",
+  "img": "systems/cyberpunk-red-core/icons/compendium/status/sixgun_addiction.svg",
+  "group": "drugs",
+  "binding": {
+    "kind": "effect",
+    "pack": "cyberpunk-red-core.dlc_hornets-pharmacy",
+    "itemId": "ka6ccQeTt7ud3pFi",
+    "itemName": "Sixgun",
+    "effectNames": [
+      "Sixgun Addiction"
+    ]
+  }
+},
+{
+  "id": "pneuma-timewarp-addiction",
+  "name": "Timewarp Addiction",
+  "img": "systems/cyberpunk-red-core/icons/compendium/status/timewarp_addiction.svg",
+  "group": "drugs",
+  "binding": {
+    "kind": "effect",
+    "pack": "cyberpunk-red-core.dlc_hornets-pharmacy",
+    "itemId": "8nOTvNR4qZP54nKy",
+    "itemName": "Timewarp",
+    "effectNames": [
+      "Timewarp Addiction"
+    ]
+  }
+},
+{
   "id": "pneuma-berserker",
   "name": "Berserker",
-  "img": "systems/cyberpunk-red-core/icons/compendium/hornets_pharmacy/berserker.svg",
+  "img": "systems/cyberpunk-red-core/icons/compendium/status/beserker.svg",
   "group": "drugs"
 },
 {
