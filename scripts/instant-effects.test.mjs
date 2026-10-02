@@ -211,7 +211,7 @@ test('saved outside-combat Sleep retains world time when a combat starts before 
 test('saved instant effect refuses a reset encounter before HP writes',async()=>{const f=setup(),s=newInstant('poison',f.actor.uuid,'Target',{combatId:'c',combatEpoch:'before'});s.state='failed';s.damage=8;game.combats.set('c',{id:'c',started:true,flags:{'pneuma-combattools':{evasionEpoch:'after'}}});await assert.rejects(handleInstant(s,{action:'apply'},f.owner,f.save),/reset/);assert.equal(f.actor.system.derivedStats.hp.value,40);});
 
 
-test('damage statuses without durations clear only with their originating encounter',async()=>{
+test('Prone clears when a participant encounter ends regardless of original encounter',async()=>{
  const {applyCombatStatus}=await import('../dist/scripts/status-sync.js');const f=setup();
  const c={id:'damage-combat',combatants:[{actor:f.actor}]},other={id:'other',combatants:[{actor:f.actor}]};
  const prone=masterStatuses.find(s=>s.name==='Prone').id;
@@ -220,18 +220,18 @@ test('damage statuses without durations clear only with their originating encoun
  assert.equal(get(effect,'flags.pneuma-combattools.endWithCombat'),c.id);
  await applyCombatStatus(f.actor,prone,other,true);
  assert.equal(get(effect,'flags.pneuma-combattools.endWithCombat'),c.id,'reapplication retains original ownership');
- await finishTimedEffects(other);assert.ok(f.actor.effects.has(effect.id));
+ await finishTimedEffects(other);assert.equal(f.actor.effects.has(effect.id),false);
  c.combatants=[];await finishTimedEffects(c);assert.equal(f.actor.effects.has(effect.id),false,'cleanup also reaches removed participants');
 });
 
-test('damage cleanup preserves preexisting statuses, outside-combat statuses, death and injuries',async()=>{
+test('combat cleanup clears preexisting Prone and preserves death and injuries',async()=>{
  const {applyCombatStatus}=await import('../dist/scripts/status-sync.js');const f=setup(),c={id:'damage-combat',combatants:[{actor:f.actor}]};
  const prone=masterStatuses.find(s=>s.name==='Prone').id,dead=masterStatuses.find(s=>s.name==='Dead').id;
  await applyCombatStatus(f.actor,prone,null,true);await applyCombatStatus(f.actor,prone,c,true);
  await applyCombatStatus(f.actor,dead,c,true);
  await applyCombatStatus(f.actor,masterStatuses.find(s=>s.name==='Broken Leg').id,c,true);
  await finishTimedEffects(c);
- assert.ok(f.actor.effects.some(e=>e.statuses.has(prone)));assert.ok(f.actor.effects.some(e=>e.statuses.has(dead)));assert.equal(f.actor.items.size,1);
+ assert.equal(f.actor.effects.some(e=>e.statuses.has(prone)),false);assert.ok(f.actor.effects.some(e=>e.statuses.has(dead)));assert.equal(f.actor.items.size,1);
 });
 
 test('damage statuses clear through both delete and reset combat hooks',async()=>{
@@ -251,7 +251,7 @@ test('incendiary damage followup and sleep prone clear at the saved encounter en
  const state=newInstant('incendiary',f.actor.uuid,f.actor.name,{combatId:c.id,combatEpoch:''});
  await handleInstant(state,{action:'apply'},f.owner,f.save);
  assert.equal(f.actor.effects.size,1);assert.equal(get([...f.actor.effects][0],'flags.pneuma-combattools.endWithCombat'),c.id);
- await sleepTarget(f.actor,c);await finishTimedEffects({id:'other',combatants:[{actor:f.actor}]});assert.equal(f.actor.effects.size,3);
+ await sleepTarget(f.actor,c);await finishTimedEffects({id:'other',combatants:[{actor:f.actor}]});assert.equal(f.actor.effects.size,2);
  await finishTimedEffects(c);assert.equal(f.actor.effects.size,0);
 });
 
@@ -336,3 +336,12 @@ test('attached poison resolves on its parent without replacing damage or sibling
  await assert.rejects(handleInstantRequest({...wire,scope:scopes[1],request:{action:'apply'}}),/Resolve the resistance/);
  parent.blind=true;await assert.rejects(handleInstantRequest({...wire,request:{action:'claim',nonce:'two'}}),/not visible/);
 });
+
+ test('combat cleanup clears native and module Prone regardless of duration or old encounter link',async()=>{
+  const f=setup(),c={id:'ended',combatants:[{actor:f.actor}]};
+  await f.actor.createEmbeddedDocuments('ActiveEffect',[
+   {name:'Native Prone',statuses:['prone']},
+   {name:'Prone',statuses:[masterStatuses.find(s=>s.name==='Prone').id],flags:{'pneuma-combattools':{endWithCombat:'old'}}}
+  ]);
+  await finishTimedEffects(c);assert.equal(f.actor.effects.size,0);
+ });

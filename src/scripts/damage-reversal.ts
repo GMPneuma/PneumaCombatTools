@@ -23,7 +23,7 @@ async function reverse({message:messageId,instance,user:userId}:Request):Promise
   if(!/^[a-zA-Z0-9_-]+$/.test(instance))throw Error("Invalid damage instance.");
   const message=game.messages?.get(messageId) as ChatMessage|undefined,user=game.users?.get(userId) as User|undefined;
   if(!message||!user)throw Error("Damage card is unavailable.");
-  if(!user.isGM&&(message.blind||message.whisper.length&&!message.whisper.includes(user.id!)&&message.author?.id!==user.id))throw Error("This damage card is private.");
+  if(!user.isGM)throw Error("Only a GM can reverse damage.");
   if(state(message,instance))return;
   const doc=new DOMParser().parseFromString(message.content??"","text/html");
   const button=Array.from(doc.querySelectorAll<HTMLElement>(selector)).find(node=>reversalInstance(node)===instance);
@@ -33,7 +33,7 @@ async function reverse({message:messageId,instance,user:userId}:Request):Promise
   const actor=(uuid?await fromUuid(uuid as Parameters<typeof fromUuid>[0]):button.dataset.tokenId
     ?(game.actors as unknown as {tokens:Record<string,Actor>})?.tokens?.[button.dataset.tokenId]
     :game.actors?.get(button.dataset.actorId??"")) as Actor|null|undefined;
-  if(!actor||!user.isGM&&!actor.testUserPermission(user,"OWNER"))throw Error("Only the target owner or GM can reverse this damage.");
+  if(!actor)throw Error("Damage target is unavailable.");
   const values=[button.dataset.hpReduction,button.dataset.ablation,button.dataset.shieldAblation].map(value=>Number.parseInt(value??"",10));
   if(values.some(value=>!Number.isFinite(value))||!button.dataset.location)throw Error("Native damage reversal data is incomplete.");
   const native=actor as Actor & {_reverseDamage?(hp:number,location:string,ablation:number,shield:number):Promise<void>};
@@ -50,6 +50,7 @@ async function reverse({message:messageId,instance,user:userId}:Request):Promise
 }
 const pending=new Map<string,{resolve:()=>void;reject:(error:Error)=>void;timer:ReturnType<typeof setTimeout>}>();
 function send(message:string,instance:string):Promise<void> {
+  if(!game.user?.isGM)throw Error("Only a GM can reverse damage.");
   requireCombatSocket();const gm=primaryGM();if(!gm)throw Error("An active GM is required to reverse damage.");
   const wire:Wire={reversalType:"request",id:foundry.utils.randomID(),message,instance,user:game.user!.id!};
   if(game.user!.id===gm.id)return reverseDamageOnce(wire);
@@ -62,6 +63,7 @@ const bound=new WeakSet<HTMLElement>();
 export function bindDamageReversal(message:ChatMessage,root:HTMLElement):void {
   if(!canRenderCombatCard(message))return;
   for(const button of Array.from(root.querySelectorAll<HTMLElement>(selector))){
+    button.hidden=!game.user?.isGM;
     const id=reversalInstance(button),used=id?state(message,id):undefined;
     button.setAttribute("aria-disabled",String(!!used));
     if(used){button.title=used==="reversed"?"Damage already reversed":used==="review"?"Reversal interrupted — GM review required":"Reversing damage";button.dataset.tooltip=button.title;button.querySelector('i')?.removeAttribute('data-tooltip');}
@@ -79,6 +81,7 @@ export function bindDamageReversal(message:ChatMessage,root:HTMLElement):void {
   root.addEventListener("click",event=>{
     const button=(event.target as Element).closest<HTMLElement>(selector);if(!button||!root.contains(button))return;
     event.preventDefault();event.stopImmediatePropagation();
+    if(!game.user?.isGM)return;
     const instance=reversalInstance(button);if(!instance||button.getAttribute("aria-disabled")==="true")return;
     button.setAttribute("aria-disabled","true");
     void Promise.resolve().then(()=>send(message.id!,instance)).catch(error=>ui.notifications!.error(String(error.message??error)))

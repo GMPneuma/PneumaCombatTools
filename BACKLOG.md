@@ -9,7 +9,7 @@ Edit each **Status** directly. Priorities are initial suggestions, not an agreed
 
 Keep IDs permanent. Add new items by copying an entry. Move finished or dropped items to the bottom and record a date and outcome. Listing work does not authorize implementation. Live verification means checking the actual Foundry world; automated checks alone do not satisfy it.
 
-This remains the master feature roadmap. The [complete previous backlog](docs/history/backlog-before-standard-template-2026-09-29.md) preserves every original request, revision and completion note; the [earlier roadmap](docs/history/pre-0.8.0-refresh/BACKLOG.md) preserves older history. Source manifest: 0.9.7. Historical version/unreleased labels are not current release verification. Existing uncommitted gameplay work was not evaluated or changed by this documentation task.
+This remains the master feature roadmap. The [complete previous backlog](docs/history/backlog-before-standard-template-2026-09-29.md) preserves every original request, revision and completion note; the [earlier roadmap](docs/history/pre-0.8.0-refresh/BACKLOG.md) preserves older history. Source manifest: 0.9.8. Historical version/unreleased labels are not current release verification. Existing uncommitted gameplay work was not evaluated or changed by this documentation task.
 
 ## Open items
 
@@ -309,3 +309,7 @@ Existing implemented work, verification records and exact superseding decisions 
 ## Release record — 0.9.7 (2026-10-01)
 
 Released the dice playback audit fixes, saved-dice retry playback, Jack-In rendering correction, Anyone Can Dodge Bullets qualifier and grapple explanation presentation. Automated validation passed; live multiplayer and DSN rendering remain open under BL-001. Existing roadmap IDs and requested behavior are retained.
+
+## Release record — 0.9.8 (2026-10-01)
+
+Reverse Damage is GM-only. Combat cleanup clears participant Prone regardless of application time. This supersedes preserving preexisting Prone; live checks remain under BL-001.

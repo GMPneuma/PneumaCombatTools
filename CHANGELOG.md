@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.8 - 2026-10-01
+
+- Restrict Reverse Damage to GMs. Hide the button from players, including target owners, and deny player reversal requests. Keep reversal status visible and preserve once-per-application protection.
+- Clear native and module Prone from participants when combat ends, resets or is deleted, regardless of when Prone was applied. Actors still in another started encounter retain existing cleanup protection.
+
+Validation: production build and strict type checks; automated suite and damage-reversal browser regression. Live Foundry verification remains pending.
+
+
 ## 0.9.7 - 2026-10-01
 
 - Fix missing Dice So Nice playback for Grab, Escape and Break Grapple; replay both saved opposed rolls, including critical dice, after resolution.

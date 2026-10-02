@@ -2,6 +2,7 @@ import { allActors as actors } from "./shared.js";
 import {actorEncounter,encounterEpoch} from "./encounter.js";
 import {effectDuration,durationExpired,hasDuration} from "./effect-duration.js";
 import {masterStatuses} from "./status-catalog.js";
+import {proneIds} from "./prone.js";
 import {applyCombatStatus, syncActorStatuses} from "./status-sync.js";
 import {empGM,empWork} from "./emp-state.js";
 const M="pneuma-combattools", key="flags."+M+".instantLifetime";
@@ -129,6 +130,11 @@ export async function finishTimedEffects(combat:Combat) {
     if(temporary.length){await actor.deleteEmbeddedDocuments("Item",temporary,{pneumaStatusSync:true} as never);await syncActorStatuses(actor);}
     let changed=false;
     for(const effect of allEffects(actor)) {
+      if(participants.has(actor.uuid)&&proneIds().some(id=>effect.statuses.has(id))) {
+        if(effect.parent===actor)await actor.deleteEmbeddedDocuments("ActiveEffect",[effect.id!]);
+        else await effect.update({disabled:true} as never);
+        changed=true;continue;
+      }
       const injury=String((effect.parent as Item)?.type)==="criticalInjury"||masterStatuses.some(s=>s.binding?.kind==="injury"&&effect.statuses.has(s.id));
       if(injury||foundry.utils.getProperty(effect,"flags."+M+".disableRequest")||(!hasDuration(effect.duration)&&!foundry.utils.getProperty(effect,"flags."+M+".endWithCombat")))continue;
       const linked=foundry.utils.getProperty(effect,"flags."+M+".endWithCombat") as string|undefined ?? effect.duration?.combat;

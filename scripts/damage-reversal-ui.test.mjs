@@ -22,13 +22,13 @@ try {
  await page.addScriptTag({type:'module',content:'import {reverseDamageOnce,bindDamageReversal} from "/scripts/damage-reversal.js";Object.assign(window,{reverseDamageOnce,bindDamageReversal});'});
  await page.waitForFunction(()=>!!window.reverseDamageOnce);
  await page.evaluate(async()=>{
-  const req={message:'m',instance:'first',user:'owner'};
+  const req={message:'m',instance:'first',user:'gm'};
   await Promise.all([reverseDamageOnce(req),reverseDamageOnce(req)]);await reverseDamageOnce(req);
   if(calls.length!==1||JSON.stringify(calls[0])!==JSON.stringify([7,'body',2,0]))throw Error('Duplicate or non-native reversal');
   await reverseDamageOnce({...req,instance:'second'});if(calls.length!==2)throw Error('Separate application blocked');
   await reverseDamageOnce({...req,instance:'legacy'});if(calls.length!==3)throw Error('Legacy receipt failed');
   let denied=false;try{await reverseDamageOnce({...req,instance:'failed',user:'other'});}catch{denied=true;}if(!denied||calls.length!==3)throw Error('Owner permission failed');
-  message.blind=true;denied=false;try{await reverseDamageOnce({...req,instance:'failed'});}catch{denied=true;}message.blind=false;if(!denied)throw Error('Blind permission failed');
+  denied=false;try{await reverseDamageOnce({...req,instance:'failed',user:'owner'});}catch{denied=true;}if(!denied||calls.length!==3||message.flags['pneuma-combattools'].damageReversals.failed)throw Error('Owner allowed to reverse damage');
   actor.fail=true;try{await reverseDamageOnce({...req,instance:'failed'});}catch{}actor.fail=false;
   await reverseDamageOnce({...req,instance:'failed'});if(calls.length!==4||message.flags['pneuma-combattools'].damageReversals.failed!=='review')throw Error('Interrupted reversal repeated');
   message.failSave=true;try{await reverseDamageOnce({...req,instance:'unclaimed'});}catch{}message.failSave=false;
@@ -46,5 +46,14 @@ try {
  await page.waitForFunction(()=>root.querySelector('[data-damage-instance="click"] .pneuma-reversal-status')?.textContent.trim()==='Damage reversed');
  await page.evaluate(()=>{root.innerHTML=message.content;bindDamageReversal(message,root);root.querySelector('[data-damage-instance="click"] a i').click();});
  assert.equal(await page.evaluate(()=>calls.length),5);
+ await page.evaluate(()=>{
+  game.user=owner;root.innerHTML=message.content;bindDamageReversal(message,root);
+  if([...root.querySelectorAll('[data-action="reverseDamage"]')].some(button=>!button.hidden))throw Error('Player sees reverse control');
+  if(!root.querySelector('[data-damage-instance="first"] .pneuma-reversal-status'))throw Error('Player lost reversal status');
+  root.querySelector('[data-damage-instance="unclaimed"] a i').click();
+  if(calls.length!==5||nativeClicks!==0)throw Error('Player click reached native reversal');
+  game.user=gm;bindDamageReversal(message,root);
+  if([...root.querySelectorAll('[data-action="reverseDamage"]')].some(button=>button.hidden))throw Error('GM reverse control hidden');
+ });
  console.log('Damage reversal browser checks passed: once per instance, concurrent requests, native arguments, legacy cards, rerenders, permissions, failed writes and interrupted reversal.');
 }finally{await browser.close();}

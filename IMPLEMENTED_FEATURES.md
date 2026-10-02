@@ -359,3 +359,7 @@ Combat Tools owns the active-grapple explanation as a separate bulleted section 
 - Damage and Group Check commit retries retain the evaluated dice and original audience, then animate once after a successful commit without rolling or spending LUCK again.
 - Jack-In WILL defense, hidden NPC QuickHack/Interface rolls and automatic/NPC QuickHack damage remain animation-free. Cancelled dialogs do not animate.
 - Build, automated regressions and browser fixtures verify these paths; live Foundry multiplayer and DSN rendering remain pending.
+
+Reverse Damage (released in 0.9.8): only GMs see and can use the native undo control in `.pneuma-damage-applied [data-action="reverseDamage"]`. Player owners are denied by the action handler and GM request processor. Saved reversal status remains visible to card viewers; once-per-application protection is retained.
+
+Prone cleanup (released in 0.9.8): ending, resetting or deleting an encounter clears participant Prone, including native CPR and module statuses, regardless of when it was applied. Other active encounters retain their existing cleanup protection.
