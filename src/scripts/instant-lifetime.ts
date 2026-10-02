@@ -1,7 +1,7 @@
 import { allActors as actors } from "./shared.js";
 import {actorEncounter,encounterEpoch} from "./encounter.js";
 import {effectDuration,durationExpired,hasDuration} from "./effect-duration.js";
-import {masterStatuses} from "./status-catalog.js";
+import {masterStatuses,isAddictionEffect} from "./status-catalog.js";
 import {proneIds} from "./prone.js";
 import {applyCombatStatus, syncActorStatuses} from "./status-sync.js";
 import {empGM,empWork} from "./emp-state.js";
@@ -100,6 +100,7 @@ export async function expireInstantActor(actor:Actor,now=game.time!.worldTime) {
   if(items.length){await actor.deleteEmbeddedDocuments("Item",items,{pneumaStatusSync:true} as never);await syncActorStatuses(actor);}
   let itemEffectsChanged=false;
   for(const effect of allEffects(actor)) {
+    if(isAddictionEffect(effect))continue;
     const expired=hasDuration(effect.duration)?durationExpired(effect.duration,now):life(effect)?.expires!==undefined&&life(effect)!.expires!<=now;
     if(!expired||effect.disabled)continue;
     if(effect.parent===actor)await actor.deleteEmbeddedDocuments("ActiveEffect",[effect.id!]);
@@ -130,6 +131,7 @@ export async function finishTimedEffects(combat:Combat) {
     if(temporary.length){await actor.deleteEmbeddedDocuments("Item",temporary,{pneumaStatusSync:true} as never);await syncActorStatuses(actor);}
     let changed=false;
     for(const effect of allEffects(actor)) {
+      if(isAddictionEffect(effect))continue;
       if(participants.has(actor.uuid)&&proneIds().some(id=>effect.statuses.has(id))) {
         if(effect.parent===actor)await actor.deleteEmbeddedDocuments("ActiveEffect",[effect.id!]);
         else await effect.update({disabled:true} as never);

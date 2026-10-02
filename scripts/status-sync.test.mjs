@@ -39,9 +39,9 @@ function setup(){
  globalThis.ui={notifications:{error:message=>{throw Error(message);}}};
  return new Actor();
 }
-test("catalog has 64 legacy statuses plus Dead, with 22 native injury bindings",()=>{
- assert.equal(masterStatuses.length,65);assert.equal(masterStatuses.filter(s=>s.binding?.kind==="injury").length,22);
- assert.equal(new Set(masterStatuses.map(s=>s.id)).size,65);
+test("catalog includes six pharmacy additions and retains 22 native injury bindings",()=>{
+ assert.equal(masterStatuses.length,71);assert.equal(masterStatuses.filter(s=>s.binding?.kind==="injury").length,22);
+ assert.equal(new Set(masterStatuses.map(s=>s.id)).size,71);
  setup();assert.equal(configuredStatuses().filter(s=>s.name==="In Jail").length,1);
 });
 test("existing native injury produces a marker with no duplicate modifier",async()=>{
@@ -145,4 +145,20 @@ test('unrelated effects and cosmetic item updates skip reconciliation',async()=>
  const item=new Item({type:'drug',name:'Stim'},actor),effect=new Effect({name:'Unrelated',statuses:['prone']},actor);
  hooks.updateItem[0](item,{img:'new.png'},{});hooks.updateActiveEffect[0](effect,{disabled:true},{});
  await new Promise(resolve=>setTimeout(resolve,0));assert.equal(scans,0);
+});
+
+test('pharmacy menu statuses enable native primary effects and retain stock on removal',async()=>{
+ for(const name of ['Prime Time','Sixgun','Timewarp','Veritas']) {
+  const actor=setup(),status=masterStatuses.find(s=>s.name===name);
+  await marker(actor,status);await syncActorStatuses(actor,[status.id]);
+  assert.equal(actor.items.size,1);const item=[...actor.items][0];
+  assert.equal([...item.effects].filter(e=>!e.disabled).length,1);
+  actor.effects.clear();await syncActorStatuses(actor,[status.id]);
+  assert.equal(actor.items.size,1);assert.ok([...item.effects].every(e=>e.disabled));
+ }
+ for(const name of ['Berserker','Sedative']) {
+  const actor=setup(),status=masterStatuses.find(s=>s.name===name);
+  await marker(actor,status);await syncActorStatuses(actor);
+  assert.equal(actor.items.size,0);assert.equal(actor.effects.size,1);
+ }
 });

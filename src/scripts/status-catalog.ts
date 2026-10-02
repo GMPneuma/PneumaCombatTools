@@ -3,6 +3,80 @@
  * Mechanical bindings use native system items, never copied modifier formulas. */
 export interface StatusDefinition { id: string; name: string; img: string; group: "head" | "body" | "general" | "custom" | "pharma" | "drugs"; binding?: { kind: "injury" | "effect"; pack: string; itemId: string; itemName: string; effectNames?: string[] } }
 export const masterStatuses: StatusDefinition[] = [
+{
+  "id": "pneuma-berserker",
+  "name": "Berserker",
+  "img": "systems/cyberpunk-red-core/icons/compendium/hornets_pharmacy/berserker.svg",
+  "group": "drugs"
+},
+{
+  "id": "pneuma-prime-time",
+  "name": "Prime Time",
+  "img": "systems/cyberpunk-red-core/icons/compendium/status/prime_time.svg",
+  "group": "drugs",
+  "binding": {
+    "kind": "effect",
+    "pack": "cyberpunk-red-core.dlc_hornets-pharmacy",
+    "itemId": "RZ7P9nSOB21pfiaI",
+    "itemName": "Prime Time",
+    "effectNames": [
+      "Prime Time"
+    ]
+  }
+},
+{
+  "id": "pneuma-sedative",
+  "name": "Sedative",
+  "img": "systems/cyberpunk-red-core/icons/compendium/status/sedative.svg",
+  "group": "pharma"
+},
+{
+  "id": "pneuma-sixgun",
+  "name": "Sixgun",
+  "img": "systems/cyberpunk-red-core/icons/compendium/status/sixgun.svg",
+  "group": "drugs",
+  "binding": {
+    "kind": "effect",
+    "pack": "cyberpunk-red-core.dlc_hornets-pharmacy",
+    "itemId": "ka6ccQeTt7ud3pFi",
+    "itemName": "Sixgun",
+    "effectNames": [
+      "Sixgun Primary",
+      "Sixgun Addiction Primary"
+    ]
+  }
+},
+{
+  "id": "pneuma-timewarp",
+  "name": "Timewarp",
+  "img": "systems/cyberpunk-red-core/icons/compendium/status/timewarp.svg",
+  "group": "drugs",
+  "binding": {
+    "kind": "effect",
+    "pack": "cyberpunk-red-core.dlc_hornets-pharmacy",
+    "itemId": "8nOTvNR4qZP54nKy",
+    "itemName": "Timewarp",
+    "effectNames": [
+      "Timewarp Primary",
+      "Timewarp Addiction Primary"
+    ]
+  }
+},
+{
+  "id": "pneuma-veritas",
+  "name": "Veritas",
+  "img": "systems/cyberpunk-red-core/icons/compendium/status/veritas.svg",
+  "group": "pharma",
+  "binding": {
+    "kind": "effect",
+    "pack": "cyberpunk-red-core.dlc_hornets-pharmacy",
+    "itemId": "2ea71NL50IBcCcJZ",
+    "itemName": "Veritas",
+    "effectNames": [
+      "Veritas Primary"
+    ]
+  }
+},
   {
     "id": "rlwo5d6rzwl5rnup",
     "name": "Brain Injury",
@@ -608,3 +682,9 @@ export const masterStatuses: StatusDefinition[] = [
     "group": "general"
   }
 ];
+
+/** Addiction survives automatic and manual status cleanup, including native variants. */
+export function isAddictionEffect(effect:ActiveEffect):boolean {
+  return /addiction/i.test(effect.name??"")||Array.from(effect.statuses).some(id=>/addiction/i.test(id)
+    ||masterStatuses.some(status=>status.id===id&&/addiction/i.test(status.name)));
+}

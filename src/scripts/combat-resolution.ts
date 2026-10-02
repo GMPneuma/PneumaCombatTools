@@ -180,11 +180,11 @@ async function writeExchange(message: ChatMessage, data: Exchange): Promise<void
   await message.update(changes);
 }
 async function revealDice(data: Exchange, message?: ChatMessage): Promise<void> {
-  if (!data.dice.length && !data.defense?.dice.length) return;
   await Promise.all([
     ...(data.attackRevealed ? [] : data.dice).map(json => showDiceAs(Roll.fromJSON(json) as Roll, data.rollMode, data.roller,message && messageDiceAudience(message))),
     ...(data.defense?.dice ?? []).map(json => showDiceAs(Roll.fromJSON(json) as Roll, data.rollMode, data.defense?.roller,message && messageDiceAudience(message))),
   ]);
+  if (message) await message.update({["flags." + MODULE + ".rollsRevealed"]:true});
 }
 async function finish(message: ChatMessage, data: Exchange, actor: Actor): Promise<void> {
   const defense = data.defense;

@@ -86,7 +86,7 @@ async function save(scene: Scene, g: Grapple) {
       const previous=property<Grapple>(message,"grapple");
       if(history&&previous?.revision!==g.revision&&!g.operation){
         await ChatMessage.create({content:grappleContent(g),speaker:message.speaker,whisper:message.whisper,blind:message.blind,
-          flags:{[MODULE]:{grappleParticipants:{source:g.source,target:g.target}}}} as never);
+          flags:{[MODULE]:{grappleParticipants:{source:g.source,target:g.target},rollsRevealed:true}}} as never);
       }
       await message.update(changes);
       // Completed history belongs in chat, not in the encounter active-state map.
@@ -220,6 +220,7 @@ export async function handleGrappleRequest(r: GrappleRequest): Promise<string | 
     const audience = message ? messageDiceAudience(message) : undefined;
     void Promise.all([showSavedDice(g.attack.dice ?? [],g.rollMode ?? "roll",g.attack.roller,audience),
       showSavedDice(defense.dice ?? [],g.rollMode ?? "roll",defense.roller,audience)])
+      .then(async()=>{if(message)await message.update({[`flags.${MODULE}.rollsRevealed`]:true} as Parameters<typeof message.update>[0]);})
       .catch(error => console.warn(MODULE,"Grapple dice display failed",error));
     return;
   }

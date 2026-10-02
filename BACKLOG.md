@@ -313,3 +313,7 @@ Released the dice playback audit fixes, saved-dice retry playback, Jack-In rende
 ## Release record — 0.9.8 (2026-10-01)
 
 Reverse Damage is GM-only. Combat cleanup clears participant Prone regardless of application time. This supersedes preserving preexisting Prone; live checks remain under BL-001.
+
+## Release record — 0.9.9 (2026-10-02)
+
+Added six Hornet’s Pharmacy statuses, preserved addiction effects during cleanup and updated dice-reveal compatibility. Live checks remain under BL-001.

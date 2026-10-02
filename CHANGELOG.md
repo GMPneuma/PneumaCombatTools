@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.9 - 2026-10-02
+
+- Add Berserker, Prime Time, Sixgun and Timewarp under Drugs, and Sedative and Veritas under Pharmaceuticals. Reuse native primary effects where available; Berserker and Sedative are status markers.
+- Preserve addiction effects during automatic combat cleanup, stale-encounter reconciliation, expiry and manual cleanup, including addiction-primary variants and renamed markers.
+- Mark attack, AoE and grapple cards as rollsRevealed after saved dice playback; mark QuickHack result cards for dice-reveal compatibility.
+
+Validation: production build, strict type checks, automated suite and status-menu browser regression. Live Foundry verification remains pending.
+
+
 ## 0.9.8 - 2026-10-01
 
 - Restrict Reverse Damage to GMs. Hide the button from players, including target owners, and deny player reversal requests. Keep reversal status visible and preserve once-per-application protection.

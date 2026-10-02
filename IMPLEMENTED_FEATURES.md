@@ -1,5 +1,7 @@
 # Combat Tools feature inventory
 
+- Resolved attacks, AoE, grapple, and netrunning messages publish `rollsRevealed` after their awaited dice display completes, allowing Visual Tools to delay procedural visuals and sounds until roll reveal finishes.
+
 Forge dice-handler lookup (released in 0.9.6): resolve CPR's dice handler from the running system script URL, falling back to recorded resource URLs and then the standard local path. This targets the same handler instance on Forge's CDN so native-animation suppression applies before Combat Tools replays saved results. Automated checks cover separate CDN/local instances, critical dice, replay, unrelated rolls, and missing resource history; live Forge verification remains pending.
 
 Long weapon-name layout (released in 0.9.6): constrain native roll-card grid tracks inside Combat Tools messages so long titles truncate within the card instead of pushing dice totals outside it. Existing full-name tooltips remain. Browser regression checks cover spaced and unbroken names at narrow and wide chat widths.
@@ -363,3 +365,7 @@ Combat Tools owns the active-grapple explanation as a separate bulleted section 
 Reverse Damage (released in 0.9.8): only GMs see and can use the native undo control in `.pneuma-damage-applied [data-action="reverseDamage"]`. Player owners are denied by the action handler and GM request processor. Saved reversal status remains visible to card viewers; once-per-application protection is retained.
 
 Prone cleanup (released in 0.9.8): ending, resetting or deleting an encounter clears participant Prone, including native CPR and module statuses, regardless of when it was applied. Other active encounters retain their existing cleanup protection.
+
+Hornet’s Pharmacy statuses (released in 0.9.9): Berserker, Prime Time, Sixgun and Timewarp appear under Drugs; Sedative and Veritas under Pharmaceuticals. Prime Time, Sixgun, Timewarp and Veritas reuse native CPR compendium effects. Berserker and Sedative are status markers because the native items provide no primary mechanical effect. No drug formulas or addiction mechanics are added.
+
+Addiction cleanup protection (released in 0.9.9): automatic encounter end/reset/delete, stale-encounter reconciliation and expiry preserve addiction effects and markers, including native addiction-primary variants. Manual cleanup uses the same protection. Addiction treatment remains deliberate.

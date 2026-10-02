@@ -345,3 +345,21 @@ test('attached poison resolves on its parent without replacing damage or sibling
   ]);
   await finishTimedEffects(c);assert.equal(f.actor.effects.size,0);
  });
+
+test('addictions survive combat cleanup and expiry, including native item variants and renamed markers',async()=>{
+ const f=setup(),c={id:'ended',combatants:[{actor:f.actor}]};
+ const addictionStatus=masterStatuses.find(s=>s.name==='Black Lace Addiction');
+ const saved=await f.actor.createEmbeddedDocuments('ActiveEffect',[
+  {name:'Black Lace Addiction',duration:{seconds:1,startTime:0},flags:{'pneuma-combattools':{endWithCombat:c.id}}},
+  {name:'Renamed',statuses:[addictionStatus.id],flags:{'pneuma-combattools':{endWithCombat:c.id}}},
+  {name:'Custom renamed',statuses:['custom-addiction'],duration:{seconds:1,startTime:0}}
+ ]);
+ const [drug]=await f.actor.createEmbeddedDocuments('Item',[{name:'Sixgun',type:'drug'}]);
+ const native=new Doc({name:'Sixgun Addiction Primary',duration:{seconds:1,startTime:0,combat:c.id}},drug);drug.effects.set(native.id,native);
+ f.actor.allApplicableEffects=()=>[...f.actor.effects,...drug.effects];
+ await finishTimedEffects(c);await expireInstantActor(f.actor,1000);
+ assert.ok(saved.every(effect=>f.actor.effects.has(effect.id)));assert.notEqual(native.disabled,true);
+ assert.ok(cleanupRows().filter(row=>saved.includes(row.document)||row.document===native).every(row=>row.blocked&&!row.selected));
+ await applyCleanup({},[...saved.map(e=>e.uuid),native.uuid]);
+ assert.ok(saved.every(effect=>f.actor.effects.has(effect.id)));assert.notEqual(native.disabled,true);
+});

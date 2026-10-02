@@ -1,5 +1,5 @@
 import {allActors,escapeHTML,primaryGM} from "./shared.js";
-import {masterStatuses} from "./status-catalog.js";
+import {masterStatuses,isAddictionEffect} from "./status-catalog.js";
 import {durationExpired,hasDuration} from "./effect-duration.js";
 import {syncActorStatuses} from "./status-sync.js";
 import {cleanupEndedEmp,empWork} from "./emp-state.js";
@@ -49,7 +49,7 @@ export function cleanupRows(scope:CleanupScope={},includeInjuries=false):Cleanup
       const ids=Array.from(effect.statuses);
       const injury=masterStatuses.some(s=>s.binding?.kind==="injury"&&ids.includes(s.id));
       const dead=ids.includes("dead")||masterStatuses.some(s=>s.name==="Dead"&&ids.includes(s.id));
-      const addiction=/addiction/i.test(effect.name??"")||masterStatuses.some(s=>/addiction/i.test(s.name)&&ids.includes(s.id));
+      const addiction=isAddictionEffect(effect);
       const managed=!!flag(effect,"disableRequest")||!!flag(effect,"empCombat")||!!flag(effect,"disabledLegPenalty")||!!flag(effect,"frameConsequences");
       if(managed)continue; // Equipment restoration owns these markers.
       const grapple=flag(effect,"grappleId");

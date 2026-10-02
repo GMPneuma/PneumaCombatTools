@@ -49,6 +49,6 @@ export async function postResult(source: Token, target: Token, result: Quickhack
     + "</div>";
   return ChatMessage.create({ content, ...delivery(result.audience, source.actor!, target.actor!),
     speaker: result.revealAttacker ? ChatMessage.getSpeaker({ actor: source.actor!, token: source.document }) : { alias: label("Result.UnknownNetrunner") },
-    flags: { [String(MODULE)]: { quickhack: result } },
+    flags: { [String(MODULE)]: { quickhack: result, rollsRevealed: true } },
   });
 }

@@ -162,8 +162,8 @@ async function save(message:ChatMessage,data:AreaAttack) {
   if(reveal)void revealAttackDice(data,message).catch(error=>console.warn(MODULE,"Area attack dice display failed",error));
 }
 async function revealAttackDice(data:AreaAttack,message:ChatMessage):Promise<void> {
-  if(!data.exchange.dice.length)return;
   await showSavedDice(data.exchange.dice,data.exchange.rollMode,data.exchange.roller,messageDiceAudience(message));
+  await message.update({[`flags.${MODULE}.rollsRevealed`]:true} as Parameters<typeof message.update>[0]);
 }
 const pending=new Map<string,{resolve:()=>void;reject:(e:Error)=>void;timer:ReturnType<typeof setTimeout>}>();
 let queue:Promise<unknown>=Promise.resolve();
