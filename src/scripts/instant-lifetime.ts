@@ -132,6 +132,11 @@ export async function finishTimedEffects(combat:Combat) {
     let changed=false;
     for(const effect of allEffects(actor)) {
       if(isAddictionEffect(effect))continue;
+      if(isSpeedheal(effect)&&belongs(effect)) {
+        if(effect.parent===actor)await actor.deleteEmbeddedDocuments("ActiveEffect",[effect.id!]);
+        else await effect.update({disabled:true} as never);
+        changed=true;continue;
+      }
       if(participants.has(actor.uuid)&&proneIds().some(id=>effect.statuses.has(id))) {
         if(effect.parent===actor)await actor.deleteEmbeddedDocuments("ActiveEffect",[effect.id!]);
         else await effect.update({disabled:true} as never);

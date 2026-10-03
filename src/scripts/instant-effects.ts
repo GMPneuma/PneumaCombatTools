@@ -1,3 +1,4 @@
+import {applyCombatStatus} from "./status-sync.js";
 import {findNativeItem} from "./native-lookup.js";
 import {registerConditionCardRefresh} from "./pending-card-refresh.js";
 import {inlineRoll} from "./inline-roll.js";
@@ -16,18 +17,23 @@ import {canRenderCombatCard} from "./card-structure.js";
 const M="pneuma-combattools";
 export interface InstantState {
   encounter?:EncounterRef; sourceMessage?:string;
-  id:InstantId; actor:string; name:string; state:"pending"|"rolling"|"failed"|"resisted"|"applying"|"applied"|"skipped"|"review";
+  id:InstantId|"status"; statusId?:string; actor:string; name:string; state:"pending"|"rolling"|"failed"|"resisted"|"applying"|"applied"|"skipped"|"review";
   nonce?:string;user?:string;total?:number;html?:string;damage?:number;damageHTML?:string;summary?:string;
 }
 export interface InstantRequest {action:string;nonce?:string;total?:number;html?:string}
-export function newInstant(id:InstantId,actor:string,name:string,encounter:EncounterRef={combatId:null}):InstantState {return {id,actor,name,encounter,state:instantEffects[id].skill?"pending":"failed"};}
+export function newInstant(id:InstantId|"status",actor:string,name:string,encounter:EncounterRef={combatId:null}):InstantState {return {id,actor,name,encounter,state:id!=="status"&&instantEffects[id].skill?"pending":"failed"};}
+function effectDefinition(s:InstantState) {
+  if(s.id!=="status")return instantEffects[s.id];
+  const status=CONFIG.statusEffects.find(effect=>effect.id===s.statusId);
+  return {name:game.i18n!.localize(status?.name??status?.label??s.statusId??"Status"),color:"#a7afb7",skill:"",dv:0,damage:""};
+}
 export const instantDone=(s:InstantState)=>["resisted","applied","skipped"].includes(s.state);
 export function instantContent(s:InstantState,scope="") {
-  const e=instantEffects[s.id],button=(a:string,label:string)=>'<button type="button" data-instant-action="'+a+'" data-instant-scope="'+esc(scope)+'">'+label+'</button>';
-  const action=s.state==="pending"?button("roll",'<i class="fas fa-shield-halved" aria-hidden="true"></i> Resist'):s.state==="failed"?button("apply","Apply"):s.state==="rolling"?button("reset","Release roll"):s.state==="review"||s.state==="applying"?button("review","Mark resolved"):"";
+  const e=effectDefinition(s),button=(a:string,label:string)=>'<button type="button" data-instant-action="'+a+'" data-instant-scope="'+esc(scope)+'">'+label+'</button>';
+  const action=s.state==="pending"?button("roll",'<i class="fas fa-shield-halved" aria-hidden="true"></i> Resist'):s.state==="failed"?button("apply","Apply Effect"):s.state==="rolling"?button("reset","Release roll"):s.state==="review"||s.state==="applying"?button("review","Mark resolved"):"";
   const label={pending:"",rolling:"Rolling…",failed:"",resisted:"Resisted",applying:"Applying — do not repeat",applied:s.summary??"Applied",skipped:"Unaffected (GM)",review:"Interrupted — GM review required"}[s.state];
-  return '<div class="pneuma-instant-effect" data-effect="'+s.id+'" data-state="'+s.state+'" style="--pneuma-ammo-color:'+e.color+'"><strong>'+esc(e.name)+(e.skill?' DV'+e.dv:'')+'</strong> '+inlineRoll(s.total,s.html,e.skill)+' '+(label?'<span>'+esc(label)+'</span> ':'')+action
-    +(['pending','failed'].includes(s.state)?button("skip","Unaffected"):"")
+  return '<div class="pneuma-instant-effect" data-effect="'+s.id+'" data-state="'+s.state+'" style="--pneuma-ammo-color:'+e.color+'"><strong>'+esc(e.name)+(e.skill?' DV'+e.dv:'')+'</strong> '+inlineRoll(s.total,s.html,e.skill)+' '+(label?'<span>'+esc(label)+'</span> ':'')+'<span class="pneuma-effect-actions">'+action
+    +(['pending','failed'].includes(s.state)?button("skip","Unaffected"):"")+'</span>'
     +(s.state==="applied"&&s.id==="sleep"?button("wake","Wake (touching Action)"):s.state==="applied"&&s.id==="incendiary"?button("extinguish","Extinguish (Action)"):"")
     +(s.damageHTML?' <span>Damage</span> '+inlineRoll(s.damage,s.damageHTML,'Damage roll'):'')+'</div>';
 }
@@ -42,7 +48,7 @@ async function resolveInstant(s:InstantState,req:InstantRequest,user:User,save:(
   const actor=await fromUuid(s.actor) as Actor|null;
   if(!actor||!user.isGM&&!actor.testUserPermission(user,"OWNER"))throw Error("Only the target owner or GM can resolve this effect.");
 
-  const e=instantEffects[s.id];
+  const e=effectDefinition(s);
   if(req.action==="wake"||req.action==="extinguish") {
     if(s.state!=="applied"||req.action==="wake"&&s.id!=="sleep"||req.action==="extinguish"&&s.id!=="incendiary")throw Error("Condition action unavailable.");
     if(!hasInstantCondition(actor,s.id==="sleep"?"sleep":"fire"))throw Error("This condition is no longer active.");
@@ -86,6 +92,10 @@ async function resolveInstant(s:InstantState,req:InstantRequest,user:User,save:(
       await createSmoke(canvas.scene,{shape:"square",origin:canvas.grid!.getCenterPoint(token.center),direction:0,length:size,width:size},"instant:"+actor.uuid+":"+foundry.utils.randomID(),combat??null);s.summary="Smoke area created: 1 minute";
     }
     else if(s.id==="sleep"){await sleepTarget(actor,combat??null);s.summary="Prone and Unconscious: 1 minute, damage, or a touching Action";}
+    else if(s.id==="status"){
+      if(!CONFIG.statusEffects.some(effect=>effect.id===s.statusId))throw Error("Status is no longer available.");
+      await applyCombatStatus(actor,s.statusId!,combat??null,true);s.summary="Applied";
+    }
     else if(s.id==="incendiary"){await igniteTarget(actor,combat??null);s.summary="On fire: 2 HP at turn end; nonstacking; Action to extinguish";}
     s.state="applied";await save();
   }catch(error){s.state="review";await save();throw error;}
@@ -95,7 +105,7 @@ export async function rollInstant(s:InstantState,send:Send,rollMode="roll",skipD
   const nonce=foundry.utils.randomID();await send({action:"claim",nonce});let committed=false;
   try {
     const actor=await fromUuid(s.actor) as Actor|null;if(!actor)throw Error("Target unavailable.");
-    const name=instantEffects[s.id].skill;
+    const name=effectDefinition(s).skill;
     const item=findNativeItem(actor.items,name) as RollItem|undefined;
     if(!item)throw Error(name+" skill is missing.");
     let roll=item.createRoll("skill",actor);
@@ -121,8 +131,8 @@ export async function bindInstantControls(root:HTMLElement,state:(scope:string)=
   }
 }
 interface EffectCard {effect:InstantState;rollMode:string}
-export async function createInstantCard(actor:Actor,id:InstantId,source?:ChatMessage,encounter=encounterRef(actorEncounter(actor),actor.isToken?actor.token?.parent?.id:canvas.scene?.id)) {
-  const data:EffectCard={effect:newInstant(id,actor.uuid,actor.name??"",encounter),rollMode:source?.blind?"blindroll":source?.whisper.length?"gmroll":"roll"};
+export async function createInstantCard(actor:Actor,id:InstantId|"status",source?:ChatMessage,encounter=encounterRef(actorEncounter(actor),actor.isToken?actor.token?.parent?.id:canvas.scene?.id),statusId?:string) {
+  const data:EffectCard={effect:id==="status"?{id,statusId,actor:actor.uuid,name:actor.name??"",encounter,state:"failed"}:newInstant(id,actor.uuid,actor.name??"",encounter),rollMode:source?.blind?"blindroll":source?.whisper.length?"gmroll":"roll"};
   if(source?.id){
     const flags=foundry.utils.getProperty(source,"flags."+M) as {exchange?:{rollMode?:string};aoe?:{exchange:{rollMode?:string}};manualRoll?:{rollMode?:string}}|undefined;
     data.rollMode=flags?.exchange?.rollMode??flags?.aoe?.exchange.rollMode??flags?.manualRoll?.rollMode??data.rollMode;

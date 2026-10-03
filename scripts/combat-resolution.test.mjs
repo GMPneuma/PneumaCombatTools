@@ -334,7 +334,7 @@ test("GM-approved miss override retains private-card and older-attack guards",as
 test("selected damage remains reusable while recorded damage applies only once",async()=>{
  setup();const msg=await rolled();const original=actor;let originalCalls=0,selectedCalls=0;
  original._applyDamage=async()=>{originalCalls++;};
- const selected={testUserPermission:u=>u.id==="owner",_applyDamage:async()=>{selectedCalls++;}};
+ const selected={uuid:"Actor.selected",name:"Selected",testUserPermission:u=>u.id==="owner",_applyDamage:async()=>{selectedCalls++;}};
  globalThis.fromUuid=async uuid=>({actor:uuid==="Token.selected"?selected:original});
  await assert.rejects(request("damage","damageApply",{user:"stranger",targetUuid:"Token.selected",options:damageOptions}),/owner or GM/);
  await request("damage","damageApply",{targetUuid:"Token.selected",options:damageOptions});
@@ -377,30 +377,32 @@ test("damage statuses validate limit and apply to the exact recipient after nati
  await assert.rejects(request("damage","damageApply",{options:damageOptions}),/changed/);
  assert.equal(calls.length,0);
  await request("damage","damageApply",{options:damageOptions,statusEffects:["prone","stunned","blind"]});
- assert.deepEqual(calls,["hp",["prone",{active:true}],["stunned",{active:true}],["blind",{active:true}]]);
+ assert.deepEqual(calls,["hp"]);
+ assert.deepEqual(Object.values(get(messages.get("damage"),"flags.pneuma-combattools.attachedEffects")).map(card=>[card.effect.statusId,card.effect.state]),[["prone","failed"],["stunned","failed"],["blind","failed"]]);
  await request("damage","damageStatuses",{statusEffects:[]});
  assert.deepEqual(get(msg,"flags.pneuma-combattools.exchange.damage.statusEffects"),[]);
 });
-test("status failure never retries HP, and status edits wait for GM review",async()=>{
- setup();await rolled();globalThis.CONFIG={statusEffects:[{id:"prone"}]};
+test("effect followup persistence failure never retries HP",async()=>{
+ setup();await rolled();const msg=messages.get("damage");globalThis.CONFIG={statusEffects:[{id:"prone"}]};
  await request("damage","damageStatuses",{statusEffects:["prone"]});
- let hp=0;actor._applyDamage=async()=>hp++;actor.toggleStatusEffect=async()=>{throw Error("status failure");};
+ let hp=0;actor._applyDamage=async()=>hp++;const update=msg.update.bind(msg);msg.update=async changes=>{if(Object.keys(changes).some(key=>key.includes("attachedEffects")))throw Error("effect save failure");return update(changes);};
  await assert.rejects(request("damage","damageApply",{options:damageOptions,statusEffects:["prone"]}),/interrupted/);
  await assert.rejects(request("damage","damageApply",{options:damageOptions,statusEffects:["prone"]}),/review/);
  await assert.rejects(request("damage","damageStatuses",{statusEffects:[]}),/review/);
  assert.equal(hp,1);
 });
-test("repeat selected-target damage activates statuses without toggling them off",async()=>{
- setup();await rolled();globalThis.CONFIG={statusEffects:[{id:"prone"}]};
+test("repeat selected-target damage queues independent status confirmations",async()=>{
+ setup();await rolled();const msg=messages.get("damage");globalThis.CONFIG={statusEffects:[{id:"prone"}]};
  await request("damage","damageStatuses",{statusEffects:["prone"]});
  let hp=0;const effects=[];
  const original=actor;
- const selected={testUserPermission:u=>u.id==="owner",_applyDamage:async()=>hp++,
+ const selected={uuid:"Actor.selected",name:"Selected",testUserPermission:u=>u.id==="owner",_applyDamage:async()=>hp++,
    toggleStatusEffect:async(id,options)=>effects.push([id,options])};
  globalThis.fromUuid=async uuid=>({actor:uuid==="Token.selected"?selected:original});
  for(const applicationId of ["first","second"]) await request("damage","damageApply",{
    application:"selected",applicationId,targetUuid:"Token.selected",options:damageOptions,statusEffects:["prone"]});
- assert.equal(hp,2);assert.deepEqual(effects,[["prone",{active:true}],["prone",{active:true}]]);
+ assert.equal(hp,2);assert.deepEqual(effects,[]);
+ assert.equal(Object.values(get(msg,"flags.pneuma-combattools.attachedEffects")).filter(card=>card.effect.actor==="Actor.selected"&&card.effect.statusId==="prone").length,2);
 });
 
 test("critical injury counts only active damage d6 sixes and chooses the attack location",async()=>{

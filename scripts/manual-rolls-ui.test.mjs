@@ -48,6 +48,10 @@ try {
  await page.addScriptTag({type:'module',content:'const M=MANUAL_MODULE;\n'+favoriteSource+'\nObject.assign(window,{rollFavorites,sameFavorite,toggleRollFavorite,removeRollFavorite,rollFavorite});'});
  const lookupSource=await readFile('dist/scripts/native-lookup.js','utf8');
  await page.addScriptTag({type:'module',content:lookupSource+'\nObject.assign(window,{findNativeItem,nativeCriticalTable});'});
+ const treatmentCardSource=(await readFile('dist/scripts/treatment-card.js','utf8')).replace(/^import .*$/gm,'');
+ await page.addScriptTag({type:'module',content:'const esc=manualEscape,rollOutcomeClass=won=>won===undefined?"":won?"pneuma-roll-winner":"pneuma-roll-loser";'+treatmentCardSource+';window.postTreatment=postTreatment;window.checkedLuck=()=>{};'});
+ const treatmentSource=(await readFile('dist/scripts/treatment.js','utf8')).replace(/^import .*$/gm,'');
+ await page.addScriptTag({type:'module',content:'const esc=manualEscape;\n'+treatmentSource+'\nwindow.openTreatment=openTreatment;'});
  const presentationSource=(await readFile('dist/scripts/native-combat.js','utf8')).replace(/^import .*$/gm,'');
  await page.addScriptTag({type:'module',content:presentationSource+'\nObject.assign(window,{markRollResult,messageDiceAudience});'});
  await page.waitForFunction(()=>window.groupContent&&window.manualNativeClasses);
@@ -103,8 +107,8 @@ try {
   holder.querySelector('[name=customDice]').value='1';holder.querySelector('[name=customSides]').value='1';holder.querySelector('[name=base]').value='-2';facesQueue.push([1]);await baseDialog.buttons.roll.callback([holder]);check(created.content.includes('1d1-2 = -1'),'minimum custom dice and negative modifier');holder.querySelector('[value=standard]').checked=true;holder.querySelector('[value=standard]').dispatchEvent(new Event('change',{bubbles:true}));check(holder.querySelector('.pneuma-custom-roll').disabled,'switching back locks custom');
   game.user=game.users.get('p1');game.user.character=actor;window.canvas={tokens:{controlled:[]}};
   actor.system={stats:{ref:{value:6},luck:{value:2,max:8}}};actor.getStat=stat=>actor.system.stats[stat].value;
-  openManualRolls();check(document.querySelector('.pneuma-roll-flyout-title').textContent==='Manual Rolls','menu header');check(document.activeElement.classList.contains('pneuma-roll-flyout'),'no item initially focused');check(!!document.querySelector('[data-roll-choice=stat]')&&!document.querySelector('[data-roll-choice=group]'),'player STAT menu');
-  check(JSON.stringify([...document.querySelectorAll('.pneuma-roll-section')].map(s=>[...s.querySelectorAll('button')].map(b=>b.dataset.rollChoice)))===JSON.stringify([['base'],['stat','skill','role'],['damage','critical','evasion']]),'three ordered sections');
+  openManualRolls();check(document.querySelector('.pneuma-roll-flyout-title').textContent==='Manual Rolls','menu header');check(document.activeElement.classList.contains('pneuma-roll-flyout'),'no item initially focused');check(!document.querySelector('[data-roll-choice=stat]')&&!!document.querySelector('[data-roll-choice=skill]')&&!document.querySelector('[data-roll-choice=group]'),'player STAT menu');
+  check(JSON.stringify([...document.querySelectorAll('.pneuma-roll-section')].map(s=>[...s.querySelectorAll('button')].map(b=>b.dataset.rollChoice)))===JSON.stringify([['base'],['skill','role','treatment'],['damage','critical','evasion']]),'three ordered sections');
   document.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown'}));check(document.activeElement.dataset.rollChoice==='base','keyboard navigation');document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));
   canvas.tokens.controlled=[{actor}];
   window.Handlebars={helpers:{cprGetSkillModInfo:()=>2}};
@@ -113,8 +117,10 @@ try {
   actor.items=[skill,role];actor.items.get=id=>actor.items.find(i=>i.id===id);actor.sheet={_onRoll:async event=>window.nativeEvent={...event.currentTarget.dataset}};
   const clickList=async selector=>{holder.querySelector(selector).click();await new Promise(resolve=>setTimeout(resolve,0));};
   await characterRollPrompt('skill');holder.innerHTML=dialog.content;dialog.render([holder]);
-  check(!holder.querySelector('select')&&holder.querySelectorAll('tbody tr').length===1,'skill list replaces dropdown');
+  check(!!holder.querySelector('[data-stat-choice]')&&!!holder.querySelector('[data-skill-filter]')&&holder.querySelectorAll('tbody tr').length===1,'skill list replaces dropdown');
   check([...holder.querySelectorAll('tbody td')].slice(2,5).map(td=>td.textContent).join(',')==='4,2,13','native level modifier and base');
+  const filter=holder.querySelector('[data-skill-filter]');filter.value='nothing';filter.dispatchEvent(new Event('input'));check(holder.querySelector('tbody tr').hidden,'filter hides unmatched skills');filter.value='PERCEP';filter.dispatchEvent(new Event('input'));check(!holder.querySelector('tbody tr').hidden,'filter is case insensitive');filter.value='';filter.dispatchEvent(new Event('input'));
+  holder.querySelector('[data-stat-choice]').value='ref';facesQueue.push([4]);await clickList('[data-stat-roll]');check(created.content.includes('data-stat-outcome="success"'),'integrated STAT roll retains roll-under behavior');
   await clickList('[data-action=view]');check(viewedSkill,'skill view opens item');
   await clickList('[data-action=roll]');check(nativeEvent.itemId==='skill'&&nativeEvent.rollType==='skill','native skill roll delegation');
   skill.system.level=5;for(const callback of hooks.updateItem)callback({...skill,parent:actor});check(dialog.content.includes('<td>14</td>'),'values refresh after item update');
@@ -172,6 +178,37 @@ try {
   return 'Passed: native Critical Success/Critical Failure dice, damage, armor defaults/bypass/half, effect slots, group claims/permissions/results, hidden DV, menu keyboard and native card controls.';
  });
  console.log(result);
+ await page.evaluate(async()=>{
+  window.beforeTreatment=document.body.innerHTML;
+  actor.type='character';const paramedic={id:'paramedic',type:'skill',name:'Paramedic',system:{level:0}},firstAid={id:'firstaid',type:'skill',name:'First Aid',system:{level:0}},medtech={id:'medtech',type:'role',name:'Medtech',system:{abilities:[{name:'Surgery Skill',hasRoll:true}]}};
+  for(const item of [paramedic,firstAid,medtech]){item.createRoll=(type,_actor,options)=>{window.treatmentEvent={type,options};return {luck:0,resultTotal:18,handleRollDialog:async()=>true,roll:async()=>{}};};item.confirmRoll=async roll=>roll;}
+  actor.items=[paramedic,firstAid,medtech];actor.hasPlayerOwner=true;canvas.tokens.controlled=[{actor,name:'Pex',document:{uuid:'Token.1'}}];
+  canvas.tokens.placeables=[...canvas.tokens.controlled,{name:'Patient',isVisible:true,actor:{uuid:'Actor.patient',hasPlayerOwner:true},document:{uuid:'Token.patient'}},{name:'NPC',isVisible:true,actor:{hasPlayerOwner:false},document:{uuid:'Token.npc'}}];
+  game.packs=new Map([['cyberpunk-red-core.core_critical-injuries-body',{getDocuments:async()=>[{type:'criticalInjury',name:'Broken Leg',system:{quickFix:{dvParamedic:13},treatment:{type:'paramedicSurgery',dvParamedic:15,dvSurgery:13}}}]}],['cyberpunk-red-core.core_critical-injuries-head',{getDocuments:async()=>[{type:'criticalInjury',name:'Foreign Object',system:{quickFix:{dvFirstAid:13,dvParamedic:13},treatment:{type:'quickFix'}}},{type:'criticalInjury',name:'Lost Eye',system:{treatment:{type:'surgery',dvSurgery:17}}}]}]]);
+  await openTreatment();document.body.innerHTML='<div class="pneuma-roll-dialog" id="treatment-preview">'+dialog.content+'</div>';dialog.render([document.querySelector('#treatment-preview')]);
+ });
+ assert.deepEqual(await page.locator('.pneuma-treatment-section h3').allTextContents(),['Stabilize','Body Crits','Head Crits']);
+ assert.equal(await page.locator('.pneuma-treatment-section').first().locator('button').count(),6);
+ assert.deepEqual(await page.locator('[data-treatment-patient] option').allTextContents(),['Select patient…','Patient','Pex','Type a patient name…']);
+ assert.equal(await page.locator('[data-treatment-patient]').inputValue(),'');
+ await page.locator('[data-treatment-patient]').selectOption('Token.patient');
+ assert.equal(await page.locator('[data-treatment-location=stabilize] select').count(),0);
+ assert.equal(await page.locator('[data-treatment-location=body] button').count(),4);assert.equal(await page.locator('[data-treatment-location=head] button').count(),4);
+ assert.deepEqual(await page.locator('[data-treatment-location=stabilize] button').allTextContents(),['First Aid DV10','Paramedic DV10','First Aid DV13','Paramedic DV13','First Aid DV15','Paramedic DV15']);
+ await page.locator('[data-treatment-location=head] select').selectOption({label:'Lost Eye'});
+ await page.getByRole('button',{name:'Surgery DV17',exact:true}).click();await page.waitForFunction(()=>window.created?.content.includes('Treatment — Lost Eye'));
+ assert.deepEqual(await page.evaluate(()=>treatmentEvent),{type:'roleAbility',options:{rollSubType:'subRoleAbility',subRoleName:'Surgery Skill'}});assert.match(await page.evaluate(()=>created.content),/pneuma-roll-winner/);assert.equal(await page.locator('[data-treatment-location=head] button:disabled').count(),3);
+ assert.equal(await page.evaluate(()=>created.flags['pneuma-combattools'].medicalParticipants.defender),'Token.patient');
+ await page.locator('[data-treatment-patient]').selectOption('custom');await page.locator('[data-treatment-patient-name]').fill('Custom patient');
+ await page.getByRole('button',{name:'Surgery DV17',exact:true}).click();await page.waitForFunction(()=>created.flags['pneuma-combattools'].medicalParticipants.defenderName==='Custom patient');
+ assert.equal(await page.evaluate(()=>created.flags['pneuma-combattools'].medicalParticipants.defender),undefined);
+ await page.setViewportSize({width:760,height:600});
+ assert.equal(await page.locator('.pneuma-treatment-list').evaluate(node=>node.scrollWidth<=node.clientWidth),true,'Treatment content fits without horizontal scrolling');
+ const columns=await page.locator('[data-treatment-location=body] .pneuma-treatment-columns > div').evaluateAll(nodes=>nodes.map(node=>({x:node.getBoundingClientRect().x,y:node.getBoundingClientRect().y})));assert.equal(columns[0].y,columns[1].y);assert.equal(columns[1].y,columns[2].y);assert(columns[0].x<columns[1].x&&columns[1].x<columns[2].x);
+ await page.screenshot({path:process.env.TEMP+'/pct-treatment-menu.png',fullPage:true});
+ await page.setViewportSize({width:450,height:800});
+ console.log('Treatment browser checks passed: wound DVs, Body/Head sections, permanent Quick Fix and native Surgery delegation.');
+ await page.evaluate(()=>{document.body.innerHTML=beforeTreatment;});
  await page.evaluate(()=>{
    const preview=document.createElement('div');preview.id='damage-preview';preview.innerHTML=manualContent(damagePreviewCard.flags['pneuma-combattools'].manualRoll);document.body.prepend(preview);bindManualCard(damagePreviewCard,preview);
  });

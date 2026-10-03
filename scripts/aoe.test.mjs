@@ -288,6 +288,8 @@ test("incendiary ignition is offered only after penetrating damage",async()=>{
   f.data().exchange.damage={status:"rolled",user:"att",nonce:"damage",result:{html:"native",values:{total:20,bonus:0,location:"body",ablation:1,ammo:"grenade",ignorePercent:0,ignoreBelow:0,lethal:true}}};
   await f.request("damage",{damageRequest:{action:"damageApply",options:{useShield:false,damageReductionRole:false,damageReductionAE:false,brainDamageReduction:false}}});
   assert.equal(f.data().rows[0].instant.state,penetrates?"failed":"skipped");
+  assert.equal(f.b.effects.some(effect=>effect.name?.includes("Fire")),false,"damage must not ignite");
+  assert.equal(Object.keys(f.messages[0].flags[M].attachedEffects??{}).length,0,"no duplicate incendiary followup");
  }
 });
 test("smart rockets cannot fire without installed Targeting Scope",async()=>{const f=fixture();f.weapon._getLoadedAmmoProp=p=>p==="type"?"smart":"rocket";await assert.rejects(startAreaAttack(f.source,f.target,"w","attack"),/Targeting Scope/);assert.equal(f.weapon.system.magazine.value,20)});

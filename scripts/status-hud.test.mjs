@@ -32,7 +32,7 @@ try {
    const all=[...tray.querySelectorAll(".effect-control")];
    return {closed,grouped,clicks,contexts,count:all.length,hidden:before.filter(n=>!all.includes(n)).map(n=>n.title).sort(),sameNodes:all.every(n=>before.includes(n)),headingColor:getComputedStyle(groups[0].querySelector("summary")).color,display:getComputedStyle(tray).display};
  });
- assert.equal(result.headingColor,"rgb(240, 240, 224)");assert.equal(result.closed,true);assert.equal(result.count,71);assert.equal(result.sameNodes,true);
+ assert.equal(result.headingColor,"rgb(240, 240, 224)");assert.equal(result.closed,true);assert.equal(result.count,72);assert.equal(result.sameNodes,true);
  assert.deepEqual(result.hidden,['Lightly Wounded','Mortally Wounded','Quick Fix','Seriously Wounded']);
  assert.deepEqual(result.grouped,[{name:"Crit Head",count:11},{name:"Crit Body",count:11},{name:"Pharmaceuticals",count:7},{name:"Drugs",count:18}]);
  assert.equal(result.clicks,1);assert.equal(result.contexts,1);assert.equal(result.display,"block");

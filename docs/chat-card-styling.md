@@ -217,3 +217,34 @@ Dice playback (released in 0.9.7): `.pneuma-grapple-rolls` still appears only af
 Reverse Damage (released in 0.9.8): only GMs see and can use the native undo control in `.pneuma-damage-applied [data-action="reverseDamage"]`. Player owners are denied by the action handler and GM request processor. Saved reversal status remains visible to card viewers; once-per-application protection is retained.
 
 Dice reveal compatibility (0.9.9): `flags.pneuma-combattools.rollsRevealed` is set after attack/AoE/grapple saved-dice playback and on QuickHack result cards. Existing card selectors are retained.
+
+Manual effect confirmation (unreleased): attached ordinary statuses use the existing `.pneuma-attached-effects .pneuma-instant-effect` layout and state selectors. `data-instant-action="apply"` reads Apply Effect; GM-only skip reads Unaffected. Damage does not apply those statuses or Incendiary automatically. Applied/resisted/skipped states remove pending actions; applied fire/sleep retain Extinguish/Wake. Per-target state remains on the originating message.
+
+Pending effect actions share `.pneuma-effect-actions`, a flex row below the effect label, keeping Apply Effect and Unaffected together at normal chat width.
+### Medical HUD and results
+
+`[data-medical-toggle]` opens the top-level Medical control. `[data-medical-menu]` uses the existing compact panel and action-button styling; opening another menu closes it. Actions use `[data-medical-action]` and optional `[data-medical-item]`. Unavailable actions are disabled. Native skill cards retain their dice and totals; `.pneuma-medical-result` records the healer, patient, action and success/failure. Speedheal posts a receipt without a skill roll.
+
+Medical menu update: the top-level Medical button remains available even with no eligible actions. Stabilize appears only when the patient has Needs Stabilization. Wake Using Action is inside Medical and retains its existing conscious-healer/unconscious-patient rules.
+
+Quick Fix options: zero skill ranks do not prevent an attempt. Each native eligible First Aid/Paramedic choice appears as its own injury action with its DV; the selected skill is carried by data-medical-skill. Quick Fix remains available at full HP. Speedheal still requires missing HP.
+
+Medical's .pneuma-medical-subheading introduces QuickFix actions; individual rows omit the repeated prefix and retain injury, skill and DV.
+
+Skill / STAT dialog: .pneuma-skill-stat-roll holds current STAT selection and roll-under action above .pneuma-skill-filter and the existing skill table. data-skill-filter filters data-skill-name rows using hidden; favorites and native roll controls retain their indices. No chat-card markup changes.
+
+Treatment dialog uses .pneuma-treatment-list, .pneuma-treatment-section and .pneuma-treatment-options for a scrollable reference with Stabilize, Body Crits and Head Crits headings. data-treatment-choice controls preserve native skill/role roll routing; each button shows skill and DV. No new chat-card markup.
+
+Treatment result cards use .pneuma-treatment-card, native roll HTML inside .pneuma-roll-winner/.pneuma-roll-loser, and .pneuma-combat-outcome. flags.pneuma-combattools.medicalParticipants preserves acting token and patient token/actor identity. The metadata is available to Visual Tools; Combat Tools does not create a participant rail.
+
+.pneuma-stabilize-table replaces the wound dropdown; data-wound-name/data-wound-dv preserve each button's wound state and DV. .pneuma-treatment-columns arranges Crit, QuickFix and Treatment horizontally.
+
+Medical toggle renders only when medical entries exist or canWake is true; an empty menu has no control.
+
+Treatment columns use shrinkable tracks and bordered action groups. Scoped select/button sizing removes native margin overflow; the list scrolls vertically only.
+
+.pneuma-treatment-list button:disabled uses reduced opacity, grayscale and no glow to make unavailable actions obvious.
+
+.pneuma-treatment-patient-picker holds data-treatment-patient and optional data-treatment-patient-name. Custom patients have a defenderName without defender token/actor UUIDs.
+
+Treatment preserves .message-content > .rollcard > .rollcard-top. Native root gains outcome classes; .pneuma-treatment-result follows as a sibling, with participant metadata unchanged.

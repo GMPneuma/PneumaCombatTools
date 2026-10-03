@@ -1045,3 +1045,51 @@ i.pneuma-neural-plug::before { content: ""; display: inline-block; width: 1em; h
 .pneuma-grapple-note[hidden] { display: none !important; }
 .pneuma-grapple-explanation { padding: 8px; margin-top: 8px; border-top: 1px solid var(--cpr-background-chat-card-block, var(--color-border-light-primary)); }
 .pneuma-grapple-explanation ul { margin: 6px 0 0; padding-left: 20px; list-style: disc; }
+
+.pneuma-effect-actions:has(button) { display:flex; gap:3px; flex-wrap:wrap; }
+
+#token-hud .pneuma-medical-subheading { display: block; padding: 4px 8px 2px; font-size: 12px; }
+
+.pneuma-skill-stat-roll { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.pneuma-skill-stat-roll label { display:flex; align-items:center; gap:6px; flex:1; }
+.pneuma-skill-stat-roll button { width:auto; }
+.pneuma-skill-filter { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.pneuma-skill-filter input { flex:1; }
+.pneuma-character-roll-list tr[hidden] { display:none; }
+
+.pneuma-treatment-list { max-height:65vh; overflow-y:auto; overflow-x:hidden; padding-right:2px; }
+.pneuma-treatment-section h3 { margin:8px 0 4px; }
+.pneuma-treatment-injury { padding:5px 0; border-bottom:1px solid #8884; }
+.pneuma-treatment-options { display:flex; align-items:center; gap:6px; margin-top:3px; }
+.pneuma-treatment-options > span { min-width:135px; font-size:12px; }
+.pneuma-treatment-options button { width:auto; flex:1; font-size:12px; }
+
+.pneuma-treatment-section h4 { margin:5px 0 2px; font-size:12px; }
+.pneuma-treatment-section select { width:100%; }
+.pneuma-treatment-card > h3 { margin:0 0 4px; }
+
+.pneuma-treatment-columns { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) minmax(0,1fr); gap:8px; align-items:stretch; }
+.pneuma-treatment-columns > div { min-width:0; }
+.pneuma-treatment-columns > div:not(:first-child) { padding:5px 6px 6px; border:1px solid var(--color-border-light-primary,#888); border-radius:4px; background:var(--color-bg-option, #8881); }
+.pneuma-treatment-columns > div:first-child { padding-top:5px; }
+.pneuma-treatment-columns h4 { margin:0 0 5px; }
+.pneuma-treatment-columns .pneuma-treatment-options { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:4px; margin:0; }
+.pneuma-treatment-columns button { min-width:0; width:100%; white-space:normal; }
+.pneuma-treatment-list :is(button, select) { box-sizing:border-box; min-width:0; max-width:100%; margin:0; }
+.pneuma-stabilize-table { width:100%; table-layout:fixed; }
+.pneuma-stabilize-table td { padding:3px 5px; }
+.pneuma-stabilize-table button { width:100%; }
+.pneuma-treatment-list button:disabled {
+  opacity:.45;
+  filter:grayscale(1);
+  background:var(--color-bg-option, #8882);
+  border-color:var(--color-border-light-primary, #888);
+  box-shadow:none;
+  cursor:not-allowed;
+}
+
+.pneuma-treatment-patient-picker { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.pneuma-treatment-patient-picker label { display:flex; align-items:center; gap:8px; flex:1; min-width:0; }
+.pneuma-treatment-patient-picker select { flex:1; min-width:0; }
+.pneuma-treatment-patient-picker input { flex:1; min-width:0; }
+.pneuma-treatment-patient-picker input[hidden] { display:none; }

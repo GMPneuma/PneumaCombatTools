@@ -40,8 +40,8 @@ function setup(){
  return new Actor();
 }
 test("catalog includes six pharmacy additions and retains 22 native injury bindings",()=>{
- assert.equal(masterStatuses.length,75);assert.equal(masterStatuses.filter(s=>s.binding?.kind==="injury").length,22);
- assert.equal(new Set(masterStatuses.map(s=>s.id)).size,75);
+ assert.equal(masterStatuses.length,76);assert.equal(masterStatuses.filter(s=>s.binding?.kind==="injury").length,22);
+ assert.equal(new Set(masterStatuses.map(s=>s.id)).size,76);
  setup();assert.equal(configuredStatuses().filter(s=>s.name==="In Jail").length,1);
 });
 test("existing native injury produces a marker with no duplicate modifier",async()=>{

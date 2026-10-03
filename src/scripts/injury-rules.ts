@@ -6,7 +6,7 @@ export function hasInjury(actor:Actor,name:string):boolean {
   if(!status)return false;
   if(Array.from(actor.effects??[]).some(e=>!e.disabled&&!foundry.utils.getProperty(e,"system.isSuppressed")&&e.statuses.has(status.id)))return true;
   return Array.from(actor.items??[]).some(item=>{
-    if(String(item.type)!=="criticalInjury")return false;
+    if(String(item.type)!=="criticalInjury"||foundry.utils.getProperty(item,"flags.pneuma-combattools.quickFix"))return false;
     const source=String(foundry.utils.getProperty(item,"_stats.compendiumSource")??foundry.utils.getProperty(item,"flags.core.sourceId")??"");
     return foundry.utils.getProperty(item,"flags.pneuma-combattools.statusId")===status.id||source.endsWith("."+status.binding!.itemId)||item.name===status.binding!.itemName;
   });

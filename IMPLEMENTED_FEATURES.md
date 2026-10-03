@@ -373,3 +373,19 @@ Addiction cleanup protection (released in 0.9.9): automatic encounter end/reset/
 Drug menu completion (released in 0.9.9): Berserker, Prime Time, Sixgun and Timewarp now have separate native addiction controls, alongside the existing drug/addiction pairs. Every status subsection, including the general/custom grid, sorts by status name. Native nodes and click/right-click handlers are retained. Pharmaceuticals remain separate.
 
 Berserker icon correction (released in 0.9.9): the primary status uses CPR’s white `status/beserker.svg` icon; its addiction uses the native red addiction icon.
+
+Manual effect confirmation (released in 0.9.10): damage applies HP/armor only. Incendiary ammunition and added status effects remain on the originating card for Apply Effect or GM-only Unaffected. Resistance effects retain Resist before Apply Effect; resolved effects remove Apply/Unaffected and retain relevant condition actions. Ordinary statuses and instant effects share the saved-state handler.
+
+Medical actions (released in 0.9.10): optional automatic Needs Stabilization after character/token HP loss, with no penalties and preserved after combat. The setting defaults off and only affects automatic marking. Medical appears only when its menu contains an action. Stabilize requires the status and uses wound-state First Aid/Paramedic DVs. Wake Using Action is grouped under Medical.
+
+SpeedHeal (released in 0.9.10): consumes carried Medtech stock, heals BODY + WILL up to maximum HP, excludes mortally wounded patients and applies Speed Heal to block reuse until combat cleanup. No world-time cooldown.
+
+QuickFix (released in 0.9.10): compact heading with separate First Aid/Paramedic choices and native DVs; zero skill ranks and full patient HP do not hide choices. Native Treatment type Quick Fix permanently removes the injury. Other fixes suppress penalties temporarily, restoring them at combat end or after 24 world hours outside combat.
+
+Skill / STAT rolls (released in 0.9.10): one window with current-stat roll-under controls above a live case-insensitive skill filter. Native skill rolls, modifiers and favorites are retained.
+
+Treatment reference (released in 0.9.10): medical-icon roll-menu entry, three-state stabilization table, horizontal Body/Head Crit dropdowns and grouped QuickFix/Treatment DV buttons. Unavailable actions are disabled; controls fit without horizontal scrolling. Patient dropdown lists visible player-owned scene tokens and allows typed names. Reference checks do not alter patient effects.
+
+Treatment/Medical cards (released in 0.9.10): native top-level rollcard structure, styled DV Success/Fail and saved source/target identity in medicalParticipants flags. Typed patients carry names only. Visual Tools receives native markup and metadata; Treatment-specific rail recognition remains owned by Visual Tools.
+
+Validation: production build, 528 automated checks passed (4 skipped), and Treatment/Medical browser fixtures. Live Foundry integration remains pending.

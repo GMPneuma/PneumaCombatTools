@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.9.10 - 2026-10-03
+
+- Standardize damage-added effects: Apply Effect or GM-only Unaffected, with resistance checks where required. Damage no longer automatically ignites targets or applies added statuses.
+- Add penalty-free Needs Stabilization and optional automatic application after character/token HP loss. Preserve it after combat; Stabilize appears only while the status exists.
+- Add a context-sensitive Medical menu with Stabilize, SpeedHeal, QuickFix and Wake Using Action. Hide Medical when its menu is empty.
+- SpeedHeal consumes a dose, heals BODY + WILL and applies Speed Heal status to block reuse until combat cleanup. Remove the world-time cooldown.
+- Show separate First Aid/Paramedic QuickFix choices with DVs, including zero-rank attempts and patients at full HP. Permanently remove injuries treated by QuickFix; restore other temporarily suppressed injuries at combat end (24 world hours outside combat).
+- Combine Skill and STAT rolls in one window and add a live skill-name filter.
+- Add a compact Treatment roll reference: stabilization table plus horizontal Body/Head Crit selectors and grouped QuickFix/Treatment DV buttons. Disable unavailable choices and prevent horizontal overflow.
+- Add a patient picker for player-owned scene tokens and typed names. Produce styled DV Success/Fail cards with native rollcard structure and exact participant metadata for downstream Visual Tools rendering.
+
+Validation: production build, strict type checks, automated regressions and browser fixtures. Live Foundry integration remains pending. Treatment reference checks do not apply patient effects; Medical actions apply their supported effects.
+
+
 ## 0.9.9 - 2026-10-02
 
 - Add Berserker, Prime Time, Sixgun and Timewarp under Drugs, and Sedative and Veritas under Pharmaceuticals. Reuse native primary effects where available; Berserker and Sedative are status markers.

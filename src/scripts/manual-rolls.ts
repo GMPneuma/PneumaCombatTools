@@ -1,4 +1,5 @@
 import {nativeCriticalTable, findNativeItem} from "./native-lookup.js";
+import {openTreatment} from "./treatment.js";
 import {markRollResult} from "./native-combat.js";
 import {removeRollFavorite, rollFavorites, sameFavorite, toggleRollFavorite, rollFavorite, type RollFavorite} from "./roll-favorites.js";
 import { primaryGM as authority } from "./shared.js";
@@ -267,7 +268,7 @@ async function basePrompt() {
   })().catch(report);}}}},{width:380,classes:["dialog","pneuma-roll-dialog"]}).render(true);
 }
 /** A roll-under check, deliberately separate from native STAT + d10 skill-style rolls. */
-async function statPrompt() {
+async function statPrompt(selectedStat?:string) {
   const tokens=canvas.tokens?.controlled ?? [];
   if(tokens.length>1)throw Error("Select only one token for a STAT roll.");
   const actor=tokens.length ? tokens[0]!.actor : game.user?.character;
@@ -282,10 +283,10 @@ async function statPrompt() {
   const options=stats.filter(stat=>foundry.utils.getProperty(actor,"system.stats."+stat+".value")!==undefined)
     .map(stat=>'<option value="'+stat+'">'+stat.toUpperCase()+' ('+current(actor,stat)+')</option>').join('');
   if(!options)throw Error("This character has no available stats.");
-  await prompt("STAT roll",'<p class="pneuma-roll-character">'+esc(actor.name)+'</p>'+field("STAT",'<select name="stat">'+options+'</select>')+'<p class="pneuma-roll-hint">Roll below the current STAT. Ties fail. No Critical Success or Critical Failure.</p>',"Roll",async form=>{
+  const run=async(stat:string)=>{
     const source=await fromUuid(actor.uuid) as Actor | null;
     if(!source?.isOwner)throw Error("This character is unavailable or no longer owned by you.");
-    const stat=value(form,"stat");if(!stats.includes(stat))throw Error("Choose a valid STAT.");
+    if(!stats.includes(stat))throw Error("Choose a valid STAT.");
     const target=current(source,stat),mode=rollMode(),{CPRRoll}=await nativeRolls();
     const roll=new CPRRoll((source.name??"Character")+" — "+stat.toUpperCase()+" roll","1d10");
     roll.calculateCritical=false;roll.wasCritical=()=>false;
@@ -294,7 +295,9 @@ async function statPrompt() {
     const result='<p class="pneuma-stat-result" data-stat-outcome="'+(success?'success':'fail')+'">'+stat.toUpperCase()+' '+target+' · Rolled '+roll.resultTotal+' · <strong>'+(success?'Success':'Fail')+'</strong> (roll under)</p>';
     const message={content:'<section class="pneuma-combat-message pneuma-stat-card">'+await nativeCard(roll)+result+'</section>',speaker:ChatMessage.getSpeaker({actor:source})};
     ChatMessage.applyRollMode(message as never,mode as never);await ChatMessage.create(message as never);await showDice(roll,mode);
-  });
+  };
+  if(selectedStat){await run(selectedStat);return;}
+  await prompt("STAT roll",'<p class="pneuma-roll-character">'+esc(actor.name)+'</p>'+field("STAT",'<select name="stat">'+options+'</select>')+'<p class="pneuma-roll-hint">Roll below the current STAT. Ties fail. No Critical Success or Critical Failure.</p>',"Roll",async form=>run(value(form,"stat")));
 }
 async function criticalPrompt() {
   await prompt("Critical injury",field("Location",'<select name="location"><option value="body">Body</option><option value="head">Head</option></select>'),"Roll",async form=>{
@@ -382,6 +385,7 @@ async function characterRollPrompt(kind: "skill" | "roleAbility") {
   type Choice={item:Item;name:string;subtype?:string;hasRoll:boolean;rank:number;stat?:string};
   const favorite = (choice:Choice):RollFavorite => ({kind,name:choice.name,subtype:choice.subtype});
   let choices:Choice[]=[];
+  let filter="",selectedStat="";
   const content=()=>{
     choices=actor.items.filter(item=>String(item.type)===(kind==="skill"?"skill":"role")).flatMap<Choice>(item=>{
       const data=item.system as unknown as {level:number;stat:string;rank:number;mainRoleAbility:string;hasRoll:boolean;abilities:{name:string;rank:number;hasRoll:boolean}[]};
@@ -389,13 +393,14 @@ async function characterRollPrompt(kind: "skill" | "roleAbility") {
       return [{item,name:data.mainRoleAbility||item.name!,subtype:"mainRoleAbility",hasRoll:data.hasRoll,rank:data.rank},
         ...(data.abilities??[]).map(ability=>({item,name:ability.name,subtype:"subRoleAbility",hasRoll:ability.hasRoll,rank:ability.rank}))];
     }).sort((a,b)=>a.name.localeCompare(b.name));
-    return '<div class="pneuma-character-roll-list"><table><thead><tr><th>Favorite</th><th>'+(kind==="skill"?'Skill':'Role Ability')+'</th><th>'+(kind==="skill"?'Level':'Rank')+'</th><th>Mod</th>'+(kind==="skill"?'<th>Base</th>':'')+'<th colspan="2">Actions</th></tr></thead><tbody>'+choices.map((choice,index)=>{
+    const stats=kind==="skill"?'<div class="pneuma-skill-stat-roll"><label>STAT <select data-stat-choice>'+["int","ref","dex","tech","cool","will","move","body","luck","emp"].filter(stat=>foundry.utils.getProperty(actor,"system.stats."+stat+".value")!==undefined).map(stat=>'<option value="'+stat+'"'+(selectedStat===stat?' selected':'')+'>'+stat.toUpperCase()+' ('+(actor as Actor&{getStat(stat:string):number}).getStat(stat)+')</option>').join('')+'</select></label><button type="button" data-stat-roll>Roll STAT</button><small>Roll under; ties fail.</small></div><label class="pneuma-skill-filter">Filter skills <input type="search" data-skill-filter value="'+esc(filter)+'" placeholder="Type a skill name"></label>':'';
+    return stats+'<div class="pneuma-character-roll-list"><table><thead><tr><th>Favorite</th><th>'+(kind==="skill"?'Skill':'Role Ability')+'</th><th>'+(kind==="skill"?'Level':'Rank')+'</th><th>Mod</th>'+(kind==="skill"?'<th>Base</th>':'')+'<th colspan="2">Actions</th></tr></thead><tbody>'+choices.map((choice,index)=>{
       // Same modifier helper and base formula as CPR's character sheet.
       const mod=Number(Handlebars.helpers.cprGetSkillModInfo!(choice.name,actor,"modTotal",{hash:{}}));
       const base=choice.rank+mod+Number(foundry.utils.getProperty(actor,`system.stats.${choice.stat}.value`));
       const starred = rollFavorites().some(f => sameFavorite(f, favorite(choice)));
       const star = choice.hasRoll ? '<button type="button" class="pneuma-roll-favorite" data-choice="'+index+'" data-action="favorite" aria-label="'+(starred?'Remove favorite ':'Favorite ')+esc(choice.name)+'" aria-pressed="'+starred+'" title="'+(starred?'Remove favorite':'Favorite (maximum 3 across skills and role abilities)')+'"><i class="'+(starred?'fas':'far')+' fa-star" aria-hidden="true"></i></button>' : '';
-      return '<tr><td>'+star+'</td><td>'+esc(choice.name)+(kind==="roleAbility"?'<small>'+esc(choice.item.name!)+'</small>':'')+'</td><td>'+choice.rank+'</td><td>'+mod+'</td>'+(kind==="skill"?'<td>'+base+'</td>':'')+'<td><button type="button" data-choice="'+index+'" data-action="view" aria-label="View '+esc(choice.name)+'">View</button></td><td><button type="button" data-choice="'+index+'" data-action="roll" aria-label="Roll '+esc(choice.name)+'"'+(choice.hasRoll?'':' disabled title="This ability has no native roll"')+'>Roll</button></td></tr>';
+      return '<tr data-skill-name="'+esc(choice.name.toLowerCase())+'"'+(kind==="skill"&&!choice.name.toLowerCase().includes(filter.toLowerCase().trim())?' hidden':'')+'><td>'+star+'</td><td>'+esc(choice.name)+(kind==="roleAbility"?'<small>'+esc(choice.item.name!)+'</small>':'')+'</td><td>'+choice.rank+'</td><td>'+mod+'</td>'+(kind==="skill"?'<td>'+base+'</td>':'')+'<td><button type="button" data-choice="'+index+'" data-action="view" aria-label="View '+esc(choice.name)+'">View</button></td><td><button type="button" data-choice="'+index+'" data-action="roll" aria-label="Roll '+esc(choice.name)+'"'+(choice.hasRoll?'':' disabled title="This ability has no native roll"')+'>Roll</button></td></tr>';
     }).join('')+'</tbody></table></div>';
   };
   const initial=content();
@@ -419,6 +424,9 @@ async function characterRollPrompt(kind: "skill" | "roleAbility") {
   const dialog=new Dialog({title:(kind==="skill"?"Skill Roll — ":"Role Ability — ")+actor.name,content:initial,buttons:{},
     render:html=>{
       const root=(html as JQuery)[0]!;
+      root.querySelector<HTMLInputElement>("[data-skill-filter]")?.addEventListener("input",event=>{filter=(event.currentTarget as HTMLInputElement).value;root.querySelectorAll<HTMLTableRowElement>("tr[data-skill-name]").forEach(row=>{row.hidden=!row.dataset.skillName!.includes(filter.toLowerCase().trim());});});
+      root.querySelector<HTMLSelectElement>("[data-stat-choice]")?.addEventListener("change",event=>{selectedStat=(event.currentTarget as HTMLSelectElement).value;});
+      root.querySelector<HTMLButtonElement>("[data-stat-roll]")?.addEventListener("click",()=>{if(busy)return;busy=true;const stat=root.querySelector<HTMLSelectElement>("[data-stat-choice]")!.value;void statPrompt(stat).catch(report).finally(()=>{busy=false;});});
       root.querySelectorAll<HTMLButtonElement>("button[data-choice]").forEach(button=>button.addEventListener("click",event=>{
         if(busy)return;
         const choice=choices[Number(button.dataset.choice)];if(!choice)return;
@@ -448,7 +456,7 @@ export function openManualRolls(anchor = document.querySelector<HTMLElement>("[d
   closeRollFlyout=()=>close();anchor.setAttribute("aria-expanded","true");
   const sections:[string,string,string,(event:MouseEvent)=>Promise<void>][][]=[
     [["base","General Roll","fa-dice-d10",basePrompt]],
-    [["stat","STAT Roll","fa-chart-simple",statPrompt],["skill","Skill Roll","fa-list",()=>characterRollPrompt("skill")],["role","Role Ability","fa-star",()=>characterRollPrompt("roleAbility")]],
+    [["skill","Skill / STAT Roll","fa-list",()=>characterRollPrompt("skill")],["role","Role Ability","fa-star",()=>characterRollPrompt("roleAbility")],["treatment","Treatment","fa-kit-medical",()=>openTreatment()]],
     [["damage","Damage","fa-burst",damagePrompt],["critical","Critical Injury","fa-heart-crack",criticalPrompt],["evasion","Evasion","fa-person-running",event=>manualEvasion(event.shiftKey)]]];
   if(game.user?.isGM)sections.push([["group","Group Check","fa-users",groupPrompt]]);
   const favorites=rollFavorites();

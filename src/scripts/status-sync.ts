@@ -75,7 +75,7 @@ async function changeSource(actor: Actor, status: Bound, active: boolean,combat?
 async function refreshMarkers(actor: Actor): Promise<void> {
   for (const status of bound) {
     const items = matchingItems(actor, status);
-    const active = status.binding.kind === "injury" ? items.length > 0 : items.some(item => sourceEffects(item, status).some(live));
+    const active = status.binding.kind === "injury" ? items.some(item=>!foundry.utils.getProperty(item,"flags."+MODULE+".quickFix")) : items.some(item => sourceEffects(item, status).some(live));
     const existing = markers(actor, status.id);
     if (active) {
       if (!existing.length) await actor.createEmbeddedDocuments("ActiveEffect", [{
@@ -131,7 +131,7 @@ export async function applyCombatStatus(actor: Actor, id: string,combat?:Combat|
   if (bound.some(status => status.id === id)) await syncActorStatuses(actor, [id], false, true,combat);
   else await actor.toggleStatusEffect(id, { active: true });
   const definition=masterStatuses.find(s=>s.id===id);
-  if(endWithCombat&&combat&&definition?.binding?.kind!=="injury"&&definition?.name!=="Dead") {
+  if(endWithCombat&&combat&&definition?.binding?.kind!=="injury"&&definition?.name!=="Dead"&&definition?.name!=="Needs Stabilization") {
     const binding=bound.find(s=>s.id===id);
     const native=new Set(binding?matchingItems(actor,binding).flatMap(item=>sourceEffects(item,binding)):[]);
     for(const effect of effects().filter(e=>live(e)&&!existing.has(e)&&(e.statuses.has(id)||native.has(e))))

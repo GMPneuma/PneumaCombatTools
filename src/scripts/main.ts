@@ -1,3 +1,4 @@
+import {registerMedical,medicalEntries,performMedical} from "./medical.js";
 import {registerDamageReversal} from "./damage-reversal.js";
 import {registerChatResultDelay} from "./chat-result-delay.js";
 import {registerStatusCleanup} from "./status-cleanup.js";
@@ -83,6 +84,7 @@ Hooks.once("init", () => {
   registerChatButtons();
   registerDamageReversal();
   registerStatusCleanup();
+  registerMedical();
   registerSelfCTH();
   registerQuickhack(() => { const target = canvas.tokens?.hud?.object ?? undefined; const source = selection && selection.target === target ? selection.attacker : selectedAttacker(); return {source, target, self:isSelfCTH(target,source)}; });
   registerGrapple();
@@ -214,7 +216,7 @@ Hooks.once("init", () => {
       const attacker = selection && selection.target === this.object ? selection.attacker : selectedAttacker();
       const selfCTH = isSelfCTH(this.object ?? undefined, attacker);
       const selfGrapple = selfCTH ? grappleMenu(this.object ?? undefined, this.object ?? undefined) : [];
-      if (selfCTH) return {...super.getData(options), standalone: false, selfCTH: true, grappleActions:selfGrapple.filter(row=>row.action!=="escape"), selfEscapes:selfGrapple.filter(row=>row.action==="escape"), selfInitiative: selfInitiativeControl(this.object!), selfActions:selfActions(this.object!.actor!), selfThrown:[...thrownEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[]),...grenadeEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[])]};
+      if (selfCTH) return {...super.getData(options), standalone: false, selfCTH: true, medicalAvailable:medicalEntries(attacker?.actor??this.object!.actor!,this.object!.actor!).length>0, medicalQuickFix:medicalEntries(attacker?.actor??this.object!.actor!,this.object!.actor!).filter(row=>row.action==="quickFix"), medical:medicalEntries(attacker?.actor??this.object!.actor!,this.object!.actor!), grappleActions:selfGrapple.filter(row=>row.action!=="escape"), selfEscapes:selfGrapple.filter(row=>row.action==="escape"), selfInitiative: selfInitiativeControl(this.object!), selfActions:selfActions(this.object!.actor!), selfThrown:[...thrownEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[]),...grenadeEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[])]};
       const connection = attacker?.actor && this.object?.actor ? connectionFor(attacker.actor, this.object.actor.uuid) : undefined;
       const ice = selfIce(this.object?.actor ?? undefined, connection?.breachCleared ?? 0);
       const sight = !!attacker && !!this.object && quickhackEnabled() && hasQuickhackSight(attacker, this.object);
@@ -222,6 +224,9 @@ Hooks.once("init", () => {
         && quickhackEnabled() && canShowQuickhack(Array.from(attacker.actor.items) as unknown as MenuWeapon[]);
       return {
         ...super.getData(options),
+        medicalAvailable: medicalEntries(attacker?.actor??undefined,this.object?.actor??undefined).length>0||canWake(attacker,this.object??undefined),
+        medicalQuickFix: medicalEntries(attacker?.actor??undefined,this.object?.actor??undefined).filter(row=>row.action==="quickFix"),
+        medical: medicalEntries(attacker?.actor??undefined,this.object?.actor??undefined),
         canWake: canWake(attacker,this.object??undefined),
         offensiveQuickhacks,
         selfIce: connection?.state === "active" && ice.walls ? ice : undefined,
@@ -264,9 +269,24 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
     if (hud.object !== token || hud.element[0] !== html[0]) return;
     html.find(".col.right").first().append(controls);
   }
+  const medicalSource=(selection?.target===token?selection.attacker:selectedAttacker())??(data.selfCTH?token:undefined);
+  html.find("[data-medical-toggle]").on("click keydown",event=>{
+    if(event.type==="keydown"&&!["Enter"," "].includes(event.key??""))return;
+    event.preventDefault();event.stopPropagation();const panel=html.find("[data-medical-menu]"),open=panel.prop("hidden");
+    html.find(".pneuma-self-menu").prop("hidden",true);html.find(".pneuma-target-menu").removeClass("active");
+    html.find("[data-self-settings-toggle], [data-self-close-toggle], [data-self-thrown-toggle], [data-self-actions-toggle]").removeClass("active").attr("aria-expanded","false");
+    panel.prop("hidden",!open);$(event.currentTarget).toggleClass("active",open).attr("aria-expanded",String(open));
+    const colors=getComputedStyle(event.currentTarget);panel.find(".combat-heading").css({backgroundColor:colors.backgroundColor,color:colors.color,borderColor:colors.borderColor});
+  });
+  html.find<HTMLButtonElement>("[data-medical-action]").on("click",async event=>{
+    event.preventDefault();event.stopPropagation();const button=event.currentTarget;if(button.disabled||!medicalSource)return;button.disabled=true;
+    try{await performMedical(medicalSource,token,button.dataset.medicalAction!,button.dataset.medicalItem||undefined,!!event.shiftKey,button.dataset.medicalSkill||undefined);}
+    catch(error){ui.notifications!.error((error as Error).message);}finally{if(hud.object===token)hud.render(true);}
+  });
   if (data.selfCTH) {
     const menus = ["settings", "close", "thrown", "actions"];
     const closeMenus = () => {
+      html.find("[data-medical-menu]").prop("hidden",true);html.find("[data-medical-toggle]").removeClass("active").attr("aria-expanded","false");
       for (const name of menus) {
         html.find(`[data-self-${name}-menu]`).prop("hidden", true);
         html.find(`[data-self-${name}-toggle]`).removeClass("active").attr("aria-expanded", "false");
@@ -373,7 +393,8 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
     event.preventDefault();
     event.stopPropagation();
     const action = event.currentTarget.dataset.combatAction;
-    const panel = html.find(".pneuma-combat-menu");
+    const panel = html.find(".pneuma-target-menu");
+    html.find("[data-medical-menu]").prop("hidden",true);html.find("[data-medical-toggle]").removeClass("active").attr("aria-expanded","false");
     if (!action || !["attack", "melee", "thrown", "quickhacks"].includes(action)) return;
     const open = panel.attr("data-open") !== action || !panel.hasClass("active");
     panel.attr("data-open", action).toggleClass("active", open);

@@ -363,3 +363,23 @@ test('addictions survive combat cleanup and expiry, including native item varian
  await applyCleanup({},[...saved.map(e=>e.uuid),native.uuid]);
  assert.ok(saved.every(effect=>f.actor.effects.has(effect.id)));assert.notEqual(native.disabled,true);
 });
+
+test('ordinary damage-added statuses wait for confirmation and can be marked unaffected only by GM',async()=>{
+ const f=setup(),{createInstantCard}=await import('../dist/scripts/instant-effects.js');
+ const parent={id:'parent',blind:false,whisper:[],flags:{},async update(changes){for(const [key,value]of Object.entries(changes))set(this,key,structuredClone(value));}};
+ let applied=0;f.actor.toggleStatusEffect=async(id,options)=>{assert.equal(id,'prone');assert.equal(options.active,true);applied++;};
+ await createInstantCard(f.actor,'status',parent,{combatId:null},'prone');
+ const state=Object.values(parent.flags['pneuma-combattools'].attachedEffects)[0].effect;
+ assert.equal(applied,0);assert.match(instantContent(state),/Apply Effect/);
+ await assert.rejects(handleInstant(state,{action:'skip'},f.owner,f.save),/GM only/);
+ await handleInstant(state,{action:'skip'},game.user,f.save);assert.equal(state.state,'skipped');assert.equal(applied,0);
+ const second={...state,state:'failed'};await handleInstant(second,{action:'apply'},f.owner,f.save);await handleInstant(second,{action:'apply'},f.owner,f.save);
+ assert.equal(applied,1);assert.equal(second.state,'applied');assert.doesNotMatch(instantContent(second),/data-instant-action="(?:apply|skip)"/);
+});
+test('GM can skip poison before resistance and incendiary before ignition',async()=>{
+ for(const id of ['poison','incendiary']) {
+  const f=setup(),state=newInstant(id,f.actor.uuid,f.actor.name,{combatId:null});
+  await handleInstant(state,{action:'skip'},game.user,f.save);
+  assert.equal(state.state,'skipped');assert.equal(f.actor.effects.size,0);assert.equal(f.actor.system.derivedStats.hp.value,40);
+ }
+});

@@ -319,3 +319,15 @@ Reverse Damage is GM-only. Combat cleanup clears participant Prone regardless of
 Added six Hornet’s Pharmacy statuses, preserved addiction effects during cleanup and updated dice-reveal compatibility. Live checks remain under BL-001.
 
 0.9.9 replacement (2026-10-02): added the four native drug addiction entries, alphabetical status subsection ordering and white Berserker primary icon.
+
+### BL-019 — Stabilization and Medical actions
+
+**Status:** Done (implementation and automated checks; live Foundry verification remains under BL-001)
+
+**Requested behavior:** Optional GM stabilization function; penalty-free Needs Stabilization after player damage, preserved after combat; top-level Medical for self-care and other patients, with Stabilize, Medtech inventory Speedheal and eligible critical-injury Quick Fix actions.
+
+**Outcome (2026-10-02, unreleased):** Uses native skill rolls, injury DVs and inventory quantities. Quick Fix permanently removes injuries whose Treatment type is Quick Fix. Other injuries retain their documents, suppress penalties temporarily and restore them when combat ends; outside combat they expire after 24 world hours. Automatic status application defaults off; Medical is always available. Actions require an owned healer and an adjacent patient.
+
+## Release record — 0.9.10 (2026-10-03)
+
+Release includes manual effect confirmation, Medical/stabilization/QuickFix/SpeedHeal, combined Skill/STAT filtering and the Treatment roll reference. Medical visibility and patient selection follow the final requested behavior. Live checks remain under BL-001.

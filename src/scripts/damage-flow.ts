@@ -2,10 +2,8 @@ import { escapeHTML as escape } from "./shared.js";
 import {requireParticipants,resolveEncounter,encounterRef,tokenEncounter,type EncounterRef} from "./encounter.js";
 import {interactArmorSelected, halfArmorSelected, halfArmorControl, armorIgnorePercent} from "./half-armor.js";
 import {reportExposure} from "./effect-events.js";
-import {igniteTarget} from "./instant-lifetime.js";
 import {instantId} from "./instant-catalog.js";
 import {createInstantCard} from "./instant-effects.js";
-import { applyCombatStatus } from "./status-sync.js";
 import { thrownRollItem } from "./thrown-weapons.js";
 import { captureDamageApplication } from "./damage-application.js";
 import { applyCriticalInjury, damageSixes, hasCriticalInjury, criticalLocation } from "./critical-injury.js";
@@ -181,8 +179,6 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
   const requestedEffects = validateDamageStatuses(request.statusEffects ?? []);
   if (JSON.stringify(effects) !== JSON.stringify(requestedEffects))
     throw new Error("Damage status effects changed. Review the updated card and apply again.");
-  if (effects.length && typeof actor.toggleStatusEffect !== "function")
-    throw new Error("Native status application is unavailable.");
   damage.statusEffects = effects;
   const v = damage.result.values;
   const interact=request.interactArmor??v.interactArmor;
@@ -198,19 +194,18 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
       data.coverUp?{ablation:interact===false?0:2*v.ablation,ignorePercent:armorIgnorePercent(v.ignorePercent,request.halfArmor,interact),ignoreBelow:v.ignoreBelow}:undefined, native=>{damage.penetrated=Number(native.rawDamageDealt)>0&&native.hpReduction>0;},data.attackMode==="aimed"&&v.location==="head");
     if(damage.penetrated) {
       const ammo=damage.result.ammoType;
-      if(ammo==="incendiary")await igniteTarget(actor);
-      else if(ammo)reportExposure(actor,ammo);
+      if(ammo&&ammo!=="incendiary")reportExposure(actor,ammo);
     }
     damage.applications = [...(damage.applications ?? []), ...summaries];
     if (application === "selected") damage.selectedTargets = [...(damage.selectedTargets ?? []), {
       id:damage.applicationId!, uuid:destination, name:token?.name ?? actor.name ?? "Target"
     }];
-    for (const id of effects) {
+    const followups=[...effects];
+    if(damage.penetrated&&damage.result.ammoType==="incendiary"&&!foundry.utils.getProperty(sourceMessage??{},"flags.pneuma-combattools.aoe")&&!followups.includes("instant:incendiary"))followups.push("instant:incendiary");
+    const visibility={blind:data.rollMode==="blindroll",whisper:["gmroll","blindroll"].includes(data.rollMode??"")?game.users!.filter(u=>u.isGM).map(u=>u.id!):data.rollMode==="selfroll"?[user.id!]:[]} as ChatMessage;
+    for (const id of followups) {
       const instant=id.startsWith("instant:")?id.slice(8):"";
-      if(instantId(instant)) {
-        const visibility={blind:data.rollMode==="blindroll",whisper:["gmroll","blindroll"].includes(data.rollMode??"")?game.users!.filter(u=>u.isGM).map(u=>u.id!):data.rollMode==="selfroll"?[user.id!]:[]} as ChatMessage;
-        await createInstantCard(actor,instant,sourceMessage??visibility,data.combatId!==undefined?encounterRef(resolveEncounter(data),data.combatScene,data.combatTokens):undefined);
-      } else await applyCombatStatus(actor, id,data.combatId!==undefined?resolveEncounter(data)??null:undefined,true);
+      await createInstantCard(actor,instantId(instant)?instant:"status",sourceMessage??visibility,data.combatId!==undefined?encounterRef(resolveEncounter(data),data.combatScene,data.combatTokens):undefined,instantId(instant)?undefined:id);
     }
   } catch (error) {
     damage.status = "review"; await save();

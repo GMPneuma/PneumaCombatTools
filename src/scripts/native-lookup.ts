@@ -5,6 +5,8 @@ const identities: Record<string, {id: string; key?: string; type: string}> = {
   "Brawling": {id:"fPnx3mKaMiRgGavI",key:"skill.brawling",type:"skill"},
   "Cybertech": {id:"LWy8XHIR3JKL1R0i",key:"skill.cybertech",type:"skill"},
   "Resist Torture/Drugs": {id:"4nZAn6M44PYI8CU2",key:"skill.resistTortureOrDrugs",type:"skill"},
+  "Medtech": {id:"8wRoRsRQnpt3Je00",type:"role"},
+  "Speedheal": {id:"3xF0I3J9RnSxf4Ux",type:"drug"},
   "Netrunner": {id:"g5S5E8UG1QJ4yFsp",type:"role"},
   "Targeting Scope": {id:"wFp72x2FXhipZXPj",type:"cyberware"}
 };
