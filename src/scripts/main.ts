@@ -216,7 +216,9 @@ Hooks.once("init", () => {
       const attacker = selection && selection.target === this.object ? selection.attacker : selectedAttacker();
       const selfCTH = isSelfCTH(this.object ?? undefined, attacker);
       const selfGrapple = selfCTH ? grappleMenu(this.object ?? undefined, this.object ?? undefined) : [];
-      if (selfCTH) return {...super.getData(options), standalone: false, selfCTH: true, medicalAvailable:medicalEntries(attacker?.actor??this.object!.actor!,this.object!.actor!).length>0, medicalQuickFix:medicalEntries(attacker?.actor??this.object!.actor!,this.object!.actor!).filter(row=>row.action==="quickFix"), medical:medicalEntries(attacker?.actor??this.object!.actor!,this.object!.actor!), grappleActions:selfGrapple.filter(row=>row.action!=="escape"), selfEscapes:selfGrapple.filter(row=>row.action==="escape"), selfInitiative: selfInitiativeControl(this.object!), selfActions:selfActions(this.object!.actor!), selfThrown:[...thrownEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[]),...grenadeEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[])]};
+      const medical = medicalEntries(attacker?.actor??(selfCTH?this.object?.actor??undefined:undefined),this.object?.actor??undefined);
+      const wake = !selfCTH && canWake(attacker,this.object??undefined);
+      if (selfCTH) return {...super.getData(options), standalone: false, selfCTH: true, medicalAvailable:medical.length>0, medicalQuickFix:medical.filter(row=>row.action==="quickFix"), medical:medical, grappleActions:selfGrapple.filter(row=>row.action!=="escape"), selfEscapes:selfGrapple.filter(row=>row.action==="escape"), selfInitiative: selfInitiativeControl(this.object!), selfActions:selfActions(this.object!.actor!), selfThrown:[...thrownEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[]),...grenadeEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[])]};
       const connection = attacker?.actor && this.object?.actor ? connectionFor(attacker.actor, this.object.actor.uuid) : undefined;
       const ice = selfIce(this.object?.actor ?? undefined, connection?.breachCleared ?? 0);
       const sight = !!attacker && !!this.object && quickhackEnabled() && hasQuickhackSight(attacker, this.object);
@@ -224,10 +226,10 @@ Hooks.once("init", () => {
         && quickhackEnabled() && canShowQuickhack(Array.from(attacker.actor.items) as unknown as MenuWeapon[]);
       return {
         ...super.getData(options),
-        medicalAvailable: medicalEntries(attacker?.actor??undefined,this.object?.actor??undefined).length>0||canWake(attacker,this.object??undefined),
-        medicalQuickFix: medicalEntries(attacker?.actor??undefined,this.object?.actor??undefined).filter(row=>row.action==="quickFix"),
-        medical: medicalEntries(attacker?.actor??undefined,this.object?.actor??undefined),
-        canWake: canWake(attacker,this.object??undefined),
+        medicalAvailable: medical.length>0||wake,
+        medicalQuickFix: medical.filter(row=>row.action==="quickFix"),
+        medical: medical,
+        canWake: wake,
         offensiveQuickhacks,
         selfIce: connection?.state === "active" && ice.walls ? ice : undefined,
         canBreach: sight && connection?.state === "active" && ice.blocked,

@@ -1,6 +1,7 @@
 import {playNotificationSound} from "./notification-sounds.js";
 import {displayedEncounter} from "./encounter.js";
 import {postHUDMessage} from "./hud-messages.js";
+import {updateTouchesPath} from "./update-path.js";
 const M="pneuma-combattools";
 declare global {interface SettingConfig {
   "pneuma-combattools.nextTurnMarker":boolean;
@@ -16,10 +17,12 @@ export function nextCombatant(combat:Combat):Combatant|undefined {
   }
 }
 let marker:{token:Token;art:PIXI.Container;frame:(phase:number)=>void;ticker:PIXI.Ticker;tick:(delta:number)=>void;key:string;running:boolean}|undefined;
+let watchedToken:Token|undefined;
 function clearNextMarker(){if(!marker)return;marker.ticker.remove(marker.tick);marker.art.destroy({children:true});marker=undefined;}
 export function refreshNextTurnMarker():void {
   const combat=displayedEncounter(),next=combat&&nextCombatant(combat);
   const token=next?.tokenId?canvas.tokens?.get(next.tokenId):undefined;
+  watchedToken=token;
   if(!canvas.ready||!canvas.app||!game.settings!.get(M,"turnMarkerEnabled")||!game.settings!.get(M,"nextTurnMarker")
     ||game.settings!.get(M,"turnMarkerDisplay")==="off"||!next?.visible||next.sceneId!==canvas.scene?.id
     ||!token||["container", "blackIce", "demon"].includes(String(token.actor?.type))||token.destroyed||token.isPreview||!token.visible||(!game.user?.isGM&&(token.document.hidden||token.document.isSecret))){clearNextMarker();return;}
@@ -60,18 +63,26 @@ export function notifyTurnChange(combat:Combat):void {
   if(current)playNotificationSound("turn");
 }
 export function registerTurnAlerts():void {
+  let frame=0;
+  const refresh=()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;refreshNextTurnMarker();});};
   game.settings!.register(M,"nextTurnMarker",{name:"Next-turn indicator",hint:"Three subtle concentric rings pulse outward around the next combatant. Respects indicator visibility and static display preferences.",scope:"client",config:true,type:Boolean,default:true,onChange:refreshNextTurnMarker});
   game.settings!.register(M,"turnPopups",{name:"Turn popups",hint:"Show popup-only alerts when your turn starts or is next. Player clients only; nothing is added to the HUD message list.",scope:"client",config:true,type:Boolean,default:true});
   const remember=(combat:Combat)=>seen.set(combat.id!,turnKey(combat));
-  Hooks.on("ready",()=>{for(const combat of game.combats??[])remember(combat);refreshNextTurnMarker();});
+  Hooks.on("ready",()=>{for(const combat of game.combats??[])remember(combat);refresh();});
   Hooks.on("createCombat",remember);
-  Hooks.on("updateCombat",(combat:Combat)=>{notifyTurnChange(combat);refreshNextTurnMarker();});
-  Hooks.on("deleteCombat",(combat:Combat)=>{seen.delete(combat.id!);refreshNextTurnMarker();});
-  for(const hook of ["canvasReady","createCombatant","updateCombatant","deleteCombatant","updateToken","updateActor","updateUser","updateSetting"])Hooks.on(hook,refreshNextTurnMarker);
-  for(const hook of ["drawToken","refreshToken"])Hooks.on(hook,refreshNextTurnMarker);
+  Hooks.on("updateCombat",(combat:Combat,changes:object)=>{
+    notifyTurnChange(combat);
+    if(["round","turn","active","scene","settings"].some(path=>updateTouchesPath(changes,path)))refresh();
+  });
+  Hooks.on("deleteCombat",(combat:Combat)=>{seen.delete(combat.id!);refresh();});
+  for(const hook of ["canvasReady","createCombatant","updateCombatant","deleteCombatant","updateUser"])Hooks.on(hook,refresh);
+  Hooks.on("updateSetting",(setting:{key?:string})=>{if(setting.key?.startsWith(M+".turnMarker")||setting.key===M+".nextTurnMarker")refresh();});
+  Hooks.on("updateActor",(actor:Actor)=>{if(actor.uuid===watchedToken?.actor?.uuid)refresh();});
+  Hooks.on("updateToken",(token:TokenDocument)=>{if(token===watchedToken?.document)refresh();});
+  for(const hook of ["drawToken","refreshToken"])Hooks.on(hook,(token:Token)=>{if(token.document===watchedToken?.document)refresh();});
   Hooks.on("destroyToken",(token:Token)=>{if(marker?.token===token)clearNextMarker();});
-  Hooks.on("canvasTearDown",clearNextMarker);
-  document.addEventListener("visibilitychange",refreshNextTurnMarker);
+  Hooks.on("canvasTearDown",()=>{cancelAnimationFrame(frame);frame=0;watchedToken=undefined;clearNextMarker();});
+  document.addEventListener("visibilitychange",refresh);
 }
 
 

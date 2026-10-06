@@ -2,16 +2,24 @@
 
 The GM's **Enable Stabilization Function** setting defaults off and only controls automatic Needs Stabilization after character/token HP loss. Needs Stabilization has no penalties and persists after combat.
 
+Medical and the Treatment reference share `src/scripts/medical-rules.ts` for stabilization DVs, native medical skill eligibility, injury QuickFix/Treatment DVs and permanent QuickFix classification. Patient mutations and reference-only checks remain separate.
+
 ## Token Medical menu
 
 Right-click your character, or select your character and right-click an adjacent patient. Medical appears only when it contains an action.
 
 - **Stabilize:** appears only with Needs Stabilization. Native TECH + First Aid or Paramedic; DV10 Lightly Wounded, DV13 Seriously Wounded, DV15 Mortally Wounded. Success requires exceeding DV and clears the status. Mortal stabilization restores 1 HP and adds one minute of unconsciousness. Takes an Action.
 - **SpeedHeal:** Medtech with a carried dose and a damaged patient. Consumes one dose, heals BODY + WILL up to maximum HP, and applies Speed Heal to block reuse. Combat cleanup clears Speed Heal. No world-time cooldown; cannot heal mortally wounded patients. Does not stabilize.
-- **QuickFix:** Medtechs see each injury's eligible First Aid/Paramedic choices and DVs, even at zero skill ranks or full patient HP. Success permanently removes injuries whose native Treatment type is Quick Fix. Other injuries are temporarily suppressed and restored at combat end; outside combat, they expire after 24 world hours or the next patient combat ends.
+- **QuickFix:** All characters see each injury's eligible First Aid/Paramedic choices and DVs, even at zero skill ranks or full patient HP. Success permanently removes injuries whose native Treatment type is Quick Fix. Other injuries are temporarily suppressed and restored at combat end; outside combat, they expire after 24 world hours or the next patient combat ends.
 - **Wake Using Action:** appears when the selected conscious character can wake another unconscious character. Retains the existing wake workflow.
 
 An active GM applies cross-actor changes. The module does not advance time or automatically spend Actions. Shift skips optional roll dialogs.
+
+GM confirmation uses the same request helper as grapple, AoE and manual cards. A timeout means confirmation is missing; check the patient/card before retrying. It does not cancel an action already running on the GM. Existing saved-roll and dose recovery safeguards remain in Medical.
+
+Medical checks GM/socket availability before rolling or spending LUCK. Evaluated rolls are posted before applying patient changes; reopening the same Medical action after an interruption retries the saved roll without another roll, LUCK payment, or chat card. If the patient's stabilization DV changed, the previous roll remains in chat for GM review before a new attempt.
+
+An interrupted SpeedHeal offers **Resume SpeedHeal** to the original healer. Saved patient progress and dose receipts let it finish without consuming a second dose. Healing and completion are saved together. Speed Heal still blocks new doses until combat cleanup. Temporary QuickFix restoration retains its recovery flag until penalties are restored and its marker is removed; a failed injury does not prevent other injuries from being restored.
 
 ## Treatment roll reference
 

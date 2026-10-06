@@ -10,8 +10,10 @@ import {halfArmorSelected, interactArmorSelected} from "../half-armor.js";
 import {automaticNPCEvasion} from "../evasion-settings.js";
 import {evasionBlocked} from "../injury-rules.js";
 import {ammoProfile,instantId} from "../instant-catalog.js";
-import {newInstant,instantContent,instantDone,handleInstant,bindInstantControls,type InstantState,type InstantRequest} from "../instant-effects.js";
+import {inherentDamageStatuses,renderDamageStatusPicker} from "../damage-status.js";
+import {newInstant,instantContent,instantDone,handleInstant,bindInstantControls,arrangeAreaEffectControls,type InstantState,type InstantRequest} from "../instant-effects.js";
 import {createSmoke,registerSmoke} from "./smoke.js";
+import {clearGrenadeMarkers} from "./marker-cleanup.js";
 import {empDisabled} from "../emp-state.js";
 import {masterStatuses} from "../status-catalog.js";
 import {moveEvader,registerAreaMovement} from "./movement.js";
@@ -20,12 +22,13 @@ import { areaKind, confirmAreaRoll, type AreaKind, type AreaWeapon } from "./wea
 import { polygon, evadeAllowed, winsAreaDefense, type Area, type Point } from "./geometry.js";
 import { placeArea, clippedPoints, templateData, areaCoverage } from "./placement.js";
 import { requireCombatSocket } from "../socket-health.js";
-import { smokeAttackDialog, diceJSON, showSavedDice, messageDiceAudience, nativeCard, rollHidden, spendBonusLuck, type RollItem } from "../native-combat.js";
+import {GMRequests} from "../gm-request.js";
+import { smokeAttackDialog, diceJSON, showSavedDice, messageDiceAudience, nativeCard, rollHidden, spendBonusLuck, type RollItem, type DiceAudience } from "../native-combat.js";
 import { thrownRollItem, improvisedSource } from "../thrown-weapons.js";
 import { getTable } from "../dv-hover.js";
 import { parseDV } from "../dv-data.js";
-import { resolutionSection, rollOutcomeClass, canRenderCombatCard } from "../card-structure.js";
-import { rollDamage, damageContent, handleDamage, applyFromCard, type DamageState, type DamageRequest } from "../damage-flow.js";
+import { bindCardAction, resolutionSection, rollOutcomeClass, canRenderCombatCard } from "../card-structure.js";
+import { rollDamage, damageContent, handleDamage, damageEffectsLocked, applyFromCard, type DamageState, type DamageRequest } from "../damage-flow.js";
 import type { Exchange } from "../combat-resolution.js";
 import { grappleWeaponBlocked } from "../grapple/state.js";
 import { checkedLuck } from "../evasion-rules.js";
@@ -34,9 +37,10 @@ interface TargetRow {
   instant?:InstantState; uuid:string; actor:string; name:string; img:string; eligible:boolean;
   state:"waiting"|"rolling"|"hit"|"miss"|"other"; total?:number; html?:string;
   claim?:{nonce:string;user:string;expires:number}; coverProneId?:string; damage?:DamageState; moved?:boolean; coverUp?:boolean; moveCost?:number;
+  responseReceipt?:{nonce:string;user:string};
 }
 export interface AreaAttack {
-  ammoType?:string; smokeId?:string; scene:string; kind:AreaKind; area:Area; intended:Point; settings:AreaSettings; templateId?:string; aimTemplateId?:string;
+  effectsLocked?:boolean; ammoType?:string; smokeId?:string; scene:string; kind:AreaKind; area:Area; intended:Point; settings:AreaSettings; templateId?:string; aimTemplateId?:string;
   phase:"scatter"|"responses"; exchange:Exchange; rows:TargetRow[]; special:boolean; areaHidden?:boolean; resolutionComplete?:boolean; effectsResolved?:boolean; attackDiceRevealed?:boolean;
 }
 interface Request {
@@ -114,31 +118,41 @@ export function areaContent(data:AreaAttack):string {
     ${r.state==="waiting"&&!r.damage?btn("exclude","fa-user-slash","GM: exclude target (cover / not on foot)",r.uuid):""}
 
     ${r.state==="other"?btn("hit","fa-check","GM: affected",r.uuid)+btn("miss","fa-xmark","GM: unaffected",r.uuid):""}
+    ${r.state==="rolling"||r.responseReceipt?btn("retryResponse","fa-rotate-right","Retry saved response",r.uuid):""}
     ${r.state!=="waiting"?btn("reset","fa-rotate-left","Reset Player Action",r.uuid):""}
     ${r.state==="miss"&&data.kind!=="suppression"&&r.total!==undefined&&!r.moved?btn("move","fa-person-walking","Move outside AoE",r.uuid):""}
-    ${r.state==="hit"&&data.exchange.damage?.result ? btn("apply","fa-bolt",r.damage?.recordedApplied?"Damage applied":"Apply shared damage (Shift: options)",r.uuid):""}
-    ${r.damage&&["review","applying"].includes(r.damage.status)?btn("damageResolved","fa-check-double","GM: mark resolved after checking damage",r.uuid):""}
+
     ${r.moved&&r.moveCost?`<span>Move: ${r.moveCost.toFixed(1)}m</span>`:""}</div>
     ${r.state==="hit"&&(r.coverUp||data.kind==="suppression")||r.state==="other"?`<span class="pneuma-aoe-response-description">${r.state==="other"?"Cover Up — GM review":data.kind==="suppression"?"Suppressed: Move to cover; Run if needed":"Cover Up · Prone · SP ×2 / ablation ×2"}</span>`:""}</div>
-    ${r.state==="hit"&&r.instant?instantContent(r.instant,r.uuid):""}
+
     `).join("");
-  const applications=data.rows.flatMap(r=>r.damage?.applications??[]).join("");
+  const applications=data.rows.filter(r=>r.state==="hit" && (data.exchange.damage?.result || r.damage?.applications?.length || r.instant || data.ammoType==="incendiary")).map(r=>`<div class="pneuma-aoe-resolution-target" data-aoe-row="${esc(r.uuid)}" data-aoe-actor="${esc(r.actor)}">
+    <img src="${esc(r.img)}" alt="" width="24" height="24"><span class="pneuma-aoe-name" title="${esc(r.name)}">${esc(r.name)}</span><div class="pneuma-aoe-target-damage">
+    ${data.exchange.damage?.result && !(r.damage?.recordedApplied&&r.damage.applications?.length) ? btn("apply","fa-bolt",r.damage?.recordedApplied?"Damage applied":"Apply damage (Shift: options)",r.uuid,r.damage?.recordedApplied?"Applied":"Apply Damage"):""}
+    ${r.damage&&["review","applying"].includes(r.damage.status)?btn("damageResolved","fa-check-double","GM: mark resolved after checking damage",r.uuid):""}
+    <div class="pneuma-damage-applications">${(r.damage?.applications??[]).join("")}</div></div><div class="pneuma-aoe-target-effects">
+    ${r.instant?instantContent(r.instant,r.uuid,true):data.ammoType==="incendiary"?instantContent({...newInstant("incendiary",r.actor,r.name),state:"pending"},r.uuid,true):""}</div><div class="pneuma-aoe-target-gm"></div></div>`).join("");
   return `<section class="rollcard pneuma-aoe-card" data-state="${data.phase==="scatter"?"scatter":waiting?"waiting":"resolved"}"><div class="rollcard-top"><div class="cpr-block">${attackHeading(data.exchange.title)}</div></div>
     ${resolutionSection("attack",attack)}
     ${resolutionSection("result",data.phase==="scatter"?"<div class='pneuma-aoe-reposition'><strong>Missed</strong><p>GM: choose a new center inside the gray area.</p></div>"+btn("scatter","fa-crosshairs","Place New Target Center","","Place New Target Center"): `<div role="list" class="pneuma-aoe-targets">${rows||"<p>No tokens in the area.</p>"}</div>`)}
     <div class="pneuma-aoe-actions">${btn("show",data.areaHidden?"fa-eye":"fa-eye-slash",data.areaHidden?"Show attack area":"Hide attack area")}${data.phase==="responses"?btn("add","fa-user-plus","GM: add selected token (manual coverage override)"):""}
     ${data.kind!=="suppression"&&data.phase!=="scatter"&&!data.special&&!data.exchange.damage?btn("damage","fa-droplet","Roll shared damage"):""}
     ${data.exchange.damage?.status==="rolling"?btn("damageReset","fa-unlock","GM: release unfinished damage roll"):""}</div>
-    ${data.special&&!profile&&!data.effectsResolved?btn("effectsResolved","fa-check-double","GM: mark manual effects resolved"):""}
-    ${data.special&&!profile?"<p>Special ammunition: resolve its effects manually. Grenade-specific effects are not automated yet.</p>":""}
-    ${data.ammoType==="smoke"?"<p>Smoke: 1 minute.</p>"+(data.smokeId?btn("removeSmoke","fa-cloud","GM: remove smoke"):""):""}
+
     ${data.kind==="explosive"?"<p>GM resolves all aspects of cover and terrain.</p>":""}
     ${data.exchange.damage?damageContent(data.exchange,"roll"):""}
-    ${applications?`<div class="pneuma-damage-applications pneuma-aoe-applications">${applications}</div>`:""}</section>`;
+    ${applications?resolutionSection(data.exchange.damage?.result?"damage-apply":"effects",`<div class="pneuma-aoe-applications">${applications}</div>`):""}
+    ${data.special&&!profile || data.ammoType==="smoke" ? resolutionSection("effects", ""
+      +(data.special&&!profile&&!data.effectsResolved?btn("effectsResolved","fa-check-double","GM: mark manual effects resolved"):"")
+      +(data.special&&!profile?"<p>Special ammunition: resolve its effects manually. Grenade-specific effects are not automated yet.</p>":"")
+      +(data.ammoType==="smoke"?"<p>Smoke: 1 minute.</p>"+(data.smokeId?btn("removeSmoke","fa-cloud","GM: remove smoke"):""):"")) : ""}</section>`;
 }
 function rowExchange(data:AreaAttack,row:TargetRow):Exchange {
   return {...data.exchange,coverUp:!!row.coverUp,defender:row.uuid,defenderActor:row.actor,defenderName:row.name,hit:row.state==="hit",
     damage:row.damage??(data.exchange.damage?.result?{...data.exchange.damage,status:"rolled",applications:[],recordedApplied:false}:undefined)};
+}
+export function areaEffectsLocked(data:AreaAttack):boolean {
+  return !!data.effectsLocked || damageEffectsLocked(data.exchange.damage) || data.rows.some(r=>damageEffectsLocked(r.damage) || !!r.instant && (r.instant.total!==undefined || ["rolling","applying","applied","resisted","skipped","review"].includes(r.instant.state)));
 }
 function complete(data:AreaAttack):boolean {
   if(data.phase!=="responses"||data.rows.some(r=>["waiting","rolling","other"].includes(r.state)))return false;
@@ -165,7 +179,7 @@ async function revealAttackDice(data:AreaAttack,message:ChatMessage):Promise<voi
   await showSavedDice(data.exchange.dice,data.exchange.rollMode,data.exchange.roller,messageDiceAudience(message));
   await message.update({[`flags.${MODULE}.rollsRevealed`]:true} as Parameters<typeof message.update>[0]);
 }
-const pending=new Map<string,{resolve:()=>void;reject:(e:Error)=>void;timer:ReturnType<typeof setTimeout>}>();
+const requests=new GMRequests();
 let queue:Promise<unknown>=Promise.resolve();
 export async function handleAreaRequest(req:Request) {
   if(game.user?.id!==gm()?.id)throw Error("An active GM is required.");
@@ -179,7 +193,7 @@ export async function handleAreaRequest(req:Request) {
   if(req.action==="instant") {
     if(!row?.instant||row.state!=="hit"||!req.instantRequest||data.phase!=="responses")throw Error("Instant effect unavailable.");
     row.instant.sourceMessage=message.id!;
-    await handleInstant(row.instant,req.instantRequest,user,()=>save(message,data),data.exchange.rollMode,messageDiceAudience(message));return;
+    await handleInstant(row.instant,req.instantRequest,user,()=>{data.effectsLocked=true;return save(message,data);},data.exchange.rollMode,messageDiceAudience(message));return;
   }
   if(req.action==="removeSmoke") {
     if(!user.isGM||data.ammoType!=="smoke")throw Error("GM only.");
@@ -222,7 +236,7 @@ export async function handleAreaRequest(req:Request) {
       if(!row||row.state!=="hit"||!["damageApply","damageResolved"].includes(req.damageRequest.action))throw Error("Select an affected target.");
       if(req.damageRequest.targetUuid && req.damageRequest.targetUuid!==row.uuid)throw Error("Damage target changed.");
       const exchange=rowExchange(data,row);
-      await handleDamage(req.damageRequest,user,exchange,async()=>{row.damage=exchange.damage;
+      await handleDamage(req.damageRequest,user,exchange,async()=>{row.damage=exchange.damage;if(damageEffectsLocked(row.damage))data.effectsLocked=true;
         if(data.ammoType==="incendiary"&&row.damage?.recordedApplied&&!row.instant) {
           row.instant=newInstant("incendiary",row.actor,row.name,rowEncounter(data,row.uuid));
           if(!row.damage.penetrated){row.instant.state="skipped";row.instant.summary="No penetrating damage";}
@@ -230,6 +244,7 @@ export async function handleAreaRequest(req:Request) {
         await save(message,data);},message);
     } else {
       if(!["damageClaim","damageRelease","damageCommit","damageReset","damageStatuses"].includes(req.damageRequest.action))throw Error("Invalid shared damage action.");
+      if(req.damageRequest.action==="damageStatuses"&&areaEffectsLocked(data))throw Error("Effect selection is locked because target resolution has started.");
       await handleDamage(req.damageRequest,user,data.exchange,()=>save(message,data),message);
     }
     return;
@@ -261,7 +276,7 @@ export async function handleAreaRequest(req:Request) {
       if(effect)await actor.deleteEmbeddedDocuments("ActiveEffect",[effect.id!]);
     }
     row.state="waiting";
-    delete row.claim;delete row.total;delete row.html;delete row.coverUp;delete row.coverProneId;delete row.moveCost;
+    delete row.claim;delete row.responseReceipt;delete row.total;delete row.html;delete row.coverUp;delete row.coverProneId;delete row.moveCost;
     if(row.instant)row.instant=newInstant(row.instant.id,row.actor,row.name,rowEncounter(data,row.uuid));
     data.effectsResolved=false;
     if(data.resolutionComplete){data.areaHidden=false;await syncTemplate(message,data);}
@@ -272,11 +287,16 @@ export async function handleAreaRequest(req:Request) {
     if(row.state!=="waiting"||!req.nonce||data.kind!=="suppression"&&!row.eligible)throw Error("This response is unavailable.");
     row.state="rolling";row.claim={nonce:req.nonce,user:user.id!,expires:Date.now()+120000};
   } else if(req.action==="release"||req.action==="commit") {
+    if(req.action==="commit"&&row.responseReceipt?.nonce===req.nonce&&row.responseReceipt?.user===user.id){
+      if(row.total!==req.total||row.html!==req.html)throw Error("Response reservation expired.");
+      return;
+    }
     if(row.claim?.nonce!==req.nonce||row.claim?.user!==user.id)throw Error("Response reservation expired.");
     if(req.action==="release"){row.state="waiting";delete row.claim;}
     else {
       if(!Number.isFinite(req.total)||typeof req.html!=="string")throw Error("Invalid defense roll.");
       row.total=req.total;row.html=req.html;
+      row.responseReceipt={nonce:req.nonce!,user:user.id!};
       row.state=winsAreaDefense(req.total!,data.exchange.total,data.kind==="suppression"?true:data.kind==="shell"?true:false)?"miss":"hit";
       delete row.claim;
     }
@@ -307,10 +327,7 @@ function send(message:string,action:string,extra:Partial<Request>={}) {
   requireCombatSocket();const authority=gm();if(!authority)throw Error("An active GM must be connected for area attacks.");
   const req:Request={...extra,aoeType:"request",id:foundry.utils.randomID(),user:game.user!.id,message,action};
   if(authority.id===game.user!.id){const next=queue.catch(()=>{}).then(()=>handleAreaRequest(req));queue=next;return next;}
-  return new Promise<void>((resolve,reject)=>{
-    const timer=setTimeout(()=>{pending.delete(req.id);reject(Error("Area response was not confirmed by the GM."));},30000);
-    pending.set(req.id,{resolve,reject,timer});game.socket!.emit(`module.${MODULE}`,req);
-  });
+  return requests.request(req.id,()=>game.socket!.emit(`module.${MODULE}`,req),30000,"Area response was not confirmed by the GM. Check the card before retrying.");
 }
 const starting=new Set<string>();
 export async function startAreaAttack(source:Token,target:Token,itemId:string,mode:string,skipDialog=false) {
@@ -394,7 +411,33 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
     ChatMessage.applyRollMode(messageData,exchange.rollMode as "roll");await ChatMessage.create(messageData);
   } finally {starting.delete(actor.uuid);}
 }
+interface SavedAreaResponse {nonce:string;roll:ReturnType<RollItem["createRoll"]>;mode:string;roller:string;audience:DiceAudience}
+const responseRetries=new Map<string,SavedAreaResponse>(),responding=new Set<string>();
+function refreshResponseRetry(message:ChatMessage,row:TargetRow,key:string) {
+  if(typeof document==="undefined")return;
+  for(const card of Array.from(document.querySelectorAll<HTMLElement>('[data-message-id="'+CSS.escape(message.id!)+'"]')))
+    for(const button of Array.from(card.querySelectorAll<HTMLButtonElement>('[data-aoe-action="retryResponse"]')))if(button.dataset.aoeTarget===row.uuid) {
+      if(responseRetries.has(key))button.disabled=false;
+      else button.remove();
+    }
+}
+async function commitAreaResponse(message:ChatMessage,row:TargetRow,key:string,saved:SavedAreaResponse) {
+  await send(message.id!,"commit",{target:row.uuid,nonce:saved.nonce,total:saved.roll.resultTotal,html:await nativeCard(saved.roll)});
+  responseRetries.delete(key);
+  refreshResponseRetry(message,row,key);
+  try{await showSavedDice(diceJSON(saved.roll),saved.mode,saved.roller,saved.audience);}
+  catch(error){console.warn(MODULE,"Area defense dice display failed; result saved",error);ui.notifications!.warn("Defense result saved. Dice animation failed.");}
+}
 async function respond(message:ChatMessage,data:AreaAttack,row:TargetRow,automatic=false,skipDialog=false) {
+  const key=game.user!.id+":"+message.id+":"+row.uuid;
+  if(responding.has(key))return;
+  responding.add(key);
+  try{await respondArea(message,data,row,key,automatic,skipDialog);}
+  finally{responding.delete(key);}
+}
+async function respondArea(message:ChatMessage,data:AreaAttack,row:TargetRow,key:string,automatic:boolean,skipDialog:boolean) {
+  const previous=responseRetries.get(key);
+  if(previous){await commitAreaResponse(message,row,key,previous);return;}
   const nonce=foundry.utils.randomID();await send(message.id!,"claim",{target:row.uuid,nonce});
   let committed=false;
   try {
@@ -408,10 +451,12 @@ async function respond(message:ChatMessage,data:AreaAttack,row:TargetRow,automat
     checkedLuck(Number(foundry.utils.getProperty(actor,"system.stats.luck.value")),0,roll.luck);
     if(data.kind!=="suppression"){const blocked=evasionBlocked(actor);if(blocked)throw Error(blocked);}
     roll=await item.confirmRoll(roll);await spendBonusLuck(actor,roll.luck);await rollHidden(roll);
-    await showSavedDice(diceJSON(roll),data.exchange.rollMode,game.user!.id,messageDiceAudience(message));
     roll.entityData={actor:actor.id!,token:row.uuid.split(".").at(-1)!,item:item.id!,tokens:[]};
-    await send(message.id!,"commit",{target:row.uuid,nonce,total:roll.resultTotal,html:await nativeCard(roll)});committed=true;
-  } finally {if(!committed)await send(message.id!,"release",{target:row.uuid,nonce});}
+    const saved={nonce,roll,mode:data.exchange.rollMode,roller:game.user!.id!,audience:messageDiceAudience(message)};
+    responseRetries.set(key,saved);
+    refreshResponseRetry(message,row,key);
+    await commitAreaResponse(message,row,key,saved);committed=true;
+  } finally {if(!committed&&!responseRetries.has(key))await send(message.id!,"release",{target:row.uuid,nonce});}
 }
 async function moveOutside(message:ChatMessage,data:AreaAttack,row:TargetRow) {
   if(canvas.scene?.id!==data.scene)throw Error("Open the attack scene first.");
@@ -427,11 +472,11 @@ async function moveOutside(message:ChatMessage,data:AreaAttack,row:TargetRow) {
 async function syncTemplate(message:ChatMessage,data:AreaAttack) {
   const scene=game.scenes!.get(data.scene) as Scene|undefined;if(!scene)return;
   const values={...templateData(data.area,scene),fillColor:data.phase==="scatter"?"#737980":ammoProfile(data.ammoType)?.color??"#d44a40",borderColor:data.phase==="scatter"?"#737980":ammoProfile(data.ammoType)?.color??"#ffffff",hidden:!!data.areaHidden,user:message.author?.id??game.user!.id,
-    flags:{[MODULE]:{areaMessage:message.id,areaShape:data.area}}};
+    flags:{[MODULE]:{areaMessage:message.id,areaShape:data.area,...(data.kind==="explosive"?{grenadeCombat:data.exchange.combatId??null}:{})}}};
   if(data.kind==="explosive") {
     const size=Number(scene.grid.size);
     const aim:Area={shape:"square",origin:data.intended,direction:0,length:size,width:size};
-    const marker={...templateData(aim,scene),fillColor:"#ffbf47",borderColor:"#ffbf47",hidden:!!data.areaHidden,user:values.user,flags:{[MODULE]:{areaMessage:message.id,areaShape:aim,originalAim:true}}};
+    const marker={...templateData(aim,scene),fillColor:"#ffbf47",borderColor:"#ffbf47",hidden:!!data.areaHidden,user:values.user,flags:{[MODULE]:{areaMessage:message.id,areaShape:aim,originalAim:true,grenadeCombat:data.exchange.combatId??null}}};
     const existing=data.aimTemplateId?scene.templates.get(data.aimTemplateId):undefined;
     if(existing)await existing.update(marker as never);
     else {const created=await scene.createEmbeddedDocuments("MeasuredTemplate",[marker as never]);data.aimTemplateId=created?.[0]?.id??undefined;}
@@ -469,7 +514,68 @@ export async function automateArea(message:ChatMessage) {
     }
   }finally{autoRows.delete(message.id!);}
 }
+/** Keep old saved dice/control nodes while combining lower recipient rows. */
+export function standardizeAreaLayout(root: HTMLElement,data?:AreaAttack): void {
+  const card=root.querySelector<HTMLElement>('.pneuma-aoe-card');
+  if(!card) return;
+  const picker=card.querySelector('.pneuma-aoe-effects-picker');
+  const roll=card.querySelector('.pneuma-resolution-damage-roll-body');
+  if(picker && roll && !roll.contains(picker))roll.append(picker);
+  if(card.querySelector('.pneuma-aoe-resolution-target'))return;
+  const targets=Array.from(card.querySelectorAll<HTMLElement>('.pneuma-aoe-targets .pneuma-aoe-target'));
+  const lowerRows=new Map<string,HTMLElement>();
+  const shell=document.createElement('div');shell.innerHTML=resolutionSection(card.querySelector('.pneuma-damage-result')?'damage-apply':'effects','<div class="pneuma-aoe-applications"></div>');
+  const section=shell.firstElementChild!,list=section.querySelector('.pneuma-aoe-applications')!;
+  const rowFor=(id:string)=>{
+    let row=lowerRows.get(id);if(row)return row;
+    const source=targets.find(target=>target.dataset.aoeRow===id);
+    row=document.createElement('div');row.className='pneuma-aoe-resolution-target';row.dataset.aoeRow=id;row.dataset.aoeActor=data?.rows.find(r=>r.uuid===id)?.actor??'';
+    const image=source?.querySelector('img');if(image)row.append(image.cloneNode(true));
+    const name=document.createElement('span');name.className='pneuma-aoe-name';name.textContent=source?.querySelector('.pneuma-aoe-name')?.textContent??'';row.append(name);
+    for(const kind of ['damage','effects']){const group=document.createElement('div');group.className='pneuma-aoe-target-'+kind;row.append(group);}
+    lowerRows.set(id,row);list.append(row);return row;
+  };
+  for(const target of targets) {
+    const controls=Array.from(target.querySelectorAll<HTMLElement>('[data-aoe-action="apply"], [data-aoe-action="damageResolved"]'));
+    if(controls.length)rowFor(target.dataset.aoeRow??'').querySelector('.pneuma-aoe-target-damage')!.append(...controls);
+  }
+  for(const old of Array.from(card.querySelectorAll<HTMLElement>('.pneuma-aoe-damage-target, .pneuma-aoe-effect-target'))) {
+    const row=rowFor(old.dataset.aoeRow??''),damage=old.classList.contains('pneuma-aoe-damage-target');
+    const group=row.querySelector(damage?'.pneuma-aoe-target-damage':'.pneuma-aoe-target-effects')!;
+    old.querySelector(':scope > strong')?.remove();group.append(...Array.from(old.childNodes));old.remove();
+  }
+  for(const effect of Array.from(card.querySelectorAll<HTMLElement>('.pneuma-aoe-targets .pneuma-instant-effect'))) {
+    const target=effect.closest<HTMLElement>('.pneuma-aoe-target')??effect.previousElementSibling as HTMLElement|null;
+    const id=effect.querySelector<HTMLElement>('[data-instant-scope]')?.dataset.instantScope??target?.dataset.aoeRow??'';
+    rowFor(id).querySelector('.pneuma-aoe-target-effects')!.append(effect);
+  }
+  for(const effect of Array.from(list.querySelectorAll<HTMLElement>('.pneuma-instant-effect'))) {effect.classList.add('pneuma-aoe-inline-effect');effect.title=effect.textContent?.trim()??'';}
+  const oldApplications=card.querySelector<HTMLElement>(':scope > .pneuma-aoe-applications');
+  if(oldApplications){
+    let destination:Element=list;
+    for(const child of Array.from(oldApplications.children)){
+      if(child.matches('.pneuma-damage-applied')){
+        const name=child.querySelector('.pneuma-applied-name')?.textContent;
+        const target=targets.find(t=>t.querySelector('.pneuma-aoe-name')?.textContent===name);
+        destination=target?rowFor(target.dataset.aoeRow??'').querySelector('.pneuma-aoe-target-damage')!:list;
+      }
+      destination.append(child);
+    }
+    oldApplications.remove();
+  }
+  if(list.childNodes.length)card.append(section);
+  for(const old of Array.from(card.querySelectorAll<HTMLElement>('.pneuma-resolution-damage-apply, .pneuma-resolution-effects'))) {
+    if(old!==section && !old.querySelector('button, .pneuma-instant-effect, .pneuma-damage-applied'))old.remove();
+  }
+}
+
 export function registerAreaAttacks() {
+  const finishMarkers=(combat:Combat)=>{
+    // Run after any pending creation/update so cleanup cannot leave a late-created marker.
+    const next=queue.catch(()=>{}).then(()=>clearGrenadeMarkers(combat));queue=next;void next.catch(errors);
+  };
+  Hooks.on("updateCombat",(combat:Combat,changes:{round?:number|null})=>{if(changes.round!==undefined&&!combat.started)finishMarkers(combat);});
+  Hooks.on("deleteCombat",finishMarkers);
   Hooks.on("updateChatMessage",(message:ChatMessage)=>{void automateArea(message).catch(errors);});
   registerAreaSettings();registerAreaMovement();registerSmoke();
   const pendingCards = new PendingCardRefresh(message => { void ui.chat?.updateMessage(message); }, message => {
@@ -514,8 +620,7 @@ export function registerAreaAttacks() {
   Hooks.once("ready",()=>game.socket!.on(`module.${MODULE}`,(p:Request|Reply)=>{
     if(!p||!["request","reply"].includes(p.aoeType))return;
     if(p.aoeType==="reply"){
-      if(p.user!==game.user!.id||p.gm!==gm()?.id)return;const wait=pending.get(p.id);if(!wait)return;
-      clearTimeout(wait.timer);pending.delete(p.id);if(p.error)wait.reject(Error(p.error));else wait.resolve();
+      requests.reply(p,undefined);
     } else if(game.user!.id===gm()?.id) {
       const reply=(error?:string)=>game.socket!.emit(`module.${MODULE}`,{aoeType:"reply",id:p.id,user:p.user,gm:game.user!.id,error});
       const next=queue.catch(()=>{}).then(()=>handleAreaRequest(p));queue=next;void next.then(()=>reply(),e=>reply((e as Error).message));
@@ -523,6 +628,17 @@ export function registerAreaAttacks() {
   }));
   Hooks.on("renderChatMessage",async(message:ChatMessage,html:JQuery)=>{
     const data=flag(message);if(!data||!canRenderCombatCard(message))return;
+    if(html[0])standardizeAreaLayout(html[0],data);
+    const picker=html[0]?.querySelector<HTMLElement>('.pneuma-aoe-effects-picker');
+    if(picker && data.exchange.damage?.result) {
+      const attacker=await actorAt(data.exchange.attacker).catch(()=>null);
+      if(attacker && owns(attacker)) {
+        const selected=(data.exchange.damage.statusEffects??inherentDamageStatuses(data.exchange.damage.result.ammoType)).slice(0,3);
+        renderDamageStatusPicker(picker,selected,areaEffectsLocked(data),!["rolled","applied"].includes(data.exchange.damage.status),
+          statusEffects=>send(message.id!,"damage",{damageRequest:{action:"damageStatuses",statusEffects}}));
+      } else picker.replaceChildren();
+    }
+    if(html[0])arrangeAreaEffectControls(html[0]);
     if(html[0])await bindInstantControls(html[0],scope=>data.rows.find(r=>r.uuid===scope)?.instant,(scope,instantRequest)=>send(message.id!,"instant",{target:scope,instantRequest}),data.exchange.rollMode,messageDiceAudience(message));
     // Shared roll only: controls stay by targets; application results follow the roll.
     html.find<HTMLElement>('.pneuma-aoe-card > .pneuma-damage-result > [data-pneuma-section="damage-apply"], .pneuma-aoe-card > .pneuma-damage-result > .pneuma-resolution-recovery-slot').toArray().forEach(node=>node.remove());
@@ -530,7 +646,7 @@ export function registerAreaAttacks() {
     html.find<HTMLElement>('.pneuma-aoe-attack [data-action="rollDamage"]').toArray().forEach(button=>button.remove());
     for(const button of html.find<HTMLButtonElement>("[data-aoe-action]").toArray()){
       const action=button.dataset.aoeAction!,row=data.rows.find(r=>r.uuid===button.dataset.aoeTarget);
-      if(action==="damage"||action==="apply")button.innerHTML='<i class="fas '+(action==="damage"?"fa-droplet":"fa-bolt")+'" aria-hidden="true"></i>';
+      if(action==="damage"||action==="apply")button.innerHTML='<i class="fas '+(action==="damage"?"fa-droplet":"fa-bolt")+'" aria-hidden="true"></i>'+(action==="apply"?' <span>'+(row?.damage?.recordedApplied?'Applied':'Apply Damage')+'</span>':'');
       if(action==="show") {
         if(!game.user!.isGM){button.remove();continue;}
         const label=data.areaHidden?"Show attack area":"Hide attack area";
@@ -547,6 +663,10 @@ export function registerAreaAttacks() {
       const actor=await actorAt(row?.uuid??data.exchange.attacker).catch(()=>null);
       const gmOnly=["removeSmoke","scatter","hit","miss","exclude","forcehit","add","reset","damageReset","damageResolved","effectsResolved"].includes(action);
       if(action!=="show"&&(!actor||!owns(actor)||gmOnly&&!game.user!.isGM)){button.remove();continue;}
+      if(action==="retryResponse"&&row&&!responseRetries.has(game.user!.id+":"+message.id+":"+row.uuid)) {
+        if(row.state!=="rolling"){button.remove();continue;}
+        button.disabled=true;button.title="Available on the rolling client's saved result after an interrupted response.";
+      }
       if(action==="roll"&&data.kind!=="suppression"&&row){
         const blocked=actor?evasionBlocked(actor):undefined;
         const eligible=actor?evadeAllowed(Number(foundry.utils.getProperty(actor,"system.stats.ref.value")),data.settings.evade):row.eligible;
@@ -555,8 +675,9 @@ export function registerAreaAttacks() {
       if(action==="reset"&&row&&!canResetResponse(data,row)) {
         button.disabled=true;button.title="Cannot reset after movement, damage or effect application has started.";
       }
+      if(action==="apply")button.dataset.chatState=row?.damage?.recordedApplied?"applied":"";
       if(action==="apply"&&(row?.damage?.recordedApplied||["review","applying"].includes(row?.damage?.status??"")))button.disabled=true;
-      button.addEventListener("click",async event=>{
+      bindCardAction(button,async event=>{
         event.preventDefault();event.stopPropagation();if(button.disabled)return;button.disabled=true;
         try {
           if(action==="show")await send(message.id!,"show",{hidden:!data.areaHidden});
@@ -571,6 +692,7 @@ export function registerAreaAttacks() {
             if(area)await send(message.id!,"scatter",{area});
           } else if(action==="add") {const selected=canvas.tokens?.controlled??[];if(selected.length!==1)throw Error("Select exactly one token to add.");await send(message.id!,"add",{target:selected[0]!.document.uuid});}
           else if(action==="roll"&&row)await respond(message,data,row,false,event.shiftKey);
+          else if(action==="retryResponse"&&row)await respond(message,data,row);
           else if(action==="move"&&row)await moveOutside(message,data,row);
           else if(action==="damage")await rollDamage(message.id!,data.exchange,(a,extra)=>send(message.id!,"damage",{damageRequest:{...extra,action:a}}),event.shiftKey);
           else if(action==="apply"&&row)await applyFromCard(rowExchange(data,row),(a,extra)=>send(message.id!,"damage",{target:row.uuid,damageRequest:{...extra,action:a}}),event.shiftKey,row.uuid,"recorded",halfArmorSelected(event),interactArmorSelected(event));
@@ -579,5 +701,6 @@ export function registerAreaAttacks() {
         }catch(e){errors(e);}finally{button.disabled=false;}
       });
     }
+    if(html[0])arrangeAreaEffectControls(html[0]);
   });
 }

@@ -104,6 +104,7 @@ test("target response reservations reject competing users and explosive ties hit
  await assert.rejects(f.request("claim",{user:"stranger",nonce:"x"}),/owner/);
  await f.request("claim",{nonce:"one"});await assert.rejects(f.request("claim",{nonce:"two"}),/unavailable/);
  await f.request("commit",{nonce:"one",total:20,html:"defense"});assert.equal(f.data().rows[0].state,"hit");
+ await f.request("commit",{nonce:"one",total:20,html:"defense"});assert.equal(f.data().rows[0].total,20,'Lost acknowledgement retries the same result');
  await assert.rejects(f.request("commit",{nonce:"one",total:30,html:"again"}),/expired/);
 });
 test("Cover Up becomes Prone without moving and cannot be used while disabled",async()=>{
@@ -134,7 +135,9 @@ test("one shared damage roll is reused per target and each application is idempo
  await f.request("damage",{target:undefined,user:"att",damageRequest:{action:"damageCommit",nonce:"damage",damage:result}});
  const request={action:"damageApply",targetUuid:f.target.document.uuid,application:"recorded",applicationId:"apply1",options:{useShield:true,damageReductionRole:true,damageReductionAE:true,brainDamageReduction:true}};
  await f.request("exclude",{user:"gm",target:f.third.document.uuid});
+ await f.request("damage",{target:undefined,user:"att",damageRequest:{action:"damageStatuses",statusEffects:[]}});
  await f.request("damage",{damageRequest:request});await f.request("damage",{damageRequest:request});
+ await assert.rejects(f.request("damage",{target:undefined,user:"att",damageRequest:{action:"damageStatuses",statusEffects:[]}}),/locked/);
  assert.equal(f.data().areaHidden,true);assert.equal(f.scene.templates[0].hidden,true);
  assert.equal(f.calls.filter(x=>x==="apply:b").length,1);assert.equal(f.data().rows[0].damage.recordedApplied,true);
  assert.equal(f.data().exchange.damage.result.values.total,24);
@@ -273,7 +276,7 @@ test("scatter placement stays silent until all responses resolve",async()=>{
 test("poison grenades use per-target resistance instead of normal damage",async()=>{
  const f=fixture();f.weapon.system.weaponType="grenadeLauncher";f.weapon._getLoadedAmmoProp=p=>p==="type"?"poison":"grenade";
  await startAreaAttack(f.source,f.target,"w","attack");assert.equal(f.data().ammoType,"poison");assert.ok(f.data().special);assert.equal(f.data().rows[0].instant.id,"poison");
- await f.request("decline");await f.request("instant",{instantRequest:{action:"claim",nonce:"resist"}});await f.request("instant",{instantRequest:{action:"commit",nonce:"resist",total:14,html:"native resistance"}});
+ await f.request("decline");await f.request("instant",{instantRequest:{action:"claim",nonce:"resist"}});assert.equal(f.data().effectsLocked,true);await f.request("instant",{instantRequest:{action:"commit",nonce:"resist",total:14,html:"native resistance"}});
  assert.equal(f.data().rows[0].instant.state,"resisted");assert.match(f.messages[0].content,/native resistance/);assert.doesNotMatch(f.messages[0].content,/resolve its effects manually/);await assert.rejects(f.request("damage",{damageRequest:{action:"damageClaim",nonce:"x"}}),/unavailable/);
 });
 test("armor-piercing rocket records its ammunition and damage formula before reload",async()=>{
@@ -376,7 +379,7 @@ test('AoE item changes refresh indexed pending cards without scanning chat histo
  globalThis.Actor=class{};globalThis.Item=class{};foundry.data={fields:{ObjectField:class{}}};game.settings.register=()=>{};game.settings.registerMenu=()=>{};game.socket={on(){}};
  const actor=Object.assign(new Actor(),{uuid:'Actor.pending'}),item=Object.assign(new Item(),{parent:actor});
  const card={id:'pending',visible:true,flags:{[M]:{aoe:{phase:'responses',rows:[{actor:actor.uuid,state:'waiting'}],exchange:{combatId:'c'}}}}};
- const frames=[],changed=[];let scans=0;globalThis.requestAnimationFrame=fn=>(frames.push(fn),frames.length);ui.chat={updateMessage:m=>changed.push(m.id)};
+ const frames=[],changed=[];let scans=0;globalThis.requestAnimationFrame=fn=>(frames.push(fn),frames.length);ui.chat={element:{find:()=>({length:1})},updateMessage:m=>changed.push(m.id)};
  game.messages={ [Symbol.iterator](){scans++;return [card][Symbol.iterator]();} };
  const {registerAreaAttacks}=await import('../dist/scripts/aoe/workflow.js');registerAreaAttacks();
  for(const fn of hooks.ready)fn();assert.equal(scans,1);

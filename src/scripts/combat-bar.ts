@@ -1,7 +1,7 @@
 import {openCombatBarSettings} from "./combat-bar-settings.js";
 import {barCombat, barEntries, canEndTurn, movementMode, MOVEMENT_MODES, registerBarMovement, validMode, type BarEntry} from "./combat-bar-state.js";
 import {requestEndTurn,registerBarTurns} from "./combat-bar-turn.js";
-import {showBarStatuses,showBarControls,showBarInitiative,closeBarFlyout,leaveBarFlyout,navigateBarEntry} from "./combat-bar-flyout.js";
+import {showBarStatuses,showBarControls,showBarInitiative,closeBarFlyout,invalidateBarStatuses,leaveBarFlyout,navigateBarEntry} from "./combat-bar-flyout.js";
 
 const MODULE = "pneuma-combattools";
 let root: HTMLElement | undefined;
@@ -106,7 +106,7 @@ function row(entry: BarEntry): HTMLElement {
     : `${entry.name} — click to select; hold to ping; Shift-click to pan; double-click for sheet${game.user?.isGM ? "; Shift-hold to pan players" : ""}`;
   const portrait = button("", title, "token");
   portrait.className = "pneuma-bar-token";
-  portrait.disabled = !entry.token && !entry.combatant?.actor;
+  portrait.disabled = !entry.token && !entry.combatant?.actor && !entry.actor;
   const img = document.createElement("img");
   img.src = entry.img;
   img.alt = "";
@@ -176,7 +176,7 @@ function bind(root: HTMLElement): void {
     event.preventDefault();event.stopPropagation();cancelHold();
     const id=target.closest<HTMLElement>("[data-entry-id]")?.dataset.entryId;
     const entry=barEntries().find(entry=>entry.id===id);
-    const actor=entry?.combatant?.actor??entry?.token?.actor;
+    const actor=entry?.actor??entry?.combatant?.actor??entry?.token?.actor;
     // Same sheet-view permission used by Foundry v12's combat tracker.
     if(actor?.testUserPermission(game.user!,"OBSERVER")){
       closeBarFlyout();
@@ -404,5 +404,5 @@ export function registerCombatBar(): void {
   window.addEventListener("blur", cancelHold);
   window.addEventListener("pointerdown", event => {if(root&&!root.contains(event.target as Node)){closeBarFlyout();}});
   window.addEventListener("keydown", event => {if(event.key==="Escape")closeBarFlyout();});
-  for(const hook of ["createActiveEffect","updateActiveEffect","deleteActiveEffect"])Hooks.on(hook,closeBarFlyout);
+  for(const hook of ["createActiveEffect","updateActiveEffect","deleteActiveEffect"])Hooks.on(hook,invalidateBarStatuses);
 }

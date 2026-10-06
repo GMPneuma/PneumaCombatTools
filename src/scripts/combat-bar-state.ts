@@ -39,6 +39,7 @@ export interface BarEntry {
   img: string;
   token?: Token;
   combatant?: Combatant;
+  actor?: Actor;
   active: boolean;
   hidden: boolean;
   defeated: boolean;
@@ -55,13 +56,16 @@ export function barEntries(combat = barCombat()): BarEntry[] {
     hidden: combatant.hidden || !!combatant.token?.hidden, defeated: combatant.isDefeated,
   }));
 
-  return (canvas.tokens?.placeables ?? []).filter(token => {
-    if (!token.actor || String(token.actor.type) === "container" || token.isPreview) return false;
-    if (!user.isGM) return token.isOwner && !token.document.hidden && token.isVisible;
-    return game.users?.some(player => player.active && !player.isGM && token.actor!.testUserPermission(player, "OWNER"));
-  }).map(token => ({
-    id: token.id!, name: token.name, img: token.actor!.img || "icons/svg/mystery-man.svg", token,
-    active: false, hidden: token.document.hidden, defeated: false,
+  const actors = new Map<string, Actor>();
+  const users = user.isGM ? Array.from(game.users?.values() ?? []).filter(player => player.active && !player.isGM) : [user];
+  for (const player of users) {
+    const actor = player.character;
+    if (actor && String(actor.type) !== "container" && (user.isGM || actor.testUserPermission(user, "OBSERVER"))) actors.set(actor.id!, actor);
+  }
+  return [...actors.values()].map(actor => ({
+    id: `actor:${actor.id}`, name: actor.name!, img: actor.img || "icons/svg/mystery-man.svg", actor,
+    token: canvas.tokens?.placeables.find(token => token.actor?.id === actor.id && !token.isPreview && (user.isGM || !token.document.hidden && token.isVisible)),
+    active: false, hidden: false, defeated: false,
   }));
 }
 

@@ -45,7 +45,8 @@ export async function postResult(source: Token, target: Token, result: Quickhack
   const dice = rollContent ? `<div class="pneuma-quickhack-roll ${rollOutcomeClass(result.success)}" data-quickhack-section="roll">${rollContent}</div>` : "";
   const content = `<div class="rollcard pneuma-quickhack-card" data-state="${result.success ? "success" : "failure"}">`
     + header + dice
-    + resolutionSection("result", `<div class="cpr-block pneuma-quickhack-result"><strong class="pneuma-quickhack-outcome">${escapeHTML(outcome)}</strong><div class="pneuma-quickhack-detail">${detail}</div>${effects}<div class="pneuma-quickhack-actions">${damage}${controls}</div></div>`)
+    + resolutionSection("result", `<div class="cpr-block pneuma-quickhack-result"><strong class="pneuma-quickhack-outcome">${escapeHTML(outcome)}</strong><div class="pneuma-quickhack-detail">${detail}</div><div class="pneuma-quickhack-actions">${damage}${controls}</div></div>`)
+    + (effects ? resolutionSection("effects", effects) : "")
     + "</div>";
   return ChatMessage.create({ content, ...delivery(result.audience, source.actor!, target.actor!),
     speaker: result.revealAttacker ? ChatMessage.getSpeaker({ actor: source.actor!, token: source.document }) : { alias: label("Result.UnknownNetrunner") },

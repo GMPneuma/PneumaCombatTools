@@ -1,8 +1,9 @@
 import { allActors as actors } from "./shared.js";
+import {withActorMutation} from "./actor-mutation.js";
 import {actorEncounter,encounterEpoch} from "./encounter.js";
 import {effectDuration,durationExpired,hasDuration} from "./effect-duration.js";
-import {masterStatuses,isAddictionEffect} from "./status-catalog.js";
-import {proneIds} from "./prone.js";
+import {masterStatuses} from "./status-catalog.js";
+import {actorInStartedCombat,effectCombat,effectBelongsToCombat,effectEndsWithCombat,effectExpired,effectLifetime,isSpeedheal} from "./effect-lifetime.js";
 import {applyCombatStatus, syncActorStatuses} from "./status-sync.js";
 import {empGM,empWork} from "./emp-state.js";
 const M="pneuma-combattools", key="flags."+M+".instantLifetime";
@@ -12,9 +13,8 @@ const status=(name:string)=>{const s=masterStatuses.find(s=>s.name===name);if(!s
 const active=(e:ActiveEffect)=>!e.disabled&&!e.isSuppressed&&!foundry.utils.getProperty(e,"system.isSuppressed");
 const allEffects=(actor:Actor):ActiveEffect[]=>Array.from(actor.allApplicableEffects?.()??actor.effects);
 const speedhealKey="flags."+M+".speedhealEffects";
-const isSpeedheal=(effect:ActiveEffect)=>effect.statuses.has(status("Speed Heal").id)||effect.statuses.has("speedheal");
 export async function trackSpeedheal(effect:ActiveEffect,combat:Combat):Promise<void> {
-  if(!active(effect)||!isSpeedheal(effect)||!effect.uuid)return;
+  if(!active(effect)||!isSpeedheal(effect)||effectLifetime(effect).protected||!effect.uuid)return;
   const saved=foundry.utils.getProperty(combat,speedhealKey) as string[]|undefined;
   if(!saved?.includes(effect.uuid))await combat.update({[speedhealKey]:[...(saved??[]),effect.uuid]});
 }
@@ -23,7 +23,7 @@ export async function clearCombatSpeedheal(combat:Combat):Promise<void> {
   for(const uuid of saved??[]){
     const effect=await fromUuid(uuid) as ActiveEffect|null;
     if(effect?.parent&&Array.from(game.combats??[]).some(c=>c.id!==combat.id&&c.started&&c.combatants.some(p=>p.actor?.uuid===effect.parent!.uuid)))continue;
-    if(effect&&isSpeedheal(effect))await effect.delete();
+    if(effect&&isSpeedheal(effect)&&!effectLifetime(effect).protected)await effect.delete();
   }
   if(saved?.length&&game.combats?.get(combat.id!)===combat)
     await combat.update({["flags."+M+".-=speedhealEffects"]:null});
@@ -100,8 +100,7 @@ export async function expireInstantActor(actor:Actor,now=game.time!.worldTime) {
   if(items.length){await actor.deleteEmbeddedDocuments("Item",items,{pneumaStatusSync:true} as never);await syncActorStatuses(actor);}
   let itemEffectsChanged=false;
   for(const effect of allEffects(actor)) {
-    if(isAddictionEffect(effect))continue;
-    const expired=hasDuration(effect.duration)?durationExpired(effect.duration,now):life(effect)?.expires!==undefined&&life(effect)!.expires!<=now;
+    const expired=effectExpired(effect,now);
     if(!expired||effect.disabled)continue;
     if(effect.parent===actor)await actor.deleteEmbeddedDocuments("ActiveEffect",[effect.id!]);
     else {await effect.update({disabled:true} as never);itemEffectsChanged=true;}
@@ -116,13 +115,9 @@ export async function finishTimedEffects(combat:Combat) {
   const participants=new Set(Array.from(combat.combatants??[]).map(c=>c.actor?.uuid));
   for(const actor of actors()) {
     // Linked actors may still be participating in another scene's encounter.
-    if(Array.from(game.combats??[]).some(c=>c.id!==combat.id&&c.started&&c.combatants.some(p=>p.actor?.uuid===actor.uuid)))continue;
+    if(actorInStartedCombat(actor,combat.id!))continue;
     try{
-    const belongs=(effect:ActiveEffect)=>{
-      const linked=foundry.utils.getProperty(effect,"flags."+M+".endWithCombat") as string|undefined ?? effect.duration?.combat;
-      const id=typeof linked==="string"?linked:linked?.id;
-      return id?id===combat.id:participants.has(actor.uuid);
-    };
+    const belongs=(effect:ActiveEffect)=>effectBelongsToCombat(effect,actor,combat);
     // Only an injury with a timed marker linked to its item is temporary.
     const temporary=actor.items.filter(item=>{
       const marker=timedMarker(actor,item);
@@ -131,23 +126,7 @@ export async function finishTimedEffects(combat:Combat) {
     if(temporary.length){await actor.deleteEmbeddedDocuments("Item",temporary,{pneumaStatusSync:true} as never);await syncActorStatuses(actor);}
     let changed=false;
     for(const effect of allEffects(actor)) {
-      if(isAddictionEffect(effect))continue;
-      if(isSpeedheal(effect)&&belongs(effect)) {
-        if(effect.parent===actor)await actor.deleteEmbeddedDocuments("ActiveEffect",[effect.id!]);
-        else await effect.update({disabled:true} as never);
-        changed=true;continue;
-      }
-      if(participants.has(actor.uuid)&&proneIds().some(id=>effect.statuses.has(id))) {
-        if(effect.parent===actor)await actor.deleteEmbeddedDocuments("ActiveEffect",[effect.id!]);
-        else await effect.update({disabled:true} as never);
-        changed=true;continue;
-      }
-      const injury=String((effect.parent as Item)?.type)==="criticalInjury"||masterStatuses.some(s=>s.binding?.kind==="injury"&&effect.statuses.has(s.id));
-      if(injury||foundry.utils.getProperty(effect,"flags."+M+".disableRequest")||(!hasDuration(effect.duration)&&!foundry.utils.getProperty(effect,"flags."+M+".endWithCombat")))continue;
-      const linked=foundry.utils.getProperty(effect,"flags."+M+".endWithCombat") as string|undefined ?? effect.duration?.combat;
-      const combatId=typeof linked==="string"?linked:linked?.id;
-      if(combatId&&combatId!==combat.id)continue;
-      if(!combatId&&!participants.has(actor.uuid))continue;
+      if(!effectEndsWithCombat(effect,actor,combat))continue;
       if(effect.parent===actor)await actor.deleteEmbeddedDocuments("ActiveEffect",[effect.id!]);
       else await effect.update({disabled:true,["flags."+M+".-=endWithCombat"]:null} as never);
       changed=true;
@@ -162,8 +141,7 @@ export async function finishTimedEffects(combat:Combat) {
 export async function reconcileEndedEffects(){
   const ids=new Set<string>();
   for(const actor of actors())for(const effect of allEffects(actor)){
-    const link=foundry.utils.getProperty(effect,"flags."+M+".endWithCombat") as string|undefined??effect.duration?.combat;
-    const id=typeof link==="string"?link:link?.id;
+    const id=effectCombat(effect);
     if(id&&!game.combats?.get(id)?.started)ids.add(id);
   }
   const errors:string[]=[];
@@ -174,17 +152,19 @@ export async function reconcileEndedEffects(){
 let work:Promise<unknown>=Promise.resolve();
 const enqueue=(run:()=>Promise<unknown>)=>{if(game.user?.id!==empGM()?.id)return;work=work.catch(()=>{}).then(run);void work.catch(e=>ui.notifications!.error("Instant effects: "+(e as Error).message));};
 export async function burnTurn(actor:Actor,turn:string) {
-  const effects=allEffects(actor).filter(e=>active(e)&&fireDamage(e)>0);
-  if(!effects.length||foundry.utils.getProperty(actor,"flags."+M+".lastBurnTurn")===turn||effects.some(e=>life(e)?.lastTurn===turn))return;
-  // Persist the turn before HP writes so duplicate combat updates cannot burn twice.
+  return withActorMutation(actor,async()=>{
+    const effects=allEffects(actor).filter(e=>active(e)&&fireDamage(e)>0);
+    if(!effects.length||foundry.utils.getProperty(actor,"flags."+M+".lastBurnTurn")===turn||effects.some(e=>life(e)?.lastTurn===turn))return;
+    // Persist the turn before HP writes so duplicate combat updates cannot burn twice.
 
-  const hp=Number(foundry.utils.getProperty(actor,"system.derivedStats.hp.value"));
-  if(!Number.isFinite(hp))throw Error("Target HP is unavailable.");
-  await actor.update({"system.derivedStats.hp.value":hp-Math.max(...effects.map(fireDamage)),["flags."+M+".lastBurnTurn"]:turn} as never);
+    const hp=Number(foundry.utils.getProperty(actor,"system.derivedStats.hp.value"));
+    if(!Number.isFinite(hp))throw Error("Target HP is unavailable.");
+    await actor.update({"system.derivedStats.hp.value":hp-Math.max(...effects.map(fireDamage)),["flags."+M+".lastBurnTurn"]:turn} as never);
+  });
 }
 export function registerInstantLifetimes() {
   const track=(effect:ActiveEffect)=>{
-    if(!active(effect)||!isSpeedheal(effect)||!(effect.parent instanceof Actor))return;
+    if(!active(effect)||!isSpeedheal(effect)||effectLifetime(effect).protected||!(effect.parent instanceof Actor))return;
     const actor=effect.parent;
     const combats=Array.from(game.combats??[]).filter(c=>c.started&&c.active&&c.combatants.some(row=>row.actor?.uuid===actor.uuid));
     if(combats.length!==1)return;
@@ -220,7 +200,7 @@ export function registerInstantLifetimes() {
   Hooks.on("updateActor",(a:Actor)=>{const before=hpValues.get(a.uuid),after=Number(foundry.utils.getProperty(a,"system.derivedStats.hp.value"));hpValues.set(a.uuid,after);if(before!==undefined&&after<before)enqueue(()=>clearInstantCondition(a,"sleep"));});
   Hooks.on("createCombat",rememberCombat);Hooks.on("preUpdateCombat",rememberCombat);
   const finish=(c:Combat)=>{
-    const affected=[...new Set([...Array.from(c.combatants??[]).flatMap(p=>p.actor?[p.actor.uuid]:[]),...actors().filter(a=>allEffects(a).some(e=>{const link=foundry.utils.getProperty(e,"flags."+M+".endWithCombat")??e.duration?.combat;return (typeof link==="string"?link:(link as Combat|undefined)?.id)===c.id;})).map(a=>a.uuid)])];
+    const affected=[...new Set([...Array.from(c.combatants??[]).flatMap(p=>p.actor?[p.actor.uuid]:[]),...actors().filter(a=>allEffects(a).some(e=>{return effectCombat(e)===c.id;})).map(a=>a.uuid)])];
     enqueue(async()=>{
       if(game.combats?.get(c.id!)?.started)return;
       try{await finishTimedEffects(c);}finally{

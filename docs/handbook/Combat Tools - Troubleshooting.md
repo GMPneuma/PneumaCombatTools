@@ -13,7 +13,7 @@
 | QuickHack controls absent | Enable integration, disable standalone Quickhack, confirm availability/deck loading and tracked connection. |
 | Jacked In but cannot hack | Check originating encounter, exact tokens, line of sight, range and connection/ejection state. Losing sight does not disconnect. |
 | EMP request unavailable | Ensure the intended combat is started and participants/context are valid. General out-of-combat disablement is unsupported. |
-| No movement counter | Check world setting, active started encounter and square grid. Hex/gridless is unsupported. |
+| No movement counter | Check world setting, active started encounter and square grid. Only the current-turn token and tokens selected by the GM show counters. Hex/gridless is unsupported. |
 | Token still cannot move in Free-Move | Check distinct grapple/EMP restrictions and native permissions. |
 | Biomonitor missing/wrong actor | Enable it; select one owned token or assign Character. Multiple fallback tokens are not guessed. |
 | Biomonitor moved left | Top-right combat bar temporarily forces left. Saved side is retained. |

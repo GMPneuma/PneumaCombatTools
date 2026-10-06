@@ -11,7 +11,7 @@ import { grappleWeaponBlocked } from "./grapple/state.js";
 import { PendingCardRefresh } from "./pending-card-refresh.js";
 import { setItemMarker } from "./item-markers.js";
 import type { CriticalMethod } from "./critical-injury.js";
-import { resolutionSection, rollOutcomeClass } from "./card-structure.js";
+import { bindCardAction, resolutionSection, rollOutcomeClass } from "./card-structure.js";
 import { damageContent, handleDamage, renderDamage, type DamageState, type DamageRequest } from "./damage-flow.js";
 import { homebrew, automaticNPCEvasion } from "./evasion-settings.js";
 import { checkedLuck, evasionButtonLabel, evasionOffer, type EvasionOffer } from "./evasion-rules.js";
@@ -525,17 +525,18 @@ export function registerCombatResolution(): void {
     html.find(".message-sender").text(data.attackerName + " → " + data.defenderName);
     if (data.state === "resolved") {
       if (game.user!.isGM && canOverrideEvasion(message, data)) {
-        const button = document.createElement("button");
+        const button = html[0]?.querySelector<HTMLButtonElement>(".pneuma-evasion-override") ?? document.createElement("button");
         button.type = "button"; button.className = "pneuma-evasion-override";
         button.dataset.gmOnly = "true"; button.textContent = "Allow evasion";
         button.title = "GM override for this attack; the attack roll has already been revealed";
-        button.addEventListener("click", async () => {
+        bindCardAction(button, async () => {
+          if (button.disabled) return;
           button.disabled = true;
           try { await request(message.id!, "overrideEvasion"); }
           catch (error) { ui.notifications!.error((error as Error).message); button.disabled = false; }
         });
         html.find(".pneuma-cannot-evade").append(button);
-      }
+      } else html[0]?.querySelectorAll(".pneuma-evasion-override").forEach(button => button.remove());
       if(data.disableSource==="microwaver")return;
       void renderDamage(message, data, html, (action, extra) => request(message.id!, action, extra))
         .catch(error => console.warn(MODULE, error));
@@ -553,7 +554,7 @@ export function registerCombatResolution(): void {
       const panel = document.createElement("div"); panel.className = "pneuma-defense-controls";
       for (const [text, evade] of data.state === "applying" ? [["Finish payment", true] as const]
         : [[data.ranged ? evasionButtonLabel(choice) : "Free evasion", true] as const, ["Do not Evade", false] as const]) {
-        const button = document.createElement("button"); button.type = "button"; button.textContent = text;
+        const button = document.createElement("button"); button.type = "button"; button.textContent = text; button.dataset.chatAction = data.state === "applying" ? "retry" : evade ? "evade" : "decline";
         if (evade && data.state === "waiting") {
           const icon = document.createElement("i"); icon.className = "fas fa-person-running pneuma-evade-icon";
           icon.setAttribute("aria-hidden", "true");

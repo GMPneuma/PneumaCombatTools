@@ -4,9 +4,9 @@ export const instantEffects = {
   poison: {name:"Poison", color:"#54ad49", skill:"Resist Torture/Drugs", dv:13, damage:"2d6", eligibility:"Meat target"},
   biotoxin: {name:"Biotoxin", color:"#ee912f", skill:"Resist Torture/Drugs", dv:15, damage:"3d6", eligibility:"Meat target"},
   emp: {name:"EMP", color:"#47c9dd", skill:"Cybertech", dv:15, damage:"", eligibility:"Cyberware or carried electronics"},
-  microwaver: {name:"Microwaver", color:"#47c9dd", skill:"Cybertech", dv:15, damage:"", eligibility:"Cyberware or carried electronics; one minute"},
+  microwaver: {name:"EMP (Microwaver)", color:"#47c9dd", skill:"Cybertech", dv:15, damage:"", eligibility:"Cyberware or carried electronics; one minute"},
   flashbang: {name:"Flashbang", color:"#f0d953", skill:"Resist Torture/Drugs", dv:15, damage:"", eligibility:"Affected target"},
-  incendiary: {name:"Ignite", color:"#ef632e", skill:"", dv:0, damage:"", eligibility:"After damage penetrates armor"},
+  incendiary: {name:"On Fire (Mild)", color:"#ef632e", skill:"", dv:0, damage:"", eligibility:"After damage penetrates armor"},
   sleep: {name:"Sleep", color:"#ad80df", skill:"Resist Torture/Drugs", dv:13, damage:"", eligibility:"Meat target"},
   teargas: {name:"Teargas", color:"#b3c84c", skill:"Resist Torture/Drugs", dv:13, damage:"", eligibility:"Meat eyes"},
 } as const;

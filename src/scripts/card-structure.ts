@@ -1,7 +1,7 @@
 /** Stable presentation sections; content is already-rendered native/module markup. */
 const labels = {
   pending: "Pending attack", attack: "Attack", evade: "Evasion", result: "Result",
-  "damage-roll": "Damage roll", "damage-apply": "Apply damage", recovery: "Recovery",
+  "damage-roll": "Damage roll", "damage-apply": "Apply damage", recovery: "Recovery", effects: "Effects",
 } as const;
 
 export function resolutionSection(kind: keyof typeof labels, content: string, classes = ""): string {
@@ -36,4 +36,13 @@ export function decorateSharedCard(root: HTMLElement, message: ChatMessage): voi
   if (!kind || !canRenderCombatCard(message)) return;
   root.classList.add("pneuma-combat-message");
   root.dataset.pneumaCardKind = kind;
+}
+
+const cardActions=new WeakMap<HTMLElement,(event:MouseEvent)=>unknown>();
+/** Replace only this module's action listener when the same card is decorated again. */
+export function bindCardAction(node:HTMLElement,action:(event:MouseEvent)=>unknown):void {
+  const previous=cardActions.get(node);
+  if(previous)node.removeEventListener('click',previous);
+  cardActions.set(node,action);
+  node.addEventListener('click',action);
 }

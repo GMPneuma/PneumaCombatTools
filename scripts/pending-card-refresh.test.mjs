@@ -5,6 +5,9 @@ globalThis.foundry = { utils: { getProperty: (object, path) => path.split(".").r
 globalThis.game = { user: { id: "viewer", isGM: false } };
 const { PendingCardRefresh } = await import("../dist/scripts/pending-card-refresh.js");
 const changed = [];
+const unmounted=new Set();
+const element={find:selector=>({length:unmounted.has(selector.match(/data-message-id="([^"]+)"/)[1])?0:1})};
+globalThis.ui={chat:{element}};
 const tracker = new PendingCardRefresh(message => changed.push(message.id));
 const card = (id, actor, combat, state = "waiting") => ({ id, visible: true, flags: { "pneuma-combattools": { exchange: { defenderActor: actor, combatId: combat, state } } } });
 const a = card("a", "Actor.a", "combat1"), b = card("b", "Actor.b", "combat1"), c = card("c", "Actor.a", "combat2");
@@ -33,7 +36,7 @@ game.users={filter:()=>[]};
 game.settings={register:()=>{}};
 game.messages={get:id=>cards.find(card=>card.id===id),[Symbol.iterator]:()=>{scans++;return cards[Symbol.iterator]();}};
 game.socket={on:()=>{}};
-globalThis.ui={chat:{updateMessage:message=>changed.push(message.id)}};
+globalThis.ui={chat:{element,updateMessage:message=>changed.push(message.id)}};
 const {registerCombatResolution}=await import("../dist/scripts/combat-resolution.js");
 registerCombatResolution();
 hooks.ready.forEach(fn=>fn());assert.equal(scans,1);
@@ -68,10 +71,18 @@ console.log('Multi-defender pending cards: one refresh per frame, completed rows
  const hooks={};globalThis.Hooks={on:(name,fn)=>(hooks[name]??=[]).push(fn),once:(name,fn)=>(hooks[name]??=[]).push(fn)};
  globalThis.Actor=class{constructor(uuid){this.uuid=uuid;}};
  const actor=new Actor('Actor.condition'),message={id:'condition',visible:true,scope:{actors:[actor.uuid],combat:'c'}};
- const updated=[];globalThis.game={messages:[message],user:{isGM:true}};globalThis.ui={chat:{updateMessage:m=>updated.push(m.id)}};
+ const updated=[];globalThis.game={messages:[message],user:{isGM:true}};globalThis.ui={chat:{element,updateMessage:m=>updated.push(m.id)}};
  registerConditionCardRefresh(m=>m.scope);hooks.ready[0]();
  hooks.deleteActiveEffect[0]({parent:actor});hooks.updateItem[0]({parent:actor});flush();assert.deepEqual(updated.splice(0),['condition']);
  hooks.updateCombat[0]({id:'other'});flush();assert.deepEqual(updated,[]);
  hooks.updateCombat[0]({id:'c'});flush();assert.deepEqual(updated.splice(0),['condition']);
  hooks.deleteChatMessage[0](message);hooks.updateActor[0](actor);flush();assert.deepEqual(updated,[]);
+}
+
+// Mount state is checked at dispatch time, and later remounts still refresh.
+{
+ const updated=[],index=new PendingCardRefresh(m=>updated.push(m.id));
+ const history=card("history","Actor.h","c");index.remember(history);
+ index.refresh();unmounted.add("history");flush();assert.deepEqual(updated,[]);
+ unmounted.delete("history");index.refresh();flush();assert.deepEqual(updated,["history"]);
 }

@@ -17,6 +17,7 @@ globalThis.foundry={utils:{getProperty:get,setProperty:set,randomID:()=>String(+
 const {medicalEntries,markMedicalDamage,needsStabilization,stabilizationDV,resolveMedical,expireQuickFixes,registerMedical}=await import('../dist/scripts/medical.js');
 const {masterStatuses}=await import('../dist/scripts/status-catalog.js');
 const {finishTimedEffects}=await import('../dist/scripts/instant-lifetime.js');
+const {injuryTreatmentChoices,stabilizationStates,nativeTreatmentSkill}=await import('../dist/scripts/medical-rules.js');
 let enabled;
 async function setup(){
  enabled=true;const users=[{id:'gm',isGM:true,active:true},{id:'owner',active:true}];users.get=id=>users.find(u=>u.id===id);
@@ -99,6 +100,12 @@ test('Quick Fix offers separate eligible skills at zero ranks and full HP',async
  assert.deepEqual(rows.filter(r=>r.item===both.id).map(r=>r.skill),['First Aid','Paramedic']);assert.match(rows.find(r=>r.item===both.id&&r.skill==='Paramedic').label,/DV15/);
  await f.request('quickFix',{item:leg.id,skill:'Paramedic',total:14});assert(get(leg,'flags.pneuma-combattools.quickFix'));
 });
+test('non-Medtech characters can Quick Fix using native medical skills',async()=>{
+ const f=await setup();f.source.items.find(i=>i.name==='Medtech').system.rank=0;
+ const [injury]=await f.target.createEmbeddedDocuments('Item',[{name:'Foreign Object',type:'criticalInjury',system:{quickFix:{dvFirstAid:13,dvParamedic:13},treatment:{type:'quickFix'}}}]);
+ const rows=medicalEntries(f.source,f.target);assert(!rows.some(r=>r.action==='speedheal'));assert.deepEqual(rows.filter(r=>r.action==='quickFix').map(r=>r.skill),['First Aid','Paramedic']);
+ await f.request('quickFix',{item:injury.id,skill:'First Aid',total:14});assert(!f.target.items.has(injury.id));
+});
 test('combat end restores temporary Quick Fix injuries and preserves stabilization',async()=>{
  const f=await setup();const [injury]=await f.target.createEmbeddedDocuments('Item',[{name:'Broken Arm',type:'criticalInjury',system:{quickFix:{dvFirstAid:13},treatment:{type:'paramedicSurgery'},deathSaveIncrease:true}}]);
  const [effect]=await injury.createEmbeddedDocuments('ActiveEffect',[{name:'Penalty',disabled:false}]);
@@ -112,4 +119,14 @@ test('Quick Fix tracks the patient scene encounter rather than the GM viewed sce
  await f.request('quickFix',{item:injury.id,skill:'First Aid',total:14});assert.equal(get(injury,'flags.pneuma-combattools.quickFix.combat'),combat.id);
  await expireQuickFixes({id:'unrelated',combatants:[]});assert(get(injury,'flags.pneuma-combattools.quickFix'));
  await expireQuickFixes(combat);assert.equal(get(injury,'flags.pneuma-combattools.quickFix'),undefined);
+});
+test('Medical and Treatment share native DVs, zero-rank eligibility and permanent QuickFix rules',async()=>{
+ const f=await setup();
+ for(const system of [{quickFix:{dvFirstAid:13,dvParamedic:15},treatment:{type:'quickFix'}},{quickFix:{dvFirstAid:0,dvParamedic:13},treatment:{type:'paramedicSurgery',dvParamedic:15,dvSurgery:13}}]){
+  const [injury]=await f.target.createEmbeddedDocuments('Item',[{name:'Injury',type:'criticalInjury',system}]);
+  const reference=injuryTreatmentChoices(injury).filter(row=>row.stage==='QuickFix'&&nativeTreatmentSkill(f.source,row.skill));
+  const menu=medicalEntries(f.source,f.target).filter(row=>row.item===injury.id);
+  assert.deepEqual(menu.map(row=>row.skill),reference.map(row=>row.skill));reference.forEach(row=>assert(menu.some(entry=>entry.label.endsWith('DV'+row.dv))));
+ }
+ for(const [hp,state]of [[30,0],[19,1],[0,2]]){f.target.system.derivedStats.hp.value=hp;assert.equal(stabilizationDV(f.target),stabilizationStates[state].dv);}
 });

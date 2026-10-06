@@ -77,3 +77,12 @@ test('render failure leaves existing controls unchanged',async t=>{
   const c=client(t,'0.5'),m=new c.Message(c.result('failure'));m.fail=true;
   const pending=assert.rejects(m.getHTML(),/render failed/);t.mock.timers.tick(500);await pending;assert.equal(c.nodes[0].inert,false);
 });
+
+test('disabled delay skips history and result lookups; enabling treats existing results as history',async t=>{
+ let reads=0;const old={id:'old',get content(){reads++;return '<div data-pneuma-roll-result="old">Old</div>';}};
+ const c=client(t,'0',[old]);await c.ready;assert.equal(reads,0);
+ const original=foundry.utils.getProperty;let lookups=0;foundry.utils.getProperty=(...args)=>{lookups++;return original(...args);};
+ const m=new c.Message(c.result('off'));c.hooks.get('createChatMessage')(m);await m.getHTML();assert.equal(lookups,0);
+ c.setDelay('1');c.hooks.get('updateSetting')({key:'pneuma-combattools.chatResultDelay'});assert.equal(reads,1);
+ const history=new c.Message(old.content,'old');await history.getHTML();assert.equal(history.calls,1);
+});

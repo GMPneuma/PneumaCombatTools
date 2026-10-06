@@ -1,7 +1,9 @@
 import {applyCombatStatus} from "./status-sync.js";
+import {withActorMutation} from "./actor-mutation.js";
 import {findNativeItem} from "./native-lookup.js";
 import {registerConditionCardRefresh} from "./pending-card-refresh.js";
-import {inlineRoll} from "./inline-roll.js";
+import {effectDefinition,instantContent} from "./instant-content.js";
+export {instantContent} from "./instant-content.js";
 import {actorEncounter,encounterRef,resolveEncounter,type EncounterRef} from "./encounter.js";
 import {reportExposure,registerEffectEvents} from "./effect-events.js";
 import {createSmoke} from "./aoe/smoke.js";
@@ -13,29 +15,33 @@ import {nativeCard,rollHidden,showDiceAs,showSavedDice,messageDiceAudience,diceJ
 import {markRollResult} from "./native-combat.js";
 import {checkedLuck} from "./evasion-rules.js";
 import {requireCombatSocket} from "./socket-health.js";
-import {canRenderCombatCard} from "./card-structure.js";
+import {masterStatuses} from "./status-catalog.js";
+import {bindCardAction,canRenderCombatCard,resolutionSection} from "./card-structure.js";
+import {arrangeInlineRollDetails} from "./inline-roll.js";
 const M="pneuma-combattools";
 export interface InstantState {
-  encounter?:EncounterRef; sourceMessage?:string;
+  encounter?:EncounterRef; sourceMessage?:string; targetToken?:string;
   id:InstantId|"status"; statusId?:string; actor:string; name:string; state:"pending"|"rolling"|"failed"|"resisted"|"applying"|"applied"|"skipped"|"review";
   nonce?:string;user?:string;total?:number;html?:string;damage?:number;damageHTML?:string;summary?:string;
 }
 export interface InstantRequest {action:string;nonce?:string;total?:number;html?:string}
 export function newInstant(id:InstantId|"status",actor:string,name:string,encounter:EncounterRef={combatId:null}):InstantState {return {id,actor,name,encounter,state:id!=="status"&&instantEffects[id].skill?"pending":"failed"};}
-function effectDefinition(s:InstantState) {
-  if(s.id!=="status")return instantEffects[s.id];
-  const status=CONFIG.statusEffects.find(effect=>effect.id===s.statusId);
-  return {name:game.i18n!.localize(status?.name??status?.label??s.statusId??"Status"),color:"#a7afb7",skill:"",dv:0,damage:""};
-}
 export const instantDone=(s:InstantState)=>["resisted","applied","skipped"].includes(s.state);
-export function instantContent(s:InstantState,scope="") {
-  const e=effectDefinition(s),button=(a:string,label:string)=>'<button type="button" data-instant-action="'+a+'" data-instant-scope="'+esc(scope)+'">'+label+'</button>';
-  const action=s.state==="pending"?button("roll",'<i class="fas fa-shield-halved" aria-hidden="true"></i> Resist'):s.state==="failed"?button("apply","Apply Effect"):s.state==="rolling"?button("reset","Release roll"):s.state==="review"||s.state==="applying"?button("review","Mark resolved"):"";
-  const label={pending:"",rolling:"Rolling…",failed:"",resisted:"Resisted",applying:"Applying — do not repeat",applied:s.summary??"Applied",skipped:"Unaffected (GM)",review:"Interrupted — GM review required"}[s.state];
-  return '<div class="pneuma-instant-effect" data-effect="'+s.id+'" data-state="'+s.state+'" style="--pneuma-ammo-color:'+e.color+'"><strong>'+esc(e.name)+(e.skill?' DV'+e.dv:'')+'</strong> '+inlineRoll(s.total,s.html,e.skill)+' '+(label?'<span>'+esc(label)+'</span> ':'')+'<span class="pneuma-effect-actions">'+action
-    +(['pending','failed'].includes(s.state)?button("skip","Unaffected"):"")+'</span>'
-    +(s.state==="applied"&&s.id==="sleep"?button("wake","Wake (touching Action)"):s.state==="applied"&&s.id==="incendiary"?button("extinguish","Extinguish (Action)"):"")
-    +(s.damageHTML?' <span>Damage</span> '+inlineRoll(s.damage,s.damageHTML,'Damage roll'):'')+'</div>';
+/** Expose each row's GM actions directly, including previously saved menus. */
+export function arrangeAreaEffectControls(root:HTMLElement):void {
+  arrangeInlineRollDetails(root);
+  root.querySelectorAll('details.pneuma-effect-gm-controls, details.pvt-target-controls').forEach(menu=>{
+    if(menu.parentElement?.closest('.pneuma-effect-gm-controls')){menu.replaceWith(...Array.from(menu.querySelectorAll('button')));return;}
+    const controls=document.createElement('span');controls.className='pneuma-effect-gm-controls';controls.append(...Array.from(menu.querySelectorAll('button')));menu.replaceWith(controls);
+  });
+  root.querySelectorAll('.pneuma-gm-action-label').forEach(label=>label.remove());
+  for(const row of Array.from(root.querySelectorAll<HTMLElement>('.pneuma-aoe-resolution-target, .pneuma-aoe-target'))) {
+    let slot=row.querySelector<HTMLElement>(':scope > .pneuma-aoe-target-gm');
+    if(!slot){slot=document.createElement('div');slot.className='pneuma-aoe-target-gm';row.insertBefore(slot,row.querySelector(':scope > .pneuma-aoe-response-description'));}
+    const buttons=Array.from(row.querySelectorAll<HTMLButtonElement>('[data-aoe-action="damageResolved"], [data-aoe-action="exclude"], [data-aoe-action="forcehit"], [data-aoe-action="hit"], [data-aoe-action="miss"], [data-aoe-action="reset"]')).filter(b=>!slot!.contains(b));
+    slot.append(...buttons);
+    row.querySelectorAll('.pneuma-effect-gm-controls').forEach(controls=>{if(!controls.querySelector('button'))controls.remove();});
+  }
 }
 /** Same serialized GM path for area rows and ad-hoc effect cards. */
 const actorWork=new Map<string,Promise<unknown>>();
@@ -81,7 +87,7 @@ async function resolveInstant(s:InstantState,req:InstantRequest,user:User,save:(
   }
   s.state="applying";await save();
   try {
-    if(e.damage){const hp=Number(foundry.utils.getProperty(actor,"system.derivedStats.hp.value"));if(!Number.isFinite(hp))throw Error("Target HP unavailable.");await actor.update({"system.derivedStats.hp.value":hp-s.damage!} as never);s.summary=s.damage+" direct HP damage; armor unchanged";reportExposure(actor,s.id);}
+    if(e.damage){await withActorMutation(actor,async()=>{const hp=Number(foundry.utils.getProperty(actor,"system.derivedStats.hp.value"));if(!Number.isFinite(hp))throw Error("Target HP unavailable.");await actor.update({"system.derivedStats.hp.value":hp-s.damage!} as never);});s.summary=s.damage+" direct HP damage; armor unchanged";reportExposure(actor,s.id);}
     else if(s.id==="emp"||s.id==="microwaver") {const selection=await createEmp(actor,{...(s.id==="microwaver"?{source:"microwaver",seconds:60}:{}),count:2,chooser:"gm",mode:"equal",policy:{foundational:true,cascade:true,electronics:true,immune:game.settings!.get(M,"empImmunity").split(/[\n,;]/)}},s.encounter,s.sourceMessage?game.messages?.get(s.sourceMessage) as ChatMessage|undefined:undefined);s.summary=!selection?"No eligible cyberware or carried electronics":s.id==="microwaver"?"Choose two items below — disabled for 60 seconds":"Choose two items below — disabled until combat ends";}
     else if(s.id==="flashbang"||s.id==="teargas") {await temporaryInjury(actor,"Damaged Eye",combat??null);if(s.id==="flashbang")await temporaryInjury(actor,"Damaged Ear",combat??null);s.summary="Temporary native injury effects: 1 minute; no bonus damage";}
     else if(s.id==="smoke") {
@@ -117,22 +123,33 @@ export async function rollInstant(s:InstantState,send:Send,rollMode="roll",skipD
   }finally{if(!committed)await send({action:"release",nonce});}
 }
 export async function bindInstantControls(root:HTMLElement,state:(scope:string)=>InstantState|undefined,send:(scope:string,req:InstantRequest)=>Promise<unknown>,rollMode="roll",audience?:DiceAudience) {
+  const actors=new Map<string,Actor|null>();
   for(const b of Array.from(root.querySelectorAll<HTMLButtonElement>("[data-instant-action]"))) {
     const attached=b.closest(".pneuma-attached-effects");
-    if(attached&&attached!==root)continue;
+    if(attached&&attached!==root||b.dataset.attachedEffect&&!root.classList.contains("pneuma-attached-effects"))continue;
+    if(b.dataset.instantAction==="extinguish"){b.remove();continue;}
     const scope=b.dataset.instantScope??"",s=state(scope),a=b.dataset.instantAction!;
-    const actor=s?await fromUuid(s.actor) as Actor|null:null;
+    if(s&&!actors.has(s.actor))actors.set(s.actor,await fromUuid(s.actor) as Actor|null);
+    const actor=s?actors.get(s.actor):null;
     if(!s||!actor||!game.user!.isGM&&(!actor.isOwner||["skip","reset","review"].includes(a))){b.remove();continue;}
-    if((a==="wake"||a==="extinguish")&&!hasInstantCondition(actor,a==="wake"?"sleep":"fire")){b.remove();continue;}
-    b.addEventListener("click",async event=>{event.preventDefault();event.stopPropagation();if(b.disabled)return;b.disabled=true;
+    if(a==="wake"&&!hasInstantCondition(actor,"sleep")){b.remove();continue;}
+    bindCardAction(b,async event=>{event.preventDefault();event.stopPropagation();if(b.disabled)return;b.disabled=true;
       try {if(a==="roll")await rollInstant(s,req=>send(scope,req),rollMode,event.shiftKey,audience);else await send(scope,{action:a});}
       catch(e){ui.notifications!.error((e as Error).message);}finally{b.disabled=false;}
     });
   }
+  root.querySelectorAll('.pneuma-effect-gm-controls').forEach(menu=>{if(!menu.querySelector('button'))menu.remove();});
+  arrangeAreaEffectControls(root);
 }
 interface EffectCard {effect:InstantState;rollMode:string}
-export async function createInstantCard(actor:Actor,id:InstantId|"status",source?:ChatMessage,encounter=encounterRef(actorEncounter(actor),actor.isToken?actor.token?.parent?.id:canvas.scene?.id),statusId?:string) {
+export async function createInstantCard(actor:Actor,id:InstantId|"status",source?:ChatMessage,encounter=encounterRef(actorEncounter(actor),actor.isToken?actor.token?.parent?.id:canvas.scene?.id),statusId?:string,targetToken?:string) {
+  if (id === "status") {
+    const name = masterStatuses.find(s=>s.id===statusId)?.name;
+    if (name === "On Fire (Mild)") id = "incendiary";
+    if (name === "EMP") id = foundry.utils.getProperty(source??{},"flags."+M+".exchange.disableSource") === "microwaver" ? "microwaver" : "emp";
+  }
   const data:EffectCard={effect:id==="status"?{id,statusId,actor:actor.uuid,name:actor.name??"",encounter,state:"failed"}:newInstant(id,actor.uuid,actor.name??"",encounter),rollMode:source?.blind?"blindroll":source?.whisper.length?"gmroll":"roll"};
+  data.effect.targetToken=targetToken;
   if(source?.id){
     const flags=foundry.utils.getProperty(source,"flags."+M) as {exchange?:{rollMode?:string};aoe?:{exchange:{rollMode?:string}};manualRoll?:{rollMode?:string}}|undefined;
     data.rollMode=flags?.exchange?.rollMode??flags?.aoe?.exchange.rollMode??flags?.manualRoll?.rollMode??data.rollMode;
@@ -148,7 +165,7 @@ export async function handleInstantRequest(w:Wire) {
   const saved=message&&foundry.utils.getProperty(message,"flags."+M+(w.scope?".attachedEffects."+w.scope:".instant")) as EffectCard|undefined;
   if(w.scope&&!/^[a-zA-Z0-9]+$/.test(w.scope))throw Error("Invalid effect reference.");
   if(message&&user&&!user.isGM&&(message.blind||message.whisper.length&&!message.whisper.includes(user.id!)&&message.author?.id!==user.id))throw Error("This card is not visible to you.");
-  if(!message||!user||!saved||!instantId(saved.effect.id))throw Error("Effect unavailable.");const data=foundry.utils.deepClone(saved);
+  if(!message||!user||!saved||!(instantId(saved.effect.id)||saved.effect.id==="status"&&CONFIG.statusEffects.some(status=>status.id===saved.effect.statusId)))throw Error("Effect unavailable.");const data=foundry.utils.deepClone(saved);
   await handleInstant(data.effect,w.request,user,()=>w.scope?message.update({["flags."+M+".attachedEffects."+w.scope]:data}):message.update({content:'<section class="rollcard pneuma-instant-card"><h3>'+esc(data.effect.name)+'</h3>'+instantContent(data.effect)+'</section>',["flags."+M+".instant"]:data} as never),data.rollMode,messageDiceAudience(message));
 }
 function send(message:string,request:InstantRequest,scope?:string) {
@@ -176,7 +193,8 @@ export function registerInstantEffects() {
     const flags=foundry.utils.getProperty(message,"flags."+M) as {instant?:EffectCard;attachedEffects?:Record<string,EffectCard>;aoe?:{rows:{instant?:InstantState}[]}}|undefined;
     const states=flags?.instant?[flags.instant.effect]:flags?.aoe?.rows.map(row=>row.instant).filter((s):s is InstantState=>!!s)??[];
     states.push(...Object.values(flags?.attachedEffects??{}).map(card=>card.effect));
-    const relevant=states.filter(s=>s.state==="applied"&&(s.id==="sleep"||s.id==="incendiary"));
+    // Only sleep retains a condition-dependent Wake action. Completed fire rows are receipts.
+    const relevant=states.filter(s=>s.state==="applied"&&s.id==="sleep");
     return relevant.length?{actors:relevant.map(s=>s.actor),combat:relevant[0]?.encounter?.combatId}:undefined;
   });
   for(const hook of ["createChatMessage","updateChatMessage"])Hooks.on(hook,(message:ChatMessage)=>{void dispatchMicrowaver(message);});
@@ -195,12 +213,30 @@ export async function renderInstantEffects(message:ChatMessage,html:JQuery):Prom
     const root=html[0];if(!root||!canRenderCombatCard(message))return;
     const data=foundry.utils.getProperty(message,"flags."+M+".instant") as EffectCard|undefined;
     if(data)await bindInstantControls(root,()=>data.effect,(_scope,req)=>send(message.id!,req),data.rollMode,messageDiceAudience(message));
+    root.querySelectorAll('.pneuma-aoe-target-gm [data-attached-effect]').forEach(node=>node.remove());
+    root.querySelectorAll('.pneuma-attached-target').forEach(node=>node.remove());
     root.querySelectorAll('.pneuma-attached-effects').forEach(node=>node.remove());
     const attached=foundry.utils.getProperty(message,"flags."+M+".attachedEffects") as Record<string,EffectCard>|undefined;
+    const groups=new Map<string,HTMLElement>();
     for(const [scope,card] of Object.entries(attached??{})){
       const section=document.createElement('section');section.className='pneuma-attached-effects rollcard';
-      section.innerHTML='<h4>'+esc(card.effect.name)+' — Effects</h4>'+instantContent(card.effect,scope);
-      (root.querySelector('.message-content')??root).append(section);
+      const target=Array.from(root.querySelectorAll<HTMLElement>('.pneuma-aoe-target-effects')).find(node=>{const row=node.parentElement!;return card.effect.targetToken?row.dataset.aoeRow===card.effect.targetToken:row.dataset.aoeActor===card.effect.actor;});
+      section.innerHTML=instantContent(card.effect,scope,true);
+      let slot:Element|null=target??root.querySelector('.pneuma-damage-effect-results')??root.querySelector('.pneuma-resolution-effects-body');
+      if(!slot) {
+        const container=document.createElement('div');container.innerHTML=resolutionSection('effects','');
+        const section=container.firstElementChild!;(root.querySelector('.message-content')??root).append(section);
+        slot=section.querySelector('.pneuma-resolution-effects-body');
+      }
+      if(target)target.append(section);
+      else {
+        const key=card.effect.targetToken??card.effect.actor;
+        let group=groups.get(key);
+        if(!group){group=document.createElement('div');group.className='pneuma-attached-target';group.innerHTML='<h4>'+esc(card.effect.name)+'</h4>';groups.set(key,group);(slot??root.querySelector('.message-content')??root).append(group);}
+        group.append(section);
+      }
+      section.querySelectorAll<HTMLElement>('[data-instant-action]').forEach(button=>button.dataset.attachedEffect=scope);
       await bindInstantControls(section,()=>card.effect,(_scope,req)=>send(message.id!,req,scope),card.rollMode,messageDiceAudience(message));
     }
+    arrangeAreaEffectControls(root);
 }

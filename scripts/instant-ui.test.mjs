@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import {resolve} from 'node:path';import {tmpdir} from 'node:os';
 const {chromium}=await import(process.env.PNEUMA_PLAYWRIGHT_MODULE||'playwright');const browser=await chromium.launch({channel:'msedge',headless:true});
 try{const page=await browser.newPage({viewport:{width:850,height:650}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
-await page.route('http://instant.test/**',async route=>{const path=new URL(route.request().url()).pathname;if(path==='/')return route.fulfill({contentType:'text/html',body:'<style>body{margin:0;background:#292d33;color:#eee;font:13px Arial}#card{position:absolute;left:520px;top:10px;width:310px}button{background:#ddd;color:#111}canvas{position:absolute;left:0;top:0}.rollcard h3{font-size:15px}</style><div id="card"></div>'});const root=resolve('dist'),file=resolve(root,'.'+path);assert.ok(file.startsWith(root));return route.fulfill({contentType:path.endsWith('.css')?'text/css':'text/javascript',body:await readFile(file)})});
+await page.route('http://instant.test/**',async route=>{const path=new URL(route.request().url()).pathname;if(path==='/')return route.fulfill({contentType:'text/html',body:'<style>body{margin:0;background:#292d33;color:#eee;font:13px Arial}#card{position:absolute;left:520px;top:10px;width:310px}button{background:#ddd;color:#111}canvas{position:absolute;left:0;top:0}.rollcard h3{font-size:15px}</style><div id="card"></div>'});if(path.startsWith('/systems/')&&path.endsWith('.svg'))return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><path fill="white" d="M2 2h14v14H2z"/></svg>'});const root=resolve('dist'),file=resolve(root,'.'+path);assert.ok(file.startsWith(root));return route.fulfill({contentType:path.endsWith('.css')?'text/css':'text/javascript',body:await readFile(file)})});
 await page.goto('http://instant.test/');await page.addStyleTag({content:await readFile('dist/styles/pneuma-combattools.css','utf8')});
 await page.addScriptTag({path:process.env.PNEUMA_PIXI_SOURCE||resolve(tmpdir(),'pneuma-pixi-7.4.3.min.js')});
 await page.evaluate(async()=>{
@@ -55,7 +55,8 @@ await page.evaluate(async()=>{
    const state={...newInstant(id,'Actor.target','Target'),state:'applied'},root=document.createElement('div');
    actor.effects=[{name:effectName,statuses:new Set([masterStatuses.find(s=>s.name===name).id])}];
    root.innerHTML=instantContent(state);await bindInstantControls(root,()=>state,async()=>{});
-   if(!root.querySelector('[data-instant-action="'+action+'"]'))throw Error('Active followup hidden');
+   if(id==='sleep'&&!root.querySelector('[data-instant-action="'+action+'"]'))throw Error('Active wake followup hidden');
+   if(id==='incendiary'&&root.querySelector('[data-instant-action="extinguish"]'))throw Error('Extinguish belongs in Treatment/self actions');
    actor.effects=[];root.innerHTML=instantContent(state);await bindInstantControls(root,()=>state,async()=>{});
    if(root.querySelector('[data-instant-action="'+action+'"]'))throw Error('Stale followup still visible');
   }

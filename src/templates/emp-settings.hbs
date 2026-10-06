@@ -29,7 +29,7 @@
     <p class="notes">EMP/Microwaver only. Included hardened items consume a selection without being disabled or rerolled. Hardening does not protect against Quickhacks. Uses native self, installed-child and sibling shielding.</p>
     <div class="form-group"><label for="emp-immunity">Immune items</label><textarea id="emp-immunity" name="immunity" rows="2">{{immunity}}</textarea><p class="notes">Exact item names or compendium source UUIDs, separated by semicolons. Applies to EMP/Microwaver direct selection; host shutdown can still affect installed options.</p></div>
     </details>
-    <details class="pneuma-emp-section" {{#if frameConfigured}}open{{/if}}><summary>Internal frame consequences</summary>
+    <details class="pneuma-emp-section" {{#if frameConfigured}}open{{/if}}><summary data-frame-label>Internal frame consequences</summary>
       <div class="form-group"><label for="emp-frame-move">User cannot move</label><input id="emp-frame-move" type="checkbox" name="frameNoMove" {{checked frameNoMove}}></div>
       <div class="form-group" data-frame-movement><label for="emp-frame-reduce">MOVE reduced by</label><input id="emp-frame-reduce" type="checkbox" name="frameReduceMove" {{checked frameReduceMove}}><input data-frame-reduction aria-label="MOVE reduction amount" type="number" min="0" step="1" name="frameMoveReduction" value="{{frameMoveReduction}}"></div>
       <div class="form-group"><label for="emp-frame-actions">Apply a penalty to all actions</label><input id="emp-frame-actions" type="checkbox" name="frameActionPenalty" {{checked frameActionPenalty}}></div>

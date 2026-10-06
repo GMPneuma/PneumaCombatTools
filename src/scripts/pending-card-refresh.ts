@@ -33,7 +33,9 @@ export class PendingCardRefresh {
       const ids = [...this.queued]; this.queued.clear();
       for (const id of ids) {
         const card = this.cards.get(id);
-        if (card?.message.visible && (!card.message.blind || game.user?.isGM)) this.update(card.message);
+        // Native updateMessage inserts missing messages. Invalidation must only refresh mounted cards.
+        if (card?.message.visible && (!card.message.blind || game.user?.isGM)
+          && ui.chat?.element?.find(`[data-message-id="${id}"]`).length) this.update(card.message);
       }
     });
   }

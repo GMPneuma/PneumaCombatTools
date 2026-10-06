@@ -1,4 +1,4 @@
-import {durationExpired,type EffectDuration} from "./effect-duration.js";
+import {durationExpired,durationEnded,type EffectDuration} from "./effect-duration.js";
 export const EMP_MODULE = "pneuma-combattools";
 export interface EmpItem {
   id: string | null; name: string | null; type: string; flags?: unknown;
@@ -18,9 +18,7 @@ export function timedDisables(item:{flags?:unknown}):Record<string,TimedDisable>
 }
 /** Combat-bound disablements end with their encounter, even if world time stops. */
 export function disableExpired(duration:EffectDuration):boolean {
-  const combat=duration.combat;
-  if(combat && !(typeof combat==="string"?game.combats?.get(combat):combat)?.started) return true;
-  return durationExpired(duration);
+  return durationEnded(duration)||durationExpired(duration);
 }
 export function activeDisables(item:{flags?:unknown}):TimedDisable[] {return Object.values(timedDisables(item)).filter(value=>!disableExpired(value.duration));}
 export function empDisabled(item: {flags?: unknown}): boolean {

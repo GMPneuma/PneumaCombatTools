@@ -12,7 +12,7 @@ Use Add Effects on supported damage cards, or the effect controls on area recipi
 | Flashbang | Resist Torture/Drugs DV15; temporary Damaged Eye and Damaged Ear, no injury bonus damage. |
 | Teargas | Resist Torture/Drugs DV13; temporary Damaged Eye. |
 | Sleep | Resist Torture/Drugs DV13; Sleep/Unconscious plus Prone and wake handling. |
-| Ignite | Supported native incendiary handling requires qualifying armor penetration. |
+| On Fire (Mild), from Incendiary | Supported native incendiary handling requires qualifying armor penetration. |
 | Smoke | Separate saved scene footprint and lifetime; no damage or resistance roll. |
 
 Biological eligibility and immunity are GM rulings. Ordinary native ammunition damage is not reapplied just because an exposure is reported. Armor-Piercing and Smart are attack/damage behaviors, not actor statuses.
@@ -27,7 +27,7 @@ Spinal Injury and ear-related next-turn Action warnings are advisory. General Ac
 
 ## Burning and waking
 
-Highest active native fire severity ticks once at the affected turn end. There is no automatic out-of-combat fire ticking. Extinguish removes actor-owned fire effects or disables relevant item-owned ones.
+Highest active native fire severity ticks once at the affected turn end. There is no automatic out-of-combat fire ticking. Extinguish removes actor-owned fire effects or disables relevant item-owned ones. All On Fire severities also clear when the participant's combat ends, resets or is deleted, including manually applied fire. Cleanup does not apply another damage tick and preserves fire belonging to another started encounter.
 
 Module-owned Sleep can expire or wake on damage/touch while preserving unrelated unconsciousness. **Prone remains after waking.** Current source also provides **Wake using action** from another token's HUD for a conscious owned helper and an unconscious target. Touching range and Action cost are adjudicated by players/GM.
 
@@ -43,3 +43,5 @@ Related: [Combat Tools - EMP and Cyberware](Combat%20Tools%20-%20EMP%20and%20Cyb
 
 ---
 Documentation baseline: [Combat Tools - Source Register](Combat%20Tools%20-%20Source%20Register.md). Return to [Combat Tools Documentation](Combat%20Tools%20Documentation.md).
+
+Damage/effect cards use attack resolution, damage roll, application/receipts, then Effects. Area defense choices remain in the attack section; target damage and effect controls appear below the shared roll. Effect-only attacks use a lower Effects section without an artificial damage roll. Attack Effects offers canonical On Fire severities and EMP; Microwaver is an EMP source with its own duration. Known damage ammunition preselects its effect, while qualifying triggers and resistance still govern application.

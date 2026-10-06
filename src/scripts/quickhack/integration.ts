@@ -1,4 +1,5 @@
 import {postHUDMessage} from "../hud-messages.js";
+import {bindCardAction} from "../card-structure.js";
 import { MODULE, LEGACY_MODULE } from "./availability.js";
 import { registerQuickhackSheet } from "./sheet.js";
 import { enabled, registerQuickhackSettings } from "./settings.js";
@@ -31,6 +32,7 @@ export async function executeActorAction(action: string, actorUuid: string, quic
   }
 }
 const cards = new Map<string, {message: ChatMessage; valid?: boolean}>();
+const guardedRoots = new WeakSet<HTMLElement>();
 let cardsQueued = false, forceCards = false;
 function refreshCards(force = false) {
   forceCards ||= force;
@@ -133,9 +135,12 @@ export function registerQuickhack(context: () => {source?: Token; target?: Token
     if (!state) return;
     const root = html[0]; if (!root) return;
     // Capture also blocks already-rendered native damage controls after the switch changes.
-    root.addEventListener("click", event => {
-      if (!enabled()) { event.preventDefault(); event.stopImmediatePropagation(); }
-    }, true);
+    if (!guardedRoots.has(root)) {
+      guardedRoots.add(root);
+      root.addEventListener("click", event => {
+        if (!enabled()) { event.preventDefault(); event.stopImmediatePropagation(); }
+      }, true);
+    }
     if (!enabled()) { html.find("button, a[data-action], [data-quickhack-action]").remove(); return; }
     const result = resultFlag(message); if (!result) return;
     const source = await fromUuid(result.sourceActorUuid) as Actor | null;
@@ -144,7 +149,7 @@ export function registerQuickhack(context: () => {source?: Token; target?: Token
       const actor = button.dataset.quickhackAction === "damage" ? source : target;
       const connectionId = result.type === "jackIn" ? message.id! : result.connectionId;
       if (!actor || !canOperate(actor) || !enabled() || !source || !resultConnectionValid(source, { ...result, connectionId })) { button.remove(); continue; }
-      button.addEventListener("click", async event => {
+      bindCardAction(button, async event => {
         event.preventDefault(); event.stopPropagation(); if (!enabled() || button.disabled) return;
         button.disabled = true;
         try { if (button.dataset.quickhackAction === "damage") await rollResultDamage(message); else await beginForceOut(message,event.shiftKey); }

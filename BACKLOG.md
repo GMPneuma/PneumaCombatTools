@@ -1,6 +1,6 @@
 # Combat Tools backlog
 
-Updated: 2026-10-01
+Updated: 2026-10-04
 
 Edit each **Status** directly. Priorities are initial suggestions, not an agreed work order.
 
@@ -12,58 +12,6 @@ Keep IDs permanent. Add new items by copying an entry. Move finished or dropped 
 This remains the master feature roadmap. The [complete previous backlog](docs/history/backlog-before-standard-template-2026-09-29.md) preserves every original request, revision and completion note; the [earlier roadmap](docs/history/pre-0.8.0-refresh/BACKLOG.md) preserves older history. Source manifest: 0.9.8. Historical version/unreleased labels are not current release verification. Existing uncommitted gameplay work was not evaluated or changed by this documentation task.
 
 ## Open items
-
-### BL-001 — Verify live combat workflows
-
-**Priority:** High\
-**Status:** Ready
-
-**Problem:** Source and browser checks leave actual multi-client integration unverified.
-
-**Desired result:** Record an integrated live-world pass with the supported module combination.
-
-**Done when:**
-
-- [ ] Test multiple clients/GMs, linked/unlinked actors, scene changes and encounter end/reset/deletion.
-- [ ] Verify native dialogs, attack/evasion/damage, status cleanup and theme combinations.
-- [ ] Check sheet attack routing, AoE reset/placement, smoke, QuickHacks, EMP, bow loading and ammunition controls.
-- [ ] Verify current turn indicators, HUDs, roll shortcuts and alerts as GM and player.
-- [ ] Record versions, results and remaining failures; do not equate automated checks with live acceptance.
-
-**Notes:** Previous backlog: Open work and dated feature verification notes.
-
-### BL-002 — Investigate actor and token naming differences
-
-**Priority:** Medium\
-**Status:** Ready
-
-**Problem:** The existing backlog retains questions about token names, actor names, older cards and scene changes.
-
-**Desired result:** Determine whether differences are presentation-only or identify a reproducible targeting problem.
-
-**Done when:**
-
-- [ ] Compare displayed names and referenced Actor/token identities on current and historical cards.
-- [ ] Check native undo after scene changes and record actual affected documents.
-
-**Notes:** Previous backlog: Actor/token identity. Differing labels alone do not establish wrong-target mutations.
-
-### BL-003 — Reproduce missing residual smoke
-
-**Priority:** Medium\
-**Status:** Ready
-
-**Problem:** An earlier report of missing residual smoke remains unverified despite passing fixtures.
-
-**Desired result:** Confirm the behavior in a real vision/fog scene.
-
-**Done when:**
-
-- [ ] Record scene vision/fog settings and smoke lifetime/visibility.
-- [ ] Reproduce removal/restoration and expiry; distinguish hidden smoke from a missing template.
-- [ ] Fix only a demonstrated defect, with regression coverage.
-
-**Notes:** Previous backlog: Smoke.
 
 ### BL-004 — Define smoke and sensory exceptions
 
@@ -144,23 +92,6 @@ This remains the master feature roadmap. The [complete previous backlog](docs/hi
 - [ ] Record a decision on exact timing and outside-combat support.
 
 **Notes:** Previous backlog: EMP timing; intentional boundary, not a confirmed defect.
-
-### BL-009 — Verify limits of damage undo
-
-**Priority:** Medium\
-**Status:** Ready
-
-**Problem:** The prior roadmap does not promise universal rollback of secondary effects, statuses or smoke; local damage-reversal work now exists.
-
-**Desired result:** Document the actual supported reversal behavior and remaining manual steps.
-
-**Done when:**
-
-- [ ] Review the in-progress damage-reversal work before proposing duplicate changes.
-- [ ] Verify supported reversal and secondary-effect behavior in a live world.
-- [ ] Record concrete failures and unsupported cases without blindly retrying damage.
-
-**Notes:** Previous backlog: Native undo. Existing uncommitted damage-reversal changes are outside this documentation task.
 
 ### BL-010 — Define general item-marker management
 
@@ -331,3 +262,136 @@ Added six Hornet’s Pharmacy statuses, preserved addiction effects during clean
 ## Release record — 0.9.10 (2026-10-03)
 
 Release includes manual effect confirmation, Medical/stabilization/QuickFix/SpeedHeal, combined Skill/STAT filtering and the Treatment roll reference. Medical visibility and patient selection follow the final requested behavior. Live checks remain under BL-001.
+
+## Dropped at user direction - 2026-10-04
+
+### BL-001 — Verify live combat workflows
+
+**Priority:** High\
+**Status:** Dropped
+
+**Outcome (2026-10-04):** Dropped at user direction. No further investigation, fixes or validation work are planned for this item. The original request and acceptance criteria are retained for history.
+
+**Problem:** Source and browser checks leave actual multi-client integration unverified.
+
+**Desired result:** Record an integrated live-world pass with the supported module combination.
+
+**Previous acceptance criteria (no longer planned):**
+
+- [ ] Test multiple clients/GMs, linked/unlinked actors, scene changes and encounter end/reset/deletion.
+- [ ] Verify native dialogs, attack/evasion/damage, status cleanup and theme combinations.
+- [ ] Check sheet attack routing, AoE reset/placement, smoke, QuickHacks, EMP, bow loading and ammunition controls.
+- [ ] Verify current turn indicators, HUDs, roll shortcuts and alerts as GM and player.
+- [ ] Record versions, results and remaining failures; do not equate automated checks with live acceptance.
+
+**Notes:** Previous backlog: Open work and dated feature verification notes.
+
+### BL-002 — Investigate actor and token naming differences
+
+**Priority:** Medium\
+**Status:** Dropped
+
+**Outcome (2026-10-04):** Dropped at user direction. No further investigation, fixes or validation work are planned for this item. The original request and acceptance criteria are retained for history.
+
+**Problem:** The existing backlog retains questions about token names, actor names, older cards and scene changes.
+
+**Desired result:** Determine whether differences are presentation-only or identify a reproducible targeting problem.
+
+**Previous acceptance criteria (no longer planned):**
+
+- [ ] Compare displayed names and referenced Actor/token identities on current and historical cards.
+- [ ] Check native undo after scene changes and record actual affected documents.
+
+**Notes:** Previous backlog: Actor/token identity. Differing labels alone do not establish wrong-target mutations.
+
+### BL-003 — Reproduce missing residual smoke
+
+**Priority:** Medium\
+**Status:** Dropped
+
+**Outcome (2026-10-04):** Dropped at user direction. No further investigation, fixes or validation work are planned for this item. The original request and acceptance criteria are retained for history.
+
+**Problem:** An earlier report of missing residual smoke remains unverified despite passing fixtures.
+
+**Desired result:** Confirm the behavior in a real vision/fog scene.
+
+**Previous acceptance criteria (no longer planned):**
+
+- [ ] Record scene vision/fog settings and smoke lifetime/visibility.
+- [ ] Reproduce removal/restoration and expiry; distinguish hidden smoke from a missing template.
+- [ ] Fix only a demonstrated defect, with regression coverage.
+
+**Notes:** Previous backlog: Smoke.
+
+### BL-009 — Verify limits of damage undo
+
+**Priority:** Medium\
+**Status:** Dropped
+
+**Outcome (2026-10-04):** Dropped at user direction. No further investigation, fixes or validation work are planned for this item. The original request and acceptance criteria are retained for history.
+
+**Problem:** The prior roadmap does not promise universal rollback of secondary effects, statuses or smoke; local damage-reversal work now exists.
+
+**Desired result:** Document the actual supported reversal behavior and remaining manual steps.
+
+**Previous acceptance criteria (no longer planned):**
+
+- [ ] Review the in-progress damage-reversal work before proposing duplicate changes.
+- [ ] Verify supported reversal and secondary-effect behavior in a live world.
+- [ ] Record concrete failures and unsupported cases without blindly retrying damage.
+
+**Notes:** Previous backlog: Native undo. Existing uncommitted damage-reversal changes are outside this documentation task.
+
+## Damage/effect standardization (2026-10-04)
+
+Implemented: semantic order attack/defense -> damage roll -> application/receipts -> effects; AoE attack responses remain in upper target rows, lower target sections hold application/effects. Known ammunition preselects canonical effect choices. Ignite/EMP/Microwaver picker duplicates are consolidated with legacy identifier support and source-specific mechanics preserved. Live Foundry/multiplayer appearance and transitions remain to verify.
+
+Damage/effect layout refinement: effect selection is inside the damage box; AoE uses one combined lower recipient row with mini-portrait, damage, resistance, effect and GM controls. This supersedes separate lower damage/effect target lists.
+
+- Treatment: On Fire / Extinguish (Action) allows a conscious controlled character to extinguish themselves or another visible burning patient, including NPCs, without a medical skill roll. Uses the active GM request path; clears all native and legacy fire severities. Live verification pending.
+- Fixed compact AoE effect labels escaping the chat log and creating outer chat-tab overflow; native chat composer positioning covered by a browser regression. Live verification pending.
+
+- Damage/effect refinement implemented: first-resolution selection lock, stable Apply-to-status glyphs, reserved far-right GM menu, and no Extinguish on resolution cards. Build, state tests and browser geometry checks pass, including both VisualTools skins at 260–400 px and native sidebar scrolling. Live verification pending.
+- Grenade marker cleanup (2026-10-04): implemented encounter-end/reset/delete cleanup for grenade blast and original-target templates, including new markers whose chat was deleted. Older templates without encounter metadata require their source card. Smoke and unrelated encounters are preserved. Live verification pending.
+- Target effect rows (2026-10-04): implemented damage line plus individual effect rows with colored left border, name, Resist when applicable, Apply/status and effect-specific GM override. Supersedes the combined one-line layout; existing selection locks and Extinguish placement retained. Live verification pending.
+- Direct GM actions and effect icon contrast (2026-10-04): removes damage/effect and target-control submenus, preserving live controls and permissions. Dark icons on light cards; contrasting tinted icons on Hub. Supersedes the previous GM disclosures. Live verification pending.
+- RTD resistance expansion (2026-10-04): implemented a full-width text-only breakdown beneath the effect row, preserving the native numeric disclosure and saved calculations. Native/sidebar and both-skin browser checks pass; live Foundry verification pending.
+- Implemented locally (2026-10-04, unreleased): native applied-damage totals expand below their target line at full width; completed effect rows use shared columns, explicit resistance labels and effect-generated damage below its named effect. Undo remains direct beside the applied total. Supersedes the compact-effect generated-damage-first layout; standalone instant cards retain their ordering. Live Foundry verification pending.
+- Superseded layout decision (2026-10-04, unreleased): remove reserved resistance/application/GM column widths. Content-sized actions align right, with visible GM buttons right-most and empty GM slots collapsed. Applied totals and completed effect icons reach the edge. Browser checks pass; live Foundry verification pending.
+- Applied-effect appearance refinement (2026-10-04, unreleased): remove the small completion checkmark; keep the effect glyph alone, with applied state in its tooltip/accessible label. Resistance and unaffected indicators retain their existing meaning.
+- Effect selection glyph fix (2026-10-04, unreleased): remove nested image backgrounds/borders before glyph tinting and use normal themed button surfaces. Prevents solid-square selected icons. Picker behavior and original status assets remain.
+
+- Card-code cleanup (2026-10-04, unreleased): consolidated normal/manual/AoE selection and instant-effect markup; replaced repeated action listeners; removed overridden card CSS and off-screen state labels. Preserves the latest per-target layout, native receipts, locks and permissions. Current styling contract replaces accumulated refinement notes; live verification pending.
+
+## Audit follow-ups 1–4 — 2026-10-04
+
+**Status:** Done (local implementation; unreleased). **Priority:** High.
+
+- Save Slow before optional dice playback; animation errors cannot cancel its effect.
+- Serialize concurrent module LUCK spends per actor on the initiating client, validating the current balance inside the queue.
+- Stop refreshing completed fire receipts and skip unmounted entries during indexed chat invalidation.
+- Preserve open HUD/status and combat-control menus through unrelated refreshes; invalidate changed content or removed anchors.
+- Regression coverage includes failed/pending DSN, concurrent/exhausted LUCK, stale fire subscriptions, unmounted/remounted cards, and browser menu continuity. Live multiplayer checks remain pending.
+
+## Audit follow-ups 5–17 — 2026-10-04
+
+**Status:** Done locally; unreleased. Supersedes the remaining refresh, control-decoration and accumulated-CSS findings.
+
+- Suppression skips unrelated combat writes and merges pending expiry scans. QuickFix checks for its flag before entering actor queues and merges pending time-driven scans.
+- Movement effect hooks redraw only the affected actor's tokens. Next-turn marker updates ignore unrelated tokens, actors and settings and merge relevant events per frame.
+- Button observers attach only to eligible module cards and inspect changed controls/subtrees. Disabled result delay bypasses result scans; enabled rendering uses one result collection per deadline check.
+- Token HUD computes Medical entries once per render; effect binding resolves each actor once per pass. Button roles, icons and completion use action/state metadata instead of English-label matching.
+- Consolidated repeated CSS component rules and button variant sizing; decorated effect slots match their 24px tracks. Native receipt columns use subgrid, and compact roll calculations expand into explicit full-width text regions.
+- Added integrated decorated-picker, effect-state, permission, width, disclosure and refresh-count regressions. See [audit follow-up evidence](docs/audits/2026-10-04-followups.md). Live Foundry/multiplayer verification remains pending.
+
+- Compact poison/biotoxin result layout (2026-10-04, local/unreleased): resistance and effect damage share the named effect row, followed by application/status and any right-most GM action. Supersedes the separate Effect damage row for attached/AoE target effects. Each numeric result expands independently below the full row; simultaneous expansions stack. Standalone instant-card ordering remains unchanged. Build and narrow-width browser verification recorded with this change; live verification pending.
+
+- Attached-effect wording (2026-10-04, local/unreleased): recipient headings contain the actor name only; the parent section retains Effects. Removes duplicated “— Effects” wording in normal/manual damage cards.
+
+- Attached EMP wording (2026-10-04, local/unreleased): removes the redundant “EMP — actor” h4 from embedded EMP results; item outcomes and chooser controls remain. Standalone card headings are unchanged.
+
+- Damage-application wording (2026-10-04, local/unreleased): “Selected Token” replaces “token” on the shared selected-recipient action; selection behavior remains unchanged.
+
+- On Fire combat cleanup (2026-10-04, local/unreleased): Mild/Strong/Deadly and legacy fire clear at participant combat end/reset/deletion, including manually applied untracked statuses. Remove actor effects or disable item effects, without another damage tick. Retain native timers and other started-encounter protection. Regression verification covers policy and actual cleanup hooks; live verification pending.
+
+Settings and outside-encounter combat bar (2026-10-05, local/unreleased): Internal frame consequences uses the Pneuma Homebrew badge. Turn Indicator's master switch precedes Configure. Disabled Turn Indicator, QuickHack and Combat Bar sections grey out dependent rows and prevent interaction while retaining saved/draft values; Combat Bar configuration follows its master too. Outside encounters, players see their assigned character and GMs see online players' assigned characters. Duplicate assignments appear once and characters need no scene token; the existing minimize control remains. No new setting. Encounter rows retain native tracker behavior. Automated checks are separate from live Foundry verification.

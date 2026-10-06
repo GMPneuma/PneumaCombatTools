@@ -1,5 +1,5 @@
 import {nativeSettingRows,positionNotice} from "./display-settings.js";
-import {combatBarPositionControls, COMBAT_BAR_SETTING_KEYS} from "./settings-layout.js";
+import {masterSettingControls, combatBarPositionControls, COMBAT_BAR_SETTING_KEYS} from "./settings-layout.js";
 
 const MODULE = "pneuma-combattools";
 type BarSetting = typeof COMBAT_BAR_SETTING_KEYS[number];
@@ -43,7 +43,7 @@ export class CombatBarSettings extends FormApplication {
   override activateListeners(html:JQuery) {
     super.activateListeners(html);
     const root=html[0];if(!root)return;
-    combatBarPositionControls(root);positionNotice(root);
+    combatBarPositionControls(root);positionNotice(root);masterSettingControls(root,"combatBar");
     root.querySelectorAll<HTMLInputElement|HTMLSelectElement>("input[name], select[name]").forEach(input => {
       input.addEventListener("change",()=>{
         const value=input instanceof HTMLInputElement && input.type==="checkbox"?input.checked:input.value;

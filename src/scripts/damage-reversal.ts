@@ -1,4 +1,5 @@
 import {primaryGM} from "./shared.js";
+import {withActorMutation} from "./actor-mutation.js";
 import {canRenderCombatCard} from "./card-structure.js";
 import {requireCombatSocket} from "./socket-health.js";
 
@@ -41,7 +42,7 @@ async function reverse({message:messageId,instance,user:userId}:Request):Promise
   const path=`flags.${M}.damageReversals.${instance}`;
   await message.update({[path]:"reversing"});
   try {
-    await native._reverseDamage(values[0]!,button.dataset.location,values[1]!,values[2]!);
+    await withActorMutation(actor,()=>native._reverseDamage!(values[0]!,button.dataset.location!,values[1]!,values[2]!));
     await message.update({[path]:"reversed"});
   }catch(error){
     await message.update({[path]:"review"});

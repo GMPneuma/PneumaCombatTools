@@ -2,10 +2,17 @@ import {barCombat,barEntries,type BarEntry} from "./combat-bar-state.js";
 let panel: HTMLElement | undefined;
 let revision = 0;
 let ownerId: string | undefined;
+let ownerActorUuid: string | undefined;
 let controlsOpen = false;
 
 export function closeBarFlyout(): void {
-  revision++;panel?.remove();panel=undefined;ownerId=undefined;controlsOpen=false;
+  revision++;panel?.remove();panel=undefined;ownerId=undefined;ownerActorUuid=undefined;controlsOpen=false;
+}
+
+/** Effect changes invalidate only the affected actor's status tooltip, not native combat controls. */
+export function invalidateBarStatuses(effect: ActiveEffect): void {
+  if (!controlsOpen && ownerActorUuid
+    && (effect.parent?.uuid === ownerActorUuid || effect.parent?.parent?.uuid === ownerActorUuid)) closeBarFlyout();
 }
 
 function createPanel(root: HTMLElement, row: HTMLElement, entry?: BarEntry): HTMLElement {
@@ -13,6 +20,7 @@ function createPanel(root: HTMLElement, row: HTMLElement, entry?: BarEntry): HTM
   panel=document.createElement("div");panel.className="pneuma-bar-flyout";
   panel.style.top=`${row.getBoundingClientRect().top-root.getBoundingClientRect().top}px`;
   ownerId=entry?.id;
+  ownerActorUuid=(entry?.actor??entry?.combatant?.actor??entry?.token?.actor)?.uuid;
   if(entry?.active&&root.querySelector(".pneuma-bar-end:not([hidden])"))panel.style.left="calc(100% + 64px)";
   if(root.dataset.orientation==="horizontal"){
     panel.style.left=`${Math.max(0,Math.min(row.getBoundingClientRect().left-root.getBoundingClientRect().left,window.innerWidth-root.getBoundingClientRect().left-270))}px`;
@@ -34,7 +42,7 @@ export function showBarStatuses(root: HTMLElement, row: HTMLElement): void {
   if (!game.user?.isGM || controlsOpen || ownerId===row.dataset.entryId) return;
   const entry=barEntries().find(entry=>entry.id===row.dataset.entryId);
   if(!entry)return;
-  const effects=(entry.combatant?.actor??entry.token?.actor)?.temporaryEffects.filter(effect=>!!effect.img)??[];
+  const effects=(entry.actor??entry.combatant?.actor??entry.token?.actor)?.temporaryEffects.filter(effect=>!!effect.img)??[];
   closeBarFlyout();
   if(!effects.length)return;
   const flyout=createPanel(root,row,entry);flyout.classList.add("pneuma-bar-statuses");

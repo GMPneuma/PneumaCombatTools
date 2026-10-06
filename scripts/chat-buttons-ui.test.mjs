@@ -6,10 +6,10 @@ try {
  const page=await browser.newPage({viewport:{width:760,height:740}});
  await page.setContent(`<main class="chat-message"><h3>Chat button states</h3>
  <section class="pneuma-defense-controls"><button>Evade</button><button>Do not Evade</button><button class="pneuma-cancel-exchange" data-gm-only="true">Cancel exchange</button></section>
- <section class="pneuma-manual-controls"><button id="apply">Apply to selected token</button><button data-gm-only="true">Mark resolved after GM review</button><button disabled title="Waiting for damage roll">Apply injury</button><button class="pneuma-damage-status-slot">+</button></section>
+ <section class="pneuma-manual-controls"><button id="apply">Apply to selected token</button><button data-gm-only="true" data-chat-action="review">Mark resolved after GM review</button><button disabled title="Waiting for damage roll">Apply injury</button><button class="pneuma-damage-status-slot">+</button></section>
  <section><button id="half" class="pneuma-half-armor" aria-pressed="false">Half Armor SP</button><button class="pneuma-half-armor" aria-pressed="true">Half Armor SP</button></section>
- <section class="pneuma-aoe-card"><button data-aoe-action="apply" title="Apply shared damage"><i class="test-bolt"></i></button><button data-aoe-action="apply" disabled title="Damage applied"><i class="test-bolt"></i></button><button data-aoe-action="reset" title="Release roll"><i class="test-reset"></i></button></section>
- <section class="pneuma-grapple-controls"><button>Roll Brawling</button><button data-gm-only="true">End (GM)</button></section>
+ <section class="pneuma-aoe-card"><button data-aoe-action="apply" title="Apply shared damage"><i class="test-bolt"></i></button><button data-aoe-action="apply" data-chat-state="applied" disabled title="Damage applied"><i class="test-bolt"></i></button><button data-aoe-action="reset" title="Release roll"><i class="test-reset"></i></button></section>
+ <section class="pneuma-grapple-controls"><button>Roll Brawling</button><button data-gm-only="true" data-chat-action="cancel">End (GM)</button></section>
  <section class="pneuma-quickhack-actions"><button>Force Out</button></section>
  <section><button data-emp-select data-gm-only="true">Choose affected items</button><button data-instant-action="roll">Resist DV15</button><button data-ribs-apply>Apply 5 damage</button></section>
  <section class="pneuma-group-action"><button>Roll</button></section><a class="pneuma-group-total">15</a><button id="native">Native control</button></main>`);

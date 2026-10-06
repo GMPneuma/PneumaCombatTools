@@ -44,15 +44,20 @@ function metersPerSpace(){const units=String(canvas.scene?.grid.units??"").toLow
 interface Display {container:PIXI.Container;marker:PIXI.Graphics;hud:HTMLDivElement;label:HTMLInputElement;run:HTMLSpanElement;reset:HTMLButtonElement;markerKey?:string;stateKey?:string}
 const displays=new Map<Token,Display>();
 function clear(token:Token){const display=displays.get(token);if(display){if(!display.container.destroyed)display.container.destroy({children:true});display.hud.remove();displays.delete(token);}}
+function showCounter(token:Token,context=movementTurn((token as Token & {_original?:Token})._original?.document??token.document)):boolean {
+  const original=(token as Token & {_original?:Token})._original??token;
+  return !!context&&(context.combat.turns[Number(context.combat.turn)]?.tokenId===original.document.id
+    || !!game.user?.isGM&&original.controlled);
+}
 function draw(token:Token,previewRecord?:MoveRecord){
   const original=(token as Token & {_original?:Token})._original;
   const doc=original?.document??token.document;
   if(token.destroyed||!active()){clear(token);return;}
   const context=movementTurn(doc);
-  if(!token.visible||!token.actor||(!game.user?.isGM&&!token.actor.hasPlayerOwner)||!context){clear(token);return;}
+  if(!token.visible||!token.actor||!context||!showCounter(token,context)){clear(token);return;}
   const prone=isProne(token.actor);
-  const record=previewRecord??(prone?(currentMovement(doc,context)??initial(doc)):token.isPreview?nextRecord(token,doc,{x:token.document.x,y:token.document.y}):currentMovement(doc,context));
-  if(!record||record.hidden&&!prone){clear(token);return;}
+  const record=previewRecord??(token.isPreview?nextRecord(token,doc,{x:token.document.x,y:token.document.y}):currentMovement(doc,context)??initial(doc));
+  if(!record){clear(token);return;}
   // Native HUD HTML lives outside Token's restricted PIXI hit area and follows canvas pan/zoom.
   const host=canvas.hud?.element[0]??document.getElementById("hud");
   if(!host)return;
@@ -79,7 +84,7 @@ function draw(token:Token,previewRecord?:MoveRecord){
     controls.append(reset,run);hud.append(attribute,controls);host.append(hud);display={container,marker,hud,label,run,reset};displays.set(token,display);
   }
   if(display.hud.parentElement!==host)host.append(display.hud);
-  display.container.visible=token.visible;
+  display.container.visible=token.visible&&!record.hidden;
   display.container.alpha=token.alpha;
   display.container.renderable=token.renderable;
   const perSpace=metersPerSpace(),entry=areaSettings().evadeMove?movementEntry(doc):undefined;
@@ -106,7 +111,7 @@ function draw(token:Token,previewRecord?:MoveRecord){
   if(display.markerKey!==markerKey){display.markerKey=markerKey;display.marker.clear().lineStyle(2,0xffffff,0.45).drawRect(record.start.x,record.start.y,token.w,token.h);}
 }
 export function registerMovement(){
-  game.settings!.register(MODULE,"movementTracking",{name:"Enable movement counters",hint:"GM world setting: enable or disable movement tracking, counters, start markers, and Reset controls for everyone. Player-owned counters are shared; NPC counters are GM-only. Does not block excess movement.",scope:"world",config:true,type:Boolean,default:true,onChange:()=>{for(const token of canvas.tokens?.placeables??[])draw(token);}});
+  game.settings!.register(MODULE,"movementTracking",{name:"Enable movement counters",hint:"Enable movement tracking, counters, start markers, and Reset controls. Counters show only for the current-turn token and tokens selected by the GM. Does not block excess movement.",scope:"world",config:true,type:Boolean,default:true,onChange:()=>{for(const token of canvas.tokens?.placeables??[])draw(token);}});
   Hooks.on("preUpdateToken",(doc:TokenDocument,changes:Record<string,unknown>,options:Record<string,unknown>)=>{
     if(doc.actor&&isProne(doc.actor)&&!game.user?.isGM&&(["x","y","elevation"] as const).some(key=>key in changes&&Number(changes[key])!==doc._source[key])){
       if(doc.object)draw(doc.object);
@@ -138,7 +143,7 @@ export function registerMovement(){
   const refreshTurns=(force=false)=>{
     const next=new Map<string,string>(),combat=barCombat();
     if(combat)combat.turns.forEach((c,index)=>{
-      if(c.tokenId)next.set(c.tokenId,combat.id+":"+c.id+":"+String(Number(combat.round)-(Number(combat.turn)<index?1:0)));
+      if(c.tokenId)next.set(c.tokenId,combat.id+":"+c.id+":"+String(Number(combat.round)-(Number(combat.turn)<index?1:0))+":"+(index===Number(combat.turn)));
     });
     for(const token of canvas.tokens?.placeables??[])if(force||turns.get(token.id!)!==next.get(token.id!))enqueue(token);
     turns=next;
@@ -146,13 +151,16 @@ export function registerMovement(){
   Hooks.on("refreshToken",(token:Token)=>{
     // The detached marker must inherit visibility immediately, before the next rendered frame.
     const display=displays.get(token);
-    if(display){display.container.visible=token.visible;display.container.alpha=token.alpha;display.container.renderable=token.renderable;}
+    if(display){display.container.visible=token.visible&&showCounter(token)&&!currentMovement((token as Token & {_original?:Token})._original?.document??token.document)?.hidden;display.container.alpha=token.alpha;display.container.renderable=token.renderable;}
     enqueue(token);
   });
   Hooks.on("updateToken",(doc:TokenDocument)=>{if(doc.object)enqueue(doc.object);});
   Hooks.on("controlToken",(token:Token)=>enqueue(token));
   Hooks.on("updateActor",(actor:Actor)=>{for(const token of canvas.tokens?.placeables??[])if(token.actor?.uuid===actor.uuid)enqueue(token);});
-  for(const hook of ["createActiveEffect","updateActiveEffect","deleteActiveEffect"])Hooks.on(hook,()=>{for(const token of canvas.tokens?.placeables??[])enqueue(token);});
+  for(const hook of ["createActiveEffect","updateActiveEffect","deleteActiveEffect"])Hooks.on(hook,(effect:ActiveEffect)=>{
+    for(const token of canvas.tokens?.placeables??[])if(token.actor &&
+      [effect.parent?.uuid,effect.parent?.parent?.uuid].includes(token.actor.uuid))enqueue(token);
+  });
   Hooks.on("updateUser",()=>refreshTurns(true));
   Hooks.on("destroyToken",(token:Token)=>{queued.delete(token);clear(token);});
   Hooks.on("canvasTearDown",()=>{queued.clear();turns.clear();for(const token of displays.keys())clear(token);});

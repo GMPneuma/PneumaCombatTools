@@ -1,8 +1,10 @@
 import {findNativeItem} from "../native-lookup.js";
+import {withActorMutation} from "../actor-mutation.js";
 import { primaryGM as gm, escapeHTML } from "../shared.js";
 import {tokenEncounter,encounterRef,resolveEncounter,requireParticipants,type EncounterRef} from "../encounter.js";
 import {updateTouchesPath} from "../update-path.js";
 import { requireCombatSocket } from "../socket-health.js";
+import {GMRequests} from "../gm-request.js";
 import { rollOutcomeClass, styleOpposedRolls } from "../card-structure.js";
 import { nativeCard, rollHidden, diceJSON, showSavedDice, messageDiceAudience, spendBonusLuck, type RollItem } from "../native-combat.js";
 import { masterStatuses } from "../status-catalog.js";
@@ -19,7 +21,7 @@ export interface GrappleRequest {
   action: string; rollMode?: string; source?: string; target?: string; result?: SkillResult; claim?: string;
 }
 interface Reply { grappleType: "reply"; request: string; user: string; gm: string; error?: string; claim?: string }
-const pending = new Map<string, { resolve: (claim?: string) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
+const requests=new GMRequests<string|undefined>();
 const claims = new Map<string, { user: string; id: string; expires: number }>();
 let queue: Promise<unknown> = Promise.resolve();
 function serialized<T>(operation: () => Promise<T>): Promise<T> {
@@ -253,18 +255,21 @@ export async function handleGrappleRequest(r: GrappleRequest): Promise<string | 
   if (!Number.isFinite(body) || body < 0) throw new Error("Attacker BODY is unavailable.");
   const receiptKey = `${scene.id}:${g.id}:${g.revision}:${r.action}`;
   type Receipt = {id:string;hp:number;unconscious:boolean;amount:number;choke?:Grapple["choke"]};
-  let receipt = property<Receipt>(target.actor!,"grappleDamage");
-  if (receipt?.id !== receiptKey) {
-    const combat = g.combat ? activeCombat(scene,g) : undefined;
-    const choke = r.action === "choke" ? combat ? nextChoke(g.choke,combat.id!,Number(combat.round)) : {combat:"",round:0,count:0} : undefined;
-    const hp = Number(foundry.utils.getProperty(target.actor!,"system.derivedStats.hp.value"));
-    const damage = r.action === "choke" ? chokeDamage(hp,body,choke!.count) : {hp:hp-body,unconscious:false};
-    if (!Number.isFinite(damage.hp)) throw new Error("Target HP is unavailable.");
-    await save(scene,{...g,operation:{action:r.action,user:r.user}});
-    receipt = {id:receiptKey,amount:body,...damage,...(choke ? {choke} : {})};
-    // HP and receipt change together, so retries after an effect/scene failure cannot deal damage twice.
-    await target.actor!.update({"system.derivedStats.hp.value":receipt.hp,[`flags.${MODULE}.grappleDamage`]:receipt} as Parameters<Actor["update"]>[0]);
-  }
+  const receipt = await withActorMutation(target.actor!,async()=>{
+    let receipt = property<Receipt>(target.actor!,"grappleDamage");
+    if (receipt?.id !== receiptKey) {
+      const combat = g.combat ? activeCombat(scene,g) : undefined;
+      const choke = r.action === "choke" ? combat ? nextChoke(g.choke,combat.id!,Number(combat.round)) : {combat:"",round:0,count:0} : undefined;
+      const hp = Number(foundry.utils.getProperty(target.actor!,"system.derivedStats.hp.value"));
+      const damage = r.action === "choke" ? chokeDamage(hp,body,choke!.count) : {hp:hp-body,unconscious:false};
+      if (!Number.isFinite(damage.hp)) throw new Error("Target HP is unavailable.");
+      await save(scene,{...g,operation:{action:r.action,user:r.user}});
+      receipt = {id:receiptKey,amount:body,...damage,...(choke ? {choke} : {})};
+      // HP and receipt change together, so retries after an effect/scene failure cannot deal damage twice.
+      await target.actor!.update({"system.derivedStats.hp.value":receipt.hp,[`flags.${MODULE}.grappleDamage`]:receipt} as Parameters<Actor["update"]>[0]);
+    }
+    return receipt;
+  });
   if (receipt.unconscious) await status(target.actor!,"Unconscious");
   if (r.action === "throw") {
     await status(target.actor!,"Prone");
@@ -281,10 +286,7 @@ async function request(data: Omit<GrappleRequest,"grappleType"|"request"|"user">
   if (!gm()) throw new Error("An active GM is required for grappling.");
   const wire: GrappleRequest = {...data,grappleType:"request",request:foundry.utils.randomID(),user:game.user!.id};
   if (gm()?.id === game.user?.id) return serialized(() => handleGrappleRequest(wire));
-  return new Promise((resolve,reject) => {
-    const timer = setTimeout(() => {pending.delete(wire.request);reject(new Error("GM did not confirm. Check the updated card before retrying."));},15000);
-    pending.set(wire.request,{resolve,reject,timer});game.socket!.emit(CHANNEL,wire);
-  });
+  return requests.request(wire.request,()=>game.socket!.emit(CHANNEL,wire),15000,"GM did not confirm. Check the updated card before retrying.");
 }
 async function brawling(actor: Actor, skipDialog = false): Promise<SkillResult | undefined> {
   const item = findNativeItem(actor.items,"Brawling") as RollItem | undefined;
@@ -370,8 +372,8 @@ export function renderGrapple(message: ChatMessage, html: JQuery) {
   const source = scene?.tokens.find(t => t.uuid === g.source.token), target = scene?.tokens.find(t => t.uuid === g.target.token);
   const canSource = !!source?.actor && owns(source.actor,game.user!);
   const canTarget = !!target?.actor && owns(target.actor,game.user!);
-  const add = (label: string, run: (event: MouseEvent) => Promise<unknown>, gmOnly = false) => {
-    const button = document.createElement("button");button.type="button";button.textContent=label;button.dataset.gmOnly=String(gmOnly);
+  const add = (label: string, run: (event: MouseEvent) => Promise<unknown>, gmOnly = false, action = "apply") => {
+    const button = document.createElement("button");button.type="button";button.textContent=label;button.dataset.gmOnly=String(gmOnly);button.dataset.chatAction=action;
     button.addEventListener("click",async event => {
       event.preventDefault();event.stopPropagation();
       if (localBusy.has(g.id)) return; localBusy.add(g.id); button.disabled=true;
@@ -380,22 +382,18 @@ export function renderGrapple(message: ChatMessage, html: JQuery) {
   };
   const act = (action: string) => request({scene:g.scene,id:g.id,revision:g.revision,action});
   if (g.operation) {
-    if (canSource || game.user?.isGM) add(`Retry ${g.operation.action}`,() => act(g.operation!.action));
-  } else if (g.state === "waiting" && canTarget) add("Roll Brawling",event => respond(g,event.shiftKey));
+    if (canSource || game.user?.isGM) add(`Retry ${g.operation.action}`,() => act(g.operation!.action),false,"retry");
+  } else if (g.state === "waiting" && canTarget) add("Roll Brawling",event => respond(g,event.shiftKey),false,"roll");
   else if (g.state === "choice" && canSource) { add("Hold Target",() => act("hold"));add("Take Held Object",() => act("take")); }
 
-  if (game.user?.isGM && g.state !== "ended") add("End (GM)",() => act("cancel"),true);
+  if (game.user?.isGM && g.state !== "ended") add("End (GM)",() => act("cancel"),true,"cancel");
 }
 export function registerGrapple() {
   Hooks.once("ready",() => {
     game.socket!.on(CHANNEL,(wire: GrappleRequest | Reply) => {
       if (wire?.grappleType === "request" && gm()?.id === game.user?.id) {
         void serialized(() => handleGrappleRequest(wire)).then(claim => reply(wire,undefined,claim),error => reply(wire,String((error as Error).message ?? error)));
-      } else if (wire?.grappleType === "reply" && wire.user === game.user?.id && wire.gm === gm()?.id) {
-        const p = pending.get(wire.request);if (!p) return;
-        clearTimeout(p.timer);pending.delete(wire.request);
-        if (wire.error) p.reject(new Error(wire.error));else p.resolve(wire.claim);
-      }
+      } else if (wire?.grappleType === "reply") requests.reply({...wire,id:wire.request},wire.claim);
     });
   });
   Hooks.on("renderChatMessage",renderGrapple);

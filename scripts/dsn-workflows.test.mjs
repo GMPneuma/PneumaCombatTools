@@ -4,6 +4,7 @@ import {registerHooks} from 'node:module';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import {installMockLibWrapper} from './lib-wrapper-fixture.mjs';
+import {GMRequests} from '../dist/scripts/gm-request.js';
 
 // CPR's automatic playback reads the core setting unless explicitly overridden.
 registerHooks({resolve(specifier,context,next){
@@ -44,7 +45,7 @@ function setup(coreMode='roll'){
 }
 function isolated(file,extra={}){
  const context={console,Map,Set,Promise,setTimeout,clearTimeout,structuredClone,FormApplication,Hooks,game,foundry,fromUuid,Roll,DOMParser,
-  ...native,checkedLuck,requireCombatSocket(){},spendBonusLuck:native.spendBonusLuck,damageSixes:()=>0,ui:{chat:{updateMessage(){}}},...extra};
+  ...native,GMRequests,checkedLuck,requireCombatSocket(){},spendBonusLuck:native.spendBonusLuck,damageSixes:()=>0,ui:{chat:{updateMessage(){}}},...extra};
  vm.createContext(context);
  const source=readFileSync(new URL('../dist/scripts/'+file+'.js',import.meta.url),'utf8')
   .replace(/^import .*;\s*$/gm,'').replace(/^export /gm,'');

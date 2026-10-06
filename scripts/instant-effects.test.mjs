@@ -14,7 +14,7 @@ const {masterStatuses}=await import('../dist/scripts/status-catalog.js');
 const {instantEffects,ammoProfile}=await import('../dist/scripts/instant-catalog.js');
 const {handleInstant,newInstant,instantContent}=await import('../dist/scripts/instant-effects.js');
 const {temporaryInjury,expireInstantActor,sleepTarget,clearInstantCondition,igniteTarget,burnTurn,registerInstantLifetimes,finishTimedEffects}=await import('../dist/scripts/instant-lifetime.js');
-const {damageStatusChoices,validateDamageStatuses}=await import('../dist/scripts/damage-status.js');
+const {damageStatusChoices,validateDamageStatuses,inherentDamageStatuses}=await import('../dist/scripts/damage-status.js');
 const {cleanupRows,applyCleanup,postCleanupNotice,resetCleanupNotice}=await import('../dist/scripts/status-cleanup.js');
 
 test('cleanup protects injuries, death and addiction; supports deliberate injury-item removal',async()=>{
@@ -47,6 +47,17 @@ test('cleanup rescans, honors scope and blocks actors in any started encounter',
  game.combats.clear();await applyCleanup({},[effect.uuid]);assert.equal(f.actor.effects.size,0);
  assert.match((await applyCleanup({},[effect.uuid])).join(' '),/Already cleared/);
  game.user=f.owner;await assert.rejects(applyCleanup({},[]),/Only a GM/);
+});
+test('persistent medical and addiction effects survive expiry, combat cleanup and GM cleanup selection',async()=>{
+ const f=setup();const saved=await f.actor.createEmbeddedDocuments('ActiveEffect',[
+  {name:'Needs Stabilization',statuses:['pneuma-needs-stabilization']},
+  {name:'Dead',statuses:['dead']},
+  {name:'Speedheal Addiction',statuses:['speedheal']}
+ ].map(data=>({...data,duration:{seconds:1,startTime:0},flags:{'pneuma-combattools':{endWithCombat:'ended'}}})));
+ const oldFrom=fromUuid;globalThis.fromUuid=async uuid=>saved.find(effect=>effect.uuid===uuid)??oldFrom(uuid);
+ await expireInstantActor(f.actor);await finishTimedEffects({id:'ended',combatants:[{actor:f.actor}],flags:{'pneuma-combattools':{speedhealEffects:[saved[2].uuid]}}});
+ const rows=cleanupRows();for(const effect of saved){assert(f.actor.effects.has(effect.id));const row=rows.find(row=>row.id===effect.uuid);assert(row.blocked&&!row.selected);}
+ await applyCleanup({},saved.map(effect=>effect.uuid));assert(saved.every(effect=>f.actor.effects.has(effect.id)));
 });
 
 test('cleanup reports partial failures and disables timed item effects without removing inventory',async()=>{
@@ -162,8 +173,8 @@ test('Quickhack Overheat burns 4 at turn end once; System Reset wakes on damage 
 test('Quickhack MOVE effects roll once, preserve stronger repeats, and expire without editing base MOVE',async()=>{
  const {applyQuickhackCondition}=await import('../dist/scripts/quickhack/conditions.js');const f=setup();globalThis.CONST={ACTIVE_EFFECT_MODES:{ADD:2}};
  globalThis.Roll=class{async evaluate(){this.total=4;return this;}};f.actor.system.stats.move={value:6};
- assert.equal(await applyQuickhackCondition(f.actor,'slow','blindroll'),4);const effect=[...f.actor.effects][0];assert.deepEqual(effect.changes,[{key:'system.stats.move.value',mode:2,value:'-4',priority:20}]);assert.equal(f.actor.system.stats.move.value,6);assert.deepEqual(diceModes,['blindroll']);
- game.time.worldTime=120;globalThis.Roll=class{async evaluate(){this.total=2;return this;}};assert.equal(await applyQuickhackCondition(f.actor,'slow'),4);assert.equal(f.actor.effects.size,1);
+ assert.equal(await applyQuickhackCondition(f.actor,'slow','blindroll'),4);const effect=[...f.actor.effects][0];assert.deepEqual(effect.changes,[{key:'system.stats.move.value',mode:2,value:'-4',priority:20}]);assert.equal(f.actor.system.stats.move.value,6);await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(diceModes,['blindroll']);
+ game.time.worldTime=120;globalThis.Roll=class{async evaluate(){this.total=2;return this;}};assert.equal(await applyQuickhackCondition(f.actor,'slow'),4);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.actor.effects.size,1);
  await applyQuickhackCondition(f.actor,'impair-movement');assert.equal(f.actor.effects.size,2);await expireInstantActor(f.actor,180);assert.equal(f.actor.effects.size,0);assert.equal(f.actor.system.stats.move.value,6);
 });
 test('Sonic Shock applies temporary native injury and deafness, preserving permanent conditions',async()=>{
@@ -242,6 +253,24 @@ test('damage statuses clear through both delete and reset combat hooks',async()=
   registerInstantLifetimes();for(const hook of hooks.createCombat??[])hook(c);
   c.started=false;for(const hook of hooks[action]??[])hook(c);
   await new Promise(r=>setTimeout(r,0));assert.equal(f.actor.effects.size,0,action);
+ }
+});
+
+test('combat reset/delete clears manually applied fire and disables item-owned fire without another burn',async()=>{
+ for(const action of ['deleteCombat','updateCombat']){
+  const f=setup(),c={id:'manual-fire',started:true,round:1,turn:0,combatants:[{actor:f.actor}]};game.combats.set(c.id,c);
+  const fire=masterStatuses.filter(s=>s.name.startsWith('On Fire ('));
+  await f.actor.createEmbeddedDocuments('ActiveEffect',fire.map(s=>({name:s.name,statuses:[s.id]})));
+  await f.actor.createEmbeddedDocuments('ActiveEffect',[{name:'Legacy fire',flags:{'pneuma-combattools':{instantLifetime:{kind:'fire'}}}},{name:'Unrelated status',statuses:['custom']}]);
+  const [item]=await f.actor.createEmbeddedDocuments('Item',[{name:'Carried item',type:'gear'}]);
+  const effect=new Doc({name:'Item fire',statuses:[fire[0].id]},item);item.effects.set(effect.id,effect);
+  f.actor.allApplicableEffects=function*(){yield* this.effects;yield* item.effects;};
+  registerInstantLifetimes();for(const hook of hooks.createCombat??[])hook(c);
+  c.started=false;for(const hook of hooks[action]??[])hook(c);
+  await new Promise(r=>setTimeout(r,0));
+  assert.deepEqual([...f.actor.effects].map(e=>e.name),['Unrelated status'],action);
+  assert.equal(effect.disabled,true,action);assert(f.actor.items.has(item.id));
+  assert.equal(f.actor.system.derivedStats.hp.value,40,'Combat end must not apply another fire tick');
  }
 });
 
@@ -381,5 +410,67 @@ test('GM can skip poison before resistance and incendiary before ignition',async
   const f=setup(),state=newInstant(id,f.actor.uuid,f.actor.name,{combatId:null});
   await handleInstant(state,{action:'skip'},game.user,f.save);
   assert.equal(state.state,'skipped');assert.equal(f.actor.effects.size,0);assert.equal(f.actor.system.derivedStats.hp.value,40);
+ }
+});
+
+ test('effect picker consolidates fire and EMP aliases, preserving legacy Microwaver source',()=>{
+  setup();CONFIG.statusEffects=masterStatuses.map(s=>({...s}));
+  const fire=masterStatuses.find(s=>s.name==='On Fire (Mild)').id,emp=masterStatuses.find(s=>s.name==='EMP').id;
+  const choices=damageStatusChoices();
+  assert(!choices.some(c=>['instant:incendiary','instant:emp','instant:microwaver'].includes(c.id)));
+  assert.equal(choices.filter(c=>c.id===fire).length,1);assert.equal(choices.filter(c=>c.id===emp).length,1);
+  assert.deepEqual(validateDamageStatuses(['instant:incendiary','instant:emp']),[fire,emp]);
+  assert.deepEqual(validateDamageStatuses(['instant:microwaver']),['instant:microwaver']);
+  assert.throws(()=>validateDamageStatuses(['instant:incendiary',fire]),/duplicated/);
+  assert.throws(()=>validateDamageStatuses(['instant:microwaver',emp]),/duplicated/);
+ });
+ test('effect-generated damage appears before effect resolution controls',()=>{
+  setup();const s={...newInstant('poison','a','Target'),state:'applied',damage:7,damageHTML:'<div>DAMAGE DICE</div>',summary:'7 HP applied'};
+  const html=instantContent(s);assert(html.indexOf('DAMAGE DICE') < html.indexOf('pneuma-effect-actions'));
+ });
+
+ test('inherent ammunition preselects canonical effects without selecting basic damage',()=>{
+  setup();assert.deepEqual(inherentDamageStatuses('incendiary'),[masterStatuses.find(s=>s.name==='On Fire (Mild)').id]);
+  assert.deepEqual(inherentDamageStatuses('emp'),[masterStatuses.find(s=>s.name==='EMP').id]);
+  assert.deepEqual(inherentDamageStatuses('poison'),['instant:poison']);assert.deepEqual(inherentDamageStatuses('basic'),[]);
+ });
+ test('canonical fire and EMP selections use shared mechanics and retain Microwaver source',async()=>{
+  const f=setup();const {createInstantCard}=await import('../dist/scripts/instant-effects.js');
+  const source={id:'source',whisper:[],blind:false,flags:{'pneuma-combattools':{exchange:{disableSource:'microwaver'}}},async update(changes){for(const [key,value]of Object.entries(changes))set(this,key,value);}};
+  const fire=masterStatuses.find(s=>s.name==='On Fire (Mild)').id,emp=masterStatuses.find(s=>s.name==='EMP').id;
+  await createInstantCard(f.actor,'status',source,undefined,fire);
+  await createInstantCard(f.actor,'status',source,undefined,emp);
+  const states=Object.values(source.flags['pneuma-combattools'].attachedEffects).map(card=>card.effect);
+  assert.equal(states[0].id,'incendiary');assert.equal(states[0].state,'failed');
+  assert.equal(states[1].id,'microwaver');assert.equal(states[1].state,'pending');
+ });
+
+ test('compact area effects retain disabled prerequisites and distinct GM override',()=>{
+  setup();const html=instantContent(newInstant('poison','a','Target'),'token',true);
+  assert.match(html,/pneuma-aoe-inline-effect/);assert.match(html,/aria-label="Resist Poison DV13"/);
+  assert.match(html,/aria-label="Apply Poison — awaiting resistance" disabled/);assert.match(html,/GM: unaffected by Poison/);
+  assert(!instantContent({...newInstant('poison','a','Target'),state:'resisted'},'token',true).includes('data-instant-action="skip"'));
+ });
+
+test('incendiary placeholder waits for damage without resist or GM application controls',()=>{
+ setup();
+ const html=instantContent({...newInstant('incendiary','actor','Target'),state:'pending'},'token',true);
+ assert.match(html,/pneuma-effect-apply/);
+ assert.match(html,/awaiting penetrating damage[^>]*disabled/);
+ assert.doesNotMatch(html,/data-instant-action|pneuma-effect-resistance|<span>Applied/);
+});
+
+test('effect Apply controls retain their glyph, finish as non-buttons, and omit Extinguish',()=>{
+ setup();
+ for(const id of ['incendiary','emp','poison']){
+  const pending=newInstant(id,'actor','Target'),failed={...pending,state:'failed'},applied={...pending,state:'applied'};
+  const before=instantContent(failed,'target',true),after=instantContent(applied,'target',true);
+  assert.match(before,/pneuma-effect-apply/);assert.match(before,/<span>Apply<\/span>/);
+  assert.match(after,/pneuma-effect-complete/);assert.doesNotMatch(after,/data-instant-action="apply"/);
+  assert.doesNotMatch(after,/fa-check|pneuma-effect-state/);
+  assert.doesNotMatch(before+after,/fa-wand|data-instant-action="extinguish"/);
+  const glyph=before.match(/<img class="pneuma-effect-glyph"[^>]*>|<i class="fas fa-(?:skull|fire|bolt)"[^>]*>/)?.[0];
+  assert(glyph);assert(after.includes(glyph));
+  assert.doesNotMatch(instantContent(applied),/data-instant-action="extinguish"/);
  }
 });

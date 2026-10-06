@@ -9,7 +9,7 @@ try{
  await page.setContent('<style>body{background:#17222c}</style><aside id="sidebar" style="position:fixed;right:0;top:0;width:300px;height:100vh"></aside><div id="chat-log"><div data-message-id="attack">Chat resolution</div></div>');
  await page.addStyleTag({content:(await readFile("dist/styles/pneuma-combattools.css","utf8")).replace("icons/biomon-alert.svg", "data:image/svg+xml;base64," + (await readFile("dist/styles/icons/biomon-alert.svg")).toString("base64"))});
  await page.evaluate(()=>{
-  window.injuryGuidance={};window.FormApplication=class {};
+  window.playNotificationSound=()=>{};window.injuryGuidance={};window.FormApplication=class {};
   window.Dialog=class {constructor(data){window.messageDialog=data;}render(){return this;}};
   window.hooks={};window.Hooks={on:(k,f)=>(hooks[k]??=[]).push(f),once:(k,f)=>(hooks[k]??=[]).push(f),callAll:(k,...args)=>(hooks[k]??[]).forEach(f=>f(...args))};
   window.values={};window.settings={};
@@ -29,7 +29,7 @@ try{
   window.foundry={utils:{randomID:()=>String(window.testMessageId=(window.testMessageId??0)+1),getProperty:(o,p)=>p.split(".").reduce((v,k)=>v?.[k],o)}};
   window.ui={sidebar:{activateTab:()=>{window.openedChat=true;}},notifications:{info:()=>{}}};
  });
- await page.addScriptTag({type:"module",content:(await readFile("dist/scripts/socket-health.js","utf8")).replace('const MODULE = "pneuma-combattools";','const SOCKET_MODULE = "pneuma-combattools";').replace("get(MODULE)","get(SOCKET_MODULE)")+"\n"+(await readFile("dist/scripts/hud-messages.js","utf8")).replace(/^import .*;\s*/gm,"")+"\n"+(await readFile("dist/scripts/update-path.js","utf8"))+"\n"+(await readFile("dist/scripts/item-markers.js","utf8")).replace(/^import .*;\s*/gm,"").replace('const MODULE = "pneuma-combattools";', "")+"\n"+(await readFile("dist/scripts/biomonitor.js","utf8"))+"\n"+(await readFile("dist/scripts/grapple/rules.js","utf8"))+"\n"+(await readFile("dist/scripts/grapple/state.js","utf8")).replace(/^import .*;\s*/gm,"").replace('export const MODULE = "pneuma-combattools";', "")+"\nconst forceOutEntries=()=>window.testIncoming??[]; const bindStatusActions=()=>{}; const closeStatusActions=()=>{}; const movementHUD=()=>[]; const grappleProperty = property;\n"+(await readFile("dist/scripts/status-catalog.js","utf8"))+"\n"+(await readFile("dist/scripts/hud-conditions.js","utf8")).replace(/^import .*;\s*/gm,"")+"\n"+(await readFile("dist/scripts/eye-hud.js","utf8")).replace(/^import .*;\s*/gm,"")+"\nObject.assign(window,{sendHUDMessage,hasBiomonitor,collectHUDConditions,actorInFocus});registerEyeHUD();"});
+ await page.addScriptTag({type:"module",content:(await readFile("dist/scripts/socket-health.js","utf8")).replace('const MODULE = "pneuma-combattools";','const SOCKET_MODULE = "pneuma-combattools";').replace("get(MODULE)","get(SOCKET_MODULE)")+"\n"+(await readFile("dist/scripts/hud-messages.js","utf8")).replace(/^import .*;\s*/gm,"")+"\n"+(await readFile("dist/scripts/update-path.js","utf8"))+"\n"+(await readFile("dist/scripts/item-markers.js","utf8")).replace(/^import .*;\s*/gm,"").replace('const MODULE = "pneuma-combattools";', "")+"\n"+(await readFile("dist/scripts/biomonitor.js","utf8"))+"\n"+(await readFile("dist/scripts/grapple/rules.js","utf8"))+"\n"+(await readFile("dist/scripts/grapple/state.js","utf8")).replace(/^import .*;\s*/gm,"").replace('export const MODULE = "pneuma-combattools";', "")+"\nconst forceOutEntries=()=>window.testIncoming??[]; const beginForceOut=async()=>{}; const hasInstantCondition=()=>true; const clearInstantCondition=async()=>{}; const escapeHTML=s=>String(s??'');\n"+(await readFile("dist/scripts/neural-intrusion.js","utf8")).replace(/^import .*;\s*/gm,"")+"\n const movementHUD=()=>[]; const grappleProperty = property;\n"+(await readFile("dist/scripts/status-catalog.js","utf8"))+"\n"+(await readFile("dist/scripts/hud-conditions.js","utf8")).replace(/^import .*;\s*/gm,"")+"\n"+(await readFile("dist/scripts/eye-hud.js","utf8")).replace(/^import .*;\s*/gm,"")+"\nObject.assign(window,{sendHUDMessage,hasBiomonitor,collectHUDConditions,actorInFocus});registerEyeHUD();"});
  const ts = (await import("../node_modules/typescript/lib/typescript.js")).default;
  const crewRoot = process.env.PNEUMA_CREWTOOLS_ROOT ?? "../PneumaCrewTools";
  const shortcutSource = await readFile(crewRoot + "/src/hud-shortcuts.ts", "utf8").catch(()=>null);
@@ -318,7 +318,7 @@ try{
  await page.evaluate(()=>{
    const hud=document.createElement('div');hud.id='pneuma-crewtools-calendar';
    hud.innerHTML='<span class="pneuma-calendar-date"><span class="pneuma-calendar-weekday">Wednesday</span><span class="pneuma-calendar-month-day">Sep 23</span><span class="pneuma-calendar-year">2045</span></span><div class="pneuma-crew-hud"><button aria-label="Crew">♟</button></div>';
-   document.body.append(hud);refreshHudShortcuts();
+   document.body.append(hud);window.calendarWidthBeforeIntegration=hud.getBoundingClientRect().width;refreshHudShortcuts();
    for(const [id,css] of [['navigation','position:fixed;left:110px;top:0;width:650px;height:90px'],['controls','position:fixed;left:0;top:100px;width:100px;height:400px']]){const node=document.createElement('div');node.id=id;node.style.cssText=css;document.body.append(node);}
    moduleEntry.api.hud.list().forEach(n=>moduleEntry.api.hud.dismiss(n.source,n.id));
    values.eyeHUDMessage=null;game.messages=[];actor.system.derivedStats.hp.value=9;
@@ -331,9 +331,9 @@ try{
  const crewBox=await page.getByRole('button',{name:'Crew',exact:true}).boundingBox();
  const bioBox=await page.locator('#pneuma-biomon-shortcut').boundingBox();
  assert.ok(bioBox.y>=crewBox.y+crewBox.height && Math.abs(bioBox.x-crewBox.x)<1,'Biomon sits below Crew in the same column');
- assert.equal(Math.round((await page.locator('#pneuma-crewtools-calendar').boundingBox()).width),138,'Calendar does not widen');
+ assert.equal((await page.locator('#pneuma-crewtools-calendar').boundingBox()).width,await page.evaluate(()=>calendarWidthBeforeIntegration),'Calendar does not widen');
  assert.equal(await page.locator('#pneuma-biomon-shortcut').evaluate(b=>getComputedStyle(b).color),'rgb(255, 98, 98)');
- await page.getByRole('button',{name:'Minimize Biomon',exact:true}).click();
+ await page.getByRole('button',{name:'Minimize Biomonitor',exact:true}).click();
  await page.waitForSelector('#pneuma-eye-hud.is-integrated-mini');
  await page.evaluate(()=>moduleEntry.api.hud.send({source:'integration',id:'alert',text:'Incoming hack'}));
  await page.waitForFunction(()=>document.querySelector('#pneuma-biomon-shortcut').classList.contains('has-alert'));
@@ -352,7 +352,7 @@ try{
  assert.ok(miniMessages.width>miniLeft.width*2,'Minimized messages extend beyond EKG width');
  assert.ok(Math.abs(miniMessages.x-miniLeft.x)<1,'Messages remain left-aligned below EKG');
  await page.screenshot({path:process.env.TEMP+'/pneuma-minimized-wide-messages.png'});
- await page.getByRole('button',{name:'Open Biomon',exact:true}).click();
+ await page.getByRole('button',{name:'Open Biomonitor',exact:true}).click();
  await page.waitForFunction(()=>!document.querySelector('#pneuma-eye-hud').classList.contains('is-minimized'));
  const left=await page.locator('#pneuma-eye-hud').boundingBox();
  const crewAnchor=await page.locator('#pneuma-crewtools-calendar').boundingBox();
@@ -367,9 +367,9 @@ try{
  await page.screenshot({path:process.env.TEMP+'/pneuma-integrated-expanded.png'});
  await page.evaluate(()=>game.settings.set('pneuma-combattools','eyeHUD',false));
  await page.waitForSelector('#pneuma-eye-hud',{state:'detached'});
- await page.getByRole('button',{name:'Open Biomon',exact:true}).click();
+ await page.getByRole('button',{name:'Open Biomonitor',exact:true}).click();
  await page.waitForSelector('#pneuma-eye-hud',{state:'visible'});
- await page.getByRole('button',{name:'Minimize Biomon',exact:true}).click();
+ await page.getByRole('button',{name:'Minimize Biomonitor',exact:true}).click();
  await page.waitForSelector('#pneuma-eye-hud.is-integrated-mini');
  await page.evaluate(()=>{document.getElementById('pneuma-crewtools-calendar').remove();refreshHudShortcuts();});
  await page.waitForFunction(()=>!document.querySelector('#pneuma-eye-hud')?.classList.contains('is-integrated-mini'));
@@ -471,6 +471,15 @@ try{
  await page.waitForSelector('.pneuma-eye-lamp[data-kind="intrusion"]');
  assert.equal(await page.locator('.pneuma-eye-lamp[data-kind="intrusion"]').innerText(),'NEURAL INTRUSION');
  assert.equal(await page.locator('.pneuma-eye-situation').filter({hasText:'Incoming Jack-In'}).count(),0);
+ await page.locator('.pneuma-eye-lamp[data-kind="intrusion"]').click({button:'right'});
+ await page.waitForSelector('.pneuma-status-actions');
+ await page.evaluate(()=>{window.savedStatusMenu=document.querySelector('.pneuma-status-actions');hooks.updateCombat.forEach(fn=>fn({},{}));});
+ await page.evaluate(()=>new Promise(requestAnimationFrame));
+ assert.equal(await page.evaluate(()=>document.querySelector('.pneuma-status-actions')===savedStatusMenu),true,'Unchanged HUD refresh preserves the open status menu');
+ await page.evaluate(()=>{window.testIncoming=[{messageId:'replacement',name:'Another Netrunner'}];hooks.updateCombat.forEach(fn=>fn({},{}));});
+ await page.waitForFunction(()=>!document.querySelector('.pneuma-status-actions'));
+ await page.locator('.pneuma-eye-lamp[data-kind="intrusion"]').click({button:'right'});
+ await page.waitForSelector('.pneuma-status-actions');
  await page.screenshot({path:process.env.TEMP+'/pct-neural-intrusion.png'});
  await page.evaluate(()=>{window.testIncoming=[];hooks.updateCombat.forEach(fn=>fn({},{}));});
  await page.waitForFunction(()=>!document.querySelector('.pneuma-eye-lamp[data-kind="intrusion"]'));

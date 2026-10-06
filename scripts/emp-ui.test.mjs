@@ -147,6 +147,7 @@ try {
   const render=async()=>{for(const fn of hooks.renderChatMessage)await fn(source,wrap(root));};
   await render();await render();
   if(root.querySelectorAll('.pneuma-attached-emp').length!==1||!root.textContent.includes('Original attack'))throw Error('EMP duplicated or replaced parent');
+  if(root.querySelector('.pneuma-attached-emp h4'))throw Error('Attached EMP repeats the effect/actor heading');
   const saved=combat.flags['pneuma-combattools'].empRequests[req.id];saved.state='applied';saved.affectedNames=['Disabled arm'];await render();
   if(!root.textContent.includes('Disabled: Disabled arm')||!root.querySelector('[data-emp-select]').disabled)throw Error('EMP result not inline');
   game.user={id:'stranger',isGM:false};actor.isOwner=false;await render();if(root.querySelector('.pneuma-attached-emp'))throw Error('EMP chooser leaked');

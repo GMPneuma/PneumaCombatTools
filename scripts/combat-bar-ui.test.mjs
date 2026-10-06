@@ -20,7 +20,7 @@ try {
   window.gm={id:'gm',isGM:true,active:true,hasPermission:()=>true};window.player={id:'p',isGM:false,active:true,hasPermission:()=>window.pingPermission};window.pingPermission=true;
   const scene={id:'scene'};
   window.makeToken=(id,name,color)=>{
-   const actor={id,name,img:'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="120" height="180"><rect width="120" height="180" fill="${color}"/><text x="60" y="95" font-size="44" text-anchor="middle" fill="white">${name.slice(0,1)}</text></svg>`),testUserPermission:u=>u===player};
+   const actor={id,uuid:'Actor.'+id,name,img:'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="120" height="180"><rect width="120" height="180" fill="${color}"/><text x="60" y="95" font-size="44" text-anchor="middle" fill="white">${name.slice(0,1)}</text></svg>`),testUserPermission:u=>u===player};
    const token={id,name,actor,isOwner:true,isVisible:true,controlled:false,center:{x:100,y:200},control:()=>{calls.select.push(id);token.controlled=true;emit('controlToken');}};
    token.document={id,uuid:'Scene.scene.Token.'+id,parent:scene,hidden:false,_source:{x:0,y:0,elevation:0},object:token,texture:{src:'WRONG-TOKEN-ART.png'}};
    actor.temporaryEffects=[{img:actor.img,name:'Prone'},{img:actor.img,name:'Dead',getFlag:()=>true}];
@@ -28,6 +28,7 @@ try {
    return token;
   };
   window.tokens=[makeToken('t1','Violet','#784462'),makeToken('t2','Solo','#365b74'),makeToken('t3','Hidden Guard','#744d36')];
+  player.character=tokens[0].actor;
   window.combat={id:'fight',active:true,started:true,scene,round:1,turn:0,flags:{},canUserModify:()=>true,
    nextTurn:async()=>{calls.next++;if(window.deferTurn)await new Promise(resolve=>window.resolveTurn=resolve);combat.turn=(combat.turn+1)%combat.turns.length;emit('updateCombat');},
    previousTurn:async()=>{calls.previous++;combat.turn=Math.max(0,combat.turn-1);emit('updateCombat');},
@@ -110,7 +111,13 @@ try {
  assert.equal(await bar.getByRole('button',{name:'No Movement',exact:true}).locator('i').getAttribute('class'),'fas fa-hand');
  await portrait.hover();assert.equal(await bar.locator('.pneuma-bar-statuses img').count(),2);
  assert.equal(await bar.locator('.pneuma-bar-statuses img').last().getAttribute('title'),'Dead');
+ await page.evaluate(()=>{window.statusFlyout=document.querySelector('.pneuma-bar-statuses');emit('updateActiveEffect',{parent:tokens[1].actor});});
+ assert.equal(await page.evaluate(()=>document.querySelector('.pneuma-bar-statuses')===statusFlyout),true,'Unrelated effect preserves status tooltip');
+ await page.evaluate(()=>emit('updateActiveEffect',{parent:{parent:tokens[0].actor}}));
+ assert.equal(await bar.locator('.pneuma-bar-statuses').count(),0,'Owned item effect invalidates its actor tooltip');
  await click(portrait,{button:'right'});assert.equal(await bar.locator('.pneuma-bar-controls .combatant-control').count(),5);
+ await page.evaluate(()=>{window.controlsFlyout=document.querySelector('.pneuma-bar-controls');emit('createActiveEffect',{parent:tokens[1].actor});emit('deleteActiveEffect',{parent:tokens[0].actor});});
+ assert.equal(await page.evaluate(()=>document.querySelector('.pneuma-bar-controls')===controlsFlyout),true,'Effects do not close native combat controls');
  await click(bar.locator('[data-control=toggleDefeated]'));assert.deepEqual(await page.evaluate(()=>calls.nativeControl),{action:'toggleDefeated',id:'c0',combat:'fight'});
  assert.equal(await page.evaluate(()=>ui.combat.viewed.id),'sidebar-preview');
  await click(portrait);assert.deepEqual(await page.evaluate(()=>calls.select),['t1']);
@@ -322,6 +329,17 @@ try {
  const flyout=await bar.locator('.pneuma-bar-controls').boundingBox(),dock=await bar.boundingBox();
  assert.ok(flyout.y-dock.y-dock.height>=3&&flyout.y-dock.y-dock.height<=6,'Non-active flyout stays close to bar');
  await page.screenshot({path:process.env.TEMP+'/pct-bar-top-right-horizontal.png'});
+ await page.evaluate(()=>{combat.started=false;canvas.tokens.placeables=[];player.character.testUserPermission=u=>u===gm||u===player;emit('updateCombat');});
+ assert.equal(await bar.locator('li').count(),1,'GM sees the assigned character without scene tokens');
+ const actorPortrait=bar.locator('li').first().locator('[data-action=token]');
+ assert.equal(await actorPortrait.isEnabled(),true);
+ const sheetsBefore=await page.evaluate(()=>calls.sheets?.length??0);
+ await actorPortrait.dblclick();
+ assert.equal(await page.evaluate(()=>calls.sheets.length),sheetsBefore+1,'Actor-only portrait opens native sheet');
+ await page.evaluate(()=>{player.active=false;emit('userConnected');});
+ assert.equal(await bar.locator('li').count(),0,'Offline players are removed from the GM bar');
+ await page.evaluate(()=>{game.user=player;emit('updateUser');});
+ assert.equal(await bar.locator('li').count(),1,'Player sees own assigned character');
  await page.evaluate(()=>{emit('canvasTearDown');canvas.ready=false;});assert.equal(await bar.count(),0);
  assert.deepEqual(errors,[]);console.log('Combat bar browser checks passed: portraits, positioning, selection, ping, pan, visibility, turn controls, mode writes, scroll and cleanup.');
 }finally{await browser.close();}

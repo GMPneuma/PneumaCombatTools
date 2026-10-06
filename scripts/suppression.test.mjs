@@ -9,7 +9,7 @@ function fixture(turn=0){
  const combat={id:'combat',started:true,round:1,turn,turns};
  globalThis.game={users:[gm],user:gm,actors:[actor],scenes:[],combats:new Map([['combat',combat]]),combat:{round:99,turn:99}};
  globalThis.foundry={utils:{getProperty:(o,p)=>p.split('.').reduce((v,k)=>v?.[k],o)}};
- const add=(id,token)=>actor.effects.push({id,flags:{[M]:{suppressionExpiry:suppressionExpiry(combat,token)}}});
+ const add=(id,token)=>actor.effects.push({id,statuses:new Set(),flags:{[M]:{suppressionExpiry:suppressionExpiry(combat,token)}}});
  return {actor,combat,add};
 }
 test('suppression survives the next turn and expires only after it ends in its originating encounter',async()=>{

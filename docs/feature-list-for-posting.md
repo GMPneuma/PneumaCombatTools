@@ -28,7 +28,7 @@ Combat workflows for Cyberpunk RED in Foundry VTT v12. Requires Cyberpunk RED Co
 - Optional AoE MOVE costs and Cover Up homebrew.
 - GM target-list corrections and attack-area Show/Hide controls.
 - Shared AoE damage results collected beneath the roll.
-- Poison, Biotoxin, Flashbang, Teargas, Sleep, Ignite, Smoke, EMP and Microwaver effect flows.
+- Poison, Biotoxin, Flashbang, Teargas, Sleep, On Fire, Smoke and EMP effect flows, including Microwaver source rules.
 - Native fire ticking, Extinguish, Sleep wake-up and temporary-effect cleanup.
 - Persistent smoke areas with their own expiry and GM removal.
 - Interact With Armor and Half Armor SP, with rounded-up SP; always available for ad-hoc damage, optional elsewhere.

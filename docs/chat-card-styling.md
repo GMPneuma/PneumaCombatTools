@@ -6,11 +6,11 @@ Chat result delay: the GM's **Attack & Damage Cards → Chat result delay** drop
 
 Reversal status is visible in the compact application row even with the native breakdown collapsed: `.pneuma-reversal-status[data-state="reversed"]` shows a check icon and **Damage reversed**. Pending and interrupted states use distinct text/icons; no success indicator is shown for an interrupted reversal. The label uses `role="status"` and persists from saved reversal state on rerender.
 
-Damage reversal: `.pneuma-damage-applied` carries `data-damage-instance` and `data-damage-actor`. Its native `[data-action="reverseDamage"]` glyph remains within the expandable native breakdown. Used/in-progress/interrupted reversals have `aria-disabled="true"`, reduced opacity, and a state tooltip; capture-phase handling blocks the native repeat action. Each instance persists independently on the message. Existing receipt breakdown classes provide legacy identity. Example: `.pneuma-damage-applied [data-action="reverseDamage"][aria-disabled="true"]`.
+Damage reversal: `.pneuma-damage-applied` carries `data-damage-instance` and `data-damage-actor`. Its native `[data-action="reverseDamage"]` glyph remains inside its receipt, beside the applied total. Used/in-progress/interrupted reversals have `aria-disabled="true"`, reduced opacity, and a state tooltip; capture-phase handling blocks the native repeat action. Each instance persists independently on the message. Existing receipt breakdown classes provide legacy identity. Example: `.pneuma-damage-applied [data-action="reverseDamage"][aria-disabled="true"]`.
 
 Weapon-title visibility: `.pneuma-attack-name` uses generic categories under Hide attack weapon names for NPCs only when the attacker has no player owner. Player-owned attacks retain their names regardless of the rolling user. Existing markup and tooltip selectors are unchanged.
 
-Attached effects: `.pneuma-attached-effects.rollcard` sections render inside the originating message content, headed by escaped target name and Effects. Existing `.pneuma-instant-effect[data-state]`, inline roll details, and `[data-instant-action]` controls retain their styles and permissions. Each attached effect has its own `data-instant-scope`. `.pneuma-attached-emp.pneuma-emp-card` holds the target's existing `[data-emp-select]` chooser and `.pneuma-emp-result` summary; only the GM or authorized chooser sees that section. Blind/private parent visibility is respected. Example: `.pneuma-attached-effects .pneuma-instant-effect[data-state="resisted"]`. Parent content updates rebuild these sections from independent message flags without duplicating chat messages. Standalone effect cards retain their existing markup.
+Attached effects: `.pneuma-attached-effects.rollcard` sections render inside the originating message content, grouped under an escaped actor-name heading beneath Effects. Existing `.pneuma-instant-effect[data-state]`, inline roll details, and `[data-instant-action]` controls retain their styles and permissions. Each attached effect has its own `data-instant-scope`. `.pneuma-attached-emp.pneuma-emp-card` holds the target's existing `[data-emp-select]` chooser and `.pneuma-emp-result` summary without a repeated “EMP — actor” h4; only the GM or authorized chooser sees that section. Blind/private parent visibility is respected. Example: `.pneuma-attached-emp .pneuma-emp-result`. Parent content updates rebuild these sections from independent message flags without duplicating chat messages. Standalone effect cards retain their existing markup. The attached EMP h4 selector is removed; target context belongs to the parent effects layout.
 
 Container, Black ICE, and Demon actor tokens retain their native HUD template, controls, and positioning. Combat Tools does not append self or targeted menu controls to these HUDs. Existing character/mook HUD selectors and card markup are unchanged.
 
@@ -34,7 +34,7 @@ Ordinary native roll cards are not globally reskinned. The armor-control enhance
 
 ## Exchange sections and state
 
-`resolutionSection` emits `.pneuma-resolution-section`, `.pneuma-resolution-KIND`, `data-pneuma-section="KIND"`, an accessible label, `.pneuma-resolution-label` and `.pneuma-resolution-body`. Kinds are `pending`, `attack`, `evade`, `result`, `damage-roll`, `damage-apply`, `recovery`.
+`resolutionSection` emits `.pneuma-resolution-section`, `.pneuma-resolution-KIND`, `data-pneuma-section="KIND"`, an accessible label, `.pneuma-resolution-label` and `.pneuma-resolution-body`. Kinds are `pending`, `attack`, `evade`, `result`, `damage-roll`, `damage-apply`, `effects`, `recovery`.
 
 | State attribute on exchange message | Values / meaning |
 | --- | --- |
@@ -54,7 +54,7 @@ Resolved means attack outcome, not that all damage/effects are complete. Applyin
 | Grapple `.pneuma-grapple-card` | `data-state`; note, opposed rolls, controls; established history | Roll Brawling, Hold/Take, recovery/GM End as applicable. Ongoing Choke/Throw/Release/Escape belong to self HUD | `.pneuma-grapple-card .pneuma-grapple-controls` |
 | QuickHack `.pneuma-quickhack-card` | `data-state="success|failure"`; heading, combined visible native rolls, outcome/effect slot | Force Out and eligible damage; audience/identity follow saved routing | `.pneuma-quickhack-card .pneuma-quickhack-effect` |
 | EMP `.pneuma-emp-card` | Request summary and chooser outcome | `data-emp-select` for authorized chooser/GM; limited shortlist does not expose every component in its UI | `.pneuma-emp-card [data-emp-select]` |
-| Instant effects `.pneuma-instant-card` / `.pneuma-instant-effect` | Standalone/embedded resolver state and summary | `data-instant-action`; resist/apply/unaffected/review/wake/extinguish as appropriate | `.pneuma-instant-effect [data-instant-action]` |
+| Instant effects `.pneuma-instant-card` / `.pneuma-instant-effect` | Standalone/embedded resolver state and summary | `data-instant-action`; resist/apply/unaffected/review; Wake on standalone Sleep cards | `.pneuma-instant-effect [data-instant-action]` |
 | Injury `.pneuma-injury-card` | `data-injury="broken-ribs|foreign-object-body|foreign-object-head"`; pending/applied/withdrawn | Owner/GM `data-ribs-apply` when eligible | `.pneuma-injury-card[data-state="pending"]` |
 | Manual `.pneuma-manual-card` | `data-manual-kind="damage|critical|group"`; shared/native content and manual controls/receipts | State-dependent application, row Roll and GM recovery | `.pneuma-manual-card .pneuma-manual-controls` |
 | Group `.pneuma-group-rows` | Heading skill/DV on one line; rows, outcome, initially hidden details | `.pneuma-group-total` toggles details, keyboard supported; modifiers expanded inside details | `.pneuma-group-outcome[data-outcome="success"]` |
@@ -170,7 +170,7 @@ Instant-effect and AoE defense rows use details.pneuma-inline-roll with a numeri
 See [the complete card audit](chat-card-audit-2026-09-26.md). Native main-card CSS remains authoritative; selector fixes are implemented; optional native-header improvements remain deferred. Reload notices now use .pneuma-ammo-notice and data-ammo-action; Foreign Object cards use their own data-injury values, including previously saved cards when rendered. The current standalone instant selector is .pneuma-instant-card, not an assumed shared outer .pneuma-combat-message wrapper.
 
 ### Condition-aware controls and audit selector fixes
-Wake/Extinguish controls are omitted when their current actor condition is absent, disabled or suppressed. Saved historical effect summaries remain unchanged. Actor/item/effect and combat events batch refresh only indexed relevant cards, including embedded AoE instant rows. Injury cards use .pneuma-injury-summary and data-state="withdrawn" when injury/epoch/encounter checks fail; applied receipts remain intact. Their data-injury value is now injury-specific (Foreign Object themes must update old broken-ribs selectors). Reload paragraphs add .pneuma-ammo-notice and data-ammo-action="reload|change", retaining default native CSS. QuickHack summaries add .pneuma-quickhack-effect-failed and data-effect-state="failed|resolved"; the legacy failure class is retained for compatibility. No QuickHack recovery control or behavior was added.
+Wake controls are omitted when their current actor condition is absent, disabled or suppressed. Extinguish is available through Treatment and self actions, rather than resolution cards. Saved historical effect summaries remain unchanged. Actor/item/effect and combat events batch refresh only indexed relevant cards, including embedded AoE instant rows. Injury cards use .pneuma-injury-summary and data-state="withdrawn" when injury/epoch/encounter checks fail; applied receipts remain intact. Their data-injury value is now injury-specific (Foreign Object themes must update old broken-ribs selectors). Reload paragraphs add .pneuma-ammo-notice and data-ammo-action="reload|change", retaining default native CSS. QuickHack summaries add .pneuma-quickhack-effect-failed and data-effect-state="failed|resolved"; the legacy failure class is retained for compatibility. No QuickHack recovery control or behavior was added.
 
 AoE response reset: `.pneuma-aoe-target [data-aoe-action="reset"]` is a labeled **Reset Player Action** button using the shared GM styling. Waiting rows retain `exclude`; answered rows replace `exclude`/`forcehit` with `reset`. Players cannot see reset. Native disabled styling is used after movement or application starts, with a reason in its title. Reset returns the row to `data-state="waiting"` and restores the original controls.
 
@@ -218,7 +218,7 @@ Reverse Damage (released in 0.9.8): only GMs see and can use the native undo con
 
 Dice reveal compatibility (0.9.9): `flags.pneuma-combattools.rollsRevealed` is set after attack/AoE/grapple saved-dice playback and on QuickHack result cards. Existing card selectors are retained.
 
-Manual effect confirmation (unreleased): attached ordinary statuses use the existing `.pneuma-attached-effects .pneuma-instant-effect` layout and state selectors. `data-instant-action="apply"` reads Apply Effect; GM-only skip reads Unaffected. Damage does not apply those statuses or Incendiary automatically. Applied/resisted/skipped states remove pending actions; applied fire/sleep retain Extinguish/Wake. Per-target state remains on the originating message.
+Manual effect confirmation (unreleased): attached ordinary statuses use the existing `.pneuma-attached-effects .pneuma-instant-effect` layout and state selectors. `data-instant-action="apply"` reads Apply Effect; GM-only skip reads Unaffected. Damage does not apply those statuses or Incendiary automatically. Applied/resisted/skipped states remove pending actions; applied Sleep retains Wake on standalone cards; Extinguish uses Treatment or self actions. Per-target state remains on the originating message.
 
 Pending effect actions share `.pneuma-effect-actions`, a flex row below the effect label, keeping Apply Effect and Unaffected together at normal chat width.
 ### Medical HUD and results
@@ -248,3 +248,60 @@ Treatment columns use shrinkable tracks and bordered action groups. Scoped selec
 .pneuma-treatment-patient-picker holds data-treatment-patient and optional data-treatment-patient-name. Custom patients have a defenderName without defender token/actor UUIDs.
 
 Treatment preserves .message-content > .rollcard > .rollcard-top. Native root gains outcome classes; .pneuma-treatment-result follows as a sibling, with participant metadata unchanged.
+
+QuickFix Medical entries no longer require a Medtech role, allowing the menu to appear for non-Medtech healers with eligible actions.
+
+Audit recovery corrections (unreleased): generic .pneuma-instant-effect[data-effect="status"] cards retain the existing Apply Effect and GM-only Unaffected controls; their requests now pass through the same dispatcher as instant effects. No selectors or native classes were removed.
+
+AoE rows keep .pneuma-aoe-card/.pneuma-aoe-target and existing native inline roll markup. [data-aoe-action="retryResponse"] is Retry saved response: it is disabled while the response is rolling without a locally retained result, enabled on the original rolling client after evaluation, and removed after commit succeeds. A completed row can briefly carry it while an interrupted acknowledgement is retried. Ownership and card visibility checks remain unchanged; other clients cannot replay a locally cached result. Example: .pneuma-aoe-target[data-state="rolling"] [data-aoe-action="retryResponse"]:disabled.
+
+Medical result cards retain .pneuma-treatment-card, .pneuma-treatment-result and medicalParticipants flags. Paid checks publish before patient mutation so the native Success/Fail result survives a failed GM confirmation. The outcome describes the check; an application error is reported through the existing notification. Saved retries do not create another card. SpeedHeal's menu label becomes Resume SpeedHeal only for the healer with an interrupted dose; the administered card is posted after successful completion.
+
+## Damage and effects contract
+
+Current local implementation, unreleased, 2026-10-04. This section consolidates the iterative damage/effect layout notes.
+
+The order is attack/defense resolution, damage roll with effect selection, then damage application and effects beneath the roll. AoE evade, Cover Up and Don't Evade remain attack-resolution controls. Effect-only attacks omit damage and use the lower effects section. QuickHack retains its existing separate native damage audience; grapple and injury workflows retain their direct-HP summaries.
+
+The damage-application action for the controlled token is labeled **Selected Token**, retaining `data-pneuma-damage-target="selected"` and the existing selection/ownership checks.
+
+Normal/manual selection uses .pneuma-damage-effects-slot inside the damage-roll body. AoE uses .pneuma-aoe-effects-picker in the same position. Both use renderDamageStatusPicker: three editable slots, or .pneuma-damage-status-locked glyphs after resolution starts. Repeated rendering replaces slots. All slots are disabled while a picker/save is active. The server and client share the first-resolution lock; per-target resistance and application remain available after selection locks.
+
+Ignite maps to On Fire (Mild); EMP/Microwaver picker aliases map to EMP. Existing source-specific resistance, duration and disabling rules remain. Legacy identifiers are accepted without duplicate selections. Native ammunition effects preselect their canonical entries.
+
+| Scope | Structure and behavior |
+| --- | --- |
+| .pneuma-aoe-resolution-target | Mini-portrait, target name, damage action/receipt, optional right-most damage GM override. No blank GM column. |
+| .pneuma-aoe-target-effects | Full-width stack beneath the target line. Single/manual attached results group by actor/token under .pneuma-attached-target; its h4 shows only the actor name beneath the section's Effects heading. |
+| .pneuma-aoe-inline-effect | Named row with effect-colored left border, resistance when applicable, Apply/status, and optional right-most GM controls. |
+| .pneuma-effect-resistance | Resist button becomes its native numeric disclosure. Opening it places text-only calculation data across the row below the actions. |
+| .pneuma-effect-application | Explicit Apply button retaining the native/specific glyph. Pending prerequisites disable it with an explanation. Applied state becomes the glyph alone with a state tooltip and accessible label; resisted/unaffected retain their shield/ban indicators. |
+| .pneuma-effect-gm-controls | Direct buttons inside a span. Empty groups and tracks collapse. Saved menu wrappers are flattened by moving live controls. |
+| .pneuma-instant-damage | Compact effect-generated damage shares the named effect line with resistance: name, Resist total, Damage total, application/status and optional right-most GM control. Its total expands to full-width text below the effect line. Standalone instant cards retain damage-first ordering. |
+| .pneuma-applied-details | Clicking the native .pneuma-applied-number expands the calculation across the target grid, before effects. Native Undo remains beside the total inside the original receipt. |
+
+instant-content.ts owns standalone, attached and pending incendiary markup. Pending incendiary shows a disabled Apply placeholder awaiting penetrating damage; it emits no resistance or GM application action. Legacy duplicate state-label spans are hidden with display:none; current compact rows expose states through glyph labels/tooltips without off-screen positioned nodes. Native chat/sidebar sizing remains untouched.
+
+Effect icons use --pneuma-effect-icon-filter and --pneuma-effect-symbol-color. Selected slot images have transparent backgrounds, no border and no shadow; the button owns its themed surface. Dialog image wells retain their native styling. No source assets or actor status catalog entries change.
+
+Extinguish is absent from attack/effect cards and remains a Treatment/self Action. Legacy card Extinguish controls are removed during binding. Wake remains available on standalone Sleep cards.
+
+Native dice/classes, data-instant-scope, data-aoe-action/data-aoe-target, receipt ancestry, reversal identities, Cover Up/injury notes and permission checks remain. Existing saved split target rows are migrated without reconstructing native dice. bindCardAction replaces only its own previous listener on repeated instant/AoE/EMP/QuickHack/injury/cleanup/evasion binding; native and third-party listeners remain. QuickHack's master-off capture guard is installed once per root.
+
+Examples: .pneuma-aoe-inline-effect:has(> .pneuma-effect-gm-slot button), .pneuma-aoe-target-damage .pneuma-applied-details. Participant-rail dimensions remain unchanged. Automated coverage and live-verification limits are recorded in [the card cleanup audit](audits/2026-10-04-card-cleanup.md).
+
+### Audit consolidation: controls and disclosures
+
+Button decoration uses `data-chat-action` where no workflow action attribute exists, `data-chat-state="applied"` for completed controls, and optional `data-chat-icon`. Existing `data-aoe-action`, `data-instant-action`, `data-quickhack-action`, explicit GM flags and known native control classes remain valid. Translated labels do not determine role, icon or completion. An observer is installed only for a module card or a root containing module controls; it processes changed controls and inserted subtrees.
+
+`.pneuma-chat-button[data-chat-role]` owns common geometry. Component variants supply `--pct-control-width`, `--pct-control-min-width`, `--pct-control-height`, `--pct-control-padding`, `--pct-control-margin` and `--pct-control-gap`; the public `--pneuma-chat-button-*` theme tokens remain defaults. Effect slots use `--pneuma-effect-slot-size` (24px) for their grid and button height, with zero margin. Necessary hover/contrast protections remain scoped to module controls.
+
+Compact effects normalize saved native roll HTML once per rendered disclosure. The native `<details><summary>` stays in its resistance/damage action cell. `.pneuma-inline-roll-details.pneuma-details-region` moves to a direct child of `.pneuma-aoe-inline-effect`, spans all columns below that line, and uses `[hidden]` when collapsed. `summary[aria-controls]` links it to the region; `aria-expanded` follows the native toggle. `.pneuma-calculation-text` contains saved calculation/modifier text without nested dice art or frame markup. Saved flags retain the original HTML; no roll is recalculated. Standalone disclosures and primary attack/damage dice remain native. Resistance and damage can both remain open; their full-width regions stack independently. Compact summaries and generated applied-damage totals carry `data-pvt-popover="native"`, preserving their click expansion through the existing presentation decorator's processed-total guard.
+
+**Selector topology change:** `.pneuma-effect-resistance .pneuma-inline-roll-details` and `.pneuma-instant-damage .pneuma-inline-roll-details` no longer match expanded compact bodies. Use `.pneuma-aoe-inline-effect > .pneuma-details-region` or the summary's `aria-controls`. Existing class names are retained, but native decorative descendants are absent inside these normalized compact regions.
+
+Native applied-damage receipts retain their full ancestry and Undo controls. Their containers share target columns using `subgrid`, with an explicit 28px target line and independently growing disclosure/note rows. They no longer require a nested `display:contents` chain. `.pneuma-applied-details` remains native, scoped by `data-visible-element`, and precedes the target's effects. GM visibility and effect-selection locks are unchanged.
+
+Compact effect rows use named grid columns for resistance, damage, application and GM actions. Optional resistance/damage/GM tracks exist only when those controls/results are present; no blank column is reserved. `.pneuma-instant-damage` groups the damage label and native disclosure total on that same line. Example: `.pneuma-aoe-inline-effect > .pneuma-instant-damage`. This supersedes the separate generated-damage row for compact target effects. Normal/manual attached targets and AoE share this renderer; permissions, state labels, effect mechanics and locked selections remain unchanged.
+
+Compact effect artwork source (2026-10-04, unreleased): .pneuma-aoe-inline-effect > .pneuma-details-region[data-pneuma-roll-html] retains the original evaluated native HTML before its visible children become .pneuma-calculation-text. summary[aria-controls] still references that region; native click state and data-pvt-popover="native" are retained. Example selector: .pneuma-aoe-inline-effect > .pneuma-details-region[data-pneuma-roll-html]. Visual Tools reads this rendered DOM source for hover dice; the attribute contains the already-rendered roll, with no fresh evaluation or audience expansion.

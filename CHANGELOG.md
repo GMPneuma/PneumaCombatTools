@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.9.11 - 2026-10-05
+
+- Reorganize damage and attached effects into clear sections with compact recipient rows, visible GM controls, improved glyph contrast and independently expandable calculation details. Preserve native damage receipts, Undo and original dice artwork for Visual Tools.
+- Preselect known ammunition effects, consolidate duplicate fire/EMP choices and lock effect selection when application begins. Retain per-target resistance and effect application.
+- Allow eligible non-Medtech characters to use QuickFix; strengthen interrupted QuickFix, SpeedHeal and stabilization recovery without duplicate resources or healing.
+- Serialize module HP changes and concurrent LUCK spending; share GM request confirmation and preserve saved AoE defenses through animation failures and retry without rerolling.
+- Share medical and effect-lifetime rules; protect Addiction, Dead and Needs Stabilization. Clear participant On Fire and encounter grenade markers at combat end/reset/deletion.
+- Restrict movement counters to the current-turn token and GM-selected tokens, with zero-movement display and matching start-marker visibility.
+- Reduce card scanning and redundant refreshes; preserve unchanged HUD status menus and combat-bar control menus.
+- Put the Turn Indicator master switch first. Grey out and prevent interaction with dependent Turn Indicator, QuickHack and Combat Bar settings when disabled. Add the Pneuma Homebrew badge to EMP Internal Frame Consequences.
+- Outside encounters, show the player's assigned character or online players' assigned characters for GMs, even without scene tokens. Deduplicate shared assignments and retain minimize; no new setting.
+
+Validation: strict production build, 580 automated tests passed (four native geometry checks skipped), and relevant settings, EMP and combat-bar browser checks. Additional audit/card browser evidence is documented in the feature inventory. Live Foundry/multiplayer verification remains pending.
+
+
 ## 0.9.10 - 2026-10-03
 
 - Standardize damage-added effects: Apply Effect or GM-only Unaffected, with resistance checks where required. Damage no longer automatically ignites targets or applies added statuses.

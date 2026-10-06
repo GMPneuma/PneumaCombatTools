@@ -5,7 +5,7 @@ const groups = [
   { id: "combat", title: "Attack & Damage Cards", keys: ["routeSheetAttacks", "hideAttackWeapon", "chatResultDelay", "showArmorControls", "maNoAblation", "reportWeaponReloads"] },
   { id: "evasion", title: "Evasion & Area Attacks", keys: ["evasionEligibility", "configureEvasion", "npcAutoEvasion", "areaSettingsMenu"] },
   { id: "movement", title: "Movement & Initiative", keys: ["movementTracking", "pneumaHomebrew"] },
-  { id: "turn-marker", title: "Turn Indicator", keys: ["turnMarkerSettings", "turnMarkerEnabled", "turnMarkerForceDefault", "turnMarkerStyle", "turnMarkerColor", "turnMarkerThickness", "turnMarkerDistance", "turnMarkerOpacity", "turnMarkerSpeed", "turnMarkerDisplay", "nextTurnMarker", "turnPopups", "notificationSounds"] },
+  { id: "turn-marker", title: "Turn Indicator", keys: ["turnMarkerEnabled", "turnMarkerSettings", "turnMarkerForceDefault", "turnMarkerStyle", "turnMarkerColor", "turnMarkerThickness", "turnMarkerDistance", "turnMarkerOpacity", "turnMarkerSpeed", "turnMarkerDisplay", "nextTurnMarker", "turnPopups", "notificationSounds"] },
   { id: "injuries", title: "Injuries & Effects", keys: ["enableStabilization", "criticalInjuries", "injuryTurnEndReminder", "empBehaviorMenu", "customStatusesMenu", "statusCleanup"] },
   { id: "quickhack", title: "QuickHack", keys: ["quickhackEnabled", "quickhackMode", "quickhackMessages"] },
   { id: "combat-bar", title: "Combat Bar", keys: [...COMBAT_BAR_SETTING_KEYS,"combatBarSettings"] },
@@ -101,6 +101,10 @@ export function groupModuleSettings(root: HTMLElement): void {
   appendGroup("other", "Other Settings", [...rows.keys()]);
   combatBarPositionControls(root);
   hoverDVControls(root);
+  for (const [id, key] of [["turn-marker", "turnMarkerEnabled"], ["quickhack", "quickhackEnabled"], ["combat-bar", "combatBar"]]) {
+    const group = root.querySelector<HTMLElement>(`[data-combat-settings-group="${id}"]`);
+    if (group) masterSettingControls(group, key!);
+  }
 }
 
 export function registerSettingsLayout(): void {
@@ -119,4 +123,20 @@ export function hoverDVControls(root:HTMLElement):void{
  for(const [value,text] of [['off','Off'],['single','Single Shot'],['autofire','Single Shot + Autofire']])select.add(new Option(text,value));
  select.value=enabled.checked?(autofire.checked?'autofire':'single'):'off';
  select.addEventListener('change',()=>{enabled.checked=select.value!=='off';autofire.checked=select.value==='autofire';enabled.dispatchEvent(new Event('change',{bubbles:true}));autofire.dispatchEvent(new Event('change',{bubbles:true}));});enabled.after(select);
+}
+
+/** Inert rows preserve native submission values while preventing edits and menu activation. */
+export function masterSettingControls(root: HTMLElement, key: string): void {
+  const master = root.querySelector<HTMLInputElement>(`[name="${MODULE}.${key}"]`);
+  if (!master) return;
+  const masterRow = master.closest<HTMLElement>(".form-group");
+  const sync = () => root.querySelectorAll<HTMLElement>(".form-group").forEach(row => {
+    if (row === masterRow) return;
+    row.inert = !master.checked;
+    row.classList.toggle("pneuma-setting-disabled", !master.checked);
+    row.setAttribute("aria-disabled", String(!master.checked));
+  });
+  // Regrouping creates a new parent, so bind to the current root rather than a detached fieldset.
+  root.onchange = sync;
+  sync();
 }

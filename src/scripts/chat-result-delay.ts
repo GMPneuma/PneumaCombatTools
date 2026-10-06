@@ -24,39 +24,45 @@ export function registerChatResultDelay(): void {
     choices: Object.fromEntries(Array.from({length: 11}, (_, index) => [(index / 2).toFixed(1), index ? `${index / 2} seconds` : "0 — Disabled"])),
   });
   const cards = new Map<string, Map<string, number>>();
-  const resultsFor = (message: ChatMessage) => {
-    let results = cards.get(message.id!);
-    if (!results) { results = new Map(); cards.set(message.id!, results); }
-    return results;
-  };
   let ready = false;
   const delay = () => Math.max(0, Math.min(5, Number(game.settings!.get(MODULE, "chatResultDelay")) || 0));
-  const record = (message: ChatMessage) => {
-    const results = resultsFor(message);
-    for (const id of visibleResults(message)) if (!results.has(id)) results.set(id, ready ? Date.now() + delay() * 1000 : 0);
-    return results;
-  };
-  for (const hook of ["createChatMessage", "updateChatMessage"]) Hooks.on(hook, (message: ChatMessage) => { if (message.id) record(message); });
-  Hooks.once("ready", async () => {
-    for (const message of game.messages!) {
-      const results = resultsFor(message);
-      for (const id of visibleResults(message)) results.set(id, 0);
+  let enabled = delay() > 0;
+  const record = (message: ChatMessage, historical = false): number => {
+    const ids = visibleResults(message);
+    if (!ids.size) return 0;
+    let results = cards.get(message.id!);
+    if (!results) { results = new Map(); cards.set(message.id!, results); }
+    let until = 0;
+    const deadline = historical || !ready ? 0 : Date.now() + delay() * 1000;
+    for (const id of ids) {
+      if (!results.has(id)) results.set(id, deadline);
+      until = Math.max(until, results.get(id)!);
     }
+    return until;
+  };
+  const seed = () => { for (const message of game.messages ?? []) record(message, true); };
+  const active = () => {
+    const next = delay() > 0;
+    if (next !== enabled) { cards.clear(); enabled = next; if (enabled) seed(); }
+    return enabled;
+  };
+  for (const hook of ["createChatMessage", "updateChatMessage"]) Hooks.on(hook, (message: ChatMessage) => {
+    if (active() && message.id) record(message);
+  });
+  Hooks.on("updateSetting", (setting: {key?: string}) => { if (setting.key === MODULE + ".chatResultDelay") active(); });
+  Hooks.once("ready", async () => {
+    if (active()) seed();
     ready = true;
 
     // Foundry v12 awaits getHTML before inserting/replacing a chat card. Delay that
     // boundary so native and asynchronous module render hooks still run normally.
     const prototype = CONFIG.ChatMessage.documentClass.prototype;
     registerNativeWrapper(prototype, "getHTML", async function (this: ChatMessage, wrapped, ...args) {
-      if (!this.id || !this.visible || this.isContentVisible === false || (this.blind && !game.user?.isGM)) return wrapped(...args);
+      if (!active() || !this.id || !this.visible || this.isContentVisible === false || (this.blind && !game.user?.isGM)) return wrapped(...args);
       while (true) {
-        const seconds = delay();
-        const results = record(this);
-        let until = 0;
-        for (const id of visibleResults(this)) {
-          until = Math.max(until, results.get(id)!);
-        }
-        if (!seconds || until <= Date.now()) break;
+        if (!active()) break;
+        const until = record(this);
+        if (until <= Date.now()) break;
         await new Promise(resolve => setTimeout(resolve, until - Date.now()));
       }
       return wrapped(...args);

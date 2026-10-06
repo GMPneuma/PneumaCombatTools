@@ -20,6 +20,8 @@ export class EmpSettingsForm extends FormApplication {
     const root=html[0];if(!root)return;
     const biowareLabel=root.querySelector<HTMLElement>("[data-bioware-label]");
     if(biowareLabel)markHomebrew(biowareLabel);
+    const frameLabel=root.querySelector<HTMLElement>("[data-frame-label]");
+    if(frameLabel)markHomebrew(frameLabel);
     const update=()=>{
       const checked=(name:string)=>!!root.querySelector<HTMLInputElement>(`[name="${name}"]`)?.checked;
       for(const [selector,visible] of [["[data-frame-movement]",!checked("frameNoMove")],["[data-frame-reduction]",checked("frameReduceMove")],["[data-frame-penalty]",checked("frameActionPenalty")]] as const){

@@ -15,7 +15,7 @@ try {
  document.querySelector('#pneuma-custom-statuses').innerHTML=Handlebars.compile(custom)({rows:[{id:'jail',name:'In Jail',img:'modules/pneuma-combattools/styles/in-jail.svg'}]});
  },{quick:await readFile('dist/templates/quickhack-settings.hbs','utf8'),custom:await readFile('dist/templates/custom-statuses.hbs','utf8')});
  assert.equal(await page.locator('#pneuma-quickhack-settings fieldset').count(),3);
- assert.equal(await page.locator('#pneuma-quickhack-settings select').count(),6);
+ assert.equal(await page.locator('#pneuma-quickhack-settings select').count(),7);
  assert.equal(await page.getByLabel('Status name',{exact:true}).inputValue(),'In Jail');
  const button=await page.locator('.pneuma-evasion-controls button').boundingBox();assert.equal(button.height,28);
  const label=await page.locator('.pneuma-combat-settings label').first().boundingBox();assert.ok(label.height<25,'Long checkbox label stays on one line with available space');

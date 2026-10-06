@@ -379,8 +379,8 @@ test("damage statuses validate limit and apply to the exact recipient after nati
  await request("damage","damageApply",{options:damageOptions,statusEffects:["prone","stunned","blind"]});
  assert.deepEqual(calls,["hp"]);
  assert.deepEqual(Object.values(get(messages.get("damage"),"flags.pneuma-combattools.attachedEffects")).map(card=>[card.effect.statusId,card.effect.state]),[["prone","failed"],["stunned","failed"],["blind","failed"]]);
- await request("damage","damageStatuses",{statusEffects:[]});
- assert.deepEqual(get(msg,"flags.pneuma-combattools.exchange.damage.statusEffects"),[]);
+ await assert.rejects(request("damage","damageStatuses",{statusEffects:[]}),/locked/);
+ assert.deepEqual(get(msg,"flags.pneuma-combattools.exchange.damage.statusEffects"),["prone","stunned","blind"]);
 });
 test("effect followup persistence failure never retries HP",async()=>{
  setup();await rolled();const msg=messages.get("damage");globalThis.CONFIG={statusEffects:[{id:"prone"}]};

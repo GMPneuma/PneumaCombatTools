@@ -7,7 +7,7 @@ import {createInstantCard} from "./instant-effects.js";
 import { thrownRollItem } from "./thrown-weapons.js";
 import { captureDamageApplication } from "./damage-application.js";
 import { applyCriticalInjury, damageSixes, hasCriticalInjury, criticalLocation } from "./critical-injury.js";
-import { chooseDamageStatuses, damageStatusChoices, validateDamageStatuses } from "./damage-status.js";
+import { damageStatusChoices, validateDamageStatuses, canonicalDamageStatus, inherentDamageStatuses, renderDamageStatusPicker } from "./damage-status.js";
 import { resolutionSection } from "./card-structure.js";
 import { diceJSON, showSavedDice, messageDiceAudience, rollHidden, nativeCard, type DiceAudience, type NativeRoll, type RollItem } from "./native-combat.js";
 import type { Exchange } from "./combat-resolution.js";
@@ -19,6 +19,7 @@ export interface DamageValues {
 export interface DamageResult { ammoType?:string; html: string; values: DamageValues; sixes?: number }
 export interface DamageState {
   status: "rolling" | "rolled" | "applying" | "applied" | "review";
+  effectsLocked?: boolean;
   selectedTargets?: {id:string; uuid:string; name:string}[];
   user: string; nonce: string; penetrated?: boolean; statusEffects?: string[]; applications?: string[]; result?: DamageResult; appliedTo?: string; recordedApplied?: boolean; application?: "recorded" | "selected"; applicationId?: string;
 }
@@ -95,13 +96,16 @@ export function damageContent(data: Exchange, mode: "full" | "roll" = "full"): s
   const actions = mode === "full" && damage.result ? resolutionSection("damage-apply",
     '<div class="rollcard-bottom pneuma-damage-application"><div class="cpr-block pneuma-damage-application-box"></div></div>'
       + history + '<div class="pneuma-damage-applications">' + (damage.applications ?? []).join("") + '</div>') : "";
-  return '<div class="pneuma-damage-result">' + resolutionSection("damage-roll", html + status)
-    + actions + (mode === "full" ? '<div class="pneuma-resolution-recovery-slot"></div>' : "") + "</div>";
+  return '<div class="pneuma-damage-result">' + resolutionSection("damage-roll", html + status + (damage.result ? (mode === "full" ? '<div class="pneuma-damage-effects-slot"></div>' : '<div class="pneuma-aoe-effects-picker"></div>') : ""))
+    + actions + (mode === "full" ? resolutionSection("effects", '<div class="pneuma-damage-effect-results"></div>') : "") + (mode === "full" ? '<div class="pneuma-resolution-recovery-slot"></div>' : "") + "</div>";
 }
 export function recordedDamageApplied(data: Exchange): boolean {
   const damage = data.damage;
   return damage?.recordedApplied ?? (!!damage && damage.status === "applied" && !damage.application
     && (!damage.appliedTo || damage.appliedTo === data.defender));
+}
+export function damageEffectsLocked(damage?:DamageState):boolean {
+  return !!damage && (!!damage.effectsLocked || ["applying","applied","review"].includes(damage.status) || !!damage.applicationId || !!damage.applications?.length);
 }
 /** Called only by the existing serialized GM coordinator. */
 export async function handleDamage(request: DamageRequest, user: User, data: Exchange,
@@ -125,6 +129,7 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
       throw new Error("Only an exchange participant's owner or GM can edit damage effects.");
     if (!data.damage?.result || !["rolled", "applied"].includes(data.damage.status))
       throw new Error("Damage effects cannot change while damage is pending or requires GM review.");
+    if(damageEffectsLocked(data.damage))throw Error("Effect selection is locked because resolution has started.");
     data.damage.statusEffects = validateDamageStatuses(request.statusEffects);
     await save(); return;
   }
@@ -161,7 +166,7 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
     if (!result || ![result.values.total, result.values.bonus, result.values.ablation, result.values.ignorePercent, result.values.ignoreBelow].every(Number.isFinite))
       throw new Error("Invalid damage result.");
     if (result.sixes !== undefined && (!Number.isInteger(result.sixes) || result.sixes < 0)) throw new Error("Invalid damage dice.");
-    damage.result = result; damage.status = "rolled"; await save(); return;
+    damage.result = result; damage.statusEffects ??= inherentDamageStatuses(result.ammoType); damage.status = "rolled"; await save(); return;
   }
   if (request.action === "damageResolved") {
     if (!user.isGM || !["review", "applying"].includes(damage.status)) throw new Error("No interrupted application to resolve.");
@@ -175,8 +180,8 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
   if (!request.options || !Object.values(request.options).every(value => typeof value === "boolean")) throw new Error("Missing native damage options.");
   const target = actor as Actor & { _applyDamage(...args: unknown[]): Promise<void> };
   if (typeof target._applyDamage !== "function") throw new Error("Native damage application is unavailable.");
-  const effects = validateDamageStatuses((damage.statusEffects ?? []).slice(0, 3));
-  const requestedEffects = validateDamageStatuses(request.statusEffects ?? []);
+  const effects = validateDamageStatuses((damage.statusEffects ?? inherentDamageStatuses(damage.result?.ammoType)).slice(0, 3));
+  const requestedEffects = validateDamageStatuses(request.statusEffects ?? inherentDamageStatuses(damage.result?.ammoType));
   if (JSON.stringify(effects) !== JSON.stringify(requestedEffects))
     throw new Error("Damage status effects changed. Review the updated card and apply again.");
   damage.statusEffects = effects;
@@ -186,7 +191,7 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
   damage.application = application;
   damage.applicationId = request.applicationId ?? foundry.utils.randomID();
   damage.appliedTo = destination;
-  damage.status = "applying"; await save();
+  damage.effectsLocked = true; damage.status = "applying"; await save();
   try {
     const token = await fromUuid(destination) as TokenDocument | null;
     const summaries = await captureDamageApplication(actor, token?.name ?? actor.name ?? "", v.location, damage.applicationId!,
@@ -200,12 +205,14 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
     if (application === "selected") damage.selectedTargets = [...(damage.selectedTargets ?? []), {
       id:damage.applicationId!, uuid:destination, name:token?.name ?? actor.name ?? "Target"
     }];
-    const followups=[...effects];
-    if(damage.penetrated&&damage.result.ammoType==="incendiary"&&!foundry.utils.getProperty(sourceMessage??{},"flags.pneuma-combattools.aoe")&&!followups.includes("instant:incendiary"))followups.push("instant:incendiary");
+    const fire = canonicalDamageStatus("instant:incendiary");
+    const area = !!foundry.utils.getProperty(sourceMessage??{},"flags.pneuma-combattools.aoe");
+    const followups=effects.filter(id=>!(canonicalDamageStatus(id)===fire && damage.result!.ammoType==="incendiary" && (!damage.penetrated || area)));
+    if(damage.penetrated&&damage.result.ammoType==="incendiary"&&!foundry.utils.getProperty(sourceMessage??{},"flags.pneuma-combattools.aoe")&&!followups.includes(fire))followups.push(fire);
     const visibility={blind:data.rollMode==="blindroll",whisper:["gmroll","blindroll"].includes(data.rollMode??"")?game.users!.filter(u=>u.isGM).map(u=>u.id!):data.rollMode==="selfroll"?[user.id!]:[]} as ChatMessage;
     for (const id of followups) {
       const instant=id.startsWith("instant:")?id.slice(8):"";
-      await createInstantCard(actor,instantId(instant)?instant:"status",sourceMessage??visibility,data.combatId!==undefined?encounterRef(resolveEncounter(data),data.combatScene,data.combatTokens):undefined,instantId(instant)?undefined:id);
+      await createInstantCard(actor,instantId(instant)?instant:"status",sourceMessage??visibility,data.combatId!==undefined?encounterRef(resolveEncounter(data),data.combatScene,data.combatTokens):undefined,instantId(instant)?undefined:id,destination);
     }
   } catch (error) {
     damage.status = "review"; await save();
@@ -279,7 +286,7 @@ export async function applyFromCard(data: Exchange, send: Send, shiftKey: boolea
       damageReductionAE: !!chosen.damageReductionAE, brainDamageReduction: !!chosen.brainDamageReduction };
   }
   await send("damageApply", { encounter, halfArmor, interactArmor, targetUuid, application, applicationId: foundry.utils.randomID(), options,
-    statusEffects: (data.damage?.statusEffects ?? []).slice(0, 3) });
+    statusEffects: (data.damage?.statusEffects ?? inherentDamageStatuses(data.damage?.result?.ammoType)).slice(0, 3) });
 }
 export async function renderDamage(message: ChatMessage, data: Exchange, html: JQuery, send: Send, manual?: {canEditEffects: boolean}): Promise<void> {
   if (!manual && !data.weaponId || html.find(".pneuma-damage-controls, .pneuma-damage-recovery-controls").length) return;
@@ -341,6 +348,7 @@ export async function renderDamage(message: ChatMessage, data: Exchange, html: J
       }
     });
   };
+  const effectsPanel = document.createElement("div"); effectsPanel.className = "pneuma-damage-effects-picker";
   const drop = html.find('[data-action="pneumaRollDamage"]');
 
   const missed = !manual && data.hit === false && !data.damageAllowedOnMiss;
@@ -356,42 +364,23 @@ export async function renderDamage(message: ChatMessage, data: Exchange, html: J
   if (data.damage?.result && (attacker.isOwner || defender.isOwner || game.user!.isGM)) {
 
     const statusBox = document.createElement("div"); statusBox.className = "pneuma-damage-status-effects";
-    statusBox.setAttribute("role", "group"); statusBox.setAttribute("aria-label", "Damage status effects");
-    const selected = (data.damage.statusEffects ?? []).slice(0, 3);
-    const choices = damageStatusChoices();
-    for (let slot = 0; slot < 3; slot++) {
-      const effect = choices.find(effect => effect.id === selected[slot]);
-      const edit = document.createElement("button"); edit.type = "button"; edit.className = "pneuma-damage-status-slot";
-      edit.dataset.pneumaStatusSlot = String(slot);
-      edit.title = selected[slot] ? "Change or remove " + (effect?.name ?? selected[slot]) : "Add effects";
-      edit.setAttribute("aria-label", edit.title);
-      if (selected[slot]) {
-        edit.dataset.statusId = selected[slot]!;
-        const icon = document.createElement("img"); icon.src = effect?.img || "icons/svg/aura.svg"; icon.alt = effect?.name ?? selected[slot]!;
-        edit.append(icon);
-      } else edit.textContent = "+";
-      edit.disabled = manual?.canEditEffects === false || !["rolled", "applied"].includes(status!);
-      edit.addEventListener("click", async event => {
-        event.preventDefault(); event.stopPropagation();
-        const slots = statusBox.querySelectorAll<HTMLButtonElement>("button");
-        slots.forEach(button => { button.disabled = true; });
-        try {
-          const effects = await chooseDamageStatuses(selected, slot);
-          if (effects !== null) await send("damageStatuses", { statusEffects: effects });
-        } catch (error) { ui.notifications!.error((error as Error).message); }
-        finally { slots.forEach(button => { button.disabled = manual?.canEditEffects === false || !["rolled", "applied"].includes(status!); }); }
-      });
-      statusBox.append(edit);
-    }
-    panel.append(statusBox);
+    const selected = (data.damage.statusEffects ?? inherentDamageStatuses(data.damage.result?.ammoType)).slice(0, 3);
+    renderDamageStatusPicker(statusBox,selected,damageEffectsLocked(data.damage),
+      manual?.canEditEffects===false||!["rolled","applied"].includes(status!),
+      statusEffects=>send("damageStatuses",{statusEffects}));
+    effectsPanel.append(statusBox);
     if (!manual) button(data.defenderName, event => applyFromCard(data, send, event.shiftKey, data.defender, "recorded", halfArmorSelected(event), interactArmorSelected(event)), "recorded");
-    button("token", event => applyFromCard(data, send, event.shiftKey, selectedDamageTarget(), "selected", halfArmorSelected(event), interactArmorSelected(event)), "selected");
+    button("Selected Token", event => applyFromCard(data, send, event.shiftKey, selectedDamageTarget(), "selected", halfArmorSelected(event), interactArmorSelected(event)), "selected");
   }
   if (!manual && game.user!.isGM && status === "rolling") button("Release unfinished damage roll", () => send("damageReset"), undefined, true);
   if (!manual && game.user!.isGM && (status === "review" || status === "applying"))
     button("Mark resolved after GM review", () => send("damageResolved"), undefined, true);
   const actions = html.find(".pneuma-damage-application-box");
   if (panel.childElementCount) (actions.length ? actions : html.find(".message-content")).append(panel);
+  if (effectsPanel.childElementCount) {
+    const effectSlot = html.find(".pneuma-damage-effects-slot");
+    (effectSlot.length ? effectSlot : html.find(".message-content")).append(effectsPanel);
+  }
   if (recoveryPanel.childElementCount) {
     const recovery = document.createElement("div");
     recovery.innerHTML = resolutionSection("recovery", "");

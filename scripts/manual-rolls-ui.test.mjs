@@ -22,8 +22,8 @@ try {
   window.wrap=nodes=>({length:nodes.length,find:s=>wrap(nodes.flatMap(n=>[...n.querySelectorAll(s)])),prop:(k,v)=>{nodes.forEach(n=>n[k]=v);return wrap(nodes);},attr:(k,v)=>{nodes.forEach(n=>n.setAttribute(k,v));return wrap(nodes);},append:n=>nodes[0]?.append(n),on:(event,fn)=>nodes.forEach(n=>n.addEventListener(event,fn))});
   window.$=node=>wrap([node]);
   window.requireCombatSocket=()=>{};window.canRenderCombatCard=()=>true;
-  window.damageContent=ex=>'<div class="pneuma-damage-result">'+ex.damage.result.html+halfArmorControl(ex.damage.result.values.ignorePercent,ex.damage.result.values.interactArmor!==false)+'<div class="pneuma-damage-application"><div class="pneuma-damage-application-box"></div></div></div>';
-  window.validateDamageStatuses=effects=>effects??[];window.damageStatusChoices=()=>[];window.chooseDamageStatuses=async()=>['prone'];
+  window.damageContent=ex=>'<div class="pneuma-damage-result"><section class="pneuma-resolution-damage-roll">'+ex.damage.result.html+halfArmorControl(ex.damage.result.values.ignorePercent,ex.damage.result.values.interactArmor!==false)+'<div class="pneuma-damage-effects-slot"></div></section><div class="pneuma-damage-application"><div class="pneuma-damage-application-box"></div></div></div>';
+  window.canonicalDamageStatus=id=>id;window.inherentDamageStatuses=()=>[];window.validateDamageStatuses=effects=>effects??[];window.damageStatusChoices=()=>[];window.chooseDamageStatuses=async()=>['prone'];
   window.selectedDamageTarget=()=> 'Token.1';window.handleDamage=async(req,user,ex,save)=>{window.applied=req;await save();};
   window.applyFromCard=async(ex,send,shift,target,application,halfArmor)=>send('damageApply',{targetUuid:target,halfArmor});
   window.DiceHandler={handle3dDice:async()=>{}};window.LOGGER={debug:()=>{}};
@@ -33,11 +33,15 @@ try {
   window.rollHidden=roll=>roll.roll();window.diceJSON=()=>[];window.nativeAPI=async()=>({Dice:DiceHandler});window.spendBonusLuck=async()=>{};
   window.showSavedDice=async()=>{};window.messageDiceAudience=message=>({whisper:message.whisper??[],blind:!!message.blind});
   window.nativeCard=async roll=>{window.lastRoll=roll;return '<div class="rollcard"><h3>'+roll.rollTitle+'</h3><b>'+roll.resultTotal+'</b></div>';};
+  window.hasInstantCondition=()=>false; // This fixture's patients have no fire or sleep effects.
+  window.isUnconscious=()=>false;
   window.damageValues=()=>({total:12,bonus:0,location:'body',ignorePercent:lastRoll.rollCardExtraArgs.ignoreArmorPercent,ablation:lastRoll.rollCardExtraArgs.ablationValue});
   window.damageSixes=roll=>roll.faces.filter(n=>n===6).length;
  });
  const shared=await readFile('dist/scripts/shared.js','utf8');
  await page.addScriptTag({type:'module',content:shared+'\nObject.assign(window,{manualEscape:escapeHTML,authority:primaryGM});'});
+ const requestsSource=(await readFile('dist/scripts/gm-request.js','utf8')).replace(/^import .*$/gm,'');
+ await page.addScriptTag({type:'module',content:'const primaryGM=authority;\n'+requestsSource+'\nwindow.GMRequests=GMRequests;'});
  const nativeRoot=process.env.TEMP+'/crewtools-cpr-native/fvtt-cyberpunk-red-core-v0.92.4-75b8c9d7cb76ed1ea2797a3404ce77172d424b6b/src';
  const native=await readFile(process.env.PNEUMA_CPR_ROLLS || nativeRoot+'/modules/rolls/cpr-rolls.js','utf8');
  await page.addScriptTag({type:'module',content:native.replace(/^import .*$/gm,'')+'\nwindow.manualNativeClasses={CPRRoll,CPRDamageRoll,CPRTableRoll};'});
@@ -48,15 +52,20 @@ try {
  await page.addScriptTag({type:'module',content:'const M=MANUAL_MODULE;\n'+favoriteSource+'\nObject.assign(window,{rollFavorites,sameFavorite,toggleRollFavorite,removeRollFavorite,rollFavorite});'});
  const lookupSource=await readFile('dist/scripts/native-lookup.js','utf8');
  await page.addScriptTag({type:'module',content:lookupSource+'\nObject.assign(window,{findNativeItem,nativeCriticalTable});'});
+ const rulesSource=(await readFile('dist/scripts/medical-rules.js','utf8')).replace(/^import .*$/gm,'');
+ await page.addScriptTag({type:'module',content:rulesSource+'\nObject.assign(window,{injuryTreatmentChoices,nativeTreatmentSkill,stabilizationStates,stabilizationSkills});'});
  const treatmentCardSource=(await readFile('dist/scripts/treatment-card.js','utf8')).replace(/^import .*$/gm,'');
  await page.addScriptTag({type:'module',content:'const esc=manualEscape,rollOutcomeClass=won=>won===undefined?"":won?"pneuma-roll-winner":"pneuma-roll-loser";'+treatmentCardSource+';window.postTreatment=postTreatment;window.checkedLuck=()=>{};'});
- const treatmentSource=(await readFile('dist/scripts/treatment.js','utf8')).replace(/^import .*$/gm,'');
+ const treatmentSource=(await readFile('dist/scripts/treatment.js','utf8')).replace(/^import .*$/gm,'').replace(/^export \{.*\} from .*;$/gm,'');
  await page.addScriptTag({type:'module',content:'const esc=manualEscape;\n'+treatmentSource+'\nwindow.openTreatment=openTreatment;'});
  const presentationSource=(await readFile('dist/scripts/native-combat.js','utf8')).replace(/^import .*$/gm,'');
  await page.addScriptTag({type:'module',content:presentationSource+'\nObject.assign(window,{markRollResult,messageDiceAudience});'});
  await page.waitForFunction(()=>window.groupContent&&window.manualNativeClasses);
+ const damageStatuses=await readFile('dist/scripts/damage-status.js','utf8');
+ await page.addScriptTag({type:'module',content:'const escape=manualEscape;'+damageStatuses.slice(damageStatuses.indexOf('export function lockedDamageStatuses('))+'\nwindow.renderDamageStatusPicker=renderDamageStatusPicker;'});
  const sharedDamage=await readFile('dist/scripts/damage-flow.js','utf8');
- await page.addScriptTag({type:'module',content:'const retry=new Map();'+sharedDamage.slice(sharedDamage.indexOf('export async function renderDamage('))+'\nwindow.renderDamage=renderDamage;'});
+ const selectionLock=sharedDamage.slice(sharedDamage.indexOf('export function damageEffectsLocked('),sharedDamage.indexOf('/** Called only'));
+ await page.addScriptTag({type:'module',content:'const retry=new Map();'+selectionLock+sharedDamage.slice(sharedDamage.indexOf('export async function renderDamage('))+'\nObject.assign(window,{renderDamage,damageEffectsLocked});'});
  let code=await readFile('dist/scripts/manual-rolls.js','utf8');
  code=code.replace(/^import .*$/gm,'').replace('return await import(path);','return window.manualNativeClasses;').replace('(await import(path)).default','window.nativeUtils');
  await page.addScriptTag({type:'module',content:'const M=MANUAL_MODULE,esc=manualEscape;\n'+code+'\nObject.assign(window,{manualContent,handleManualRequest,bindManualCard,registerManualRolls,openManualRolls,damagePrompt,basePrompt,groupPrompt,criticalPrompt,statPrompt,characterRollPrompt});'});
@@ -147,8 +156,8 @@ try {
   holder.querySelector('[name=armor]').checked=false;facesQueue.push([3,2,1]);await promptData.callback([holder]);check(created.flags['pneuma-combattools'].manualRoll.damage.result.values.interactArmor===false&&lastRoll.rollCardExtraArgs.ignoreArmorPercent===0,'no armor or ablation');
   const damage=created.flags['pneuma-combattools'].manualRoll;damage.damage.result.values.ignorePercent=0;damage.damage.result.values.interactArmor=true;
   const dm={...message,id:'damage',flags:{'pneuma-combattools':{manualRoll:damage}}};game.messages.set('damage',dm);
-  cards.innerHTML=manualContent(damage);bindManualCard(dm,cards);bindHalfArmor(cards);check(cards.querySelectorAll('.pneuma-damage-status-slot').length===3,'three effect slots');
-  cards.querySelector('.pneuma-half-armor').click();check(cards.querySelectorAll('.pneuma-damage-status-slot').length===3,'shared three effect slots');check(cards.querySelector('.pneuma-damage-recipient').textContent.trim()==='token','shared recipient label');cards.querySelector('.pneuma-apply-damage').click();await new Promise(resolve=>setTimeout(resolve,20));check(applied.halfArmor===true,'half armor passed to apply');
+  cards.innerHTML=manualContent(damage);bindManualCard(dm,cards);bindHalfArmor(cards);await new Promise(requestAnimationFrame);check(cards.querySelectorAll('.pneuma-damage-status-slot').length===3,'three effect slots');
+  cards.querySelector('.pneuma-half-armor').click();await new Promise(requestAnimationFrame);check(cards.querySelectorAll('.pneuma-damage-status-slot').length===3,'shared three effect slots');check(cards.querySelector('.pneuma-damage-recipient').textContent.trim()==='Selected Token','shared recipient label');cards.querySelector('.pneuma-apply-damage').click();await new Promise(resolve=>setTimeout(resolve,20));check(applied.halfArmor===true,'half armor passed to apply');
   await handleManualRequest({message:'damage',user:'gm',request:{action:'effects',effects:['prone']}});check(dm.flags['pneuma-combattools'].manualRoll.damage.statusEffects[0]==='prone','effects saved');
   cards.insertAdjacentHTML('beforeend','<div class="rollcard" id="native"><a data-action="applyDamage" data-ignore-armor-percent="0">Native apply damage</a></div>');bindHalfArmor(cards);bindHalfArmor(cards);
   const native=document.querySelector('#native');check(native.querySelectorAll('button').length===2,'no duplicate button');native.querySelector('.pneuma-half-armor').click();check(native.querySelector('a').dataset.ignoreArmorPercent==='50','native toggle');native.querySelector('.pneuma-half-armor').click();check(native.querySelector('a').dataset.ignoreArmorPercent==='0','native restore');
@@ -187,8 +196,9 @@ try {
   game.packs=new Map([['cyberpunk-red-core.core_critical-injuries-body',{getDocuments:async()=>[{type:'criticalInjury',name:'Broken Leg',system:{quickFix:{dvParamedic:13},treatment:{type:'paramedicSurgery',dvParamedic:15,dvSurgery:13}}}]}],['cyberpunk-red-core.core_critical-injuries-head',{getDocuments:async()=>[{type:'criticalInjury',name:'Foreign Object',system:{quickFix:{dvFirstAid:13,dvParamedic:13},treatment:{type:'quickFix'}}},{type:'criticalInjury',name:'Lost Eye',system:{treatment:{type:'surgery',dvSurgery:17}}}]}]]);
   await openTreatment();document.body.innerHTML='<div class="pneuma-roll-dialog" id="treatment-preview">'+dialog.content+'</div>';dialog.render([document.querySelector('#treatment-preview')]);
  });
- assert.deepEqual(await page.locator('.pneuma-treatment-section h3').allTextContents(),['Stabilize','Body Crits','Head Crits']);
- assert.equal(await page.locator('.pneuma-treatment-section').first().locator('button').count(),6);
+ assert.deepEqual(await page.locator('.pneuma-treatment-section h3').allTextContents(),['On Fire','Stabilize','Body Crits','Head Crits']);
+ assert.equal(await page.locator('[data-treatment-location=stabilize] button').count(),6);
+ assert.equal(await page.locator('[data-treatment-extinguish]').isDisabled(),true,'No burning patient is selected');
  assert.deepEqual(await page.locator('[data-treatment-patient] option').allTextContents(),['Select patient…','Patient','Pex','Type a patient name…']);
  assert.equal(await page.locator('[data-treatment-patient]').inputValue(),'');
  await page.locator('[data-treatment-patient]').selectOption('Token.patient');
@@ -214,8 +224,8 @@ try {
  });
  const applyRow=page.locator('#damage-preview .pneuma-damage-recipient'),slots=page.locator('#damage-preview .pneuma-damage-status-effects');
  const rowBox=await applyRow.boundingBox(),slotBox=await slots.boundingBox();
- assert.ok(slotBox.x>=rowBox.x+rowBox.width,'Effects sit to the right of the recipient');
- assert.ok(Math.abs((slotBox.y+slotBox.height/2)-(rowBox.y+rowBox.height/2))<4,'Effects align with the apply row');
+ assert.equal(await page.locator('#damage-preview .pneuma-resolution-damage-roll .pneuma-damage-status-effects').count(),1,'Effects are inside the damage box');
+
  await page.locator('#damage-preview').screenshot({path:process.env.TEMP+'/pct-shared-damage.png'});
  await page.evaluate(()=>document.getElementById('damage-preview').remove());
 

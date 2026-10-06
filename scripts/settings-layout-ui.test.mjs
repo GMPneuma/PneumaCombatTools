@@ -11,9 +11,10 @@ try {
  const result=await page.evaluate(()=>{
   const form=document.querySelector('form');
   const defs={combatBarDock:['bottom-left','top-right'],combatBarOrientation:['vertical','horizontal']};
-  const keys=['routeSheetAttacks','injuryTurnEndReminder','movementTracking','showArmorControls','npcAutoEvasion','combatBar',...Object.keys(defs),'combatBarSize','criticalInjuries','eyeHUD','eyeHUDDock','biomonitorShowHP','hoverDV','hoverAutofire'];
+  const keys=['routeSheetAttacks','injuryTurnEndReminder','movementTracking','showArmorControls','npcAutoEvasion','combatBar','turnMarkerEnabled','turnMarkerDisplay','quickhackEnabled','quickhackMode',...Object.keys(defs),'combatBarSize','criticalInjuries','eyeHUD','eyeHUDDock','biomonitorShowHP','hoverDV','hoverAutofire'];
   for(const key of keys){const row=document.createElement('div');row.className='form-group';row.innerHTML='<label>'+key+'</label>'+(defs[key]?'<select name="pneuma-combattools.'+key+'">'+defs[key].map(v=>'<option>'+v+'</option>').join('')+'</select>':'<input name="pneuma-combattools.'+key+'" type="checkbox">');form.append(row);}
   const menu=document.createElement("div");menu.className="form-group submenu";menu.innerHTML='<label>Turn Indicator</label><button type="button" data-key="pneuma-combattools.turnMarkerSettings">Configure</button>';form.append(menu);menu.querySelector("button").addEventListener("click",()=>window.indicatorMenuOpened=true);
+  form.querySelector('[name$=combatBar]').checked=true;form.querySelector('[name$=turnMarkerEnabled]').checked=true;
   groupModuleSettings(form);groupModuleSettings(form);
   const radios=[...form.querySelectorAll('input[type=radio]')];
   const initial=radios.map(r=>r.checked);
@@ -22,7 +23,7 @@ try {
  });
  assert.equal(result.count,4);assert.deepEqual(result.initial,[false,true,false,false]);assert.deepEqual(result.checked,[false,false,true,false]);
  assert.equal(result.values['pneuma-combattools.combatBarDock'],'top-right');assert.equal(result.values['pneuma-combattools.combatBarOrientation'],'horizontal');assert.equal(result.hidden,true);
- assert.deepEqual(result.groups,['Attack & Damage Cards','Evasion & Area Attacks','Movement & Initiative','Turn Indicator','Injuries & Effects','Combat Bar','Token HUD & Targeting','Biomonitor']);
+ assert.deepEqual(result.groups,['Attack & Damage Cards','Evasion & Area Attacks','Movement & Initiative','Turn Indicator','Injuries & Effects','QuickHack','Combat Bar','Token HUD & Targeting','Biomonitor']);
  assert.equal(await page.locator('[name="pneuma-combattools.routeSheetAttacks"]').isChecked(),false);
  assert.equal(await page.locator('[name="pneuma-combattools.routeSheetAttacks"]').evaluate(n=>n.closest('fieldset').dataset.combatSettingsGroup),'combat');
  await page.locator('[data-key="pneuma-combattools.turnMarkerSettings"]').click();assert.equal(await page.evaluate(()=>indicatorMenuOpened),true);
@@ -31,6 +32,14 @@ try {
  await page.locator('[data-hover-dv-mode]').selectOption('autofire');assert.equal(await page.locator('[name$="hoverDV"]').isChecked(),true);assert.equal(await page.locator('[name$="hoverAutofire"]').isChecked(),true);
  await page.locator('[data-hover-dv-mode]').selectOption('single');assert.equal(await page.locator('[name$="hoverAutofire"]').isChecked(),false);
  await page.locator('[data-hover-dv-mode]').selectOption('off');assert.equal(await page.locator('[name$="hoverDV"]').isChecked(),false);
+ for(const [key,id] of [['turnMarkerEnabled','turn-marker'],['quickhackEnabled','quickhack'],['combatBar','combat-bar']]) {
+  const master=page.locator('[name="pneuma-combattools.'+key+'"]');
+  await master.uncheck();
+  assert.ok(await page.locator('[data-combat-settings-group="'+id+'"] .form-group').evaluateAll(rows=>rows.slice(1).every(row=>row.inert&&row.getAttribute('aria-disabled')==='true')));
+  assert.equal(await page.locator('[data-combat-settings-group="'+id+'"] .form-group').first().locator('input').getAttribute('name'),'pneuma-combattools.'+key);
+  await master.check();
+  assert.ok(await page.locator('[data-combat-settings-group="'+id+'"] .form-group').evaluateAll(rows=>rows.every(row=>!row.inert)));
+ }
  await page.screenshot({path:tmpdir()+'/pct-settings-cleanup.png'});
  console.log('Settings browser checks passed: grouping, saved values, radio selection, keyboard navigation, native submission and repeated rendering.');
 } finally {await browser.close();}

@@ -1,4 +1,5 @@
 import { checkedLuck } from "./evasion-rules.js";
+import { withActorMutation } from "./actor-mutation.js";
 import { registerNativeWrapper } from "./native-wrappers.js";
 export interface NativeRoll {
   skillName?: string; rollTitle: string; rollCard: string; resultTotal: number; luck: number; formula?: string;
@@ -150,9 +151,11 @@ export async function evasionDialog(roll: NativeRoll, actor: Actor, item: Item,
   } finally { dialogNotes.delete(roll); }
 }
 export async function spendBonusLuck(actor: Actor, bonus: number): Promise<void> {
-  const current = Number(foundry.utils.getProperty(actor, "system.stats.luck.value"));
-  const remaining = checkedLuck(current, 0, bonus);
-  if (bonus) await actor.update({ "system.stats.luck.value": remaining } as Parameters<Actor["update"]>[0]);
+  await withActorMutation(actor, async () => {
+    const current = Number(foundry.utils.getProperty(actor, "system.stats.luck.value"));
+    const remaining = checkedLuck(current, 0, bonus);
+    if (bonus) await actor.update({ "system.stats.luck.value": remaining } as Parameters<Actor["update"]>[0]);
+  });
 }
 // Reuse CPR's obscured-task ID so its own situational toggle cannot stack the same penalty.
 const smokeModId="heavilyObscured-coreBook";

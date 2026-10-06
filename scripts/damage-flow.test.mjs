@@ -43,13 +43,13 @@ try {
  await page.addScriptTag({type:'module',content:(await readFile('dist/scripts/shared.js','utf8'))+'\nObject.assign(window,{escapeHTML,escape:escapeHTML,escapeInstant:escapeHTML});'});
  await page.waitForFunction(()=>!!window.instantEffects);
  const statusSource = await readFile(new URL('../dist/scripts/damage-status.js', import.meta.url), 'utf8');
- await page.addScriptTag({type:'module',content:statusSource.replace(/^import .*$/gm,'')+'\nObject.assign(window,{chooseDamageStatuses,damageStatusChoices,validateDamageStatuses});'});
+ await page.addScriptTag({type:'module',content:statusSource.replace(/^import .*$/gm,'')+'\nObject.assign(window,{chooseDamageStatuses,damageStatusChoices,validateDamageStatuses,canonicalDamageStatus,inherentDamageStatuses,lockedDamageStatuses,renderDamageStatusPicker});'});
  await page.waitForFunction(()=>!!window.chooseDamageStatuses);
  const criticalSource = (await readFile('dist/scripts/native-lookup.js','utf8'))+'\n'+(await readFile(new URL('../dist/scripts/critical-injury.js', import.meta.url), 'utf8')).replace(/^import .*$/gm,'');
  await page.addScriptTag({type:'module',content:criticalSource.replace('import(utilsPath)', 'Promise.resolve({default:window.criticalUtils})')+'\nObject.assign(window,{hasCriticalInjury,criticalLocation,damageSixes,applyCriticalInjury});'});
  await page.waitForFunction(()=>!!window.hasCriticalInjury);
- const applicationSource = (await readFile(new URL('../dist/scripts/native-wrappers.js', import.meta.url), 'utf8'))+'\n'+(await readFile(new URL('../dist/scripts/damage-application.js', import.meta.url), 'utf8')).replace(/^import .*$/gm,'');
- await page.addScriptTag({type:'module',content:applicationSource+'\nObject.assign(window,{compactDamageApplication,captureWithChat,captureDamageApplication});'});
+ const applicationSource = (await readFile('dist/scripts/actor-mutation.js','utf8'))+'\n'+(await readFile(new URL('../dist/scripts/native-wrappers.js', import.meta.url), 'utf8'))+'\n'+(await readFile(new URL('../dist/scripts/damage-application.js', import.meta.url), 'utf8')).replace(/^import .*$/gm,'');
+ await page.addScriptTag({type:'module',content:applicationSource+'\nObject.assign(window,{compactDamageApplication,captureWithChat,captureDamageApplication,isDamageCaptureView,withActorMutation,registerNativeWrapper});'});
  await page.waitForFunction(()=>!!window.compactDamageApplication);
  const skullResult=await page.evaluate(async()=>{
    const actor={items:[{name:"Cracked Skull"}],system:{derivedStats:{hp:{value:30}}},async update(data){this.system.derivedStats.hp.value=data["system.derivedStats.hp.value"];}};
@@ -135,7 +135,7 @@ try {
  });
  assert.deepEqual(result.values,{total:22,bonus:5,location:'head',ablation:2,ammo:'armorPiercing',ignorePercent:0.5,ignoreBelow:0,lethal:true});
  assert.match(result.pending,/pneumaRollDamage/);
- assert.equal(await page.locator(".pneuma-damage-application button").count(),3);assert.equal(await page.locator("a.pneuma-apply-damage").count(),2);
+ assert.equal(await page.locator(".pneuma-resolution-damage-roll .pneuma-damage-status-slot").count(),3);assert.equal(await page.locator("a.pneuma-apply-damage").count(),2);
  assert.equal(result.header,'DamageSmart');assert.equal(result.weaponRepeated,false);assert.equal(result.bolts,2);assert.deepEqual(result.destinations,['recorded','selected']);
  assert.deepEqual(result.applyButtons,[' Defender',' token']);
  assert.equal(result.nativeApply,0);assert.equal(result.detail,'22');assert.equal(result.requests.length,0);
@@ -162,9 +162,10 @@ try {
   await renderDamage({id:'msg'},data,wrap([document.body]),async()=>{throw Error('Disabled bolt must not run');});
   const recorded=document.querySelector('[data-pneuma-damage-target="recorded"]');recorded.click();
   return {recorded:recorded.getAttribute('aria-disabled'),selected:document.querySelector('[data-pneuma-damage-target="selected"]').getAttribute('aria-disabled'),
+   effectButtons:document.querySelectorAll(".pneuma-damage-status-slot").length,locked:!!document.querySelector(".pneuma-damage-status-locked"),
    afterDice:!!(document.querySelector('[data-visible-element="d6-data-details"]').compareDocumentPosition(document.querySelector('.pneuma-damage-application')) & Node.DOCUMENT_POSITION_FOLLOWING)};
  });
- assert.equal(applied.recorded,'true');assert.equal(applied.selected,null);assert.equal(applied.afterDice,true);
+ assert.equal(applied.recorded,'true');assert.equal(applied.selected,null);assert.equal(applied.afterDice,true);assert.equal(applied.effectButtons,0);assert.equal(applied.locked,true);
 
  // Sections must not expose the saved attack/damage while defense is pending.
  const sections = await page.evaluate(async () => {
@@ -196,7 +197,7 @@ try {
  for (const snapshot of sections.snapshots) {
    assert.deepEqual(snapshot.kinds,["pending"]); assert.equal(snapshot.hasRoll,false); assert.equal(snapshot.slot,true);
  }
- assert.deepEqual(sections.kinds,["attack","result","damage-roll","damage-apply"]);
+ assert.deepEqual(sections.kinds,["attack","result","damage-roll","damage-apply","effects"]);
  assert.equal(sections.structure,true); assert.equal(sections.applicationInside,true); assert.equal(sections.dropInside,true);
  assert.equal(sections.recovery,true); assert.equal(sections.prematureApply,false);
  assert.match(sections.cancelled,/Exchange cancelled by GM/);
@@ -221,11 +222,13 @@ try {
    return {labelCount:labels.length,baseHidden,skinCanShow,cost:cost.textContent,
      inHeader:!!cost.closest(".rollcard-top"),standalone:document.querySelectorAll("p.pneuma-evasion-cost").length,
      right:cost.getBoundingClientRect().right>=heading.getBoundingClientRect().right-12,
-     buttonBackground:getComputedStyle(slot).backgroundColor,imageBackground:getComputedStyle(slot.firstElementChild).backgroundColor};
+     buttonBackground:getComputedStyle(slot).backgroundColor,imageBackground:getComputedStyle(slot.firstElementChild).backgroundColor,
+     imageBorder:getComputedStyle(slot.firstElementChild).borderWidth,imageFilter:getComputedStyle(slot.firstElementChild).filter};
  });
  assert.equal(presentation.labelCount,4);assert.equal(presentation.baseHidden,true);assert.equal(presentation.skinCanShow,true);
  assert.equal(presentation.cost,"1 LUCK");assert.equal(presentation.inHeader,true);assert.equal(presentation.standalone,0);assert.equal(presentation.right,true);
- assert.equal(presentation.buttonBackground,"rgb(51, 51, 51)");assert.equal(presentation.imageBackground,"rgb(51, 51, 51)");
+ assert.equal(presentation.buttonBackground,"rgb(227, 227, 223)");assert.equal(presentation.imageBackground,"rgba(0, 0, 0, 0)");
+ assert.equal(presentation.imageBorder,"0px");assert.equal(presentation.imageFilter,"brightness(0)");
 
  // A skin can turn labels into side strips without rebuilding native content.
  const css = await readFile(new URL("../src/styles/pneuma-combattools.css", import.meta.url), "utf8");
@@ -292,13 +295,26 @@ try {
    const background=getComputedStyle(slots[0]).backgroundColor;
    document.body.innerHTML='<div class="message-content">'+exchangeContent({...data,damage:{...data.damage,statusEffects:[]}})+'</div>';
    await renderDamage({id:"empty-slots"}, {...data,damage:{...data.damage,statusEffects:[]}},wrap([document.body]),async()=>{});
-   return {background,selected,removed,disabled,icons,square:rect.width===rect.height,right:right.left>=recipient.right,
+   return {background,selected,removed,disabled,icons,square:rect.width===rect.height,inside:!!document.querySelector(".pneuma-resolution-damage-roll .pneuma-damage-status-effects"),
      empty:[...document.querySelectorAll(".pneuma-damage-status-slot")].map(slot=>slot.textContent)};
  });
  assert.deepEqual(picker.selected,["prone","stunned","dead"]);
  assert.deepEqual(picker.removed,["prone","dead"]);assert.equal(picker.disabled,true);
- assert.equal(picker.background,"rgb(51, 51, 51)");assert.equal(picker.icons,3);assert.equal(picker.square,true);assert.equal(picker.right,true);
+ assert.equal(picker.background,"rgb(240, 240, 240)");assert.equal(picker.icons,3);assert.equal(picker.square,true);assert.equal(picker.inside,true);
  assert.deepEqual(picker.empty,["+","+","+"]);
+ const inherited=await page.evaluate(async()=>{
+  const data={...window.damageFixture,damage:{...window.damageFixture.damage,statusEffects:undefined,result:{...window.damageFixture.damage.result,ammoType:'incendiary'}}};
+  document.body.innerHTML='<div class="message-content">'+damageContent(data)+'</div>';
+  await renderDamage({id:'manual-inherited'},data,wrap([document.body]),async()=>{}, {canEditEffects:true});
+  return {selected:document.querySelector('.pneuma-resolution-damage-roll .pneuma-damage-status-slot')?.dataset.statusId,
+    expected:masterStatuses.find(s=>s.name==='On Fire (Mild)').id,
+    slotCount:document.querySelectorAll('.pneuma-resolution-damage-roll .pneuma-damage-status-slot').length,
+    selectedOnly:[...document.querySelectorAll('.pneuma-apply-damage')].map(n=>n.dataset.pneumaDamageTarget),
+    order:[...document.querySelectorAll('[data-pneuma-section]')].map(n=>n.dataset.pneumaSection)};
+ });
+ assert.equal(inherited.selected,inherited.expected);assert.equal(inherited.slotCount,3);
+ assert.deepEqual(inherited.selectedOnly,['selected']);assert.deepEqual(inherited.order,['damage-roll','damage-apply','effects']);
+
  const critical = await page.evaluate(async () => {
    const data={...window.damageFixture,attackMode:"aimed",location:"head",
      damage:{...window.damageFixture.damage,result:{...window.damageFixture.damage.result,sixes:2}}};
@@ -397,6 +413,7 @@ try {
      chat.RenderDamageApplicationCard({actor,hpReduction:1});
      chat.RenderDamageApplicationCard({actor:view,hpReduction:7,location:"body"});
    });
+   await new Promise(resolve=>requestAnimationFrame(resolve));
    const installed=chat.RenderDamageApplicationCard;
    const restored=installed!==original;
    let failed=false;
@@ -418,7 +435,7 @@ try {
      count:document.querySelectorAll(".pneuma-damage-applied-row").length,
      firstName:row.querySelector(".pneuma-applied-name").textContent,
      expanded:!detail[0].classList.contains("hide"),secondHidden:detail[1].classList.contains("hide"),
-     undo:detail[0].querySelector('[data-action="reverseDamage"]')!==null,
+     undo:detail[0].previousElementSibling.querySelector('[data-action="reverseDamage"]')!==null,
      horizontal:children[0].left<children[1].left&&children[1].left<children[2].left,
      larger:parseFloat(getComputedStyle(row.querySelector(".pneuma-applied-number")).fontSize)>parseFloat(getComputedStyle(row).fontSize)};
  });
@@ -439,20 +456,39 @@ try {
    const native='<span data-action="toggleVisibility" data-visible-element="d6-data-details">1</span><div class="d6-data-details">detail</div>';
    window.renderTemplate=async()=>native;
    let nativeCalls=0,otherCalls=0;const chat={RenderDamageApplicationCard(){nativeCalls++;}};
-   const actor={};let firstView,release;
+   const actor={uuid:'Actor.concurrent'};let firstView,release,secondEntered=false;
    const first=captureWithChat(chat,actor,"First","body","one",async view=>{
      firstView=view;await new Promise(resolve=>release=resolve);chat.RenderDamageApplicationCard({actor:view,hpReduction:1});
    });
+   await new Promise(resolve=>requestAnimationFrame(resolve));
    const installed=chat.RenderDamageApplicationCard;
    // A later cooperating wrapper stays installed after success and failure.
    chat.RenderDamageApplicationCard=function(data){otherCalls++;return installed.call(this,data);};
    const other=chat.RenderDamageApplicationCard;
-   const second=await captureWithChat(chat,actor,"Second","body","two",async view=>chat.RenderDamageApplicationCard({actor:view,hpReduction:2}));
-   release();const rows=await first;
+   const pendingSecond=captureWithChat(chat,actor,"Second","body","two",async view=>{secondEntered=true;return chat.RenderDamageApplicationCard({actor:view,hpReduction:2});});
+   await new Promise(resolve=>requestAnimationFrame(resolve));if(secondEntered)throw Error("Second capture bypassed the actor queue");
+   release();const [rows,second]=await Promise.all([first,pendingSecond]);
    chat.RenderDamageApplicationCard({actor:firstView,hpReduction:3});
    return {first:rows[0].includes('First'),second:second[0].includes('Second'),nativeCalls,otherCalls,preserved:chat.RenderDamageApplicationCard===other};
  });
  assert.deepEqual(concurrent,{first:true,second:true,nativeCalls:1,otherCalls:3,preserved:true});
+ await page.addScriptTag({type:'module',content:(await readFile('dist/scripts/native-effect-integration.js','utf8')).replace(/^import .*$/gm,'')+'\nwindow.installNativeEffectIntegration=installNativeEffectIntegration;'});
+ const nativeQueue=await page.evaluate(async()=>{
+   let nativeCards=0;
+   const chat={RenderRollCard:async()=>{},damageApplication(){},RenderDamageApplicationCard(){nativeCards++;}};
+   const dialog={showDialog:async()=>{}};
+   const actor={uuid:'Actor.native-queue',system:{derivedStats:{hp:{value:30}}},async update(changes){await new Promise(r=>setTimeout(r,1));this.system.derivedStats.hp.value=changes['system.derivedStats.hp.value'];},async _applyDamage(damage){
+     await this.update({'system.derivedStats.hp.value':this.system.derivedStats.hp.value-damage});
+     await chat.RenderDamageApplicationCard({actor:this,hpReduction:damage,rawDamageDealt:damage});
+   }};
+   installNativeEffectIntegration(chat,dialog,actor);
+   const [receipt]=await Promise.all([
+     captureWithChat(chat,actor,'Managed','body','native-queue',view=>actor._applyDamage.call(view,8)),
+     actor._applyDamage(3)
+   ]);
+   return {hp:actor.system.derivedStats.hp.value,captured:receipt[0].includes('Managed'),nativeCards};
+ });
+ assert.deepEqual(nativeQueue,{hp:19,captured:true,nativeCards:1},'Managed capture and native damage share a queue without recursively acquiring it');
 
 
 
@@ -567,7 +603,7 @@ try {
    const head=masterStatuses.find(s=>s.group==='head');await chooseDamageStatuses([head.id],0);
    return {labels,noExcluded,firstOpen,editing:document.querySelector('details[open] summary').firstChild.textContent.trim()};
  });
- assert.deepEqual(pickerGroups.labels,['Instant Effects','Body Crits','Head Crits','Drugs','Pharma','Misc']);
+ assert.deepEqual(pickerGroups.labels,['Attack Effects','Body Crits','Head Crits','Drugs','Pharma','Misc']);
  assert.ok(pickerGroups.noExcluded&&pickerGroups.firstOpen);assert.equal(pickerGroups.editing,'Head Crits');
  await page.screenshot({path:process.env.TEMP+'/pct-effects-categories.png'});
  console.log('Combat flow browser checks passed: awareness checkbox/reset, native damage metadata, scoped application control, retained expandable result.');

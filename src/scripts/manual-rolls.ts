@@ -4,12 +4,13 @@ import {markRollResult} from "./native-combat.js";
 import {removeRollFavorite, rollFavorites, sameFavorite, toggleRollFavorite, rollFavorite, type RollFavorite} from "./roll-favorites.js";
 import { primaryGM as authority } from "./shared.js";
 import { MANUAL_MODULE as M, manualEscape as esc, manualNumber, groupContent, type ManualCard, type InjuryResult } from "./manual-roll-state.js";
-import { damageContent, handleDamage, renderDamage, selectedDamageTarget, damageValues, type DamageRequest } from "./damage-flow.js";
+import { damageContent, handleDamage, damageEffectsLocked, renderDamage, selectedDamageTarget, damageValues, type DamageRequest } from "./damage-flow.js";
 import { validateDamageStatuses } from "./damage-status.js";
 import { damageSixes } from "./critical-injury.js";
 import { nativeCard, rollHidden, nativeAPI, diceJSON, showSavedDice, messageDiceAudience, spendBonusLuck, type DiceAudience, type NativeRoll, type RollItem } from "./native-combat.js";
 import { canRenderCombatCard } from "./card-structure.js";
 import { requireCombatSocket } from "./socket-health.js";
+import {GMRequests} from "./gm-request.js";
 import type { Exchange } from "./combat-resolution.js";
 
 type ManualNativeRoll = NativeRoll & { bonusDamage: number; rollCardExtraArgs: Record<string, unknown>; calculateCritical: boolean };
@@ -20,7 +21,7 @@ const flag = "flags." + M + ".manualRoll";
 const state = (message: ChatMessage) => foundry.utils.getProperty(message, flag) as ManualCard | undefined;
 const report = (error: unknown) => ui.notifications!.error((error as Error).message ?? String(error));
 let queue: Promise<unknown> = Promise.resolve();
-const pending = new Map<string, {resolve(): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout>}>();
+const requests=new GMRequests();
 const retry = new Map<string, {request: Request; dice: string[]; mode: string; roller: string; audience: DiceAudience}>();
 async function nativeRolls() {
   const path = "/systems/cyberpunk-red-core/modules/rolls/cpr-rolls.js";
@@ -126,6 +127,7 @@ export async function handleManualRequest(wire: Pick<Wire,"message" | "user" | "
   if (req.action === "effects") {
     if (!user.isGM && user.id !== data.creator) throw Error("Only the roller or GM can edit effects.");
     if (!data.damage || !["rolled","applied"].includes(data.damage.status)) throw Error("Damage is busy or awaiting review.");
+    if(damageEffectsLocked(data.damage))throw Error("Effect selection is locked because resolution has started.");
     data.damage.statusEffects=validateDamageStatuses(req.effects);await save(message,data);return;
   }
   if (req.action === "review") {
@@ -153,7 +155,7 @@ function send(message: string, request: Request): Promise<void> {
   requireCombatSocket();const gm=authority();if(!gm)throw Error("An active GM is required to update this card.");
   const wire:Wire={manualType:"request",id:foundry.utils.randomID(),message,user:game.user!.id!,request};
   if (gm.id===game.user!.id) { const next=queue.catch(()=>{}).then(()=>handleManualRequest(wire));queue=next;return next; }
-  return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(wire.id);reject(Error("The GM did not confirm this action. Check the card before retrying."));},30000);pending.set(wire.id,{resolve,reject,timer});game.socket!.emit(channel,wire);});
+  return requests.request(wire.id,()=>game.socket!.emit(channel,wire),30000,"The GM did not confirm this action. Check the card before retrying.");
 }
 async function rollGroup(message: ChatMessage, data: ManualCard, rowId: string, skipDialog = false) {
   const key=message.id+":"+rowId,previous=retry.get(key);
@@ -175,7 +177,7 @@ async function rollGroup(message: ChatMessage, data: ManualCard, rowId: string, 
   } finally {if(!rolled)await send(message.id!,{action:"release",row:rowId,nonce});ui.chat?.updateMessage(message);}
 }
 function addButton(parent: HTMLElement, label: string, run: (event: MouseEvent)=>Promise<unknown>, className="") {
-  const button=document.createElement("button");button.type="button";button.textContent=label;button.className=className;
+  const button=document.createElement("button");button.type="button";button.textContent=label;button.className=className;button.dataset.chatAction="injury";
   button.addEventListener("click",event=>{event.preventDefault();event.stopPropagation();button.disabled=true;void run(event).catch(report).finally(()=>{button.disabled=false;});});parent.append(button);return button;
 }
 export function bindManualCard(message: ChatMessage, html: HTMLElement) {
@@ -201,8 +203,8 @@ export function bindManualCard(message: ChatMessage, html: HTMLElement) {
     for(const row of data.rows??[]) {
       if(!game.user!.isGM && row.user!==game.user!.id)continue;
       const slot=root.querySelector<HTMLElement>('[data-group-user="'+CSS.escape(row.user)+'"] .pneuma-group-action')!;
-      if(row.state==="waiting" || retry.has(message.id+":"+row.user))addButton(slot,retry.has(message.id+":"+row.user)?"Finish roll":"Roll",event=>rollGroup(message,data,row.user,event.shiftKey)).dataset.gmOnly=String(game.user!.isGM && row.user!==game.user!.id);
-      else if(row.state==="rolling" && game.user!.isGM)addButton(slot,"Release",()=>send(message.id!,{action:"reset",row:row.user})).dataset.gmOnly="true";
+      if(row.state==="waiting" || retry.has(message.id+":"+row.user)){const button=addButton(slot,retry.has(message.id+":"+row.user)?"Finish roll":"Roll",event=>rollGroup(message,data,row.user,event.shiftKey));button.dataset.chatAction=retry.has(message.id+":"+row.user)?"retry":"roll";button.dataset.gmOnly=String(game.user!.isGM && row.user!==game.user!.id); }
+      else if(row.state==="rolling" && game.user!.isGM){const button=addButton(slot,"Release",()=>send(message.id!,{action:"reset",row:row.user}));button.dataset.gmOnly="true";button.dataset.chatAction="release";}
     }return;
   }
   const controls=root.querySelector<HTMLElement>(".pneuma-manual-controls")!;
@@ -214,7 +216,7 @@ export function bindManualCard(message: ChatMessage, html: HTMLElement) {
     },{canEditEffects:!!game.user!.isGM || game.user!.id===data.creator}).catch(report);
     if((data.damage.result?.sixes??0)>=2 && !data.injuryBusy)addButton(controls,"Roll critical injury for selected token",()=>send(message.id!,{action:"injury",target:selectedDamageTarget()}));
   } else if(!data.injuryBusy)addButton(controls,"Apply injury to selected token",()=>send(message.id!,{action:"injury",target:selectedDamageTarget()}));
-  if(game.user!.isGM && (data.injuryBusy || data.damage && ["review","applying"].includes(data.damage.status)))addButton(controls,"Mark resolved after GM review",()=>send(message.id!,{action:"review"})).dataset.gmOnly="true";
+  if(game.user!.isGM && (data.injuryBusy || data.damage && ["review","applying"].includes(data.damage.status))){const button=addButton(controls,"Mark resolved after GM review",()=>send(message.id!,{action:"review"}));button.dataset.gmOnly="true";button.dataset.chatAction="review";}
 }
 function field(label:string, control:string) {const name=/name="([^"]+)"/.exec(control)?.[1]??'field';return '<div class="form-group"><label for="pneuma-roll-'+name+'">'+label+'</label><div class="form-fields">'+control.replace('name=', 'id="pneuma-roll-'+name+'" name=')+'</div></div>';}
 const pair=(content:string)=>'<div class="pneuma-roll-pair">'+content+'</div>';
@@ -513,6 +515,6 @@ export function registerManualRolls(): void {
   Hooks.on("renderChatMessage",(message:ChatMessage,html:JQuery)=>{if(html[0])bindManualCard(message,html[0]);});
   Hooks.once("ready",()=>game.socket!.on(channel,(wire:Wire)=>{
     if(wire?.manualType==="request" && game.user!.id===authority()?.id){const next=queue.catch(()=>{}).then(()=>handleManualRequest(wire));queue=next;void next.then(()=>game.socket!.emit(channel,{...wire,manualType:"reply",gm:game.user!.id}),error=>game.socket!.emit(channel,{...wire,manualType:"reply",gm:game.user!.id,error:(error as Error).message}));}
-    else if(wire?.manualType==="reply" && wire.user===game.user!.id && wire.gm===authority()?.id){const waiter=pending.get(wire.id);if(!waiter)return;clearTimeout(waiter.timer);pending.delete(wire.id);if(wire.error)waiter.reject(Error(wire.error));else waiter.resolve();}
+    else if(wire?.manualType==="reply")requests.reply({...wire,gm:wire.gm??""},undefined);
   }));
 }

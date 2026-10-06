@@ -1,4 +1,4 @@
-import {canRenderCombatCard} from "./card-structure.js";
+import {bindCardAction,canRenderCombatCard,resolutionSection} from "./card-structure.js";
 import { allActors, escapeHTML as esc } from "./shared.js";
 import { registerEmpRefresh } from "./emp-refresh.js";
 import { updateTouchesPath } from "./update-path.js";
@@ -116,11 +116,13 @@ export function registerEmp() {
         const chooser=request.sourceActor?await fromUuid(request.sourceActor) as Actor|null:actor;
         if(!game.user?.isGM&&(request.chooser!=="player"||!chooser?.isOwner))continue;
         root=document.createElement('section');root.className='pneuma-attached-emp pneuma-emp-card';
-        root.innerHTML='<h4>'+esc(disableLabel(request.source))+' — '+esc(actor?.name??'Target')+'</h4><button type="button" data-emp-select>Choose affected items</button>';
-        (outer.querySelector('.message-content')??outer).append(root);
+        root.innerHTML='<button type="button" data-emp-select>Choose affected items</button>';
+        let slot:Element|null=Array.from(outer.querySelectorAll<HTMLElement>('.pneuma-aoe-target-effects')).find(node=>node.parentElement?.dataset.aoeActor===request.actor)??outer.querySelector('.pneuma-damage-effect-results')??outer.querySelector('.pneuma-resolution-effects-body');
+        if(!slot){const shell=document.createElement('div');shell.innerHTML=resolutionSection('effects','');const section=shell.firstElementChild!;(outer.querySelector('.message-content')??outer).append(section);slot=section.querySelector('.pneuma-resolution-effects-body');}
+        (slot??outer).append(root);
       }
       const button=root.querySelector<HTMLButtonElement>("[data-emp-select]");if(!button)continue;
-      button.dataset.gmOnly=String(request?.chooser!=="player");
+      button.dataset.gmOnly=String(request?.chooser!=="player");button.dataset.chatState=request?.state??"";
       button.disabled=!combat?.started||!request||request.state!=="pending";
       root.querySelectorAll(".pneuma-emp-result").forEach(el=>el.remove());
       const names=request?.method==="shortlist"&&!game.user?.isGM?request.selectedNames:request?.affectedNames;
@@ -128,7 +130,7 @@ export function registerEmp() {
       if(request?.resistedNames?.length){const result=document.createElement("p");result.className="pneuma-emp-result";result.textContent="Hardened — unaffected: "+request.resistedNames.join(", ");button.before(result);}
       if(names?.length){const result=document.createElement("p");result.className="pneuma-emp-result";result.textContent="Disabled: "+names.join(", ");button.before(result);}
       if(button.disabled)button.textContent=combat?.started&&request?.state==="applied"?disableLabel(request.source)+" applied":"Combat ended";
-      button.addEventListener("click",()=>{if(combat&&request)void chooseEmp(combat,request);});
+      bindCardAction(button,()=>{if(!button.disabled&&combat&&request)void chooseEmp(combat,request);});
 
     }
   });

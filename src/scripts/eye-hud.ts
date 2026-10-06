@@ -482,10 +482,10 @@ function publishIntrusionState(): void {
   Hooks.callAll("pneumaCombatToolsNeuralIntrusionChanged", actorUuid);
 }
 function render() {
-  closeStatusActions();
   publishIntrusionState();
   const incomingRows: HTMLElement[] = [];
   if (!game.settings!.get(MODULE, "eyeHUD")) {
+    closeStatusActions();
     for (const key of flashNotices.keys()) removeFlashNotice(key);
     updateCrewButton(actorInFocus(), false, "Open Biomonitor");
     clearEffectArrivals(); effectActor = undefined; previousEffects.clear();
@@ -588,9 +588,10 @@ function render() {
     const grappleRows = actor ? [...grappleHUD(actor),...movementHUD(actor)] : [];
     const nextMedical = JSON.stringify([monitor, actor?.uuid, actor?.isOwner, grappleRows, data,
       actor && foundry.utils.getProperty(actor, "system.derivedStats.hp"), rows,
-      disabled.map(entry => [entry.item?.id, entry.name, entry.detail]), lampStates,
+      disabled.map(entry => [entry.item?.id, entry.name, entry.detail]), lampStates, actor && forceOutEntries(actor),
       game.settings!.get(MODULE, "biomonitorShowHP")]);
     if (nextMedical !== medicalSignature) {
+      closeStatusActions();
       const medical = element("div", "pneuma-eye-medical");
       const vitalColumn = element("div", "pneuma-eye-vitals-column");
       if (monitor) vitalColumn.append(vitals(actor, lampStates, data));
@@ -638,7 +639,7 @@ function render() {
   }
   }
   if (!minimized && body.parentElement !== panel) panel.append(body);
-  else if (minimized) body.remove();
+  else if (minimized) { closeStatusActions(); body.remove(); }
   // Expanded HUD has no header row. Controls share the Implant Integrity label.
   const previousControls = Array.from(panel.querySelectorAll(".pneuma-eye-header, .pneuma-eye-inline-controls"));
   const controlParent = minimized ? panel : panel.querySelector(".pneuma-eye-cyber-heading") ?? panel;

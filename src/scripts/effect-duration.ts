@@ -1,5 +1,12 @@
 /** Native ActiveEffect duration: CPR rounds are three seconds. */
 export interface EffectDuration {seconds?:number|null;rounds?:number|null;turns?:number|null;startTime?:number|null;startRound?:number|null;startTurn?:number|null;combat?:string|Combat|null}
+export function durationCombat(duration:EffectDuration|undefined):string|undefined {
+  const combat=duration?.combat;return typeof combat==="string"?combat:combat?.id??undefined;
+}
+export function durationEnded(duration:EffectDuration):boolean {
+  const combat=duration.combat;
+  return !!combat&&!(typeof combat==="string"?game.combats?.get(combat):combat)?.started;
+}
 export function effectDuration(seconds:number, combat?:Combat|null):EffectDuration {
   return combat?.started ? {seconds:null,rounds:Math.ceil(seconds/3),turns:0,combat:combat.id!,startRound:combat.round??0,startTurn:combat.turn??0,startTime:game.time!.worldTime}
     : {seconds,rounds:null,turns:null,combat:null,startRound:null,startTurn:null,startTime:game.time!.worldTime};

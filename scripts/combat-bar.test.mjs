@@ -20,6 +20,7 @@ function fixture(){
  const gm={id:'gm',active:true,isGM:true},player={id:'p',active:true,isGM:false},offline={id:'off',active:false,isGM:false};
  const scene={id:'scene'};
  const actor={id:'a',name:'Actor',img:'actor-art.webp',testUserPermission:u=>u.id==='p'};
+ player.character=actor;
  const token={id:'t',name:'Token Name',actor,isOwner:true,isVisible:true,isPreview:false,controlled:false};
  token.document={id:'t',uuid:'Scene.scene.Token.t',parent:scene,hidden:false,_source:{x:10,y:20,elevation:0},object:token};
  const participant={id:'c1',name:'Combat Name',actor,token:token.document,sceneId:'scene',visible:true,hidden:false,isDefeated:false,players:[player]};
@@ -65,13 +66,20 @@ test('players see visible combatants owned by others, in native turn order',()=>
  f.token.isOwner=false;f.combat.turns=[second,f.participant];f.combat.combatant=second;
  assert.deepEqual(barEntries().map(e=>[e.name,e.active]),[['Enemy',true],['Combat Name',false]]);
 });
-test('outside combat GM sees connected player-owned scene tokens; players see own tokens',()=>{
+test('outside combat uses assigned actors without requiring scene tokens',()=>{
  const f=fixture();f.combat.started=false;
- assert.equal(barEntries()[0].name,'Token Name');game.user=f.gm;assert.equal(barEntries().length,1);
+ assert.equal(barEntries()[0].name,'Actor');game.user=f.gm;assert.equal(barEntries().length,1);
  f.player.active=false;assert.equal(barEntries().length,0);
  game.user=f.player;assert.equal(barEntries().length,1);
- f.token.isOwner=false;assert.equal(barEntries().length,0);
- f.token.isOwner=true;f.token.document.hidden=true;assert.equal(barEntries().length,0);
+ f.token.isOwner=false;f.token.document.hidden=true;assert.equal(barEntries().length,1);assert.equal(barEntries()[0].token,undefined);
+ canvas.tokens.placeables=[];assert.equal(barEntries()[0].actor,f.actor);
+ f.player.character=undefined;assert.deepEqual(barEntries(),[]);
+});
+test('GM lists only online non-GM assigned actors and deduplicates shared characters',()=>{
+ const f=fixture();f.combat.started=false;game.user=f.gm;canvas.tokens.placeables=[];
+ f.gm.character={id:'gmActor'};f.offline.character={id:'offlineActor'};
+ game.users.push({id:'second',isGM:false,active:true,character:f.actor},{id:'unassigned',isGM:false,active:true});
+ assert.deepEqual(barEntries().map(e=>e.actor.id),['a']);
 });
 test('selected sidebar encounter cannot redirect the bar or movement of another scene',()=>{
  const f=fixture();game.combat={id:'preview'};

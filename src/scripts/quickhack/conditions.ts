@@ -20,7 +20,8 @@ export async function applyQuickhackCondition(actor:Actor,id:string,rollMode="ro
   if(id==="system-reset") {await sleepTarget(actor,combat);return;}
   if(id!=="slow"&&id!=="impair-movement")return;
   let amount=1;
-  if(id==="slow") {const roll=await new Roll("1d6").evaluate();amount=roll.total!;await showDiceAs(roll,rollMode,game.user!.id,audience);}
+  let roll:Roll|undefined;
+  if(id==="slow") {roll=await new Roll("1d6").evaluate();amount=roll.total!;}
   const old=actor.effects.find(e=>foundry.utils.getProperty(e,"flags."+M+".quickhackEffect")===id);
   // Refresh this hack's duration; keep the stronger penalty instead of stacking identical hacks.
   const penalty=Math.max(amount,old&&!old.disabled?Number(foundry.utils.getProperty(old,"flags."+M+".quickhackAmount"))||0:0);
@@ -29,5 +30,7 @@ export async function applyQuickhackCondition(actor:Actor,id:string,rollMode="ro
     flags:{[M]:{quickhackEffect:id,quickhackAmount:penalty}}};
   Object.assign(data.flags,{"cyberpunk-red-core":penaltyFlags(data.changes)});
   if(old)await old.update(data as never);else await actor.createEmbeddedDocuments("ActiveEffect",[data] as never);
+  // The saved penalty is authoritative; optional dice playback cannot block application.
+  if(roll)void showDiceAs(roll,rollMode,game.user!.id,audience).catch(error=>console.warn(M,"Slow dice display failed",error));
   return penalty;
 }

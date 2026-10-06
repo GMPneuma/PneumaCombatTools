@@ -29,7 +29,7 @@ try {
   const doc={id:'t',uuid:'Scene.scene.Token.t',parent:scene,x:400,y:300,elevation:5,flags:{'pneuma-combattools':{movement:record}}};
   // This HUD fixture applies positions immediately; animation/source divergence is covered in movement.test.mjs.
   Object.defineProperty(doc,'_source',{get:()=>({x:doc.x,y:doc.y,elevation:doc.elevation})});
-  token.document=doc;token.actor={effects:[],system:{derivedStats:{walk:{value:12}}}};doc.actor=token.actor;token.w=100;token.h=100;token.isOwner=true;token.isPreview=false;
+  token.id=doc.id;token.document=doc;token.actor={uuid:"Actor.mover",effects:[],system:{derivedStats:{walk:{value:12}}}};doc.actor=token.actor;token.w=100;token.h=100;token.isOwner=true;token.isPreview=false;
   token.tooltip={text:'',style:{}};token.getCenterPoint=p=>({x:p.x+50,y:p.y+50});token.checkCollision=()=>false;doc.object=token;
   window.movementEnabled=true;window.movementSetting=undefined;window.writes=[];doc.update=async(data,options)=>{
    writes.push({data,options});if(window.rejectNext){window.rejectNext=false;throw Error('Update rejected');}
@@ -44,19 +44,19 @@ try {
  });
  const rules=await readFile('dist/scripts/encounter.js','utf8')+'\n'+(await readFile('dist/scripts/combat-bar-state.js','utf8')).replace(/^import .*;\s*/gm,'').replace('const MODULE = '+JSON.stringify('pneuma-combattools')+';','')+'\n'+await readFile('dist/scripts/movement-rules.js','utf8');
  const movement=await readFile('dist/scripts/status-catalog.js','utf8')+'\n'+(await readFile('dist/scripts/prone.js','utf8')).replace(/^import .*;\s*/gm,'')+'\n'+(await readFile('dist/scripts/movement.js','utf8')).replace(/^import .*;\s*/gm,'');
- await page.addScriptTag({type:'module',content:rules+'\nconst grappleFor=()=>undefined;const movementEntry=()=>undefined;const areaSettings=()=>({evadeMove:false});\n'+movement+'\nregisterMovement();hooks.refreshToken.forEach(fn=>fn(token));'});
+ await page.addScriptTag({type:'module',content:rules+'\nconst electedGM=()=>game.users.find(user=>user.active&&user.isGM);const grappleFor=()=>undefined;const movementEntry=()=>undefined;const areaSettings=()=>({evadeMove:false});\n'+movement+'\nregisterMovement();hooks.refreshToken.forEach(fn=>fn(token));'});
  const counter=page.locator('.pneuma-movement-hud input'),reset=page.getByRole('button',{name:'Reset',exact:true});
  await reset.waitFor();assert.equal(await page.evaluate(()=>oldArrowReachable),false,'Original token-child arrow must reproduce the missed hit');
  assert.deepEqual(await page.evaluate(()=>({name:movementSetting.name,scope:movementSetting.scope,default:movementSetting.default})),{name:'Enable movement counters',scope:'world',default:true});
  await page.evaluate(()=>{movementEnabled=false;movementSetting.onChange();});assert.equal(await page.locator('.pneuma-movement-hud').count(),0);
  await page.evaluate(()=>{movementEnabled=true;movementSetting.onChange();});
  assert.equal(await counter.inputValue(),'3 / 6');assert.equal(await counter.evaluate(n=>getComputedStyle(n).fontSize),'24px');
- await page.evaluate(()=>{token.actor.effects=[{statuses:new Set(['prone'])}];hooks.createActiveEffect.forEach(fn=>fn());});
+ await page.evaluate(()=>{token.actor.effects=[{statuses:new Set(['prone'])}];hooks.createActiveEffect.forEach(fn=>fn({parent:token.actor}));});
  assert.equal(await counter.inputValue(),'0/0');assert.equal(await reset.isVisible(),false);
  assert.equal(await page.locator('.pneuma-movement-run').isVisible(),false);
  await page.evaluate(async()=>{game.user.isGM=false;token.actor.hasPlayerOwner=true;await doc.update({x:500},{});});
  assert.equal(await page.evaluate(()=>doc.x),400);assert.equal(await counter.inputValue(),'0/0');
- await page.evaluate(()=>{game.user.isGM=true;token.actor.effects=[];hooks.deleteActiveEffect.forEach(fn=>fn());writes.length=0;});
+ await page.evaluate(()=>{game.user.isGM=true;token.actor.effects=[];hooks.deleteActiveEffect.forEach(fn=>fn({parent:token.actor}));writes.length=0;});
  assert.equal(await counter.inputValue(),'3 / 6');assert.equal(await reset.isVisible(),true);
  // Inspect rendered bounds before the deferred redraw: animation must never carry the origin along.
  assert.deepEqual(await page.evaluate(()=>{
@@ -93,12 +93,12 @@ try {
  }
  await page.screenshot({path:process.env.TEMP+'/pneuma-movement-sizing.png'});
  const inputBox=await counter.boundingBox(),resetBox=await reset.boundingBox();assert(resetBox.y>=inputBox.y+inputBox.height);
- await reset.click();await page.waitForFunction(()=>doc.x===100&&doc.y===200&&doc.flags['pneuma-combattools'].movement.spent===0&&!document.querySelector('.pneuma-movement-hud'));
- assert.equal(await counter.count(),0);assert.equal(await page.evaluate(()=>canvas.tokens.children.some(c=>c.name==='pneuma-movement')),false);assert.equal(await page.evaluate(()=>writes.length),1);
+ await reset.click();await page.waitForFunction(()=>doc.x===100&&doc.y===200&&doc.flags['pneuma-combattools'].movement.spent===0&&document.querySelector('.pneuma-movement-hud input')?.value==='0 / 6');
+ assert.equal(await counter.inputValue(),'0 / 6');assert.equal(await counter.isVisible(),true);assert.equal(await page.evaluate(()=>canvas.tokens.children.find(c=>c.name==='pneuma-movement').visible),false);assert.equal(await page.evaluate(()=>writes.length),1);
  assert.equal(await page.evaluate(()=>writes[0].options.pneumaMoveDelta),-6);
  // The native #hud transform moves/scales both boxes; mouse clicks still hit the Reset control.
  await page.evaluate(()=>{doc.x=400;token.x=400;doc.flags['pneuma-combattools'].movement.spent=2;doc.flags['pneuma-combattools'].movement.hidden=false;document.getElementById('hud').style.transform='translate(30px,20px) scale(1.2)';hooks.refreshToken.forEach(fn=>fn(token));});
- await reset.click();await page.waitForFunction(()=>doc.x===100&&!document.querySelector('.pneuma-movement-hud'));assert.equal(await counter.count(),0);
+ await reset.click();await page.waitForFunction(()=>doc.x===100&&doc.flags['pneuma-combattools'].movement.spent===0&&document.querySelector('.pneuma-movement-hud input')?.value==='0 / 6');assert.equal(await counter.inputValue(),'0 / 6');
  await page.evaluate(async()=>{await doc.update({x:200},{});});assert.equal(await counter.inputValue(),'1 / 6');
  await page.evaluate(()=>{rejectNext=true;});await reset.click();await page.waitForFunction(()=>window.error?.includes('Update rejected'));assert.equal(await reset.isEnabled(),true);
  await page.evaluate(()=>{token.isOwner=false;hooks.refreshToken.forEach(fn=>fn(token));});assert.equal(await reset.isVisible(),false);
@@ -106,8 +106,7 @@ try {
  assert.equal(await counter.isVisible(),true,'Players can see another player-owned token counter');
  assert.equal(await reset.isVisible(),false,'Only owners can reset');
  await page.evaluate(()=>{token.actor.hasPlayerOwner=false;hooks.updateActor.forEach(fn=>fn(token.actor));});
- assert.equal(await page.locator('.pneuma-movement-hud').count(),0,'NPC counter hidden from players');
- assert.equal(await page.evaluate(()=>canvas.tokens.children.some(c=>c.name==='pneuma-movement')),false,'NPC start marker hidden too');
+ assert.equal(await counter.isVisible(),true,'Visible current-turn NPC counter is shown to players');
  await page.evaluate(()=>{game.user.isGM=true;hooks.updateUser.forEach(fn=>fn(game.user));});
  assert.equal(await counter.isVisible(),true,'GM can see NPC counters');
  await page.evaluate(()=>{game.user.isGM=false;token.actor.hasPlayerOwner=true;token.isOwner=true;hooks.updateActor.forEach(fn=>fn(token.actor));});
@@ -115,10 +114,42 @@ try {
  assert.equal(await page.evaluate(()=>{const marker=canvas.tokens.children.find(c=>c.name==='pneuma-movement');token.visible=false;hooks.refreshToken.forEach(fn=>fn(token));return marker.visible;}),false,'Visibility updates synchronously before queued drawing');
  assert.equal(await page.locator('.pneuma-movement-hud').count(),0,'Invisible tokens never reveal counters');
  await page.evaluate(()=>{token.visible=true;hooks.refreshToken.forEach(fn=>fn(token));});
+ // Only the current turn and GM selection may reveal a counter. Tracking remains intact while hidden.
+ await page.evaluate(()=>{
+  const other=new PIXI.Container(),otherDoc={id:'other',uuid:'Scene.scene.Token.other',parent:canvas.scene,x:600,y:400,elevation:0,
+   _source:{x:600,y:400,elevation:0},flags:{'pneuma-combattools':{movement:{combat:'c',turn:'q:0',start:{x:500,y:400,elevation:0},spent:5}}}};
+  Object.assign(other,{id:otherDoc.id,document:otherDoc,actor:{...token.actor,uuid:'Actor.other'},w:100,h:100,isOwner:true,isPreview:false,controlled:false,tooltip:token.tooltip,
+   getCenterPoint:token.getCenterPoint,checkCollision:()=>false});otherDoc.actor=other.actor;otherDoc.object=other;other.position.set(600,400);
+  canvas.tokens.addChild(other);canvas.tokens.placeables.push(other);canvas.scene.tokens.push(otherDoc);window.other=other;
+  const q={id:'q',tokenId:'other'};game.combat.turns.push(q);game.combat.combatants.push(q);
+  hooks.canvasReady.forEach(fn=>fn());
+ });
+ assert.equal(await counter.count(),1,'Unselected off-turn token with saved movement stays hidden');
+ await page.evaluate(()=>{other.controlled=true;hooks.controlToken.forEach(fn=>fn(other,true));});
+ assert.equal(await counter.count(),1,'Player selection never reveals an off-turn counter');
+ await page.evaluate(()=>{game.user.isGM=true;hooks.updateUser.forEach(fn=>fn(game.user));});
+ assert.equal(await counter.count(),2,'GM selection shows the off-turn token alongside the current-turn token');
+ assert.deepEqual(await counter.evaluateAll(inputs=>inputs.map(input=>input.value)),['1 / 6','5 / 6']);
+ await page.evaluate(()=>{other.controlled=false;hooks.controlToken.forEach(fn=>fn(other,false));});
+ assert.equal(await counter.count(),1,'GM deselection removes its off-turn counter');
+ await page.evaluate(()=>{game.user.isGM=false;token.controlled=true;game.combat.turn=1;hooks.updateCombat.forEach(fn=>fn(game.combat,{turn:1}));});
+ assert.equal(await counter.count(),1,'Turn advance removes the previous counter despite player selection');
+ assert.equal(await counter.inputValue(),'0 / 6','New turn shows a counter before any movement');
+ assert.equal(await page.evaluate(()=>doc.flags['pneuma-combattools'].movement.spent),1,'Hidden counters retain tracking');
+ await page.evaluate(()=>{game.user.isGM=true;hooks.updateUser.forEach(fn=>fn(game.user));});
+ assert.equal(await counter.count(),2,'GM selection retains the previous-turn counter');
+ await page.evaluate(()=>{token.controlled=false;hooks.controlToken.forEach(fn=>fn(token,false));});
+ assert.equal(await counter.count(),1);
+ await page.evaluate(()=>{game.combat.started=false;hooks.updateCombat.forEach(fn=>fn(game.combat,{round:0}));});
+ assert.equal(await counter.count(),0,'Ending combat removes all counters');
+ await page.evaluate(()=>{
+  game.combat.started=true;game.combat.turn=0;game.combat.turns.pop();game.combat.combatants.pop();canvas.tokens.placeables.pop();canvas.scene.tokens.pop();
+  hooks.destroyToken.forEach(fn=>fn(other));other.destroy();game.user.isGM=false;hooks.updateCombat.forEach(fn=>fn(game.combat,{turn:0}));
+ });
  await page.evaluate(()=>hooks.destroyToken.forEach(fn=>fn(token)));assert.equal(await page.locator('.pneuma-movement-hud').count(),0);
  assert.equal(await page.evaluate(()=>canvas.tokens.children.some(c=>c.name==='pneuma-movement')),false);
  await page.evaluate(()=>hooks.refreshToken.forEach(fn=>fn(token)));
  await page.evaluate(()=>hooks.canvasTearDown.forEach(fn=>fn()));
  assert.equal(await page.evaluate(()=>canvas.tokens.children.some(c=>c.name==='pneuma-movement')),false,'Scene teardown removes detached markers');
- console.log('Movement UI checks passed: reproduced old hit failure, real clicks reset position/counter, larger stacked boxes, pan/zoom, failed-update retry, ownership and cleanup.');
+ console.log('Movement UI checks passed: turn/GM-selection visibility, fresh zero counters, Reset, NPC/player visibility, hidden tracking, pan/zoom, failed-update retry and cleanup.');
 } finally {await browser.close();}

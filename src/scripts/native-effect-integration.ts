@@ -1,4 +1,6 @@
 import {registerNativeWrapper} from "./native-wrappers.js";
+import {withActorMutation} from "./actor-mutation.js";
+import {isDamageCaptureView} from "./damage-application.js";
 import {reportExposure} from "./effect-events.js";
 import {igniteTarget} from "./instant-lifetime.js";
 const MODULE="pneuma-combattools";
@@ -7,7 +9,6 @@ const contexts:string[]=[];
 const dialogContext=new WeakMap<object,string>();
 export function installNativeEffectIntegration(chat:object,dialog:object,actorPrototype:object) {
   const applications=new WeakMap<Actor,{hpReduction:number;rawDamageDealt:number}>();
-  const queues=new WeakMap<Actor,Promise<unknown>>();
   registerNativeWrapper(chat,"RenderDamageApplicationCard",function(wrapped,data:{actor:Actor;hpReduction:number;rawDamageDealt:number}){
     const application=applications.get(data.actor);
     if(application){application.hpReduction=data.hpReduction;application.rawDamageDealt=data.rawDamageDealt;}
@@ -37,7 +38,7 @@ export function installNativeEffectIntegration(chat:object,dialog:object,actorPr
     const form=args[8];
     const ammo=(form&&typeof form==="object"?dialogContext.get(form):undefined)??contexts.at(-1);
     const actor=this;
-    const run=(queues.get(actor)??Promise.resolve()).catch(()=>{}).then(async()=>{
+    const run=async()=>{
       const application={hpReduction:0,rawDamageDealt:0};applications.set(actor,application);
       try {
         const result=await wrapped(...args);
@@ -47,9 +48,9 @@ export function installNativeEffectIntegration(chat:object,dialog:object,actorPr
         }
         return result;
       }finally{applications.delete(actor);}
-    });
-    queues.set(actor,run);
-    try{return await run;}finally{if(queues.get(actor)===run)queues.delete(actor);}
+    };
+    // Managed capture already holds this actor's queue; unrelated native calls still join it.
+    return isDamageCaptureView(actor)?run():withActorMutation(actor,run);
   },"WRAPPER");
 }
 export function registerNativeEffectIntegration() {

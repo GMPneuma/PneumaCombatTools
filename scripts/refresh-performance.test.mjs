@@ -38,7 +38,7 @@ test('movement batches repeated token refreshes and filters combat flags; reorde
  f.fire('canvasReady');f.flush();assert.deepEqual(draws,['a','b']);draws.length=0;
  f.fire('updateCombat',combat,{flags:{empRequests:{}}});f.flush();assert.deepEqual(draws,[]);
  f.fire('refreshToken',tokens[0]);f.fire('updateToken',{object:tokens[0]});f.fire('controlToken',tokens[0]);f.flush();assert.deepEqual(draws,['a']);draws.length=0;
- combat.turn=1;f.fire('updateCombat',combat,{turn:1});f.flush();assert.deepEqual(draws,['b']);draws.length=0;
- combat.turns.reverse();f.fire('updateCombatant',{parent:combat,token:{object:tokens[0]}},{initiative:20});f.flush();assert.deepEqual(draws,['a']);draws.length=0;
+ combat.turn=1;f.fire('updateCombat',combat,{turn:1});f.flush();assert.deepEqual(draws,['a','b']);draws.length=0;
+ combat.turns.reverse();f.fire('updateCombatant',{parent:combat,token:{object:tokens[0]}},{initiative:20});f.flush();assert.deepEqual(draws,['a','b']);draws.length=0;
  f.fire('refreshToken',tokens[1]);f.fire('canvasTearDown');f.flush();assert.deepEqual(draws,[]);
 });

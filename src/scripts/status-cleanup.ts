@@ -1,25 +1,17 @@
 import {allActors,escapeHTML,primaryGM} from "./shared.js";
-import {masterStatuses,isAddictionEffect} from "./status-catalog.js";
+import {bindCardAction} from "./card-structure.js";
+import {masterStatuses} from "./status-catalog.js";
 import {durationExpired,hasDuration} from "./effect-duration.js";
+import {actorInStartedCombat,effectCombat,endedEffect,effectLifetime,effectExpired} from "./effect-lifetime.js";
+export {actorInStartedCombat,effectCombat,endedEffect} from "./effect-lifetime.js";
 import {syncActorStatuses} from "./status-sync.js";
 import {cleanupEndedEmp,empWork} from "./emp-state.js";
-import {empReferences,timedDisables} from "./emp-rules.js";
+import {empReferences,timedDisables,disableExpired} from "./emp-rules.js";
 import {actorGrapples} from "./grapple/state.js";
 
 const M="pneuma-combattools";
 const flag=(doc:object,key:string)=>foundry.utils.getProperty(doc,`flags.${M}.${key}`);
 export interface CleanupScope {actors?:string[];combat?:string;label?:string}
-export function actorInStartedCombat(actor:Actor):boolean {
-  return Array.from(game.combats??[]).some(c=>c.started&&c.combatants.some(p=>p.actor?.uuid===actor.uuid));
-}
-export function effectCombat(effect:ActiveEffect):string|undefined {
-  const value=flag(effect,"endWithCombat")??effect.duration?.combat;
-  return typeof value==="string"?value:(value as Combat|undefined)?.id??undefined;
-}
-export function endedEffect(effect:ActiveEffect):boolean {
-  const id=effectCombat(effect);
-  return !!id&&!game.combats?.get(id)?.started;
-}
 export interface CleanupRow {id:string;actor:Actor;document?:ActiveEffect|Item;name:string;reason:string;operation:string;selected:boolean;blocked:boolean;injury:boolean;emp?:boolean;grapple?:string}
 export function cleanupRows(scope:CleanupScope={},includeInjuries=false):CleanupRow[] {
   const rows:CleanupRow[]=[];
@@ -46,23 +38,19 @@ export function cleanupRows(scope:CleanupScope={},includeInjuries=false):Cleanup
     }
     for(const effect of effects){
       if(injuryMarkers.has(effect)||effect.disabled)continue;
-      const ids=Array.from(effect.statuses);
-      const injury=masterStatuses.some(s=>s.binding?.kind==="injury"&&ids.includes(s.id));
-      const dead=ids.includes("dead")||masterStatuses.some(s=>s.name==="Dead"&&ids.includes(s.id));
-      const addiction=isAddictionEffect(effect);
-      const managed=!!flag(effect,"disableRequest")||!!flag(effect,"empCombat")||!!flag(effect,"disabledLegPenalty")||!!flag(effect,"frameConsequences");
-      if(managed)continue; // Equipment restoration owns these markers.
+      const policy=effectLifetime(effect),injury=policy.injury;
+      if(policy.kind==="managed")continue; // Equipment restoration owns these markers.
       const grapple=flag(effect,"grappleId");
       if(grapple&&grapples.some(g=>g.id===grapple&&g.combat&&!game.combats?.get(g.combat)?.started))continue;
       const liveGrapple=!!grapple&&grapples.some(g=>g.id===grapple);
-      const ended=endedEffect(effect),expired=hasDuration(effect.duration)&&durationExpired(effect.duration);
+      const ended=endedEffect(effect),expired=effectExpired(effect);
       const orphanGrapple=!!grapple&&!liveGrapple;
       const itemEffect=effect.parent!==actor;
       if(itemEffect&&!hasDuration(effect.duration)&&!effectCombat(effect))continue;
-      const protectedEffect=dead||addiction||liveGrapple||injury&&!includeInjuries;
-      rows.push({id:effect.uuid,actor,document:effect,name:effect.name??"Status effect",reason:inCombat?"Blocked: actor is in a started encounter":dead?"Protected: Dead":addiction?"Protected: addiction":liveGrapple?"Protected: active grapple":injury?"Critical injury marker":ended?"References an ended or missing combat":expired?"Expired duration":orphanGrapple?"Orphaned grapple marker":"Untracked or duration remains — review",operation:itemEffect?"Disable item effect; retain item":"Clear status effect",selected:!inCombat&&!protectedEffect&&(ended||expired||orphanGrapple),blocked:inCombat||protectedEffect,injury});
+      const protectedEffect=!!policy.protected||liveGrapple||injury&&!includeInjuries;
+      rows.push({id:effect.uuid,actor,document:effect,name:effect.name??"Status effect",reason:inCombat?"Blocked: actor is in a started encounter":policy.protected?policy.label:liveGrapple?"Protected: active grapple":injury?"Critical injury marker":ended?"References an ended or missing combat":expired?"Expired duration":orphanGrapple?"Orphaned grapple marker":policy.label+" - review",operation:itemEffect?"Disable item effect; retain item":"Clear status effect",selected:!inCombat&&!protectedEffect&&(ended||expired||orphanGrapple),blocked:inCombat||protectedEffect,injury});
     }
-    const staleEmp=actor.items.some(item=>empReferences(item).some(id=>!game.combats?.get(id)?.started)||Object.values(timedDisables(item)).some(e=>{const id=typeof e.duration.combat==="string"?e.duration.combat:e.duration.combat?.id;return !!id&&!game.combats?.get(id)?.started||durationExpired(e.duration);}));
+    const staleEmp=actor.items.some(item=>empReferences(item).some(id=>!game.combats?.get(id)?.started)||Object.values(timedDisables(item)).some(e=>disableExpired(e.duration)));
     const staleMarker=actor.effects.some(e=>!!flag(e,"disableRequest")||!!flag(e,"empCombat")||!!flag(e,"disabledLegPenalty")||!!flag(e,"frameConsequences"));
     if(staleEmp||staleMarker)rows.push({id:actor.uuid+":emp",actor,name:"Equipment disablements",reason:inCombat?"Blocked: actor is in a started encounter":staleEmp?"Ended or expired equipment disablements":"Check equipment markers against their sources",operation:"Reconcile equipment and derived penalties",selected:!inCombat,blocked:inCombat,injury:false,emp:true});
   }
@@ -144,6 +132,6 @@ export function registerStatusCleanup(){
     if(!scope)return;
     const button=html.find('[data-status-cleanup]');
     if(!game.user?.isGM){button.remove();return;}
-    button.on("click",()=>new StatusCleanup(scope).render(true));
+    html[0]?.querySelectorAll<HTMLElement>('[data-status-cleanup]').forEach(node=>bindCardAction(node,()=>new StatusCleanup(scope).render(true)));
   });
 }

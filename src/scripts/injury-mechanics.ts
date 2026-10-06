@@ -1,4 +1,6 @@
 import {registerConditionCardRefresh} from "./pending-card-refresh.js";
+import {bindCardAction} from "./card-structure.js";
+import {withActorMutation} from "./actor-mutation.js";
 import { primaryGM as gm, escapeHTML as escape } from "./shared.js";
 import {evasionBlocked,hasInjury} from "./injury-rules.js";
 import {registerNativeWrapper} from "./native-wrappers.js";
@@ -43,15 +45,17 @@ export async function applyRibsDamage(id:string,user:User):Promise<void> {
     if(!actor||(!user.isGM&&!actor.testUserPermission(user,"OWNER")))throw Error("Only the character's owner or GM can apply this damage.");
     if(data.applied)return;
     if(data.distance<=4||!game.combats?.get(data.combat)?.started||(get<string>(game.combats!.get(data.combat)!,`flags.${MODULE}.evasionEpoch`)??"")!==data.epoch)throw Error("This movement warning is no longer active.");
-    const receipts=get<Record<string,string[]>>(actor,`flags.${MODULE}.ribsApplications`)??{};
-    const messages=receipts[data.combat]??[];
-    if(!messages.includes(id)){
-      if(!hasInjury(actor,data.injury??"Broken Ribs"))throw Error("This injury is no longer active.");
-      const hp=Number(foundry.utils.getProperty(actor,"system.derivedStats.hp.value"));
-      if(!Number.isFinite(hp))throw Error("Character HP is unavailable.");
-      // HP and receipt share one actor update, so retrying a failed card write cannot apply twice.
-      await actor.update({"system.derivedStats.hp.value":hp-5,[`flags.${MODULE}.ribsApplications`]:{...receipts,[data.combat]:[...messages,id]}} as never);
-    }
+    await withActorMutation(actor,async()=>{
+      const receipts=get<Record<string,string[]>>(actor,`flags.${MODULE}.ribsApplications`)??{};
+      const messages=receipts[data.combat]??[];
+      if(!messages.includes(id)){
+        if(!hasInjury(actor,data.injury??"Broken Ribs"))throw Error("This injury is no longer active.");
+        const hp=Number(foundry.utils.getProperty(actor,"system.derivedStats.hp.value"));
+        if(!Number.isFinite(hp))throw Error("Character HP is unavailable.");
+        // HP and receipt share one actor update, so retrying a failed card write cannot apply twice.
+        await actor.update({"system.derivedStats.hp.value":hp-5,[`flags.${MODULE}.ribsApplications`]:{...receipts,[data.combat]:[...messages,id]}} as never);
+      }
+    });
     data.applied=true;await message.update({content:ribsContent(data),[path]:data} as never);
   });
 }
@@ -96,7 +100,7 @@ export function registerInjuryMechanics():void {
     for(const button of html.find<HTMLButtonElement>("[data-ribs-apply]").toArray()){
       if(!actor||(!game.user?.isGM&&!actor.isOwner)){button.remove();continue;}
       button.disabled=data.applied===true||!eligible;
-      button.addEventListener("click",async event=>{event.preventDefault();if(button.disabled)return;button.disabled=true;try{await requestDamage(message.id!);}catch(e){ui.notifications!.error(String(e));button.disabled=false;}});
+      bindCardAction(button,async event=>{event.preventDefault();if(button.disabled)return;button.disabled=true;try{await requestDamage(message.id!);}catch(e){ui.notifications!.error(String(e));button.disabled=false;}});
     }
   });
   Hooks.once("ready",async()=>{
