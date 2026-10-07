@@ -1,3 +1,4 @@
+import {quickhackAssetPath} from "./asset-paths.js";
 import {tokenEncounter,encounterRef,resolveEncounter} from "../encounter.js";
 import { requireCombatSocket } from "../socket-health.js";
 import { showSavedDice, messageDiceAudience } from "../native-combat.js";
@@ -17,8 +18,8 @@ import {selfIce} from "./self-ice.js";
 export const actorQuickhacks = (actor: Actor) => {
   const items = [...actor.items] as unknown as QuickhackItem[];
   return availableQuickhacks(items, mode(), enabled()).map(hack => ({
-    ...hack, img: items.find(item => quickhackId(item) === hack.id && item.img)?.img
-      ?? [...game.items ?? []].find(item => quickhackId(item as unknown as QuickhackItem) === hack.id && item.img)?.img
+    ...hack, img: quickhackAssetPath(items.find(item => quickhackId(item) === hack.id && item.img)?.img)
+      ?? quickhackAssetPath([...game.items ?? []].find(item => quickhackId(item as unknown as QuickhackItem) === hack.id && item.img)?.img)
       ?? `modules/${MODULE}/styles/quickhacks/${hack.id}-gray.png`,
   }));
 };

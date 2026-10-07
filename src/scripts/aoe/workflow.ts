@@ -18,7 +18,7 @@ import {empDisabled} from "../emp-state.js";
 import {masterStatuses} from "../status-catalog.js";
 import {moveEvader,registerAreaMovement} from "./movement.js";
 import { MODULE, areaSettings, registerAreaSettings, type AreaSettings } from "./settings.js";
-import { areaKind, confirmAreaRoll, type AreaKind, type AreaWeapon } from "./weapon.js";
+import { isMolotov, areaKind, confirmAreaRoll, type AreaKind, type AreaWeapon } from "./weapon.js";
 import { polygon, evadeAllowed, winsAreaDefense, type Area, type Point } from "./geometry.js";
 import { placeArea, clippedPoints, templateData, areaCoverage } from "./placement.js";
 import { requireCombatSocket } from "../socket-health.js";
@@ -337,8 +337,9 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
   const kind=areaKind(original,mode);if(!kind)return;
   requireCombatSocket();if(!gm())throw Error("An active GM is required for area attacks.");
   if(String(original.type)!=="ammo"&&grappleWeaponBlocked(actor,original))throw Error("Grappled characters cannot use weapons requiring two hands.");
-  const ammoType=String(String(original.type)==="ammo"?foundry.utils.getProperty(original,"system.type")??"":original._getLoadedAmmoProp?.("type")??"");
-  const variety=String(original.type)==="ammo"?"grenade":String(original._getLoadedAmmoProp?.("variety")??(foundry.utils.getProperty(original,"system.weaponType")==="rocketLauncher"?"rocket":"grenade"));
+  const molotov=isMolotov(original);
+  const ammoType=molotov?"incendiary":String(String(original.type)==="ammo"?foundry.utils.getProperty(original,"system.type")??"":original._getLoadedAmmoProp?.("type")??"");
+  const variety=String(original.type)==="ammo"||molotov?"grenade":String(original._getLoadedAmmoProp?.("variety")??(foundry.utils.getProperty(original,"system.weaponType")==="rocketLauncher"?"rocket":"grenade"));
   const profile=kind==="explosive"?ammoProfile(ammoType,variety):undefined;
   if(ammoType==="smart"&&profile&&!actor.items.some(i=>nativeItemMatches(i,"Targeting Scope")&&!!(foundry.utils.getProperty(i,"system.isInstalledInActor")??foundry.utils.getProperty(i,"system.isInstalled"))&&!empDisabled(i)))throw Error("Smart rockets require installed, operational Targeting Scope cyberware.");
   starting.add(actor.uuid);
@@ -355,19 +356,19 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
     const validate=()=>{if(!canAim(aimPoint))throw Error("The target square is outside the attacker’s line of sight.");const current=resolveEncounter(encounter);if(current&&ammoType!=="smoke")requireParticipants(current,(canvas.tokens?.placeables??[]).filter(t=>t.actor&&!['container','blackIce','demon'].includes(String(t.actor.type))&&areaCoverage(area)({x:t.x,y:t.y,width:t.w,height:t.h})).map(t=>t.document.uuid));};
     validate();
     let item:RollItem=original, thrownSource:object|undefined;
-    if(String(original.type)==="ammo"){
-      const snapshot=await improvisedSource() as {name:string;system:Record<string,unknown>};
-      snapshot.name=original.name??"Grenade";snapshot.system={...snapshot.system,damage:"6d6",
+    if(String(original.type)==="ammo"||molotov){
+      const snapshot=(molotov?original.toObject():await improvisedSource()) as {name:string;system:Record<string,unknown>};
+      snapshot.name=original.name??"Grenade";snapshot.system={...snapshot.system,damage:molotov?"5d6":"6d6",
         dvTable:"DV Grenade Launcher",installedItems:{list:[original.id]},hasInstalled:true};
       thrownSource=snapshot;item=thrownRollItem(snapshot,actor);
     }
     let roll=item.createRoll(kind==="suppression"?"suppressive":"attack",actor);
-    const ammoOK=()=>String(original.type)==="ammo"?Number(foundry.utils.getProperty(original,"system.amount"))>0:!item.hasAmmo||item.hasAmmo(roll);
+    const ammoOK=()=>String(original.type)==="ammo"?Number(foundry.utils.getProperty(original,"system.amount"))>0:molotov||!item.hasAmmo||item.hasAmmo(roll);
     if(!ammoOK())throw Error(kind==="suppression"?"Suppressive fire requires 10 bullets in the magazine.":"No ammunition available.");
     let dv:number|undefined=kind==="shell"?13:undefined;
     if(kind==="explosive"){
       const distance=canvas.grid!.measurePath([source.center,area.origin],{}).distance * Number(canvas.scene!.grid.size) / Number(canvas.scene!.grid.distance) / pixelsPerUnit();
-      if(String(original.type)==="ammo"&&distance>25)throw Error("Thrown grenades have a maximum range of 25m/yd.");
+      if((String(original.type)==="ammo"||molotov)&&distance>25)throw Error("Thrown grenades have a maximum range of 25m/yd.");
       dv=parseDV((await getTable(String(foundry.utils.getProperty(item,"system.dvTable"))))?.getResultsForRoll(distance)[0]?.text);
       if(dv===undefined)throw Error("No native ranged DV table is available for this distance.");
     }
@@ -375,7 +376,7 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
     if(canvas.scene?.id!==scene||source.x!==sourcePosition.x||source.y!==sourcePosition.y||!owns(actor)||actor.items.get(itemId)!==original||areaKind(original,mode)!==kind||!ammoOK())throw Error("The weapon, scene, ownership or ammunition changed.");
     if(String(original.type)!=="ammo"&&grappleWeaponBlocked(actor,original))throw Error("Grappled characters cannot use weapons requiring two hands.");
     checkedLuck(Number(foundry.utils.getProperty(actor,"system.stats.luck.value")),0,roll.luck);
-    const currentAmmo=String(String(original.type)==="ammo"?foundry.utils.getProperty(original,"system.type")??"":original._getLoadedAmmoProp?.("type")??"");
+    const currentAmmo=isMolotov(original)?"incendiary":String(String(original.type)==="ammo"?foundry.utils.getProperty(original,"system.type")??"":original._getLoadedAmmoProp?.("type")??"");
     if(currentAmmo!==ammoType)throw Error("Ammunition changed during targeting. Start the attack again.");
     const blastFormula=kind==="explosive"?item.createRoll("damage",actor,{damageType:"attack"}).formula:undefined;
     validate();

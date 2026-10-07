@@ -1,3 +1,4 @@
+import {displayedEncounter} from "./encounter.js";
 import {nativeDVIds} from "./native-lookup.js";
 import { distanceWithElevation, equippedRanges, parseDV, dvTone, type RangeItem } from "./dv-data.js";
 
@@ -6,6 +7,7 @@ declare global {
     "cyberpunk-red-core.dvRollTableCompendium": string;
     "pneuma-combattools.hoverDV": boolean;
     "pneuma-combattools.hoverAutofire": boolean;
+    "pneuma-combattools.hoverDVEncounterOnly": boolean;
   }
 }
 
@@ -64,11 +66,15 @@ function position() {
   panel.style.top = `${Math.max(8, Math.min(y, window.innerHeight - height - 8))}px`;
 }
 
+function encounterAllowsHover(): boolean {
+  return !game.settings!.get(MODULE_ID, "hoverDVEncounterOnly") || !!displayedEncounter();
+}
+
 async function refresh() {
   const current = ++revision;
   const target = hovered;
   const source = attacker();
-  if (!game.settings!.get(MODULE_ID, "hoverDV") || !target?.isVisible || ["container", "blackIce", "demon"].includes(String(target.actor?.type)) || target.isPreview ||
+  if (!encounterAllowsHover() || !game.settings!.get(MODULE_ID, "hoverDV") || !target?.isVisible || ["container", "blackIce", "demon"].includes(String(target.actor?.type)) || target.isPreview ||
     !source || source === target || canvas.activeLayer !== canvas.tokens) {clear();return;}
   const distance = distanceWithElevation(canvas.grid!.measurePath([source.center, target.center], {}).distance,
     source.document.elevation, target.document.elevation);
@@ -89,7 +95,7 @@ async function refresh() {
     }
   }));
   // Async compendium reads must not resurrect a tooltip after hover/selection changes.
-  if (revision !== current || hovered !== target || attacker() !== source || !target.isVisible) return;
+  if (revision !== current || hovered !== target || attacker() !== source || !target.isVisible || !encounterAllowsHover()) return;
   const visible = lines.filter((line): line is { dv: number; name: string } => !!line);
   if (!visible.length) {clear();return;}
   const signature = JSON.stringify(visible);
@@ -112,7 +118,7 @@ async function refresh() {
 }
 
 export function registerHoverDV() {
-  for (const [key, defaultValue] of [["hoverDV", true], ["hoverAutofire", false]] as const) {
+  for (const [key, defaultValue] of [["hoverDV", true], ["hoverAutofire", false], ["hoverDVEncounterOnly", true]] as const) {
     game.settings!.register(MODULE_ID, key, {
       name: `PNEUMA_COMBAT_TOOLS.${key}Name`, hint: `PNEUMA_COMBAT_TOOLS.${key}Hint`,
       scope: "client", config: true, type: Boolean, default: defaultValue,
@@ -125,6 +131,7 @@ export function registerHoverDV() {
     else return;
     void refresh();
   });
+  for (const hook of ["createCombat", "updateCombat", "deleteCombat", "createCombatant", "updateCombatant", "deleteCombatant", "canvasReady"]) Hooks.on(hook, () => { void refresh(); });
   Hooks.on("controlToken", () => { void refresh(); });
   Hooks.on("canvasPan", position);
   Hooks.on("refreshToken", (token: Token) => {

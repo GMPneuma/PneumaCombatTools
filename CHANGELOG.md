@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.9.12 - 2026-10-07
+
+- Add "Only show Hover DVs during active encounter", enabled by default. Require an active, started encounter on the current scene while enabled.
+- Route Molotov Cocktails through the incendiary grenade area workflow with 5d6 damage, scatter, evasion and armor-penetration-dependent fire application.
+- Distinguish duplicate CTH ranged weapons by loaded ammunition type; show magazine counts when types match and refresh after reload/load.
+- Correct legacy standalone QuickHack icon paths in the HUD and repair stored world, actor and unlinked token-item image paths during GM initialization.
+- Add a public combat-end summary with round reached, player/NPC counts, player critical injuries, defeated/dead participants and observed cleanup results. Keep the cleanup button and mutations GM-only. Mark mid-encounter injury tracking as partial.
+- Group eligible First Aid/Paramedic choices into small click-to-expand Stabilize and QuickFix submenus. Show applicable DVs and skill + STAT bases; keep single-skill choices directly clickable.
+- Exclude the docs directory from the installed module package while retaining it in the repository.
+- Add a subtle, occasional sparkle above the chat Roll button. Respect reduced motion and stop the cue while its menu is open.
+
+Validation: production build, strict type checks, automated regressions and relevant browser fixtures passed; four native geometry tests skipped. Live Foundry/multiplayer verification remains pending.
+
+
 ## 0.9.11 - 2026-10-05
 
 - Reorganize damage and attached effects into clear sections with compact recipient rows, visible GM controls, improved glyph contrast and independently expandable calculation details. Preserve native damage receipts, Undo and original dice artwork for Visual Tools.

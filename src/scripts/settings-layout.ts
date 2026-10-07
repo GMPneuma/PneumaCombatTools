@@ -9,7 +9,7 @@ const groups = [
   { id: "injuries", title: "Injuries & Effects", keys: ["enableStabilization", "criticalInjuries", "injuryTurnEndReminder", "empBehaviorMenu", "customStatusesMenu", "statusCleanup"] },
   { id: "quickhack", title: "QuickHack", keys: ["quickhackEnabled", "quickhackMode", "quickhackMessages"] },
   { id: "combat-bar", title: "Combat Bar", keys: [...COMBAT_BAR_SETTING_KEYS,"combatBarSettings"] },
-  { id: "token-hud", title: "Token HUD & Targeting", keys: ["tokenHUDSettings", "hoverDV", "hoverAutofire", "alwaysShowEKG"] },
+  { id: "token-hud", title: "Token HUD & Targeting", keys: ["tokenHUDSettings", "hoverDV", "hoverAutofire", "hoverDVEncounterOnly", "alwaysShowEKG"] },
   { id: "status-hud", title: "Biomonitor", keys: ["eyeHUD", "biomonitorSettings", "eyeHUDDock", "crewHUDIntegration", "biomonitorShowHP", "forcePlayerHUDAnimations", "eyeHUDAnimateMessages", "biomonitorFlashSeconds"] },
 ] as const;
 

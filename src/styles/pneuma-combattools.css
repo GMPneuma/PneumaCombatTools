@@ -1174,3 +1174,30 @@ i.pneuma-neural-plug::before { content: ""; display: inline-block; width: 1em; h
 .pneuma-calculation-text { white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; line-height:1.4; text-align:left; }
 
 .pneuma-setting-disabled { opacity: 0.45; filter: grayscale(1); }
+
+#token-hud [data-weapon-ammo-detail] { flex: 0 0 auto; white-space: nowrap; font-size: 10px; }
+
+#token-hud [data-medical-menu] .combat-weapon-name { height: auto; min-height: 28px; }
+#token-hud [data-medical-menu] .combat-weapon-name span { white-space: normal; overflow: visible; text-overflow: clip; }
+
+#token-hud .pneuma-medical-choices > summary { cursor: pointer; }
+#token-hud .pneuma-medical-choices[open] > summary > i { transform: rotate(90deg); }
+#token-hud .pneuma-medical-choices > ul { padding-left: 12px; }
+
+/* Brief attention cue on the chat roll-menu anchor, with no extra control or timer. */
+[data-pneuma-manual-rolls] { position: relative; }
+[data-pneuma-manual-rolls]::after {
+  content: ""; position: absolute; top: -5px; right: -4px; width: 9px; height: 9px;
+  background: currentColor; pointer-events: none; opacity: 0;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  animation: pneuma-roll-sparkle 18s ease-in-out 6s infinite;
+}
+@keyframes pneuma-roll-sparkle {
+  0%, 89%, 96%, 100% { opacity: 0; transform: scale(.3) rotate(0deg); }
+  91% { opacity: .65; transform: scale(1) rotate(15deg); }
+  94% { opacity: .35; transform: scale(.7) rotate(30deg); }
+}
+[data-pneuma-manual-rolls][aria-expanded="true"]::after { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  [data-pneuma-manual-rolls]::after { animation: none; }
+}

@@ -19,7 +19,7 @@ try {
   window.calls=[];
   const gun=(id,value)=>({id,uuid:'Actor.test.Item.'+id,system:{isRanged:true,weaponType:'smg',magazine:{value,max:30}},reserve:{system:{amount:60}},getMagazineSpace(){return 30-this.system.magazine.value;},getInstalledItems(){return [this.reserve];},async reload(){calls.push('reload');this.system.magazine.value=30;},async load(){calls.push('change');}});
   window.actor={isOwner:true,items:new Map([['empty',gun('empty',0)],['partial',gun('partial',9)],['full',gun('full',30)]])};
-  const weapons=[...actor.items.keys()].map(id=>({id,name:{empty:'Empty SMG',partial:'Partial SMG',full:'Full SMG'}[id],category:'attack',gunAmmo:true,autofire:true}));
+  const weapons=[...actor.items.keys()].map(id=>({id,name:{empty:'Empty SMG',partial:'Partial SMG',full:'Full SMG'}[id],category:'attack',gunAmmo:true,autofire:true,ammoDetail:id==='partial'?'Armor-Piercing':id==='full'?'Basic · 30/30':''}));
   weapons.push({id:'bow',name:'Bow',category:'attack'});
   const root=document.querySelector('#token-hud');root.innerHTML=Handlebars.compile(template)({weapons});
   root.classList.add('monks-little-details');
@@ -27,6 +27,8 @@ try {
   root.querySelector('.combat-heading').textContent='Ranged weapons';root.querySelector('.combat-empty').hidden=true;
   bindWeaponAmmo(root,actor);
  },await readFile('dist/templates/combat-hud.hbs','utf8'));
+ assert.equal(await page.locator('[data-item-id="partial"] [data-weapon-ammo-detail]').textContent(),'Armor-Piercing');
+ assert.ok(await page.locator('[data-item-id="partial"] [data-weapon-ammo-detail]').evaluate(el=>{const detail=el.getBoundingClientRect(),button=el.closest('button').getBoundingClientRect();return detail.right<=button.right&&detail.left>=button.left;}),'Ammo label fits the menu button');
  const row=id=>page.locator(`[data-weapon-ammo="${id}"]`);
  const menu=page.locator('.pneuma-target-menu');
  assert.equal(await menu.evaluate(el=>el.classList.contains('status-effects')),false);

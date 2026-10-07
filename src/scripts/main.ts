@@ -1,3 +1,5 @@
+import {medicalMenuGroups} from "./medical-menu.js";
+import {registerCombatSummary} from "./combat-summary.js";
 import {registerMedical,medicalEntries,performMedical} from "./medical.js";
 import {registerDamageReversal} from "./damage-reversal.js";
 import {registerChatResultDelay} from "./chat-result-delay.js";
@@ -48,7 +50,7 @@ import { registerItemMarkers, decorateItemList } from "./item-markers.js";
 import { registerCriticalSettings } from "./critical-settings.js";
 import { registerCombatResolution } from "./combat-resolution.js";
 import { registerArmorShortcut } from "./armor-shortcut.js";
-import { canShowQuickhack, attackEntries, thrownEntries, grenadeEntries, attackFromHUD, type MenuWeapon, type AttackMode } from "./attack-menu.js";
+import { canShowQuickhack, refreshAttackAmmoLabels, attackEntries, thrownEntries, grenadeEntries, attackFromHUD, type MenuWeapon, type AttackMode } from "./attack-menu.js";
 import { registerHoverDV } from "./dv-hover.js";
 import { registerEvasionSettings } from "./evasion-settings.js";
 
@@ -83,6 +85,7 @@ Hooks.once("init", () => {
   registerHalfArmor();
   registerChatButtons();
   registerDamageReversal();
+  registerCombatSummary();
   registerStatusCleanup();
   registerMedical();
   registerSelfCTH();
@@ -218,7 +221,7 @@ Hooks.once("init", () => {
       const selfGrapple = selfCTH ? grappleMenu(this.object ?? undefined, this.object ?? undefined) : [];
       const medical = medicalEntries(attacker?.actor??(selfCTH?this.object?.actor??undefined:undefined),this.object?.actor??undefined);
       const wake = !selfCTH && canWake(attacker,this.object??undefined);
-      if (selfCTH) return {...super.getData(options), standalone: false, selfCTH: true, medicalAvailable:medical.length>0, medicalQuickFix:medical.filter(row=>row.action==="quickFix"), medical:medical, grappleActions:selfGrapple.filter(row=>row.action!=="escape"), selfEscapes:selfGrapple.filter(row=>row.action==="escape"), selfInitiative: selfInitiativeControl(this.object!), selfActions:selfActions(this.object!.actor!), selfThrown:[...thrownEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[]),...grenadeEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[])]};
+      if (selfCTH) return {...super.getData(options), standalone: false, selfCTH: true, medicalAvailable:medical.length>0, medicalQuickFix:medicalMenuGroups(medical.filter(row=>row.action==="quickFix")), medical:medicalMenuGroups(medical.filter(row=>row.action!=="quickFix")), grappleActions:selfGrapple.filter(row=>row.action!=="escape"), selfEscapes:selfGrapple.filter(row=>row.action==="escape"), selfInitiative: selfInitiativeControl(this.object!), selfActions:selfActions(this.object!.actor!), selfThrown:[...thrownEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[]),...grenadeEntries(Array.from(this.object!.actor!.items) as unknown as MenuWeapon[])]};
       const connection = attacker?.actor && this.object?.actor ? connectionFor(attacker.actor, this.object.actor.uuid) : undefined;
       const ice = selfIce(this.object?.actor ?? undefined, connection?.breachCleared ?? 0);
       const sight = !!attacker && !!this.object && quickhackEnabled() && hasQuickhackSight(attacker, this.object);
@@ -227,8 +230,8 @@ Hooks.once("init", () => {
       return {
         ...super.getData(options),
         medicalAvailable: medical.length>0||wake,
-        medicalQuickFix: medical.filter(row=>row.action==="quickFix"),
-        medical: medical,
+        medicalQuickFix: medicalMenuGroups(medical.filter(row=>row.action==="quickFix")),
+        medical: medicalMenuGroups(medical.filter(row=>row.action!=="quickFix")),
         canWake: wake,
         offensiveQuickhacks,
         selfIce: connection?.state === "active" && ice.walls ? ice : undefined,
@@ -346,7 +349,7 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
     catch(error){ui.notifications!.error(error instanceof Error?error.message:String(error));}
     finally{button.disabled=false;}
   });
-  if (attacker?.actor && html[0]) bindWeaponAmmo(html[0], attacker.actor);
+  if (attacker?.actor && html[0]) {bindWeaponAmmo(html[0], attacker.actor);refreshAttackAmmoLabels(html[0], attacker.actor);}
   if (attacker?.actor && html[0]) decorateItemList(html[0], attacker.actor);
   html.find<HTMLButtonElement>("[data-grapple-action]").on("click", async event => {
     event.preventDefault(); event.stopPropagation();
@@ -424,8 +427,10 @@ Hooks.on("canvasTearDown", () => {
 for (const hook of ["createItem", "updateItem", "deleteItem"]) Hooks.on(hook, (item: Item) => {
   const hud = canvas.tokens?.hud, token = hud?.object;
   const attacker = selection?.target === token ? selection?.attacker : selectedAttacker();
-  if (attacker?.actor && item.parent?.uuid === attacker.actor.uuid && hud?.element[0])
+  if (attacker?.actor && item.parent?.uuid === attacker.actor.uuid && hud?.element[0]) {
     refreshWeaponAmmo(hud.element[0], attacker.actor);
+    refreshAttackAmmoLabels(hud.element[0], attacker.actor);
+  }
 });
 
 // Reposition only the open HUD; no token redraws or canvas-wide work on zoom.

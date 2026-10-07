@@ -27,21 +27,35 @@ export const quickFixed=(item:Item)=>!!get(item,`flags.${M}.quickFix`);
 interface SpeedhealOperation {id:string;source:string;stock:string;amount:number}
 const speedhealOperation=(actor:Actor)=>get(actor,`flags.${M}.speedhealOperation`) as SpeedhealOperation|undefined;
 interface Choice {name:string;item:RollItem;dv:number}
+function medicalBase(actor:Actor,choice:Choice):number|undefined {
+  const stat=String(get(choice.item,"system.stat")??"tech");
+  const native=actor as Actor & {getStat?(name:string):number};
+  const rank=Number(get(choice.item,"system.level")),value=Number(native.getStat?.(stat)??get(actor,`system.stats.${stat}.value`));
+  return Number.isFinite(rank)&&Number.isFinite(value)?rank+value:undefined;
+}
+function medicalSkillLabel(actor:Actor,choice:Choice):string {
+  return `(${choice.name==="Paramedic"?"Para":"1st Aid"} ${medicalBase(actor,choice)??"?"})`;
+}
 function skills(actor:Actor,injury?:Item):Choice[] {
   const choices=injury?injuryTreatmentChoices(injury).filter(row=>row.stage==="QuickFix"):stabilizationSkills.map(skill=>({skill,dv:0}));
   return choices.flatMap(choice=>{const native=nativeTreatmentSkill(actor,choice.skill);return native?[{name:choice.skill,item:native.item as RollItem,dv:choice.dv}]:[];});
 }
-export interface MedicalEntry {action:string;label:string;item?:string;skill?:string;disabled?:boolean;title?:string}
+export interface MedicalEntry {action:string;label:string;item?:string;skill?:string;disabled?:boolean;title?:string;groupLabel?:string;choiceLabel?:string}
 export function medicalEntries(source:Actor|undefined,target:Actor|undefined):MedicalEntry[] {
   if(!target||!["character","mook"].includes(String(target.type)))return [];
   const dead=masterStatuses.find(status=>status.name==="Dead")?.id;
   const unavailable=target.effects.some(effect=>!effect.disabled&&(effect.statuses.has("dead")||!!dead&&effect.statuses.has(dead)));
-  const rows:MedicalEntry[]=needsStabilization(target)?[{action:"stabilize",label:"Stabilize — DV"+stabilizationDV(target),disabled:unavailable||!source||!skills(source).length,title:!source?"Select a character to provide medical care":"Action; First Aid or Paramedic"}]:[];
+  const rows:MedicalEntry[]=[];
+  if(needsStabilization(target)) {
+    const choices=source?skills(source):[];
+    for(const choice of choices)rows.push({action:"stabilize",skill:choice.name,groupLabel:"Stabilize — DV"+stabilizationDV(target),choiceLabel:choice.name+" ("+(medicalBase(source!,choice)??"?")+")",label:"Stabilize — DV"+stabilizationDV(target)+" "+medicalSkillLabel(source!,choice),disabled:unavailable,title:"Action; roll "+choice.name+"; parentheses show skill + STAT before roll modifiers"});
+    if(!choices.length)rows.push({action:"stabilize",label:"Stabilize — DV"+stabilizationDV(target),disabled:true,title:source?"First Aid or Paramedic skill required":"Select a character to provide medical care"});
+  }
   if(source&&!unavailable) {
     const operation=speedhealOperation(target),resuming=operation?.source===source.uuid;
     if(medtech(source)&&(resuming||medicalHP(target)<maximum(target)&&dose(source)))rows.push({action:"speedheal",label:resuming?"Resume SpeedHeal":"SpeedHeal",disabled:medicalHP(target)<1||!!operation&&!resuming||hasSpeedheal(target)&&!resuming,title:resuming?"Finish the interrupted dose without consuming another":"BODY + WILL HP; Speed Heal status blocks reuse until combat ends; cannot heal Mortally Wounded"});
     for(const injury of target.items.filter(item=>String(item.type)==="criticalInjury"&&!quickFixed(item)&&skills(source,item).length>0))
-      for(const choice of skills(source,injury))rows.push({action:"quickFix",item:injury.id!,skill:choice.name,label:injury.name+" — "+choice.name+" DV"+choice.dv,title:"Quick Fix: 1 minute; use the injury's native skill and DV"});
+      for(const choice of skills(source,injury))rows.push({action:"quickFix",item:injury.id!,skill:choice.name,groupLabel:injury.name??"Injury",choiceLabel:choice.name+" — DV"+choice.dv+" ("+(medicalBase(source,choice)??"?")+")",label:injury.name+" — DV"+choice.dv+" "+medicalSkillLabel(source,choice),title:"Quick Fix: 1 minute; use the injury's native skill and DV"});
   }
   return rows;
 }
@@ -85,7 +99,7 @@ async function applyMedical(req:Request):Promise<void> {
 async function applyPatient(req:Request,healer:Actor,patient:Actor,target:TokenDocument):Promise<void> {
   const healed=get(patient,`flags.${M}.speedhealCompleted`) as {id:string;user:string}|undefined;
   if(req.action==="speedheal"&&healed?.id===req.id&&healed.user===req.user)return;
-  if(!medicalEntries(healer,patient).some(row=>row.action===req.action&&row.item===req.item&&!row.disabled))throw Error("This medical action is no longer available.");
+  if(!medicalEntries(healer,patient).some(row=>row.action===req.action&&row.item===req.item&&(!req.skill||row.skill===req.skill)&&!row.disabled))throw Error("This medical action is no longer available.");
   if(medicalHP(patient)!==req.hp&&!(req.action==="speedheal"&&speedhealOperation(patient)))throw Error("Patient HP changed. The roll is retained; reopen Medical to retry.");
   if(req.action==="stabilize"&&req.dv!==undefined&&req.dv!==stabilizationDV(patient))throw Error("Patient wound state changed. Check the saved roll with the GM before trying again.");
   if(req.action==="speedheal") {

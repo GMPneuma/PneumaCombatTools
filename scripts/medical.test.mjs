@@ -23,11 +23,11 @@ async function setup(){
  enabled=true;const users=[{id:'gm',isGM:true,active:true},{id:'owner',active:true}];users.get=id=>users.find(u=>u.id===id);
  globalThis.game={user:users[0],users,time:{worldTime:100},settings:{get:()=>enabled},combats:new Collection(),actors:[],scenes:[]};
  globalThis.CONFIG={statusEffects:masterStatuses};globalThis.canvas={tokens:{hud:null}};
- const source=new Doc({name:'Medic',type:'character',isOwner:true,system:{stats:{luck:{value:2}}}}),target=new Doc({name:'Patient',type:'character',hasPlayerOwner:true,system:{derivedStats:{hp:{value:30,max:40}},stats:{body:{value:6},will:{value:7}}}});
+ const source=new Doc({name:'Medic',type:'character',isOwner:true,system:{stats:{luck:{value:2},tech:{value:8}}}}),target=new Doc({name:'Patient',type:'character',hasPlayerOwner:true,system:{derivedStats:{hp:{value:30,max:40}},stats:{body:{value:6},will:{value:7}}}});
  game.actors=[source,target];const scene={id:'scene',grid:{size:100}};
  const sourceToken={uuid:'Scene.scene.Token.s',actor:source,parent:scene,x:0,y:0},targetToken={uuid:'Scene.scene.Token.t',actor:target,parent:scene,x:100,y:0};
  globalThis.fromUuid=async uuid=>[sourceToken,targetToken,source,target].find(d=>d.uuid===uuid);
- await source.createEmbeddedDocuments('Item',[{name:'First Aid',type:'skill',system:{level:0}},{name:'Paramedic',type:'skill',system:{level:4}},{name:'Medtech',type:'role',system:{rank:4}},{name:'Speedheal',type:'drug',system:{amount:2}}]);
+ await source.createEmbeddedDocuments('Item',[{name:'First Aid',type:'skill',system:{level:0,stat:'tech'}},{name:'Paramedic',type:'skill',system:{level:4,stat:'tech'}},{name:'Medtech',type:'role',system:{rank:4}},{name:'Speedheal',type:'drug',system:{amount:2}}]);
  await markMedicalDamage(target,40);
  const request=(action,extra={})=>resolveMedical({medicalType:'request',id:String(++serial),user:'owner',source:sourceToken.uuid,target:targetToken.uuid,action,hp:target.system.derivedStats.hp.value,...extra});
  return {source,target,sourceToken,targetToken,request};
@@ -66,7 +66,7 @@ test('Speedheal consumes one dose, caps BODY + WILL healing, and preserves stabi
 });
 test('medical menu is always available; Speedheal requires Medtech, stock and nonmortal target',async()=>{
  const f=await setup();assert(medicalEntries(f.source,f.target).some(r=>r.action==='speedheal'));
- f.source.items.find(i=>i.name==='Medtech').system.rank=0;assert.deepEqual(medicalEntries(f.source,f.target).map(r=>r.action),['stabilize']);
+ f.source.items.find(i=>i.name==='Medtech').system.rank=0;assert.deepEqual(medicalEntries(f.source,f.target).map(r=>r.action),['stabilize','stabilize']);
  f.source.items.find(i=>i.name==='Medtech').system.rank=4;f.target.system.derivedStats.hp.value=0;assert(medicalEntries(f.source,f.target).find(r=>r.action==='speedheal').disabled);
  f.target.effects.clear();enabled=false;assert(!medicalEntries(f.source,f.target).some(r=>r.action==='stabilize'));
  assert.deepEqual(medicalEntries(undefined,f.target),[]);
@@ -126,7 +126,29 @@ test('Medical and Treatment share native DVs, zero-rank eligibility and permanen
   const [injury]=await f.target.createEmbeddedDocuments('Item',[{name:'Injury',type:'criticalInjury',system}]);
   const reference=injuryTreatmentChoices(injury).filter(row=>row.stage==='QuickFix'&&nativeTreatmentSkill(f.source,row.skill));
   const menu=medicalEntries(f.source,f.target).filter(row=>row.item===injury.id);
-  assert.deepEqual(menu.map(row=>row.skill),reference.map(row=>row.skill));reference.forEach(row=>assert(menu.some(entry=>entry.label.endsWith('DV'+row.dv))));
+  assert.deepEqual(menu.map(row=>row.skill),reference.map(row=>row.skill));reference.forEach(row=>assert(menu.some(entry=>entry.label.includes('DV'+row.dv+' ('))));
  }
  for(const [hp,state]of [[30,0],[19,1],[0,2]]){f.target.system.derivedStats.hp.value=hp;assert.equal(stabilizationDV(f.target),stabilizationStates[state].dv);}
+});
+
+test('Stabilize and QuickFix list both native skills with healer skill plus STAT bases',async()=>{
+ const f=await setup();f.source.items.find(item=>item.name==='First Aid').system.level=4;f.source.items.find(item=>item.name==='Paramedic').system.level=2;
+ f.target.system.derivedStats.hp.value=0;
+ const rows=medicalEntries(f.source,f.target).filter(row=>row.action==='stabilize');
+ assert.deepEqual(rows.map(row=>[row.skill,row.label]),[['First Aid','Stabilize — DV15 (1st Aid 12)'],['Paramedic','Stabilize — DV15 (Para 10)']]);
+ const [injury]=await f.target.createEmbeddedDocuments('Item',[{name:'Broken Arm',type:'criticalInjury',system:{quickFix:{dvFirstAid:13,dvParamedic:15}}}]);
+ assert.deepEqual(medicalEntries(f.source,f.target).filter(row=>row.item===injury.id).map(row=>row.label),['Broken Arm — DV13 (1st Aid 12)','Broken Arm — DV15 (Para 10)']);
+ injury.system.quickFix.dvFirstAid=0;assert.deepEqual(medicalEntries(f.source,f.target).filter(row=>row.item===injury.id).map(row=>row.skill),['Paramedic']);
+});
+
+test('medical submenus group dual skills and preserve direct single-skill actions',async()=>{
+ const {medicalMenuGroups}=await import('../dist/scripts/medical-menu.js');
+ const f=await setup();
+ const groups=medicalMenuGroups(medicalEntries(f.source,f.target).filter(row=>row.action==='stabilize'));
+ assert.equal(groups.length,1);assert.equal(groups[0].label,'Stabilize — DV10');assert.equal(groups[0].submenu,true);
+ assert.deepEqual(groups[0].choices.map(row=>[row.skill,row.label]),[['First Aid','First Aid (8)'],['Paramedic','Paramedic (12)']]);
+ const [injury]=await f.target.createEmbeddedDocuments('Item',[{name:'Broken Arm',type:'criticalInjury',system:{quickFix:{dvFirstAid:0,dvParamedic:13}}}]);
+ const single=medicalMenuGroups(medicalEntries(f.source,f.target).filter(row=>row.item===injury.id));
+ assert.equal(single[0].submenu,false);assert.equal(single[0].choices[0].label,'Broken Arm — DV13 (Para 12)');
+ assert.equal(single[0].choices[0].item,injury.id);assert.equal(single[0].choices[0].skill,'Paramedic');
 });

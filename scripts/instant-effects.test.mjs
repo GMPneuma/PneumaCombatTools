@@ -86,11 +86,11 @@ test('automatic cleanup leaves actors in another started encounter untouched',as
  await finishTimedEffects({id:'gone',combatants:[]});assert.equal(f.actor.effects.size,1);
 });
 
-test('cleanup notice whispers only GMs and retains actor scope after combat deletion',async()=>{
+test('cleanup notice is public and retains actor scope after combat deletion',async()=>{
  const f=setup(),messages=[];globalThis.ChatMessage={create:async data=>messages.push(data)};
  const c={id:'notice',name:'Encounter <one>',combatants:[{actor:f.actor}]};resetCleanupNotice(c);
  await postCleanupNotice(c);await postCleanupNotice(c);
- assert.equal(messages.length,1);assert.deepEqual(messages[0].whisper,['gm']);
+ assert.equal(messages.length,1);assert.deepEqual(messages[0].whisper,[]);assert.equal(messages[0].blind,false);
  assert.match(messages[0].content,/Encounter &lt;one&gt;/);
  assert.deepEqual(messages[0].flags['pneuma-combattools'].statusCleanup.actors,[f.actor.uuid]);
 });

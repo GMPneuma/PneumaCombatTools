@@ -18,7 +18,7 @@ if (existing) {
   await rm(output, { recursive: true });
 }
 await mkdir(resolve(output, "scripts"), { recursive: true });
-for (const file of ["module.json", "styles", "lang", "templates", "sounds", "README.md", "CHANGELOG.md", "IMPLEMENTED_FEATURES.md", "BACKLOG.md", "FOUNDRY_V13_MIGRATION.dm", "docs"]) {
+for (const file of ["module.json", "styles", "lang", "templates", "sounds", "README.md", "CHANGELOG.md", "IMPLEMENTED_FEATURES.md", "BACKLOG.md", "FOUNDRY_V13_MIGRATION.dm"]) {
   const source = ["styles", "lang", "templates", "sounds"].includes(file) ? resolve(root, "src", file) : resolve(root, file);
   await cp(source, resolve(output, file), { recursive: true, filter: (path) => !path.endsWith("-preview.png") });
 }

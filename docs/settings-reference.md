@@ -79,6 +79,7 @@ The exact grouping code is [settings-layout.ts](../src/scripts/settings-layout.t
 | Key(s) | Scope and default | Purpose / source |
 | --- | --- | --- |
 | hudScale, statusIconScale | Client; 1, range 0.5–2 | HUD and status icon size; [main.ts](../src/scripts/main.ts). |
+| hoverDVEncounterOnly | Client; true | Only show hover DVs during an active, started encounter on the current scene. |
 | hoverDV, hoverAutofire | Client; true / false | DV hover and Autofire rows; [dv-hover.ts](../src/scripts/dv-hover.ts). |
 | critical-method keys | World; true except Quickhack | Per-method injury eligibility; [critical-settings.ts](../src/scripts/critical-settings.ts), method names in [critical-injury.ts](../src/scripts/critical-injury.ts). |
 | evasionReflex, evasionCoprocessor | World/internal; free | Older qualifier compatibility defaults. |

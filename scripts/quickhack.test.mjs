@@ -457,3 +457,27 @@ test('QuickHack LUCK is not spent on cancellation, and insufficient LUCK prevent
  f.role.createRoll=()=>({...create(),luck:1,handleRollDialog:async()=>false});await executeQuickhack(f.a,f.b,'jack-in');assert.equal(f.state.rolls,0);assert.equal(updates.length,0);
  f.role.createRoll=()=>({...create(),luck:1});await executeQuickhack(f.a,f.b,'jack-in');assert.equal(f.source.system.stats.luck.value,1);assert.equal(updates.length,1);
 });
+
+test('legacy QuickHack image paths are corrected in menus and stored items without changing custom artwork',async()=>{
+ const f=fixture();contentDocuments();
+ const {repairQuickhackAssetPaths}=await import('../dist/scripts/quickhack/content.js');
+ const {quickhackAssetPath}=await import('../dist/scripts/quickhack/asset-paths.js');
+ const {stat}=await import('node:fs/promises');
+ for(const hack of QUICKHACKS){
+  const url=quickhackAssetPath('modules/pneuma-quickhack/icons/quickhacks/'+hack.id+'-gray.png');
+  assert.equal(url,'modules/pneuma-combattools/styles/quickhacks/'+hack.id+'-gray.png');
+  assert.ok((await stat('dist/'+url.split('/').slice(2).join('/'))).isFile());
+ }
+ const world=await Item.create({...hack('world'),img:'modules/pneuma-quickhack/icons/quickhacks/overheat-gray.png'});
+ const owned=hack('owned',{img:'modules/pneuma-quickhack/icons/quickhacks/overheat-gray.png'});
+ let writes=0;owned.update=async data=>{writes++;Object.assign(owned,data);};f.source.items.push(owned);game.actors.push(f.source);
+ const custom=await Item.create({...hack('custom'),img:'custom/art.png'});
+ const launcher=await Item.create({type:'weapon',img:'modules/pneuma-quickhack/icons/quickhack-gray.png',system:{},flags:{[LEGACY_MODULE]:{action:'quickhack'}}});
+ const tokenItem={img:'modules/pneuma-quickhack/icons/quickhacks/lure-gray.png',update:async function(data){Object.assign(this,data);}};
+ game.scenes.push({tokens:[{actorLink:false,actor:{items:[tokenItem]}}]});
+ assert.equal(actorQuickhacks(f.source).find(h=>h.id==='overheat').img,'modules/pneuma-combattools/styles/quickhacks/overheat-gray.png');
+ await repairQuickhackAssetPaths();await repairQuickhackAssetPaths();
+ assert.equal(writes,1,'Repair is idempotent');assert.equal(owned.img,world.img);
+ assert.equal(custom.img,'custom/art.png');assert.equal(launcher.img,'modules/pneuma-combattools/styles/quickhack-gray.png');
+ assert.equal(tokenItem.img,'modules/pneuma-combattools/styles/quickhacks/lure-gray.png');
+});

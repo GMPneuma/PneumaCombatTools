@@ -1,3 +1,4 @@
+import {captureCombatSummary,waitCombatSummary} from "./combat-summary.js";
 import { allActors as actors } from "./shared.js";
 import {withActorMutation} from "./actor-mutation.js";
 import {actorEncounter,encounterEpoch} from "./encounter.js";
@@ -199,21 +200,24 @@ export function registerInstantLifetimes() {
   Hooks.on("preUpdateActor",rememberHP);
   Hooks.on("updateActor",(a:Actor)=>{const before=hpValues.get(a.uuid),after=Number(foundry.utils.getProperty(a,"system.derivedStats.hp.value"));hpValues.set(a.uuid,after);if(before!==undefined&&after<before)enqueue(()=>clearInstantCondition(a,"sleep"));});
   Hooks.on("createCombat",rememberCombat);Hooks.on("preUpdateCombat",rememberCombat);
-  const finish=(c:Combat)=>{
+  const finish=(c:Combat,lastRound=c.round??0)=>{
+    const summary=captureCombatSummary(c,lastRound);
     const affected=[...new Set([...Array.from(c.combatants??[]).flatMap(p=>p.actor?[p.actor.uuid]:[]),...actors().filter(a=>allEffects(a).some(e=>{return effectCombat(e)===c.id;})).map(a=>a.uuid)])];
     enqueue(async()=>{
       if(game.combats?.get(c.id!)?.started)return;
+      try{await waitCombatSummary();}catch{summary.partial=true;}
+      summary.criticals=captureCombatSummary(c,lastRound).criticals;
       try{await finishTimedEffects(c);}finally{
         await empWork(async()=>{});
         const {waitGrappleCleanup}=await import("./grapple/workflow.js");await waitGrappleCleanup();
-        Hooks.callAll("pneumaCombatCleanupFinished",c,affected);
+        Hooks.callAll("pneumaCombatCleanupFinished",c,affected,summary);
       }
     });
   };
-  Hooks.on("deleteCombat",(c:Combat)=>{previous.delete(c.id!);finish(c);});
+  Hooks.on("deleteCombat",(c:Combat)=>{const round=previous.get(c.id!)?.round;previous.delete(c.id!);finish(c,round);});
   Hooks.on("updateCombat",(c:Combat)=>{
     const p=previous.get(c.id!);rememberCombat(c);
-    if(p?.started&&!c.started){finish(c);return;}
+    if(p?.started&&!c.started){finish(c,p.round);return;}
     if(!p?.started||!c.started)return;
     const nextRound=(c.round??0)>p.round;
     if(!nextRound && !((c.round??0)===p.round&&(c.turn??0)>p.turn))return;

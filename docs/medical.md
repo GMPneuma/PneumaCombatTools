@@ -28,3 +28,7 @@ Manual Rolls → **Treatment** lists every native critical injury. Stabilize dis
 Choose a player-owned token from the current scene, or choose **Type a patient name…**. An eligible targeted token is preselected; otherwise choose a patient. Typed names are recorded without token/actor IDs.
 
 Reference rolls produce native skill/role cards with styled DV Success/Fail outcomes. They do not change patient effects. Medical cards use the same native presentation and preserve exact participant metadata for Visual Tools. Treatment successes do not automatically apply full critical-injury treatment.
+
+Medical skill menu labels (2026-10-07, local/unreleased): Stabilize lists First Aid and Paramedic separately when the healer has their native skill items. QuickFix retains each injury-specific eligible skill choice. Labels show DV followed by the healer skill + native STAT base, using (1st Aid 12) / (Para 10). Zero skill ranks remain eligible. Clicking a row rolls its selected skill directly with native roll options. Medical labels wrap to keep the base visible.
+
+Medical choice submenus (2026-10-07, local/unreleased): supersedes the expanded Stabilize/QuickFix list. When both skills are eligible, native click-to-expand details group Stabilize by DV and QuickFix by injury. Child rows show First Aid or Paramedic, applicable DV and skill + STAT base. Single-skill actions remain direct buttons with their base. Existing action/item/skill attributes and native rolling behavior remain.

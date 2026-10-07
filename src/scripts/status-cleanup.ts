@@ -1,3 +1,4 @@
+import {combatSummaryHTML,type CombatSummarySnapshot} from "./combat-summary.js";
 import {allActors,escapeHTML,primaryGM} from "./shared.js";
 import {bindCardAction} from "./card-structure.js";
 import {masterStatuses} from "./status-catalog.js";
@@ -112,20 +113,18 @@ export class StatusCleanup extends FormApplication {
 }
 const notices=new Set<string>();
 export function resetCleanupNotice(combat:Combat){notices.delete(combat.id!);}
-export async function postCleanupNotice(combat:Combat,affected?:string[]){
+export async function postCleanupNotice(combat:Combat,affected?:string[],summary?:CombatSummarySnapshot){
   if(game.user?.id!==primaryGM()?.id||notices.has(combat.id!))return;
   const scope:CleanupScope={combat:combat.id!,actors:affected??[...new Set(Array.from(combat.combatants??[]).flatMap(p=>p.actor?[p.actor.uuid]:[]))],label:combat.name??"Ended combat"};
   // Include tagged actors even if removed from the tracker before combat ended.
   for(const actor of allActors())if(Array.from(actor.allApplicableEffects?.()??actor.effects).some(e=>effectCombat(e)===combat.id)&&!scope.actors!.includes(actor.uuid))scope.actors!.push(actor.uuid);
-  const whisper=game.users!.filter(u=>u.isGM).map(u=>u.id!);
-  if(!whisper.length)return;
   notices.add(combat.id!);
-  try{await ChatMessage.create({content:`<section class="pneuma-status-cleanup-card"><p>${escapeHTML(scope.label)} ended. Review any remaining status effects.</p><button type="button" data-status-cleanup data-gm-only="true">Clear Token Status Effects</button></section>`,whisper,flags:{[M]:{statusCleanup:scope}}} as never);}
+  try{await ChatMessage.create({content:`<section class="pneuma-status-cleanup-card"><p>${escapeHTML(scope.label)} ended. Review any remaining status effects.</p>${summary?combatSummaryHTML(summary):""}<button type="button" data-status-cleanup data-gm-only="true">Clear Token Status Effects</button></section>`,whisper:[],blind:false,flags:{[M]:{statusCleanup:scope}}} as never);}
   catch(error){notices.delete(combat.id!);throw error;}
 }
 export function registerStatusCleanup(){
   Hooks.on("updateCombat",(combat:Combat)=>{if(combat.started)resetCleanupNotice(combat);});
-  Hooks.on("pneumaCombatCleanupFinished",(combat:Combat,actors:string[])=>{void postCleanupNotice(combat,actors).catch(error=>ui.notifications!.error(String(error)));});
+  Hooks.on("pneumaCombatCleanupFinished",(combat:Combat,actors:string[],summary?:CombatSummarySnapshot)=>{void postCleanupNotice(combat,actors,summary).catch(error=>ui.notifications!.error(String(error)));});
   game.settings!.registerMenu(M,"statusCleanup",{name:"Clean Status Effects",label:"Open cleanup",hint:"GM review of ended-combat, expired and untracked effects. Permanent critical injuries are protected by default.",icon:"fas fa-broom",type:StatusCleanup,restricted:true});
   Hooks.on("renderChatMessage",(message:ChatMessage,html:JQuery)=>{
     const scope=flag(message,"statusCleanup") as CleanupScope|undefined;

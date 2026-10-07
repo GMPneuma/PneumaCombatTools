@@ -441,3 +441,19 @@ test('response reset blocks applied work and clears only Cover Up prone created 
  await assert.rejects(f.request('reset',{user:'gm'}),/Cannot reset/);
  }
 });
+
+test("Molotov uses incendiary blast resolution with native 5d6, including renamed source items",async()=>{
+ for(const renamed of [false,true]){
+ const f=fixture();f.weapon.name=renamed?'Renamed bottle':'Molotov Cocktail';f.weapon.system.weaponType='thrownWeapon';f.weapon.system.damage='5d6';
+ if(renamed)f.weapon._stats={compendiumSource:'Compendium.cyberpunk-red-core.dlc_black-chrome-plus.Item.1004Olp4DHhMOc1z'};
+ f.weapon.toObject=()=>({name:f.weapon.name,type:'weapon',system:{...f.weapon.system}});
+ CONFIG.Item={documentClass:class{constructor(data,{parent}){Object.assign(this,data);this.actor=parent;this.createRoll=mode=>({...f.weapon.createRoll(mode),formula:mode==='damage'?this.system.damage:'1d10'});}}};
+ assert.equal(areaKind(f.weapon,'attack'),'explosive');assert.equal(areaKind(f.weapon,'aimed'),undefined);
+ await startAreaAttack(f.source,f.target,'w','attack');
+ assert.equal(f.data().ammoType,'incendiary');assert.equal(f.data().special,false);
+ assert.equal(f.data().exchange.damageFormula,'5d6');assert.equal(f.data().exchange.thrownSource.system.damage,'5d6');
+ assert.equal(f.data().exchange.criticalMethod,'Grenade');assert.equal(f.calls.filter(x=>x==='consume').length,0);
+ }
+ const ordinary={type:'weapon',name:'Thrown Weapon',system:{weaponType:'thrownWeapon'}};
+ assert.equal(areaKind(ordinary,'attack'),undefined,'Other thrown weapons stay single-target');
+});

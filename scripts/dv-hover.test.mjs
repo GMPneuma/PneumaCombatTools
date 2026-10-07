@@ -67,12 +67,25 @@ test('hover lifecycle, table precedence, range boundaries, updates and stale asy
   globalThis.game = { settings: { get: (_, key) => settings.get(key), register: (_, key, config) => settings.set(key, config.default) },
     tables: { getName: () => worldTable }, packs: new Map([['custom.dv', pack]]), i18n: { localize: () => 'Autofire' } };
   registerHoverDV();
+  assert.equal(settings.get("hoverDVEncounterOnly"),true);
+  settings.set("hoverDVEncounterOnly",false);
   const settle = () => new Promise(resolve => setImmediate(resolve));
   fire('hoverToken', target, true);
   await settle();
   assert.equal(children[0].children[0].textContent, 'DV13 <pistol>');
   assert.equal(children[0].children[0].children[0].className, 'pneuma-dv-value pneuma-dv-green');
   assert.equal(packReads, 0, 'world table takes precedence');
+  settings.set('hoverDVEncounterOnly',true);canvas.scene={id:'scene'};game.combats=[];
+  fire('updateCombat');await settle();assert.equal(children.length,0,'No encounter hides DVs');
+  const combat={active:true,started:false,scene:canvas.scene};game.combats=[combat];
+  fire('createCombat');await settle();assert.equal(children.length,0,'Unstarted encounter hides DVs');
+  combat.started=true;fire('updateCombat');await settle();assert.equal(children.length,1,'Starting encounter shows current hover');
+  combat.scene={id:'other'};fire('updateCombat');await settle();assert.equal(children.length,0,'Foreign scene encounter does not qualify');
+  combat.scene=canvas.scene;fire('updateCombat');await settle();assert.equal(children.length,1);
+  combat.active=false;fire('updateCombat');await settle();assert.equal(children.length,0,'Inactive encounter hides DVs');
+  combat.active=true;fire('updateCombat');await settle();assert.equal(children.length,1);
+  game.combats=[];fire('deleteCombat');await settle();assert.equal(children.length,0,'Deleting encounter clears DVs');
+  settings.set('hoverDVEncounterOnly',false);fire('controlToken');await settle();assert.equal(children.length,1,'Disabled option preserves outside-combat hover');
   const retained = children[0]; const row = retained.children[0];
   fire("updateToken", target.document);await settle();
   assert.equal(children[0],retained);assert.equal(retained.children[0],row,"unchanged DV retains row nodes");

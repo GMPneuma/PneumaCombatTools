@@ -169,3 +169,15 @@ test("grenade menu excludes depleted inventory",async()=>{
  const items=[0,1,3,-1].map(amount=>weapon(String(amount),{variety:"grenade",amount},{type:"ammo"}));
  assert.deepEqual(grenadeEntries(items).map(row=>row.id),["1","3"]);
 });
+
+test('duplicate ranged weapons show native ammo type and matching types include magazine counts',()=>{
+ globalThis.game={i18n:{localize:key=>({'CPR.global.ammo.type.basic':'Basic','CPR.global.ammo.type.armorPiercing':'Armor-Piercing'})[key]??key}};
+ const gun=(id,type,rounds)=>weapon(id,{magazine:{value:rounds,max:8}},{name:'Heavy Pistol',_getLoadedAmmoProp:()=>type});
+ const a=gun('a','basic',8),b=gun('b','armorPiercing',3);
+ assert.deepEqual(attackEntries([a,b]).map(row=>[row.id,row.ammoDetail]),[['a','Basic'],['b','Armor-Piercing']]);
+ b._getLoadedAmmoProp=()=> 'basic';
+ assert.deepEqual(attackEntries([a,b]).map(row=>row.ammoDetail),['Basic · 8/8','Basic · 3/8']);
+ assert.equal(attackEntries([a])[0].ammoDetail,'','Unique names stay compact');
+ b._getLoadedAmmoProp=()=>undefined;assert.equal(attackEntries([a,b])[1].ammoDetail,'Unloaded');
+ b.name='heavy pistol';assert.equal(attackEntries([a,b]).find(row=>row.id==='a').ammoDetail,'Basic');
+});

@@ -11,16 +11,31 @@ export type AttackMode = "attack" | "aimed" | "autofire" | "suppressive";
 export interface MenuWeapon extends EquipmentItem {
   id: string | null; name: string | null; img?: string | null; type: string;
   flags?: { [key: string]: unknown };
+  _getLoadedAmmoProp?(prop:string):unknown;
 }
 /** Launcher ownership is not a RAW requirement. */
 export function canShowQuickhack(items: MenuWeapon[]) {
   return !!findNativeItem(items,"Netrunner");
 }
 export function attackEntries(items: MenuWeapon[]) {
-  return availableWeapons(items).filter(item => !isQuickhackLauncher(item)
+  const weapons=availableWeapons(items).filter(item => !isQuickhackLauncher(item)
     && item.name?.trim().toLowerCase() !== "quickhack")
     .filter(item => item.system.weaponType !== "thrownWeapon")
-    .map(item => ({ id: item.id, name: item.name, img: item.img,
+    ;
+  const nameKey=(item:MenuWeapon)=>(item.name??"").trim().toLowerCase();
+  const ammoType=(item:MenuWeapon)=>String(item._getLoadedAmmoProp?.("type")??"");
+  const detail=(item:MenuWeapon)=>{
+    if(!item.system.isRanged)return "";
+    const siblings=weapons.filter(other=>nameKey(other)===nameKey(item));
+    if(siblings.length<2)return "";
+    const type=ammoType(item),key=`CPR.global.ammo.type.${type}`;
+    const translated=type?game.i18n?.localize(key):undefined;
+    const label=type?(translated&&translated!==key?translated:type):"Unloaded";
+    const rounds=gunAmmo(item)?.rounds;
+    const sameType=siblings.filter(other=>ammoType(other)===type).length>1;
+    return label+(sameType&&rounds!==undefined?` · ${rounds}/${item.system.magazine!.max}`:"");
+  };
+  return weapons.map(item => ({ id: item.id, name: item.name, img: item.img, ammoDetail:detail(item),
       category: ["unarmed", "martialArts"].includes(item.system.weaponType ?? "") ? "brawling"
         : (item.system.weaponType ?? "").toLowerCase().includes("melee") ? "melee" : "attack",
       deferred: false, area: !!areaKind(item,"attack"),
@@ -78,4 +93,14 @@ export async function attackFromHUD(attacker: Token, target: Token, itemId: stri
         { item: thrownRollItem(source, actor), source, improvised: itemId === "__improvised" });
     } else await startCombatExchange(attacker, target, itemId, mode, event);
   } finally { rolling.delete(actor.uuid); }
+}
+
+/** Update duplicate labels after native reload/load and inventory changes. */
+export function refreshAttackAmmoLabels(root:HTMLElement,actor:Actor):void {
+  const rows=attackEntries(Array.from(actor.items) as unknown as MenuWeapon[]);
+  root.querySelectorAll<HTMLElement>('[data-weapon-ammo-detail]').forEach(label=>{
+    const id=label.closest<HTMLElement>('[data-item-id]')?.dataset.itemId;
+    const detail=rows.find(row=>row.id===id)?.ammoDetail??"";
+    label.textContent=detail;label.hidden=!detail;
+  });
 }

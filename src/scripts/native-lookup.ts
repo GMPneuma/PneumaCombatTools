@@ -1,5 +1,6 @@
 /** Identities verified against CPR v0.92.4 (Foundry v12). */
 const identities: Record<string, {id: string; key?: string; type: string}> = {
+  "Molotov Cocktail": {id:"1004Olp4DHhMOc1z",type:"weapon"},
   "Evasion": {id:"CzaAkwAjPDplz4nn",key:"skill.evasion",type:"skill"},
   "Concentration": {id:"f319Qi6jITQMATyG",key:"skill.concentration",type:"skill"},
   "Brawling": {id:"fPnx3mKaMiRgGavI",key:"skill.brawling",type:"skill"},

@@ -1,3 +1,4 @@
+import {quickhackAssetPath} from "./asset-paths.js";
 import { primaryGM as electedGM } from "../shared.js";
 import { MODULE, quickhackId, isQuickhackLauncher, type QuickhackItem } from "./availability.js";
 import { QUICKHACKS, type Quickhack } from "./catalog.js";
@@ -21,9 +22,10 @@ export function initializeQuickhackContent(): Promise<void> {
   if (!enabled() || !primaryGM()) return Promise.resolve();
   return initialization ??= createMissingContent().finally(() => { initialization = undefined; });
 }
-/** Seed missing content only. Existing documents are never rewritten. */
+/** Repair legacy artwork paths; seed missing content without changing other item data. */
 async function createMissingContent() {
   if (!enabled()) return;
+  await repairQuickhackAssetPaths();
   const root = await ensureFolder("CombatTools");
   const folder = await ensureFolder("Quickhacks", root);
   for (const hack of QUICKHACKS) {
@@ -49,4 +51,18 @@ async function ensureFolder(name: string, parent?: Folder): Promise<Folder> {
   const created = await Folder.create({ name, type: "Item", folder: parent?.id ?? null });
   if (!created) throw new Error(`Could not create QuickHack content folder: ${name}`);
   return created;
+}
+
+export async function repairQuickhackAssetPaths():Promise<void> {
+  if(!enabled()||!primaryGM())return;
+  const items=new Set<Item>(game.items??[]);
+  for(const actor of game.actors??[])for(const item of actor.items)items.add(item);
+  for(const scene of game.scenes??[])for(const token of scene.tokens??[]) {
+    if(token.actorLink)continue;
+    for(const item of token.actor?.items??[])items.add(item);
+  }
+  for(const item of items) {
+    const img=quickhackAssetPath(item.img);
+    if(img&&img!==item.img)await item.update({img});
+  }
 }
