@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.13 - 2026-10-07
+
+- Replace the delayed single gray sparkle on the chat Roll icon with five small gold sparkles distributed around the button.
+- Animate a three-second burst every 15 seconds, leaving 12 seconds quiet between bursts.
+- Keep decorative particles click-through, avoid duplicates on repeated chat rendering, and disable the animation while the roll menu is open or reduced motion is enabled.
+
+Validation: production build, strict type checks, automated tests and the native manual-roll browser fixture. Browser checks verify five particles on the actual Roll icon, burst/repeat timing, click passthrough, repeated rendering and existing roll/menu controls. Live Foundry verification remains pending.
+
+
 ## 0.9.12 - 2026-10-07
 
 - Add "Only show Hover DVs during active encounter", enabled by default. Require an active, started encounter on the current scene while enabled.

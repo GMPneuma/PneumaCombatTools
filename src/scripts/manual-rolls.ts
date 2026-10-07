@@ -509,6 +509,9 @@ export function registerManualRolls(): void {
     const icon=html[0]?.querySelector<HTMLElement>("#chat-controls .fa-dice-d20, .chat-controls .fa-dice-d20");
     closeRollFlyout?.();
     if(!icon||icon.dataset.pneumaManualRolls)return;icon.dataset.pneumaManualRolls="true";icon.setAttribute("role","button");icon.setAttribute("aria-haspopup","menu");icon.setAttribute("aria-expanded","false");icon.tabIndex=0;icon.title="Manual rolls";icon.setAttribute("aria-label","Manual rolls");
+    const sparkles=document.createElement("span");sparkles.className="pneuma-roll-sparkles";sparkles.setAttribute("aria-hidden","true");
+    for(let index=0;index<5;index++){const star=document.createElement("span");star.className="pneuma-roll-sparkle";sparkles.append(star);}
+    icon.append(sparkles);
     icon.addEventListener("click",event=>{event.preventDefault();event.stopPropagation();openManualRolls(icon);});
     icon.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();openManualRolls(icon);}});
   });

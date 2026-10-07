@@ -413,3 +413,7 @@ Medical skill menu labels (released in 0.9.12, 2026-10-07): Stabilize lists Firs
 Medical choice submenus (released in 0.9.12, 2026-10-07): supersedes the expanded Stabilize/QuickFix list. When both skills are eligible, native click-to-expand details group Stabilize by DV and QuickFix by injury. Child rows show First Aid or Paramedic, applicable DV and skill + STAT base. Single-skill actions remain direct buttons with their base. Existing action/item/skill attributes and native rolling behavior remain.
 
 Chat roll-menu attention cue (released in 0.9.12, 2026-10-07): the native manual-roll dice icon has a small, theme-colored sparkle above it roughly every 18 seconds. It has no pointer interaction, stops while the menu is open and is disabled for reduced-motion preferences. No timers or extra controls are added.
+
+Roll-button sparkle visibility correction (released in 0.9.13, 2026-10-07): the native chat manual-roll icon now owns a decorative gold span rather than a gray pseudo-element. The first pulse begins within two seconds and repeats every 12 seconds. Reduced-motion and open-menu suppression remain. This supersedes the released 18-second cue with its delayed first pulse.
+
+Roll-button sparkle burst (released in 0.9.13, 2026-10-07): supersedes the single sparkle with five small gold sparkles distributed around the chat Roll icon. Each burst lasts three seconds, with cycles starting every 15 seconds (12 seconds quiet). Open-menu and reduced-motion suppression remain; decorative particles do not intercept clicks.

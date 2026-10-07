@@ -1184,20 +1184,35 @@ i.pneuma-neural-plug::before { content: ""; display: inline-block; width: 1em; h
 #token-hud .pneuma-medical-choices[open] > summary > i { transform: rotate(90deg); }
 #token-hud .pneuma-medical-choices > ul { padding-left: 12px; }
 
-/* Brief attention cue on the chat roll-menu anchor, with no extra control or timer. */
-[data-pneuma-manual-rolls] { position: relative; }
-[data-pneuma-manual-rolls]::after {
-  content: ""; position: absolute; top: -5px; right: -4px; width: 9px; height: 9px;
-  background: currentColor; pointer-events: none; opacity: 0;
+/* Three-second sparkle burst around the native chat roll-menu icon every 15 seconds. */
+[data-pneuma-manual-rolls] { position: relative; overflow: visible; }
+[data-pneuma-manual-rolls] > .pneuma-roll-sparkles {
+  position: absolute; left: 50%; top: 50%; width: 52px; height: 44px;
+  transform: translate(-50%, -50%); pointer-events: none; opacity: 0;
+  animation: pneuma-roll-sparkle-burst 15s linear infinite;
+}
+.pneuma-roll-sparkles > .pneuma-roll-sparkle {
+  position: absolute; width: 9px; height: 9px; background: #ffd27a; pointer-events: none;
   clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
-  animation: pneuma-roll-sparkle 18s ease-in-out 6s infinite;
+  animation: pneuma-roll-sparkle-twinkle .9s ease-in-out infinite;
 }
-@keyframes pneuma-roll-sparkle {
-  0%, 89%, 96%, 100% { opacity: 0; transform: scale(.3) rotate(0deg); }
-  91% { opacity: .65; transform: scale(1) rotate(15deg); }
-  94% { opacity: .35; transform: scale(.7) rotate(30deg); }
+.pneuma-roll-sparkles > :nth-child(1) { left: 5px; top: 5px; animation-delay: -.1s; }
+.pneuma-roll-sparkles > :nth-child(2) { left: 33px; top: 1px; width: 7px; height: 7px; animation-delay: -.4s; }
+.pneuma-roll-sparkles > :nth-child(3) { left: 43px; top: 23px; animation-delay: -.7s; }
+.pneuma-roll-sparkles > :nth-child(4) { left: 20px; top: 34px; width: 7px; height: 7px; animation-delay: -.2s; }
+.pneuma-roll-sparkles > :nth-child(5) { left: 0; top: 27px; width: 6px; height: 6px; animation-delay: -.6s; }
+@keyframes pneuma-roll-sparkle-burst {
+  0%, 19.999% { opacity: 1; }
+  20%, 100% { opacity: 0; }
 }
-[data-pneuma-manual-rolls][aria-expanded="true"]::after { animation: none; }
+@keyframes pneuma-roll-sparkle-twinkle {
+  0%, 100% { opacity: 0; transform: scale(.2) rotate(0deg); }
+  45% { opacity: .85; transform: scale(1) rotate(15deg); }
+  70% { opacity: .4; transform: scale(.6) rotate(30deg); }
+}
+[data-pneuma-manual-rolls][aria-expanded="true"] > .pneuma-roll-sparkles,
+[data-pneuma-manual-rolls][aria-expanded="true"] > .pneuma-roll-sparkles > .pneuma-roll-sparkle { animation: none; }
 @media (prefers-reduced-motion: reduce) {
-  [data-pneuma-manual-rolls]::after { animation: none; }
+  [data-pneuma-manual-rolls] > .pneuma-roll-sparkles,
+  .pneuma-roll-sparkles > .pneuma-roll-sparkle { animation: none; }
 }
