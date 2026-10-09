@@ -227,16 +227,20 @@ async function prompt(title:string,content:string,label:string,run:(form:HTMLFor
 }
 const value=(form:HTMLFormElement,name:string)=>new FormData(form).get(name)?.toString()??"";
 async function damagePrompt() {
-  await prompt("Manual damage roll",field("Label",'<input name="title" value="Manual damage" maxlength="100">')+pair(field("Damage dice",'<select name="dice">'+Array.from({length:8},(_,i)=>'<option value="'+(i+1)+'"'+(i===2?' selected':'')+'>'+(i+1)+'d6</option>').join('')+'</select>')+field("Modifier",numeric("modifier",0)))+field("Location",'<select name="location"><option value="body">Body</option><option value="head">Head (aimed)</option></select>')+'<div class="pneuma-roll-checks">'+check("armor","Interact with armor",true)+check("critical","Critical bonus / injuries",true)+'</div>',"Roll",async form=>{
+  await prompt("Manual damage roll",field("Label",'<input name="title" value="Manual damage" maxlength="100">')+pair(field("Damage dice",'<select name="dice">'+Array.from({length:8},(_,i)=>'<option value="'+(i+1)+'"'+(i===2?' selected':'')+'>'+(i+1)+'d6</option>').join('')+'</select>')+field("Modifier",numeric("modifier",0)))+field("Location",'<select name="location"><option value="body">Body</option><option value="head">Head (aimed)</option></select>')+'<div class="pneuma-roll-checks">'+check("armor","Interact with armor",true)+check("halfArmor","Halves Armor SP (round up)")+check("critical","Critical bonus / injuries",true)+'</div>',"Roll",async form=>{
     const mode=rollMode(),dice=manualNumber(value(form,"dice"),"Dice",1,8),modifier=manualNumber(value(form,"modifier"),"Modifier",-100,100);
     const {CPRDamageRoll}=await nativeRolls();const title=value(form,"title").trim()||"Manual damage";
     const roll=new CPRDamageRoll(title,dice+"d6"+(modifier>=0?"+":"")+modifier,"ranged");
     roll.isAimed=value(form,"location")==="head";roll.location=roll.isAimed?"head":"body";
-    roll.rollCardExtraArgs={ablationValue:1,ignoreArmorPercent:0,ignoreBelowSP:0,ammoVariety:""};
+    const interactArmor=new FormData(form).has("armor"),halfArmor=interactArmor&&new FormData(form).has("halfArmor");
+    roll.rollCardExtraArgs={ablationValue:1,ignoreArmorPercent:halfArmor?50:0,ignoreBelowSP:0,ammoVariety:""};
     await rollHidden(roll);if(!new FormData(form).has("critical"))roll.wasCritical=()=>false;
     const html=await nativeCard(roll);
-    await create({kind:"damage",creator:game.user!.id!,title,rollMode:mode,damage:{status:"rolled",user:game.user!.id!,nonce:foundry.utils.randomID(),result:{html,values:{...damageValues(html),interactArmor:new FormData(form).has("armor")},sixes:new FormData(form).has("critical")?damageSixes(roll):0}}});
+    await create({kind:"damage",creator:game.user!.id!,title,rollMode:mode,damage:{status:"rolled",user:game.user!.id!,nonce:foundry.utils.randomID(),result:{html,values:{...damageValues(html),ignorePercent:halfArmor?50:0,interactArmor},sixes:new FormData(form).has("critical")?damageSixes(roll):0}}});
     await showDice(roll,mode);
+  },form=>{
+    const armor=form.querySelector<HTMLInputElement>('[name="armor"]')!,half=form.querySelector<HTMLInputElement>('[name="halfArmor"]')!;
+    const sync=()=>{half.disabled=!armor.checked;};armor.addEventListener("change",sync);sync();
   });
 }
 async function basePrompt() {

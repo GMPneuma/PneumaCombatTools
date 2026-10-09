@@ -8,7 +8,7 @@ import {movementHUD} from "./aoe/movement.js";
 import { grappleHUD } from "./grapple/state.js";
 import { registerHUDMessages, postHUDMessage, listHUDMessages, dismissHUDMessage, hudMessageKey } from "./hud-messages.js";
 import { getItemMarkers } from "./item-markers.js";
-import { ekgPaused, setEKGPaused, createEKGTrace, vitalState, indicatorState, signalExposure, clearRoundExposures, type LampId } from "./biomonitor.js";
+import { ekgPaused, setEKGPaused, createEKGTrace, vitalState, indicatorState, signalExposure, clearRoundExposures, hasMonitorExposure, type LampId } from "./biomonitor.js";
 const MODULE = "pneuma-combattools";
 declare global { interface SettingConfig {
   "pneuma-combattools.biomonitorShowHP": boolean;
@@ -661,7 +661,7 @@ function render() {
 export function registerEyeHUD() {
   registerHUDMessages(schedule, showFlashNotice);
   const module = game.modules!.get(MODULE) as unknown as {api?: Record<string, unknown>};
-  module.api = {...module.api, getNeuralIntrusionActor: neuralIntrusionActor};
+  module.api = {...module.api, getNeuralIntrusionActor: neuralIntrusionActor, hasMonitorExposure, hasNeuralIntrusion:(actor:Actor)=>forceOutEntries(actor).length>0};
   const crewActive = !!game.modules?.get("pneuma-crewtools")?.active;
   game.settings!.register(MODULE, "crewHUDIntegration", { name: "Integrate with Pneuma’s Crew Tools HUD", hint: "Minimize Biomonitor into Crew Tools’ HUD. Falls back to the normal control when that HUD is unavailable.", scope: "client", config: crewActive, type: Boolean, default: true, onChange: schedule });
   game.settings!.register(MODULE, "eyeHUDDock", { name: "Biomonitor position", hint: "Choose the top-left or top-right corner.", scope: "client", config: true, type: String, choices: { right: "Top right", left: "Top left" }, default: "left", onChange: schedule });

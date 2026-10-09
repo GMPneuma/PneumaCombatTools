@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
+import {masterStatuses} from '../dist/scripts/status-catalog.js';
+import {buildCombatReport,combatReportMarkdown} from '../dist/scripts/combat-report.js';
 import {registerCombatSummary,waitCombatSummary,captureCombatSummary,combatSummaryHTML} from '../dist/scripts/combat-summary.js';
 const get=(object,path)=>path.split('.').reduce((value,key)=>value?.[key],object);
 function fixture(){
@@ -20,19 +22,20 @@ test('GM summary retains reset round, counts new player crits once, excludes pre
  const f=fixture();await f.start();
  const injury={uuid:'Actor.player.Item.new',name:'Broken <arm>',type:'criticalInjury',parent:f.player};f.player.items.push(injury);
  f.fire('createItem',injury);f.fire('createItem',injury);await waitCombatSummary();
- f.player.effects.push({uuid:'Effect.fire',name:'On Fire',disabled:false,statuses:new Set()},{uuid:'Effect.addiction',name:'Addiction',disabled:false,statuses:new Set()});
+ f.player.effects.push({uuid:'Effect.fire',name:'On Fire',disabled:false,statuses:new Set([masterStatuses.find(s=>s.name==='On Fire (Mild)').id])},{uuid:'Effect.addiction',name:'Addiction',disabled:false,statuses:new Set()});
  f.combat.round=0;f.combat.started=false;const summary=captureCombatSummary(f.combat,4);
  f.player.effects.shift();f.player.items.pop();
  const html=combatSummaryHTML(summary);
  assert.equal(summary.round,4);assert.equal(summary.players,1);assert.equal(summary.npcs,1);assert.equal(summary.criticals.length,1);
- assert.match(html,/Reached round 4/);assert.match(html,/Broken &lt;arm&gt;.*no longer present/);assert.doesNotMatch(html,/Old injury/);
- assert.match(html,/Defeated.*Guard/);assert.match(html,/Effects cleared during automatic cleanup:.*On Fire/);assert.match(html,/Effects remaining for review:.*Addiction/);
- assert.doesNotMatch(html,/Partial injury record/);
+ assert.match(html,/Round reached 4/);assert.doesNotMatch(html,/Broken &lt;arm&gt;|Old injury/);assert.match(html,/Current injuries: 1/);
+ const markdown=combatReportMarkdown(buildCombatReport(summary));assert.ok(markdown.includes("Broken <arm\\> (no longer present)"));assert.ok(markdown.includes("Old injury"));
+ assert.match(html,/Defeated.*markers: 1/);assert.match(html,/Conditions cleared: 1/);assert.doesNotMatch(html,/Addiction/);
+ assert.doesNotMatch(html,/partial record/);
 });
 test('mid-encounter adoption is partial and persistent crit records survive recapture',async()=>{
  const f=fixture();f.combat.started=true;f.combat.round=3;f.fire('ready');await waitCombatSummary();
  const injury={uuid:'Actor.player.Item.new',name:'Broken Arm',type:'criticalInjury',parent:f.player};f.player.items.push(injury);f.fire('createItem',injury);await waitCombatSummary();
- const summary=captureCombatSummary(f.combat);assert.equal(summary.partial,true);assert.equal(summary.criticals.length,1);assert.match(combatSummaryHTML(summary),/Partial injury record/);
+ const summary=captureCombatSummary(f.combat);assert.equal(summary.partial,true);assert.equal(summary.criticals.length,1);assert.match(combatSummaryHTML(summary),/partial record/);
  f.player.items.pop();assert.equal(captureCombatSummary(f.combat).criticals.length,1,'Removed injury remains in recorded applications');
 });
 test('cleanup summary stays in the public existing review and does not duplicate notices',async()=>{
@@ -41,7 +44,7 @@ test('cleanup summary stays in the public existing review and does not duplicate
  const messages=[];globalThis.ChatMessage={create:async data=>messages.push(data)};
  resetCleanupNotice(f.combat);const snapshot=captureCombatSummary(f.combat,2);
  await postCleanupNotice(f.combat,undefined,snapshot);await postCleanupNotice(f.combat,undefined,snapshot);
- assert.equal(messages.length,1);assert.deepEqual(messages[0].whisper,[]);assert.equal(messages[0].blind,false);assert.match(messages[0].content,/pneuma-combat-summary/);assert.match(messages[0].content,/data-status-cleanup/);
+ assert.equal(messages.length,1);assert.deepEqual(messages[0].whisper,[]);assert.equal(messages[0].blind,false);assert.match(messages[0].content,/pneuma-combat-summary/);assert.match(messages[0].content,/data-status-cleanup/);assert.match(messages[0].content,/data-copy-combat-summary/);assert.equal(messages[0].flags['pneuma-combattools'].combatReport.version,1);assert.equal(typeof messages[0].flags['pneuma-combattools'].combatReport.participants[0].name,'string');
 });
 
 test('public review removes only the cleanup control on player clients',async()=>{
@@ -52,4 +55,45 @@ test('public review removes only the cleanup control on player clients',async()=
  let removed=false;const html={0:{querySelectorAll:()=>[]},find:()=>({remove:()=>{removed=true;}})};
  game.user={id:'player',isGM:false};f.fire('renderChatMessage',message,html);assert.equal(removed,true);
  game.user={id:'gm',isGM:true};removed=false;f.fire('renderChatMessage',message,html);assert.equal(removed,false,'GM keeps the cleanup control');
+});
+
+test('snapshot excludes cyberware, includes current injuries and stabilization, saves player HP only, and Markdown stays frozen',async()=>{
+ const f=fixture();await f.start();
+ f.player.system={derivedStats:{hp:{value:18,max:40}}};f.npc.system={derivedStats:{hp:{value:7,max:20}}};
+ const cyber={uuid:'Actor.player.Item.scope.Effect.scope',name:'Targeting Scope',parent:{type:'cyberware'},disabled:false,statuses:new Set()};
+ const stabilize={uuid:'Effect.stabilize',name:'Needs Stabilization',disabled:false,statuses:new Set(['pneuma-needs-stabilization'])};
+ f.player.allApplicableEffects=function*(){yield cyber;};f.npc.effects.push(stabilize);
+ f.npc.items.push({uuid:'Item.foreign',name:'Foreign Object (Body)',type:'criticalInjury'});
+ const report=buildCombatReport(captureCombatSummary(f.combat,2)),html=combatSummaryHTML(captureCombatSummary(f.combat,2));
+ assert.doesNotMatch(html,/Targeting Scope/);assert.ok(html.includes('HP 18/40'));assert.match(combatReportMarkdown(report),/Seriously Wounded/);assert.match(html,/Needs Stabilization/);assert.match(combatReportMarkdown(report),/Foreign Object/);assert.doesNotMatch(html,/Foreign Object/);
+ assert.equal(report.participants.find(row=>!row.player).hp,undefined);
+ const before=combatReportMarkdown(report);f.player.system.derivedStats.hp.value=40;f.npc.effects=[];f.npc.items=[];
+ assert.equal(combatReportMarkdown(report),before,'Saved snapshot does not re-read actors');
+ report.name='@everyone **ambush**';const markdown=combatReportMarkdown(report);assert.ok(!markdown.includes('@everyone'),'Copy avoids Discord pings');assert.ok(markdown.includes('\\*\\*ambush\\*\\*'),'Names escape Discord markup');
+});
+
+test('public Copy Discord Markdown uses persisted report data and survives repeated render',async()=>{
+ const f=fixture();await f.start();globalThis.FormApplication=class{};
+ const {registerStatusCleanup}=await import('../dist/scripts/status-cleanup.js');game.settings={registerMenu(){}};registerStatusCleanup();
+ const report=buildCombatReport(captureCombatSummary(f.combat,2));
+ const message={flags:{'pneuma-combattools':{statusCleanup:{combat:f.combat.id},combatReport:report}}};
+ let handler,copied;const copy={addEventListener:(_name,fn)=>{handler=fn;},removeEventListener:()=>{}};
+ Object.defineProperty(globalThis,'navigator',{configurable:true,value:{clipboard:{writeText:async value=>{copied=value;}}}});
+ ui.notifications.info=()=>{};game.user={id:'player',isGM:false};
+ const html={0:{querySelectorAll:selector=>selector==='[data-copy-combat-summary]'?[copy]:[]},find:()=>({remove(){}})};
+ f.fire('renderChatMessage',message,html);f.fire('renderChatMessage',message,html);await handler({});
+ assert.equal(copied,combatReportMarkdown(report));
+});
+
+test('removed defeated combatants remain in the saved roster after tracker removal',async()=>{
+ const f=fixture();await f.start();const row=f.combat.combatants[1];row.parent=f.combat;
+ f.fire('deleteCombatant',row);f.combat.combatants.pop();await waitCombatSummary();
+ const summary=captureCombatSummary(f.combat);assert.equal(summary.npcs,1);assert.ok(summary.actors.includes(f.npc));assert.deepEqual(summary.defeated,['Guard']);
+ const report=buildCombatReport(summary);assert.ok(report.participants.some(row=>row.name==='Guard'));
+ assert.match(combatReportMarkdown(report),/Encounter participants/);
+});
+test('late participant remains after removal and recapture',async()=>{
+ const f=fixture();await f.start();const actor={uuid:'Actor.late',name:'Late mook',hasPlayerOwner:false,items:[],effects:[]};game.actors.push(actor);
+ const row={actor,parent:f.combat,name:actor.name,isDefeated:false};f.combat.combatants.push(row);f.fire('createCombatant',row);await waitCombatSummary();
+ f.fire('deleteCombatant',row);f.combat.combatants.pop();await waitCombatSummary();assert.equal(captureCombatSummary(f.combat).npcs,2);
 });

@@ -461,7 +461,7 @@ test('EMP refresh indexes affected actors, batches events and ignores unrelated 
 });
 
 test('EMP cards refresh only changed requests, removed requests and combat availability',async()=>{
- const f=fixture();globalThis.FormApplication=class{};const hooks={};globalThis.Hooks={on:(n,fn)=>(hooks[n]??=[]).push(fn),once:(n,fn)=>(hooks[n]??=[]).push(fn)};
+ const f=fixture();game.modules=new Map([[module,{}]]);globalThis.FormApplication=class{};const hooks={};globalThis.Hooks={on:(n,fn)=>(hooks[n]??=[]).push(fn),once:(n,fn)=>(hooks[n]??=[]).push(fn)};
  foundry.data={fields:{ObjectField:class{}}};game.settings={register(){},registerMenu(){}};const refreshed=[];globalThis.ui={chat:{updateMessage:m=>refreshed.push(m.id)},notifications:{error:e=>{throw Error(e)}}};
  game.messages=collection([{id:'one'},{id:'two'}]);f.request.message='one';f.combat.flags[module].empRequests.other={...f.request,id:'other',message:'two'};
  const {registerEmp}=await import('../dist/scripts/emp.js');registerEmp();

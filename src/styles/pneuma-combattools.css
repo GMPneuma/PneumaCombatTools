@@ -1216,3 +1216,5 @@ i.pneuma-neural-plug::before { content: ""; display: inline-block; width: 1em; h
   [data-pneuma-manual-rolls] > .pneuma-roll-sparkles,
   .pneuma-roll-sparkles > .pneuma-roll-sparkle { animation: none; }
 }
+
+.pneuma-status-cleanup-card .pneuma-combat-summary { overflow-wrap: anywhere; }

@@ -457,3 +457,12 @@ test("Molotov uses incendiary blast resolution with native 5d6, including rename
  const ordinary={type:'weapon',name:'Thrown Weapon',system:{weaponType:'thrownWeapon'}};
  assert.equal(areaKind(ordinary,'attack'),undefined,'Other thrown weapons stay single-target');
 });
+
+test('suppression accepts covered non-combat tokens and their concentration responses',async()=>{
+ const f=fixture('suppression');const combat={id:'c',scene:f.scene,active:true,started:true,round:1,turn:0,flags:{},combatants:[{token:f.source.document,actor:f.a}],turns:[{id:'attacker',token:f.source.document}]};game.combats=collection([combat]);
+ await startAreaAttack(f.source,f.target,'w','suppressive');assert.equal(f.weapon.system.magazine.value,10);
+ assert.ok(f.data().rows.some(row=>row.uuid===f.target.document.uuid));
+ await f.request('claim',{nonce:'one'});await f.request('commit',{nonce:'one',total:19,html:'failed'});
+ assert.equal(f.data().rows[0].state,'hit');assert.equal(f.b.effects[0].name,'Suppressed');assert.equal(f.b.effects[0].flags[M].suppressionExpiry,undefined);
+ combat.flags={[M]:{evasionEpoch:'reset'}};await assert.rejects(f.request('reset',{user:'gm'}),/reset/);
+});

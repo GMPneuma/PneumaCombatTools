@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {hasActorEMP} from '../dist/scripts/emp-rules.js';
+const combat={started:true,round:1,turn:0,turns:[{},{}]};
+globalThis.game={combats:{get:()=>combat},time:{worldTime:100}};
+const actor={items:[]};assert.equal(hasActorEMP(actor),false,'pending or resisted application has no disabled item');
+actor.items=[{flags:{'pneuma-combattools':{empCombats:['combat']}}}];assert.equal(hasActorEMP(actor),true);
+const reloaded=JSON.parse(JSON.stringify(actor));assert.equal(hasActorEMP(reloaded),true,'saved item records survive fresh actor data');
+combat.started=false;assert.equal(hasActorEMP(actor),false,'combat end clears untimed EMP');
+actor.items=[{flags:{'pneuma-combattools':{timedDisables:{hit:{source:'emp',duration:{seconds:60,startTime:100}}}}}}];assert.equal(hasActorEMP(actor),true);game.time.worldTime=160;assert.equal(hasActorEMP(actor),false);
+game.time.worldTime=100;actor.items[0].flags['pneuma-combattools'].timedDisables.hit.source='short-circuit';assert.equal(hasActorEMP(actor),false,'other disable sources do not activate EMP');
+console.log('Applied EMP state, refresh persistence, expiry and source isolation passed');

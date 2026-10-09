@@ -1,4 +1,5 @@
-import {combatSummaryHTML,type CombatSummarySnapshot} from "./combat-summary.js";
+import {buildCombatReport,combatReportHTML,combatReportMarkdown,type CombatReport} from "./combat-report.js";
+import {type CombatSummarySnapshot} from "./combat-summary.js";
 import {allActors,escapeHTML,primaryGM} from "./shared.js";
 import {bindCardAction} from "./card-structure.js";
 import {masterStatuses} from "./status-catalog.js";
@@ -115,11 +116,12 @@ const notices=new Set<string>();
 export function resetCleanupNotice(combat:Combat){notices.delete(combat.id!);}
 export async function postCleanupNotice(combat:Combat,affected?:string[],summary?:CombatSummarySnapshot){
   if(game.user?.id!==primaryGM()?.id||notices.has(combat.id!))return;
-  const scope:CleanupScope={combat:combat.id!,actors:affected??[...new Set(Array.from(combat.combatants??[]).flatMap(p=>p.actor?[p.actor.uuid]:[]))],label:combat.name??"Ended combat"};
+  const scope:CleanupScope={combat:combat.id!,actors:[...new Set([...(affected??Array.from(combat.combatants??[]).flatMap(p=>p.actor?[p.actor.uuid]:[])),...(summary?.actors.map(actor=>actor.uuid)??[])])],label:combat.name??"Ended combat"};
   // Include tagged actors even if removed from the tracker before combat ended.
   for(const actor of allActors())if(Array.from(actor.allApplicableEffects?.()??actor.effects).some(e=>effectCombat(e)===combat.id)&&!scope.actors!.includes(actor.uuid))scope.actors!.push(actor.uuid);
+  const report=summary?buildCombatReport(summary):undefined;
   notices.add(combat.id!);
-  try{await ChatMessage.create({content:`<section class="pneuma-status-cleanup-card"><p>${escapeHTML(scope.label)} ended. Review any remaining status effects.</p>${summary?combatSummaryHTML(summary):""}<button type="button" data-status-cleanup data-gm-only="true">Clear Token Status Effects</button></section>`,whisper:[],blind:false,flags:{[M]:{statusCleanup:scope}}} as never);}
+  try{await ChatMessage.create({content:`<section class="pneuma-status-cleanup-card">${report?combatReportHTML(report)+'<button type="button" data-copy-combat-summary data-chat-icon="fa-copy">Copy to paste in Discord</button>':'<p>'+escapeHTML(scope.label)+' ended. Review any remaining status effects.</p>'}<button type="button" data-status-cleanup data-gm-only="true">Clear Token Status Effects</button></section>`,whisper:[],blind:false,flags:{[M]:{statusCleanup:scope,...(report?{combatReport:report}:{})}}} as never);}
   catch(error){notices.delete(combat.id!);throw error;}
 }
 export function registerStatusCleanup(){
@@ -129,6 +131,12 @@ export function registerStatusCleanup(){
   Hooks.on("renderChatMessage",(message:ChatMessage,html:JQuery)=>{
     const scope=flag(message,"statusCleanup") as CleanupScope|undefined;
     if(!scope)return;
+    const report=flag(message,"combatReport") as CombatReport|undefined;
+    if(report&&html[0])html[0].querySelectorAll<HTMLElement>('[data-copy-combat-summary]').forEach(node=>bindCardAction(node,async()=>{
+      const markdown=combatReportMarkdown(report);
+      try{await navigator.clipboard.writeText(markdown);ui.notifications!.info("Combat snapshot copied as Discord Markdown.");}
+      catch{new Dialog({title:"Discord combat snapshot",content:'<p>Copy the Markdown below.</p><textarea readonly style="width:100%;min-height:300px">'+escapeHTML(markdown)+'</textarea>',buttons:{close:{label:"Close"}}}).render(true);}
+    }));
     const button=html.find('[data-status-cleanup]');
     if(!game.user?.isGM){button.remove();return;}
     html[0]?.querySelectorAll<HTMLElement>('[data-status-cleanup]').forEach(node=>bindCardAction(node,()=>new StatusCleanup(scope).render(true)));

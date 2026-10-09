@@ -17,3 +17,7 @@ An icon is not proof of complete rule automation. See [injury coverage](body-hea
 Styling and custom artwork remain separate from mechanics. Preserve native IDs and bindings when integrating; use the status API/managed workflow rather than replacing names to simulate mechanics.
 
 Implementation: [status-catalog.ts](../src/scripts/status-catalog.ts), [status-settings.ts](../src/scripts/status-settings.ts), [status-hud.ts](../src/scripts/status-hud.ts), [status-sync.ts](../src/scripts/status-sync.ts), [damage-status.ts](../src/scripts/damage-status.ts).
+
+2026-10-09 local update: Drugs contains nine primary statuses; Addiction contains the nine corresponding addiction statuses. Both groups are collapsed and alphabetical, and retain native Foundry controls. This reorganization preserves all IDs and native bindings. Hornet's Pharmacy drugs/pharmaceuticals are already included in this catalog. Emerald City, Mortalis and Red Lace remain excluded by user request. Piranha Smash uses Smash's status; its different addiction-check DV is not handled by the status picker.
+
+General status group (2026-10-09, local/unreleased): normal and custom token statuses appear in a General disclosure section above the specialized groups. General starts expanded on each new HUD render and can be collapsed by clicking its heading. Other sections retain their collapsed defaults. Native status controls and alphabetical order are preserved.

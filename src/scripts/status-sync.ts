@@ -15,7 +15,7 @@ function matchingItems(actor: Actor, status: Bound): Item[] {
     if (String(item.type) !== (b.kind === "injury" ? "criticalInjury" : "drug")) return false;
     const source = String(foundry.utils.getProperty(item, "_stats.compendiumSource")
       ?? foundry.utils.getProperty(item, "flags.core.sourceId") ?? "");
-    return flag(item, "statusId") === status.id || source.endsWith("." + b.itemId) || item.name === b.itemName;
+    return flag(item, "statusId") === status.id || (!!b.itemId&&source.endsWith("." + b.itemId)) || item.name === b.itemName;
   });
 }
 function sourceEffects(item: Item, status: Bound): ActiveEffect[] {
@@ -28,12 +28,14 @@ function markers(actor: Actor, id: string): ActiveEffect[] {
   return Array.from(actor.effects).filter(effect => effect.statuses.has(id));
 }
 async function sourceItem(status: Bound): Promise<Item> {
-  const key = status.binding.pack + "." + status.binding.itemId;
+  const key = status.binding.pack + "." + (status.binding.itemId||status.binding.itemName);
   let promise = sources.get(key);
   if (!promise) {
     promise = (async () => {
       const pack = game.packs!.get(status.binding.pack);
-      const item = await pack?.getDocument(status.binding.itemId);
+      // Resolve name-bound drugs from the installed system instead of inventing IDs.
+      const id=status.binding.itemId||(await pack?.getIndex())?.find(row=>row.name===status.binding.itemName)?._id;
+      const item = id?await pack?.getDocument(id):undefined;
       if (!item || String((item as Item).type) !== (status.binding.kind === "injury" ? "criticalInjury" : "drug"))
         throw new Error("Native " + status.name + " item is unavailable.");
       return item as Item;

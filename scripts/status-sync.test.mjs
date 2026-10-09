@@ -90,6 +90,20 @@ test("sheet drug toggles reflect on token; source-less general statuses remain u
  [...item.effects][0].disabled=true;await syncActorStatuses(actor);assert.equal(actor.effects.size,0);
  await marker(actor,{id:"prone",name:"Prone"});await syncActorStatuses(actor);assert.equal(actor.effects.size,1);
 });
+test("Blue Glass primary and addiction sync independently in both directions",async()=>{
+ const actor=setup();const primary=masterStatuses.find(s=>s.name==='Blue Glass'),addiction=masterStatuses.find(s=>s.name==='Blue Glass Addiction');
+ const [item]=await actor.createEmbeddedDocuments('Item',[{name:'Blue Glass',type:'drug',effects:[{name:'Blue Glass Primary',disabled:false},{name:'Blue Glass Addiction',disabled:true}]}]);
+ await syncActorStatuses(actor);assert.deepEqual([...actor.effects].map(e=>e.name),['Blue Glass']);
+ [...item.effects][0].disabled=true;[...item.effects][1].disabled=false;await syncActorStatuses(actor);assert.deepEqual([...actor.effects].map(e=>e.name),['Blue Glass Addiction']);
+ await marker(actor,primary);await syncActorStatuses(actor,[primary.id]);assert.equal([...item.effects][0].disabled,false);assert.equal([...item.effects][1].disabled,false);
+ actor.effects.delete([...actor.effects].find(e=>e.statuses.has(primary.id)).id);await syncActorStatuses(actor,[primary.id]);assert.equal([...item.effects][0].disabled,true);assert.equal([...item.effects][1].disabled,false);
+ actor.effects.delete([...actor.effects].find(e=>e.statuses.has(addiction.id)).id);await syncActorStatuses(actor,[addiction.id]);assert.equal([...item.effects][1].disabled,true);
+});
+test("Blue Glass token status resolves installed native drug by compendium name",async()=>{
+ const actor=setup(),primary=masterStatuses.find(s=>s.name==='Blue Glass');
+ game.packs.get=()=>({getIndex:async()=>[{_id:'installed-blue-glass',name:'Blue Glass'}],getDocument:async id=>{assert.equal(id,'installed-blue-glass');return {type:'drug',toObject:()=>({_id:id,name:'Blue Glass',type:'drug',effects:[{name:'Blue Glass Primary',disabled:true}]})};}});
+ await marker(actor,primary);await syncActorStatuses(actor,[primary.id]);assert.equal(actor.items.size,1);assert.equal([...([...actor.items][0].effects)][0].disabled,false);
+});
 test("startup adopts legacy injury statuses without duplicating existing injury",async()=>{
  const actor=setup();await marker(actor,leg);await syncActorStatuses(actor,[],true);await syncActorStatuses(actor,[],true);
  assert.equal(actor.items.size,1);assert.equal(actor.effects.size,1);
@@ -172,4 +186,12 @@ test('each new street-drug addiction toggles its native effect and retains drug 
   actor.effects.clear();await syncActorStatuses(actor,[status.id]);
   assert.equal(actor.items.size,1);assert.equal([...item.effects][0].disabled,true);
  }
+});
+
+test('street-drug primaries and addictions are separate without adding excluded drugs',()=>{
+ const names=['Black Lace','Blue Glass','Boost','Smash','Synthcoke','Berserker','Prime Time','Sixgun','Timewarp'];
+ assert.deepEqual(masterStatuses.filter(s=>s.group==='drugs').map(s=>s.name).sort(),[...names].sort());
+ assert.deepEqual(masterStatuses.filter(s=>s.group==='addiction').map(s=>s.name).sort(),names.map(name=>name+' Addiction').sort());
+ for(const name of ['Emerald City','Mortalis','Red Lace','Piranha Smash'])assert.ok(!masterStatuses.some(s=>s.name===name));
+ for(const status of masterStatuses.filter(s=>s.group==='addiction'))assert.equal(status.binding?.kind,'effect');
 });

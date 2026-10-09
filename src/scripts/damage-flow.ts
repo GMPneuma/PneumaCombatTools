@@ -199,7 +199,7 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
       data.coverUp?{ablation:interact===false?0:2*v.ablation,ignorePercent:armorIgnorePercent(v.ignorePercent,request.halfArmor,interact),ignoreBelow:v.ignoreBelow}:undefined, native=>{damage.penetrated=Number(native.rawDamageDealt)>0&&native.hpReduction>0;},data.attackMode==="aimed"&&v.location==="head");
     if(damage.penetrated) {
       const ammo=damage.result.ammoType;
-      if(ammo&&ammo!=="incendiary")reportExposure(actor,ammo);
+      if(ammo&&ammo!=="incendiary")await reportExposure(actor,ammo);
     }
     damage.applications = [...(damage.applications ?? []), ...summaries];
     if (application === "selected") damage.selectedTargets = [...(damage.selectedTargets ?? []), {

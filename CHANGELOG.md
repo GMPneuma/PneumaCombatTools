@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.9.14 - 2026-10-09
+
+- Group normal/custom token statuses under General, expanded by default and collapsible; split nine primary drug statuses and nine addiction statuses into separate Drugs and Addiction sections.
+- Allow suppressive-fire targets outside the combat tracker to respond. Their Suppressed condition requires manual clearance because they have no next turn for automatic expiry.
+- Retain removed encounter participants in combat-end reports while their actors still exist.
+- Show a compact combat-end chat summary with player HP, injury counts and urgent conditions; exclude passive equipment modifiers. Add Copy to paste in Discord for the detailed saved snapshot.
+- Await QuickFix restoration before producing the combat-end report.
+- Add Halves Armor SP (round up) to manual damage rolls; disable it when armor interaction is off.
+- Synchronize Blue Glass primary and addiction effects independently using the installed native compendium item.
+- Expose read-only poison, EMP and neural-intrusion state for Visual Tools. Persist combat poison/biotoxin exposure through refresh with encounter and next-turn expiry.
+- Report Flashbang and Tear Gas visuals separately with native duration; preserve combat records through refresh and broadcast temporary noncombat events.
+
+Validation: production build, strict TypeScript checks, automated suite and focused browser fixtures. Live Foundry/multiplayer verification remains pending.
+
 ## 0.9.13 - 2026-10-07
 
 - Replace the delayed single gray sparkle on the chat Roll icon with five small gold sparkles distributed around the button.

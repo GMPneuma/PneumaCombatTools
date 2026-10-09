@@ -24,6 +24,11 @@ export function activeDisables(item:{flags?:unknown}):TimedDisable[] {return Obj
 export function empDisabled(item: {flags?: unknown}): boolean {
   return empReferences(item).some(id => game.combats?.get(id)?.started)||activeDisables(item).length>0;
 }
+/** Actual EMP-applied state only; other quickhack disablements do not count. */
+export function hasActorEMP(actor:Actor):boolean {
+  return [...actor.items].some(item=>empReferences(item).some(id=>game.combats?.get(id)?.started)
+    ||activeDisables(item).some(disable=>disable.source==='emp'));
+}
 /** Native compendium identity survives item renaming; exact name supports imported copies. */
 export function isMicrowaver(item: {name?:string|null;flags?:unknown}):boolean {
   const source=foundry.utils.getProperty(item,"_stats.compendiumSource")??foundry.utils.getProperty(item,"flags.core.sourceId");

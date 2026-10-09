@@ -188,7 +188,7 @@ export async function handleAreaRequest(req:Request) {
   if(!message||!saved||!user)throw Error("Area attack is unavailable.");
   const data=foundry.utils.deepClone(saved);
   const combat=resolveEncounter(data.exchange);
-  if(combat&&req.target)requireParticipants(combat,[req.target]);
+  if(combat&&req.target&&data.kind!=="suppression")requireParticipants(combat,[req.target]);
   const row=data.rows.find(r=>r.uuid===req.target);
   if(req.action==="instant") {
     if(!row?.instant||row.state!=="hit"||!req.instantRequest||data.phase!=="responses")throw Error("Instant effect unavailable.");
@@ -353,7 +353,7 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
     const area=await placeArea(p=>{aimPoint=p;return makeArea(kind,source,p,ammoType==="smoke"?{...s,blastShape:"square",blastSize:10}:s);},target.center,
       kind==="shell"?"Aim the shell area in front of the attacker.":kind==="suppression"?"Aim suppressive fire.":"Place the blast center in line of sight.",profile?.color,canAim);
     if(!area||canvas.scene?.id!==scene)return;
-    const validate=()=>{if(!canAim(aimPoint))throw Error("The target square is outside the attacker’s line of sight.");const current=resolveEncounter(encounter);if(current&&ammoType!=="smoke")requireParticipants(current,(canvas.tokens?.placeables??[]).filter(t=>t.actor&&!['container','blackIce','demon'].includes(String(t.actor.type))&&areaCoverage(area)({x:t.x,y:t.y,width:t.w,height:t.h})).map(t=>t.document.uuid));};
+    const validate=()=>{if(!canAim(aimPoint))throw Error("The target square is outside the attacker’s line of sight.");const current=resolveEncounter(encounter);if(current&&kind!=="suppression"&&ammoType!=="smoke")requireParticipants(current,(canvas.tokens?.placeables??[]).filter(t=>t.actor&&!['container','blackIce','demon'].includes(String(t.actor.type))&&areaCoverage(area)({x:t.x,y:t.y,width:t.w,height:t.h})).map(t=>t.document.uuid));};
     validate();
     let item:RollItem=original, thrownSource:object|undefined;
     if(String(original.type)==="ammo"||molotov){

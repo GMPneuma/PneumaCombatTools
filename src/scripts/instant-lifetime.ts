@@ -210,7 +210,8 @@ export function registerInstantLifetimes() {
       try{await finishTimedEffects(c);}finally{
         await empWork(async()=>{});
         const {waitGrappleCleanup}=await import("./grapple/workflow.js");await waitGrappleCleanup();
-        Hooks.callAll("pneumaCombatCleanupFinished",c,affected,summary);
+        const {expireQuickFixes}=await import("./medical.js");
+        try{await expireQuickFixes(c);}finally{Hooks.callAll("pneumaCombatCleanupFinished",c,affected,summary);}
       }
     });
   };

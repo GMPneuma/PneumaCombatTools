@@ -37,7 +37,7 @@ test('a failed LUCK write releases the actor queue for a later retry',async()=>{
  await assert.rejects(spendBonusLuck(actor,1),/write failed/);await spendBonusLuck(actor,1);assert.equal(actor.system.stats.luck.value,1);
 });
 test('completed fire cards do not subscribe to condition refresh; sleep keeps its Wake refresh',()=>{
- let scope;const ctx=fixture('instant-effects',{registerConditionCardRefresh:fn=>scope=fn,registerEffectEvents(){},registerInstantLifetimes(){},Hooks:{on(){},once(){}},foundry:{utils:{getProperty:get}}});
+ let scope;const ctx=fixture('instant-effects',{registerConditionCardRefresh:fn=>scope=fn,registerEffectEvents(){},registerFlashbangEvents(){},getFlashbangState(){},getTearGasState(){},game:{modules:new Map([["pneuma-combattools",{}]])},registerInstantLifetimes(){},Hooks:{on(){},once(){}},foundry:{utils:{getProperty:get}}});
  ctx.registerInstantEffects();const fire={id:'incendiary',state:'applied',actor:'Actor.a'},sleep={...fire,id:'sleep'};
  for(const data of [{instant:{effect:fire}},{attachedEffects:{a:{effect:fire}}},{aoe:{rows:[{instant:fire}]}}])assert.equal(scope({flags:{'pneuma-combattools':data}}),undefined);
  const tracked=scope({flags:{'pneuma-combattools':{attachedEffects:{a:{effect:fire},b:{effect:sleep}}}}});assert.deepEqual([...tracked.actors],['Actor.a']);

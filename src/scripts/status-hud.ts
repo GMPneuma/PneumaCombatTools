@@ -9,8 +9,10 @@ export function groupStatusHUD(root: HTMLElement, statuses: StatusDefinition[]):
   tray.classList.add("pneuma-status-tray");
   const general = document.createElement("div"); general.className = "pneuma-status-grid";
   const groups = new Map<string, HTMLElement>([["general", general], ["custom", general]]);
-  tray.append(general);
-  for (const [group, title] of [["head", "Crit Head"], ["body", "Crit Body"], ["pharma", "Pharmaceuticals"], ["drugs", "Drugs"]]) {
+  const generalSection = document.createElement("details"); generalSection.className = "pneuma-status-group"; generalSection.open = true;
+  const generalTitle = document.createElement("summary"); generalTitle.textContent = "General";
+  generalSection.append(generalTitle, general); tray.append(generalSection);
+  for (const [group, title] of [["head", "Crit Head"], ["body", "Crit Body"], ["pharma", "Pharmaceuticals"], ["drugs", "Drugs"], ["addiction", "Addiction"]]) {
     const details = document.createElement("details"); details.className = "pneuma-status-group";
     const summary = document.createElement("summary"); summary.textContent = title!;
     const grid = document.createElement("div"); grid.className = "pneuma-status-grid";

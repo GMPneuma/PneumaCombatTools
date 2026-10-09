@@ -40,7 +40,7 @@ export function collectHUDConditions(actor: Actor) {
     const drug = lastingDrugFor(title) ?? lastingDrugFor(name);
     if (drug) { drugs.add(drug.name); return; }
     if (/addiction/i.test(title)) return;
-    if (definition?.group === "drugs" || definition?.group === "pharma" || /speed\s*heal|rapid?detox|radaway/i.test(title)) return;
+    if (definition?.group === "drugs" || definition?.group === "pharma" || definition?.group === "addiction" || /speed\s*heal|rapid?detox|radaway/i.test(title)) return;
     if (/poison|biotoxin|radiation|on[ _-]?fire|incendiary|burning|unconscious/i.test(title)) { exposures.add(title); return; }
     if (/^EMP\b/i.test(title)) return;
     if (title === "Netrunning") return; // Jacked In is sourced from the actual connection, not this marker.

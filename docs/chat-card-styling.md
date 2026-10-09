@@ -309,3 +309,11 @@ Compact effect artwork source (2026-10-04, unreleased): .pneuma-aoe-inline-effec
 ### Combat-end summary (2026-10-07)
 
 Public `.pneuma-status-cleanup-card` now includes `.pneuma-combat-summary` before the existing `[data-status-cleanup]` button. Plain paragraphs and a player-injury list show round reached, participants, recorded crits, defeat state and observed cleanup effects. Text is escaped; no native controls or selectors are removed. The card is public (no whisper recipients, not blind); the cleanup button is removed on non-GM clients and cleanup mutations remain GM-only. Example: `.pneuma-status-cleanup-card .pneuma-combat-summary`.
+
+### Focused combat snapshot and copy (2026-10-07)
+
+`.pneuma-status-cleanup-card .pneuma-combat-summary` now renders final player condition, relevant NPC conditions/injuries, recorded injury additions and actual recognized-condition cleanup. The prior arbitrary remaining-effects paragraph is removed. `[data-copy-combat-summary]` is public and copies the frozen `combatReport` message flag as Discord Markdown; `[data-status-cleanup]` remains GM-only. Native cleanup handlers and selectors are retained. All interpolated HTML is escaped. Example selector: `.pneuma-status-cleanup-card [data-copy-combat-summary]`.
+
+Discord copy button theming (2026-10-07, local/unreleased): [data-copy-combat-summary] joins the shared chat-control selector and uses the copy glyph. It receives the existing pneuma-chat-button theme classes and public/player role metadata; cleanup remains GM-only.
+
+Compact chat versus detailed Discord snapshot (2026-10-07, local/unreleased): chat shows encounter/round/counts, brief player HP/injury totals, urgent stabilization needs and outcome totals. Detailed condition/injury names, recorded additions, cleared-condition names, scene and UTC timestamp remain in the saved Discord Markdown export. No underlying report data or copy/cleanup permissions change.

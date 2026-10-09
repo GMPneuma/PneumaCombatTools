@@ -6,6 +6,7 @@ import {effectDefinition,instantContent} from "./instant-content.js";
 export {instantContent} from "./instant-content.js";
 import {actorEncounter,encounterRef,resolveEncounter,type EncounterRef} from "./encounter.js";
 import {reportExposure,registerEffectEvents} from "./effect-events.js";
+import {reportFlashbang,getFlashbangState,getTearGasState,registerFlashbangEvents} from './flashbang-state.js';
 import {createSmoke} from "./aoe/smoke.js";
 import {instantEffects,instantId,type InstantId,escapeInstant as esc} from "./instant-catalog.js";
 import {hasInstantCondition,temporaryInjury,sleepTarget,igniteTarget,clearInstantCondition,registerInstantLifetimes} from "./instant-lifetime.js";
@@ -87,9 +88,9 @@ async function resolveInstant(s:InstantState,req:InstantRequest,user:User,save:(
   }
   s.state="applying";await save();
   try {
-    if(e.damage){await withActorMutation(actor,async()=>{const hp=Number(foundry.utils.getProperty(actor,"system.derivedStats.hp.value"));if(!Number.isFinite(hp))throw Error("Target HP unavailable.");await actor.update({"system.derivedStats.hp.value":hp-s.damage!} as never);});s.summary=s.damage+" direct HP damage; armor unchanged";reportExposure(actor,s.id);}
+    if(e.damage){await withActorMutation(actor,async()=>{const hp=Number(foundry.utils.getProperty(actor,"system.derivedStats.hp.value"));if(!Number.isFinite(hp))throw Error("Target HP unavailable.");await actor.update({"system.derivedStats.hp.value":hp-s.damage!} as never);});s.summary=s.damage+" direct HP damage; armor unchanged";await reportExposure(actor,s.id);}
     else if(s.id==="emp"||s.id==="microwaver") {const selection=await createEmp(actor,{...(s.id==="microwaver"?{source:"microwaver",seconds:60}:{}),count:2,chooser:"gm",mode:"equal",policy:{foundational:true,cascade:true,electronics:true,immune:game.settings!.get(M,"empImmunity").split(/[\n,;]/)}},s.encounter,s.sourceMessage?game.messages?.get(s.sourceMessage) as ChatMessage|undefined:undefined);s.summary=!selection?"No eligible cyberware or carried electronics":s.id==="microwaver"?"Choose two items below — disabled for 60 seconds":"Choose two items below — disabled until combat ends";}
-    else if(s.id==="flashbang"||s.id==="teargas") {await temporaryInjury(actor,"Damaged Eye",combat??null);if(s.id==="flashbang")await temporaryInjury(actor,"Damaged Ear",combat??null);s.summary="Temporary native injury effects: 1 minute; no bonus damage";}
+    else if(s.id==="flashbang"||s.id==="teargas") {await temporaryInjury(actor,"Damaged Eye",combat??null);if(s.id==="teargas"){try{await reportFlashbang(actor,combat,"teargas");}catch(error){console.error("Tear Gas visual state failed",error);}}if(s.id==="flashbang"){await temporaryInjury(actor,"Damaged Ear",combat??null);try{await reportFlashbang(actor,combat);}catch(error){console.error('pneuma-combattools | Flashbang visual state failed',error);}}s.summary="Temporary native injury effects: 1 minute; no bonus damage";}
     else if(s.id==="smoke") {
       if(s.encounter?.combatScene&&canvas.scene?.id!==s.encounter.combatScene)throw Error("Open the target scene to place smoke.");
       const tokens=canvas.tokens?.placeables.filter(t=>t.actor?.uuid===actor.uuid&&(!s.encounter?.combatTokens?.length||s.encounter.combatTokens.includes(t.document.uuid)))??[];
@@ -189,6 +190,9 @@ export async function dispatchMicrowaver(message:ChatMessage) {
   finally {microwavePending.delete(message.id!);}
 }
 export function registerInstantEffects() {
+  registerFlashbangEvents();
+  const module=game.modules!.get(M) as unknown as {api?:Record<string,unknown>};
+  module.api={...module.api,getFlashbangState,getTearGasState};
   registerConditionCardRefresh(message=>{
     const flags=foundry.utils.getProperty(message,"flags."+M) as {instant?:EffectCard;attachedEffects?:Record<string,EffectCard>;aoe?:{rows:{instant?:InstantState}[]}}|undefined;
     const states=flags?.instant?[flags.instant.effect]:flags?.aoe?.rows.map(row=>row.instant).filter((s):s is InstantState=>!!s)??[];

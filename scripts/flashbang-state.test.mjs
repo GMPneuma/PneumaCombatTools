@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {reportFlashbang,getFlashbangState,getTearGasState} from '../dist/scripts/flashbang-state.js';
+const get=(o,p)=>p.split('.').reduce((v,k)=>v?.[k],o);let id=0;
+globalThis.foundry={utils:{getProperty:get,randomID:()=>`hit${++id}`}};
+const actor={uuid:'Actor.test'};
+const combat={id:'combat',started:true,round:1,turn:0,turns:[{},{}],flags:{},async update(changes){for(const [path,value] of Object.entries(changes)){const parts=path.split('.');let at=this;for(const part of parts.slice(0,-1))at=at[part]??={};at[parts.at(-1)]=value;}}};
+globalThis.game={time:{worldTime:0},combats:[combat]};game.combats.get=()=>combat;
+assert.equal(getFlashbangState(actor),undefined,'ordinary injuries have no flashbang visual state');await reportFlashbang(actor,combat);assert.equal(getFlashbangState(actor).id,'hit1');
+const restored=JSON.parse(JSON.stringify(combat));game.combats=[restored];game.combats.get=()=>restored;assert.equal(getFlashbangState(actor).id,'hit1','combat record restores after reload');
+restored.round=21;assert.equal(getFlashbangState(actor),undefined,'60 seconds equals 20 CPR rounds');restored.round=2;restored.started=false;assert.equal(getFlashbangState(actor),undefined,'combat end clears');
+globalThis.Hooks={callAll(){}};game.time.worldTime=0;await reportFlashbang(actor,null,'teargas');assert.ok(getTearGasState(actor));assert.equal(getFlashbangState(actor),undefined,'tear gas cannot cause flashbang flash');game.time.worldTime=60;assert.equal(getTearGasState(actor),undefined,'noncombat gas expires');
+console.log('Flashbang source isolation, refresh recovery and native-duration expiry passed');

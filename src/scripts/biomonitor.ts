@@ -22,6 +22,12 @@ const flashes = new Map<string, Map<LampId, number>>();
 const roundExposures = new Map<string, Set<LampId>>();
 const clearedExposures = new Map<string, Set<LampId>>();
 const roundKinds: LampId[] = ["poison", "biotoxin"];
+/** Read current viewer-local exposure state without changing monitor timing. */
+export function hasMonitorExposure(uuid:string,kind:LampId):boolean {
+  return !!roundExposures.get(uuid)?.has(kind)
+    || (flashes.get(uuid)?.get(kind)??0)>Date.now()
+    || (!!seen.get(uuid)?.has(kind)&&!clearedExposures.get(uuid)?.has(kind));
+}
 /** Clear visual exposure reports, without changing actor effects or damage. */
 export function clearRoundExposures() {
   for (const uuid of new Set([...seen.keys(), ...roundExposures.keys()])) {

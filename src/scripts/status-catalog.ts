@@ -1,14 +1,14 @@
 /** Cyberpunk condition names/icons; legacy IDs retained for existing Condition Lab statuses.
  * Source: https://raw.githubusercontent.com/mclemente/fvtt-condition-lab-triggler/2.0.1/src/condition-maps/cyberpunk-red-core.json
  * Mechanical bindings use native system items, never copied modifier formulas. */
-export interface StatusDefinition { id: string; name: string; img: string; group: "head" | "body" | "general" | "custom" | "pharma" | "drugs"; binding?: { kind: "injury" | "effect"; pack: string; itemId: string; itemName: string; effectNames?: string[] } }
+export interface StatusDefinition { id: string; name: string; img: string; group: "head" | "body" | "general" | "custom" | "pharma" | "drugs" | "addiction"; binding?: { kind: "injury" | "effect"; pack: string; itemId: string; itemName: string; effectNames?: string[] } }
 export const masterStatuses: StatusDefinition[] = [
   {id:"pneuma-needs-stabilization",name:"Needs Stabilization",img:"icons/svg/regen.svg",group:"general"},
 {
   "id": "pneuma-berserker-addiction",
   "name": "Berserker Addiction",
   "img": "systems/cyberpunk-red-core/icons/compendium/status/beserker_addiction.svg",
-  "group": "drugs",
+  "group": "addiction",
   "binding": {
     "kind": "effect",
     "pack": "cyberpunk-red-core.dlc_hornets-pharmacy",
@@ -23,7 +23,7 @@ export const masterStatuses: StatusDefinition[] = [
   "id": "pneuma-prime-time-addiction",
   "name": "Prime Time Addiction",
   "img": "systems/cyberpunk-red-core/icons/compendium/status/prime_time_addiction.svg",
-  "group": "drugs",
+  "group": "addiction",
   "binding": {
     "kind": "effect",
     "pack": "cyberpunk-red-core.dlc_hornets-pharmacy",
@@ -38,7 +38,7 @@ export const masterStatuses: StatusDefinition[] = [
   "id": "pneuma-sixgun-addiction",
   "name": "Sixgun Addiction",
   "img": "systems/cyberpunk-red-core/icons/compendium/status/sixgun_addiction.svg",
-  "group": "drugs",
+  "group": "addiction",
   "binding": {
     "kind": "effect",
     "pack": "cyberpunk-red-core.dlc_hornets-pharmacy",
@@ -53,7 +53,7 @@ export const masterStatuses: StatusDefinition[] = [
   "id": "pneuma-timewarp-addiction",
   "name": "Timewarp Addiction",
   "img": "systems/cyberpunk-red-core/icons/compendium/status/timewarp_addiction.svg",
-  "group": "drugs",
+  "group": "addiction",
   "binding": {
     "kind": "effect",
     "pack": "cyberpunk-red-core.dlc_hornets-pharmacy",
@@ -598,7 +598,7 @@ export const masterStatuses: StatusDefinition[] = [
     "id": "k0nv7f1qm82pj28q",
     "name": "Black Lace Addiction",
     "img": "systems/cyberpunk-red-core/icons/compendium/status/black_lace_addiction.svg",
-    "group": "drugs",
+    "group": "addiction",
     "binding": {
       "kind": "effect",
       "pack": "cyberpunk-red-core.core_drugs",
@@ -613,13 +613,15 @@ export const masterStatuses: StatusDefinition[] = [
     "id": "ms4wgzm5hmji55py",
     "name": "Blue Glass",
     "img": "systems/cyberpunk-red-core/icons/compendium/status/blue_glass.svg",
-    "group": "drugs"
+    "group": "drugs",
+    "binding": {"kind":"effect","pack":"cyberpunk-red-core.core_drugs","itemId":"","itemName":"Blue Glass","effectNames":["Blue Glass","Blue Glass Primary","Blue Glass Primary Effect"]}
   },
   {
     "id": "bhl2fsrzn4or72f5",
     "name": "Blue Glass Addiction",
     "img": "systems/cyberpunk-red-core/icons/compendium/status/blue_glass_addiction.svg",
-    "group": "drugs"
+    "group": "addiction",
+    "binding": {"kind":"effect","pack":"cyberpunk-red-core.core_drugs","itemId":"","itemName":"Blue Glass","effectNames":["Blue Glass Addiction","Blue Glass Addicted"]}
   },
   {
     "id": "vc6wdch7hgjnyceg",
@@ -640,7 +642,7 @@ export const masterStatuses: StatusDefinition[] = [
     "id": "y444oapg2pl9wiwk",
     "name": "Boost Addiction",
     "img": "systems/cyberpunk-red-core/icons/compendium/status/boost_addiction.svg",
-    "group": "drugs",
+    "group": "addiction",
     "binding": {
       "kind": "effect",
       "pack": "cyberpunk-red-core.core_drugs",
@@ -670,7 +672,7 @@ export const masterStatuses: StatusDefinition[] = [
     "id": "ed97q4btoj3ggpip",
     "name": "Smash Addiction",
     "img": "systems/cyberpunk-red-core/icons/compendium/status/smash_addiciton.svg",
-    "group": "drugs",
+    "group": "addiction",
     "binding": {
       "kind": "effect",
       "pack": "cyberpunk-red-core.core_drugs",
@@ -701,7 +703,7 @@ export const masterStatuses: StatusDefinition[] = [
     "id": "xwk3lj08yk83j02b",
     "name": "Synthcoke Addiction",
     "img": "systems/cyberpunk-red-core/icons/compendium/status/synthcoke_addiciton.svg",
-    "group": "drugs",
+    "group": "addiction",
     "binding": {
       "kind": "effect",
       "pack": "cyberpunk-red-core.core_drugs",

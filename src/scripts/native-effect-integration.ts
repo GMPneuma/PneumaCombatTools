@@ -44,7 +44,7 @@ export function installNativeEffectIntegration(chat:object,dialog:object,actorPr
         const result=await wrapped(...args);
         if(application.hpReduction>0&&ammo){
           if(ammo==="incendiary"&&application.rawDamageDealt>0)await igniteTarget(actor);
-          else if(ammo!=="incendiary")reportExposure(actor,ammo);
+          else if(ammo!=="incendiary")await reportExposure(actor,ammo);
         }
         return result;
       }finally{applications.delete(actor);}

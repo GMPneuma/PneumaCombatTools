@@ -5,7 +5,7 @@ import { updateTouchesPath } from "./update-path.js";
 import {actorEncounter,encounterRef,resolveEncounter,type EncounterRef} from "./encounter.js";
 import {registerEmpSettings} from "./emp-settings.js";
 import {applyEmpBehavior,empBehavior} from "./emp-behavior.js";
-import {EMP_MODULE as MODULE, eligibleEmpItems, empGroup, empWeight, type EmpItem, randomEmp, disableLabel} from "./emp-rules.js";
+import {EMP_MODULE as MODULE, eligibleEmpItems, empGroup, empWeight, type EmpItem, randomEmp, disableLabel,hasActorEMP} from "./emp-rules.js";
 import {frameMovementBlocked, empGM, empRequests, empRandomSelection, empSelectionPool, empWork, applyEmpSelection, finishEmp, reconcileEmp, installEmpNativeGuards, type EmpRequest} from "./emp-state.js";
 import {requireCombatSocket} from "./socket-health.js";
 declare global {interface SettingConfig {"pneuma-combattools.empImmunity":string}}
@@ -75,6 +75,8 @@ export async function createEmp(actor:Actor,options:Pick<EmpRequest,"count"|"cho
   return request;
 }
 export function registerEmp() {
+  const module=game.modules!.get(MODULE) as unknown as {api?:Record<string,unknown>};
+  module.api={...module.api,hasActorEMP};
   registerEmpSettings();
   Hooks.on("preUpdateToken",(doc:TokenDocument,changes:Record<string,unknown>,_options:unknown,userId:string)=>{
     if(frameMovementBlocked(doc.actor,changes,!!game.users?.get(userId)?.isGM)){ui.notifications!.warn("Cannot move: Internal Frame disabled.");return false;}

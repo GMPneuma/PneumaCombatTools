@@ -23,19 +23,25 @@ try {
    const before=[...tray.querySelectorAll(".effect-control")];
    groupStatusHUD(root,masterStatuses);groupStatusHUD(root,masterStatuses);
    const groups=[...tray.querySelectorAll("details")];
-   const closed=groups.every(g=>!g.open);
+   const closed=groups.slice(1).every(g=>!g.open);
+   const generalOpen=groups[0].open;
    for(const grid of tray.querySelectorAll(".pneuma-status-grid")){const names=[...grid.querySelectorAll(".effect-control")].map(icon=>icon.title);if(JSON.stringify(names)!==JSON.stringify([...names].sort((a,b)=>a.localeCompare(b,"en",{sensitivity:"base"}))))throw Error("Subsection is not alphabetical");}
    const grouped=groups.map(g=>({name:g.querySelector("summary").textContent,count:g.querySelectorAll(".effect-control").length}));
    groups[0].open=true;
    groups[0].querySelector(".effect-control").click();
    groups[0].querySelector(".effect-control").dispatchEvent(new MouseEvent("contextmenu",{bubbles:true}));
    const all=[...tray.querySelectorAll(".effect-control")];
-   return {closed,grouped,clicks,contexts,count:all.length,hidden:before.filter(n=>!all.includes(n)).map(n=>n.title).sort(),sameNodes:all.every(n=>before.includes(n)),headingColor:getComputedStyle(groups[0].querySelector("summary")).color,display:getComputedStyle(tray).display};
+   return {closed,generalOpen,grouped,clicks,contexts,count:all.length,hidden:before.filter(n=>!all.includes(n)).map(n=>n.title).sort(),sameNodes:all.every(n=>before.includes(n)),headingColor:getComputedStyle(groups[0].querySelector("summary")).color,display:getComputedStyle(tray).display};
  });
- assert.equal(result.headingColor,"rgb(240, 240, 224)");assert.equal(result.closed,true);assert.equal(result.count,72);assert.equal(result.sameNodes,true);
+ assert.equal(result.headingColor,"rgb(240, 240, 224)");assert.equal(result.closed,true);assert.equal(result.generalOpen,true);assert.equal(result.count,72);assert.equal(result.sameNodes,true);
  assert.deepEqual(result.hidden,['Lightly Wounded','Mortally Wounded','Quick Fix','Seriously Wounded']);
- assert.deepEqual(result.grouped,[{name:"Crit Head",count:11},{name:"Crit Body",count:11},{name:"Pharmaceuticals",count:7},{name:"Drugs",count:18}]);
+ assert.deepEqual(result.grouped,[{name:"General",count:25},{name:"Crit Head",count:11},{name:"Crit Body",count:11},{name:"Pharmaceuticals",count:7},{name:"Drugs",count:9},{name:"Addiction",count:9}]);
  assert.equal(result.clicks,1);assert.equal(result.contexts,1);assert.equal(result.display,"block");
+ await page.locator('details').first().locator('summary').click();
+ assert.equal(await page.locator('details').first().evaluate(node=>node.open),false);
+ assert.equal(await page.locator('details').first().locator('.effect-control').first().isVisible(),false);
+ await page.locator('details').first().locator('summary').click();
+ assert.equal(await page.locator('details').first().locator('.effect-control').first().isVisible(),true);
  const visibility = await page.evaluate(() => {
    const root = document.querySelector("#token-hud");
    const tray = root.querySelector(".status-effects");
