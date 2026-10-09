@@ -3,7 +3,7 @@ import {attackTitle,attackHeading} from "../attack-title.js";
 import {inlineRoll} from "../inline-roll.js";
 import { primaryGM as gm, escapeHTML as esc } from "../shared.js";
 import { PendingCardRefresh } from "../pending-card-refresh.js";
-import {tokenEncounter,encounterRef,resolveEncounter,requireParticipants,type EncounterRef} from "../encounter.js";
+import {tokenEncounter,encounterRef,resolveEncounter,type EncounterRef} from "../encounter.js";
 import {suppressionExpiry} from "../suppression.js";
 import {attackCrossesSmoke} from "./smoke-obscuration.js";
 import {halfArmorSelected, interactArmorSelected} from "../half-armor.js";
@@ -93,7 +93,7 @@ function targets(data:AreaAttack):TargetRow[] {
       state:data.kind==="shell" && data.exchange.total<=13?"miss":"waiting",
     }));
 }
-function rowEncounter(data:AreaAttack,uuid:string):EncounterRef {return encounterRef(resolveEncounter(data.exchange),data.scene,[data.exchange.attacker,uuid]);}
+function rowEncounter(data:AreaAttack,_uuid:string):EncounterRef {return encounterRef(resolveEncounter(data.exchange),data.scene,[data.exchange.attacker]);}
 const btn=(action:string,icon:string,title:string,target="",label="")=>`<button type="button" data-aoe-action="${action}" data-aoe-target="${esc(target)}" title="${esc(title)}" aria-label="${esc(title)}"><i class="fas ${icon}" aria-hidden="true"></i>${label?" "+esc(label):""}</button>`;
 const awaitingResponses=(data:AreaAttack)=>data.phase==="scatter"||data.rows.some(r=>["waiting","rolling"].includes(r.state));
 function canResetResponse(data:AreaAttack,row:TargetRow):boolean {
@@ -136,7 +136,7 @@ export function areaContent(data:AreaAttack):string {
     ${resolutionSection("attack",attack)}
     ${resolutionSection("result",data.phase==="scatter"?"<div class='pneuma-aoe-reposition'><strong>Missed</strong><p>GM: choose a new center inside the gray area.</p></div>"+btn("scatter","fa-crosshairs","Place New Target Center","","Place New Target Center"): `<div role="list" class="pneuma-aoe-targets">${rows||"<p>No tokens in the area.</p>"}</div>`)}
     <div class="pneuma-aoe-actions">${btn("show",data.areaHidden?"fa-eye":"fa-eye-slash",data.areaHidden?"Show attack area":"Hide attack area")}${data.phase==="responses"?btn("add","fa-user-plus","GM: add selected token (manual coverage override)"):""}
-    ${data.kind!=="suppression"&&data.phase!=="scatter"&&!data.special&&!data.exchange.damage?btn("damage","fa-droplet","Roll shared damage"):""}
+    ${data.kind!=="suppression"&&data.phase!=="scatter"&&!data.special&&!data.exchange.damage?btn("damage","fa-droplet","Roll shared damage (click to roll immediately; Shift-click to modify)"):""}
     ${data.exchange.damage?.status==="rolling"?btn("damageReset","fa-unlock","GM: release unfinished damage roll"):""}</div>
 
     ${data.kind==="explosive"?"<p>GM resolves all aspects of cover and terrain.</p>":""}
@@ -148,7 +148,7 @@ export function areaContent(data:AreaAttack):string {
       +(data.ammoType==="smoke"?"<p>Smoke: 1 minute.</p>"+(data.smokeId?btn("removeSmoke","fa-cloud","GM: remove smoke"):""):"")) : ""}</section>`;
 }
 function rowExchange(data:AreaAttack,row:TargetRow):Exchange {
-  return {...data.exchange,coverUp:!!row.coverUp,defender:row.uuid,defenderActor:row.actor,defenderName:row.name,hit:row.state==="hit",
+  return {...data.exchange,areaTarget:true,coverUp:!!row.coverUp,defender:row.uuid,defenderActor:row.actor,defenderName:row.name,hit:row.state==="hit",
     damage:row.damage??(data.exchange.damage?.result?{...data.exchange.damage,status:"rolled",applications:[],recordedApplied:false}:undefined)};
 }
 export function areaEffectsLocked(data:AreaAttack):boolean {
@@ -171,7 +171,7 @@ async function save(message:ChatMessage,data:AreaAttack) {
   const resolved=complete(data);
   if(resolved&&!data.resolutionComplete){data.areaHidden=true;await syncTemplate(message,data);}
   data.resolutionComplete=resolved;
-  await message.update({content:areaContent(data),[`flags.${MODULE}.aoe`]:data} as Parameters<ChatMessage["update"]>[0]);
+  await message.update({content:areaContent(data),[`flags.${MODULE}.aoe`]:data,...(!data.exchange.damage&&flag(message)?.exchange.damage?{[`flags.${MODULE}.aoe.exchange.-=damage`]:null}:{})} as Parameters<ChatMessage["update"]>[0]);
   // Persist first: later saves and chat rerenders must never repeat the animation.
   if(reveal)void revealAttackDice(data,message).catch(error=>console.warn(MODULE,"Area attack dice display failed",error));
 }
@@ -187,11 +187,12 @@ export async function handleAreaRequest(req:Request) {
   const saved=message&&flag(message);
   if(!message||!saved||!user)throw Error("Area attack is unavailable.");
   const data=foundry.utils.deepClone(saved);
-  const combat=resolveEncounter(data.exchange);
-  if(combat&&req.target&&data.kind!=="suppression")requireParticipants(combat,[req.target]);
+  resolveEncounter(data.exchange);
+
   const row=data.rows.find(r=>r.uuid===req.target);
   if(req.action==="instant") {
     if(!row?.instant||row.state!=="hit"||!req.instantRequest||data.phase!=="responses")throw Error("Instant effect unavailable.");
+    row.instant.encounter=rowEncounter(data,row.uuid);
     row.instant.sourceMessage=message.id!;
     await handleInstant(row.instant,req.instantRequest,user,()=>{data.effectsLocked=true;return save(message,data);},data.exchange.rollMode,messageDiceAudience(message));return;
   }
@@ -353,7 +354,7 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
     const area=await placeArea(p=>{aimPoint=p;return makeArea(kind,source,p,ammoType==="smoke"?{...s,blastShape:"square",blastSize:10}:s);},target.center,
       kind==="shell"?"Aim the shell area in front of the attacker.":kind==="suppression"?"Aim suppressive fire.":"Place the blast center in line of sight.",profile?.color,canAim);
     if(!area||canvas.scene?.id!==scene)return;
-    const validate=()=>{if(!canAim(aimPoint))throw Error("The target square is outside the attacker’s line of sight.");const current=resolveEncounter(encounter);if(current&&kind!=="suppression"&&ammoType!=="smoke")requireParticipants(current,(canvas.tokens?.placeables??[]).filter(t=>t.actor&&!['container','blackIce','demon'].includes(String(t.actor.type))&&areaCoverage(area)({x:t.x,y:t.y,width:t.w,height:t.h})).map(t=>t.document.uuid));};
+    const validate=()=>{if(!canAim(aimPoint))throw Error("The target square is outside the attacker’s line of sight.");resolveEncounter(encounter);};
     validate();
     let item:RollItem=original, thrownSource:object|undefined;
     if(String(original.type)==="ammo"||molotov){

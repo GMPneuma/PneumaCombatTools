@@ -137,7 +137,7 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
   const application = request.application ?? (request.targetUuid && request.targetUuid !== data.defender ? "selected" : "recorded");
   const destination = request.action === "damageApply" && application === "selected" ? request.targetUuid : data.defender;
   if (!destination) throw new Error("Select exactly one token to apply damage.");
-  if(request.action === "damageApply" && data.combatId)requireParticipants(resolveEncounter(data)!,[destination]);
+  if(request.action === "damageApply" && data.combatId && !data.areaTarget)requireParticipants(resolveEncounter(data)!,[destination]);
   const actor = await damageActor(applying ? destination : data.attacker);
   if (!user.isGM && !actor.testUserPermission(user, "OWNER")) throw new Error("Only this actor's owner or GM can continue.");
   const damage = data.damage;
@@ -224,7 +224,7 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
 }
 const retry = new Map<string, { result: { nonce: string; damage: DamageResult }; dice: string[]; mode: string; roller: string; audience?: DiceAudience }>();
 type Send = (action: DamageRequest["action"], extra?: Partial<DamageRequest>) => Promise<unknown>;
-export async function rollDamage(id: string, data: Exchange, send: Send, skipDialog = false): Promise<void> {
+export async function rollDamage(id: string, data: Exchange, send: Send, modifyDialog = false): Promise<void> {
   const previous = retry.get(id);
   if (previous) {
     await send("damageCommit", previous.result); retry.delete(id);
@@ -239,7 +239,7 @@ export async function rollDamage(id: string, data: Exchange, send: Send, skipDia
     if (!item?.createRoll) throw new Error("The original weapon is unavailable.");
     let roll = item.createRoll("damage", actor, { damageType: data.attackMode });
     configureDamage(roll, data);
-    if (!await roll.handleRollDialog({ type: "pneuma-damage", ctrlKey: skipDialog, metaKey: false }, actor, item)) return;
+    if (!await roll.handleRollDialog({ type: "pneuma-damage", ctrlKey: !modifyDialog, metaKey: false }, actor, item)) return;
     roll = await item.confirmRoll(roll);
     if(data.areaAmmo)configureAreaAmmo(roll,data);
     await rollHidden(roll);
@@ -266,7 +266,7 @@ export function selectedDamageTarget(): string {
 }
 export async function applyFromCard(data: Exchange, send: Send, shiftKey: boolean, targetUuid = data.defender, application: "recorded" | "selected" = "recorded", halfArmor?: boolean, interactArmor?: boolean): Promise<void> {
   const token=await fromUuid(targetUuid) as TokenDocument|null;
-  const encounter=data.combatId!==undefined?encounterRef(resolveEncounter(data),data.combatScene,[...(data.combatTokens??[]),targetUuid]):encounterRef(tokenEncounter(token?.parent?.id,[targetUuid]),token?.parent?.id,[targetUuid]);
+  const encounter=data.combatId!==undefined?encounterRef(resolveEncounter(data),data.combatScene,[...(data.combatTokens??[]),...(data.areaTarget?[]:[targetUuid])]):encounterRef(tokenEncounter(token?.parent?.id,[targetUuid]),token?.parent?.id,[targetUuid]);
   resolveEncounter(encounter);
   const actor = await damageActor(targetUuid);
   if (!actor.isOwner) throw new Error("Only the selected actor’s owner or GM can apply damage.");

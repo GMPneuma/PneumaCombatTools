@@ -474,3 +474,12 @@ test('effect Apply controls retain their glyph, finish as non-buttons, and omit 
   assert.doesNotMatch(instantContent(applied),/data-instant-action="extinguish"/);
  }
 });
+
+test('AoE timed effects apply to actors outside the originating combat roster',async()=>{
+ for(const id of ['sleep','flashbang','teargas','incendiary']){
+  const f=setup(),c={id:'outside-effects',started:true,round:1,turn:0,combatants:[],turns:[]};game.combats.set(c.id,c);
+  const state=newInstant(id,f.actor.uuid,f.actor.name,{combatId:c.id,combatEpoch:'',combatTokens:[]});state.state='failed';
+  await handleInstant(state,{action:'apply'},f.owner,f.save);assert.equal(state.state,'applied',id);
+  assert.ok(f.actor.effects.size||f.actor.items.size,id);
+ }
+});

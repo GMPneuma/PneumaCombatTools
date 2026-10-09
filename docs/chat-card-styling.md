@@ -317,3 +317,7 @@ Public `.pneuma-status-cleanup-card` now includes `.pneuma-combat-summary` befor
 Discord copy button theming (2026-10-07, local/unreleased): [data-copy-combat-summary] joins the shared chat-control selector and uses the copy glyph. It receives the existing pneuma-chat-button theme classes and public/player role metadata; cleanup remains GM-only.
 
 Compact chat versus detailed Discord snapshot (2026-10-07, local/unreleased): chat shows encounter/round/counts, brief player HP/injury totals, urgent stabilization needs and outcome totals. Detailed condition/injury names, recorded additions, cleared-condition names, scene and UTC timestamp remain in the saved Discord Markdown export. No underlying report data or copy/cleanup permissions change.
+
+Autofire outcome multiplier: `.pneuma-resolution-card .pneuma-result-summary .pneuma-autofire-multiplier` is an inline read-only span within the existing result bar. It appears only on resolved autofire outcomes with a known native maximum (or ×0 for a miss). No controls, visibility permissions or existing selectors change. Example: `.pneuma-resolution-result .pneuma-autofire-multiplier { font-weight: bold; }`.
+
+Damage roll controls retain existing selectors and permissions. `.pneuma-result-damage[data-action="pneumaRollDamage"]` and AoE `[data-aoe-action="damage"]` roll immediately on click; Shift-click opens the native damage modifier dialog. Titles describe these gestures. No markup or class removal.

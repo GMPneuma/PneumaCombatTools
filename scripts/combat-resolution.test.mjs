@@ -615,3 +615,12 @@ test('Anyone Can Dodge Bullets grants a shared free allowance without actor prer
  assert.equal(evasionOffer(true,'custom',withRef,facts,0,true).free,1);
  assert.equal(evasionOffer(true,'custom',{...withRef,reflex:q(true,true,true)},facts,0,true).free,2);
 });
+
+test('autofire result bar displays capped damage multiplier against DV or evasion and zero on misses',async()=>{
+ const {exchangeContent,autofireResultMultiplier}=await import('../dist/scripts/combat-resolution.js');setup();
+ const data=message('autofire-result').flags['pneuma-combattools'].exchange;Object.assign(data,{state:'resolved',attackMode:'autofire',hit:true,total:22,dv:13,autofireMaximum:4});
+ assert.equal(autofireResultMultiplier(data),4);assert.match(exchangeContent(data),/pneuma-autofire-multiplier">Autofire ×4/);
+ data.defense={total:20,html:'',fee:0};assert.equal(autofireResultMultiplier(data),2);assert.match(exchangeContent(data),/Autofire ×2/);
+ data.hit=false;assert.equal(autofireResultMultiplier(data),0);assert.match(exchangeContent(data),/Autofire ×0/);
+ data.attackMode='attack';assert.doesNotMatch(exchangeContent(data),/pneuma-autofire-multiplier/);
+});

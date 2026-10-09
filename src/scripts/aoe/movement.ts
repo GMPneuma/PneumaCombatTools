@@ -1,5 +1,5 @@
 import { primaryGM as electedGM } from "../shared.js";
-import {tokenEncounter,displayedEncounter,encounterRef,type EncounterRef,resolveEncounter} from "../encounter.js";
+import {sceneEncounter,displayedEncounter,encounterRef,type EncounterRef,resolveEncounter} from "../encounter.js";
 import {areaSettings,MODULE} from "./settings.js";
 import type {Point} from "./geometry.js";
 import {isProne} from "../prone.js";
@@ -8,7 +8,7 @@ const key="aoeMovement";
 let queue:Promise<unknown>=Promise.resolve();
 export function movementWork<T>(work:()=>Promise<T>):Promise<T>{const next=queue.catch(()=>{}).then(work);queue=next;return next;}
 const authority=()=>electedGM()?.id===game.user?.id;
-export function movementEntry(token:TokenDocument, combat:Combat|null|undefined=tokenEncounter(token.parent?.id,[token.uuid])) {
+export function movementEntry(token:TokenDocument, combat:Combat|null|undefined=sceneEncounter(token.parent?.id)) {
   if(!combat?.started)return;
   const participant=combat.combatants.find(c=>c.token?.uuid===token.uuid);
   if(!participant)return;
@@ -34,8 +34,9 @@ export function distanceMoved(a:Point,b:Point):number {
 export async function moveEvader(token:Token,point:Point,costs:boolean,borrow:boolean,receipt:string, encounter?:Partial<EncounterRef>) {
   return movementWork(async()=>{
     if(token.actor&&isProne(token.actor))throw Error("Prone: Get Up before moving.");
-    const entry=movementEntry(token.document,encounter?resolveEncounter(encounter)??null:tokenEncounter(token.document.parent?.id,[token.document.uuid]));
-    if(costs&&!entry)throw Error("Start/select this token's combat to track evasion MOVE.");
+    const entry=movementEntry(token.document,encounter?resolveEncounter(encounter)??null:sceneEncounter(token.document.parent?.id));
+    // Outside-tracker targets can escape; turn-based MOVE spending applies only to participants.
+    costs=costs&&!!entry;
     const prior=foundry.utils.getProperty(token.document,`flags.${MODULE}.aoeEscape`) as {id:string;cost:number}|undefined;
     if(prior?.id===receipt)return prior.cost;
     const reserved=entry?.current.escape?.id===receipt?entry.current.escape:undefined;
@@ -61,7 +62,7 @@ export function movementHUD(actor:Actor):{id:string;text:string;detail:string}[]
 export function registerAreaMovement(){
   Hooks.on("preUpdateToken",(doc:TokenDocument,changes:Record<string,unknown>,options:Record<string,unknown>)=>{
     if(options.pneumaAreaMove||!areaSettings().evadeMove||!("x" in changes||"y" in changes))return;
-    try{options.pneumaAreaEncounter=encounterRef(tokenEncounter(doc.parent?.id,[doc.uuid]),doc.parent?.id,[doc.uuid]);}catch(error){ui.notifications!.warn((error as Error).message);return false;}
+    try{const combat=sceneEncounter(doc.parent?.id);if(!combat?.combatants.some(row=>row.token?.uuid===doc.uuid))return;options.pneumaAreaEncounter=encounterRef(combat,doc.parent?.id,[doc.uuid]);}catch(error){ui.notifications!.warn((error as Error).message);return false;}
     if(doc.object)options.pneumaAreaFrom={x:doc.object.center.x,y:doc.object.center.y};
   });
   Hooks.on("updateToken",(doc:TokenDocument,_changes:unknown,options:Record<string,unknown>)=>{

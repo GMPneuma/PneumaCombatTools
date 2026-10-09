@@ -34,6 +34,8 @@ export interface Exchange extends Partial<EncounterRef> {
   roller?: string;
   cannotEvade?: string; evasionOverride?: boolean; attackRevealed?: boolean;
   disableSource?: "microwaver";
+  areaTarget?: boolean;
+  autofireMaximum?: number;
   areaAmmo?: {type:string;variety:string};
   attacker: string; defender: string; defenderActor: string; attackerName: string; defenderName: string;
   ranged: boolean; category: string; title: string; dv?: number; total: number; html: string; dice: string[];
@@ -124,6 +126,13 @@ function canOverrideEvasion(message: ChatMessage, data: Exchange): boolean {
   return !!data.cannotEvade && !data.evasionOverride && data.state === "resolved" && !data.damage
     && !flag(message, "microwaverClaim");
 }
+export function autofireResultMultiplier(data: Exchange): number | undefined {
+  if(data.attackMode!=="autofire")return;
+  if(!data.hit)return 0;
+  const maximum=data.autofireMaximum,margin=data.total-(data.defense?.total??data.dv??NaN);
+  if(typeof maximum!=="number"||!Number.isFinite(maximum)||maximum<1||!Number.isFinite(margin))return;
+  return Math.min(Math.max(margin,1),maximum);
+}
 export function exchangeContent(data: Exchange): string {
   if (data.state !== "resolved") return '<div class="pneuma-resolution-card">' + resolutionSection("pending", '<div class="rollcard pneuma-pending-exchange"><div class="rollcard-top"><div class="cpr-block">'
     + '<div class="pneuma-pending-title">' + attackHeading(data.title,'div') + '</div>'
@@ -161,15 +170,17 @@ export function exchangeContent(data: Exchange): string {
     defense = resolutionSection("evade", part.body.innerHTML,
       "pneuma-defense-result " + rollOutcomeClass(!data.hit));
   }
+  const multiplier=autofireResultMultiplier(data);
   const opposed = data.unaware ? "Defender unaware — no evasion" : data.defense ? "Evasion " + data.defense.total : data.ranged ? "DV " + data.dv : "Defense declined";
   const damageControl = data.disableSource==="microwaver" ? "" : data.weaponId
-    ? '<button type="button" class="pneuma-result-damage" data-action="pneumaRollDamage" aria-label="Roll damage" title="Roll damage (Shift-click to roll immediately; manual override allowed)"><i class="fas fa-droplet" aria-hidden="true"></i></button>'
+    ? '<button type="button" class="pneuma-result-damage" data-action="pneumaRollDamage" aria-label="Roll damage" title="Roll damage (Click to roll immediately; Shift-click to modify)"><i class="fas fa-droplet" aria-hidden="true"></i></button>'
     : legacyDamage;
   return '<div class="pneuma-resolution-card">'
     + resolutionSection("attack", doc.body.innerHTML, "pneuma-attack-result " + rollOutcomeClass(!!data.hit))
     + defense + resolutionSection("result", '<p class="pneuma-combat-outcome" title="' + escape(opposed) + '">' + damageControl + '<strong class="pneuma-result-summary">'
     + escape(data.attackerName) + ' <span class="' + (data.hit ? "pneuma-hit" : "pneuma-miss") + '">'
     + (data.hit ? "hits" : "misses") + '</span> ' + escape(data.defenderName)
+    + (multiplier!==undefined?' <span class="pneuma-autofire-multiplier">Autofire ×'+multiplier+'</span>':'')
     + '</strong></p>' + (data.cannotEvade ? '<small class="pneuma-cannot-evade" title="' + escape(data.cannotEvade) + '">'
       + (data.evasionOverride ? 'GM allowed evasion' : 'Target cannot evade') + '</small>' : '')) + damageContent(data) + '</div>';
 }
@@ -407,6 +418,7 @@ export async function startCombatExchange(attacker: Token, target: Token, itemId
     total: roll.resultTotal, html: await nativeCard(roll), dice: diceJSON(roll), roller: game.user!.id!,
     rollMode: game.settings!.get("core", "rollMode") ?? "roll", state: "waiting" };
   skipUnavailableEvasion(data, target.actor!, combat);
+  if(mode==="autofire")data.autofireMaximum=item.createRoll("damage",actor,{damageType:mode}).autofireMultiplierMax;
   if (choice.unaware) { data.state = "resolved"; data.hit = !ranged || data.total > dv!; }
   const messageData = { content: exchangeContent(data), speaker: ChatMessage.getSpeaker({ actor, token: attacker.document }),
     flags: { [MODULE]: { exchange: data } } } as Parameters<typeof ChatMessage.applyRollMode>[0];

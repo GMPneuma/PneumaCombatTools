@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.15 - 2026-10-09
+
+- Allow all AoE attacks to affect scene tokens outside the combat tracker, including damage, special grenade responses, attached effects and evasion relocation. Retain attacker membership, ownership, scene and originating-encounter validation.
+- Skip optional turn-based MOVE spending and borrowing for outside-tracker tokens. Their turn-specific fire damage and suppression expiry require manual handling.
+- Fix shared AoE damage cancellation and GM reset retaining a saved reservation, preventing subsequent damage rolls.
+- Display Autofire ×N in the Hit/Miss result bar, capped by the native weapon maximum and calculated against DV or Evasion. Misses display ×0. Older hit cards without a saved maximum omit it.
+- Roll damage immediately on ordinary click; Shift-click opens the native modifier dialog. Update single-target and shared AoE tooltips.
+
+Validation: production build, strict TypeScript checks, 605 automated tests passed (four optional native geometry checks skipped), and damage-flow browser checks. Live Foundry/multiplayer verification remains pending.
+
 ## 0.9.14 - 2026-10-09
 
 - Group normal/custom token statuses under General, expanded by default and collapsible; split nine primary drug statuses and nine addiction statuses into separate Drugs and Addiction sections.

@@ -520,3 +520,13 @@ Drug/addiction grouping (2026-10-09, local/unreleased): the token status palette
 General status group (2026-10-09, local/unreleased): normal and custom token statuses appear in a General disclosure section above the specialized groups. General starts expanded on each new HUD render and can be collapsed by clicking its heading. Other sections retain their collapsed defaults. Native status controls and alphabetical order are preserved.
 
 Release status (2026-10-09): the changes recorded above since v0.9.13 are included in v0.9.14. Validation: 597 automated tests passed; four optional native geometry checks skipped; status HUD, combat-summary and manual-roll/Treatment browser fixtures passed. Live Foundry/multiplayer verification remains pending.
+
+All-area noncombat targets (2026-10-09, local/unreleased): all area attacks accept affected scene tokens outside the encounter tracker. AoE target damage, attached effects, special-grenade resistance/application and GM recipient controls retain the originating encounter without requiring target membership. Optional evasion MOVE spending/borrowing applies only to tracked combatants; outside-tracker evaders can relocate without turn bookkeeping. Attacker membership, actor permissions, scene checks and ended/reset encounter validation remain. Timed effects follow the originating encounter clock; outside-tracker On Fire damage and suppression next-turn timing require manual handling.
+
+AoE damage cancellation (2026-10-09, local/unreleased): explicitly delete the saved shared damage reservation on cancellation or GM reset. Foundry nested flag merging otherwise retained the old reservation after the visible button reset. Cancel/retry and GM-reset regressions use merge-preserving flag updates.
+
+Autofire outcome multiplier (local/unreleased): resolved Hit/Miss bars include Autofire ×N, calculated from attack versus DV or Evasion and capped by the native weapon damage-roll maximum. Misses display ×0. The attack stores the native maximum; older cards without it omit the hit multiplier. Damage-dialog overrides remain separate.
+
+Damage-roll click behavior (local/unreleased): ordinary damage-button clicks immediately roll using the native dialog bypass; Shift-click opens native modifiers. Applies to single-target and shared AoE damage buttons, with matching tooltips. Attack, defense and damage-application button modifiers are unchanged.
+
+Release status (2026-10-09): all-area noncombat targets, AoE cancellation/retry, autofire result multiplier and immediate damage-roll clicks are included in v0.9.15. Live Foundry verification remains pending.

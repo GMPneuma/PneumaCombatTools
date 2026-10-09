@@ -36,7 +36,7 @@ function fixture(kind="explosive",total=20){
  globalThis.CONFIG={Canvas:{polygonBackends:{move:{testCollision:()=>null},sight:{testCollision:()=>false}}}};
  globalThis.fromUuid=async uuid=>docs.get(uuid);
  globalThis.renderTemplate=async(_p,roll)=>'<div class="rollcard">native '+roll.resultTotal+'</div>';
- globalThis.ChatMessage={getSpeaker:()=>({}),applyRollMode:()=>{},create:async data=>{const message={...data,id:"message"+(++serial),author:game.user,async update(change){if(change.content)this.content=change.content;if(change["flags."+M+".aoe"])this.flags[M].aoe=structuredClone(change["flags."+M+".aoe"]);}};messages.push(message);return message;}};
+ globalThis.ChatMessage={getSpeaker:()=>({}),applyRollMode:()=>{},create:async data=>{const message={...data,id:"message"+(++serial),author:game.user,async update(change){if(change.content)this.content=change.content;if(change["flags."+M+".aoe"]){const previous=this.flags[M].aoe;const next=structuredClone(change["flags."+M+".aoe"]);if(previous?.exchange.damage&&!Object.hasOwn(next.exchange,"damage"))next.exchange.damage=previous.exchange.damage;this.flags[M].aoe=next;}if(Object.hasOwn(change,"flags."+M+".aoe.exchange.-=damage"))delete this.flags[M].aoe.exchange.damage;}};messages.push(message);return message;}};
  globalThis.DOMParser=class{parseFromString(html){return {querySelectorAll:()=>[],querySelector:()=>null,body:{innerHTML:html}}}};
  const weapon={id:"w",type:"weapon",name:"Weapon",system:{isRanged:true,weaponType:kind==="shell"?"shotgun":kind==="suppression"?"assaultRifle":"rocketLauncher",magazine:{value:20},dvTable:"DV Rocket Launcher",fireModes:{suppressiveFire:true}},
  _getLoadedAmmoProp:p=>p==="variety"?(kind==="shell"?"shotgunShell":"rocket"):p==="type"?"basic":undefined,
@@ -333,7 +333,15 @@ test('homebrew area defense settings and player ownership prevent NPC automation
 function encounterFixture(){const f=fixture();const combat={id:'c',scene:f.scene,active:true,started:true,flags:{},combatants:[f.source,f.target,f.third,f.outside].map(t=>({token:t.document,actor:t.actor}))};game.combats=collection([combat]);game.combat={id:'preview',started:true,round:99};return {...f,combat};}
 test('AoE captures active scene encounter and follows it across tracker changes',async()=>{const f=encounterFixture();await startAreaAttack(f.source,f.target,'w','attack');assert.equal(f.data().exchange.combatId,'c');f.combat.active=false;game.combat={id:'elsewhere'};await f.request('decline');assert.equal(f.data().rows.find(r=>r.uuid===f.target.document.uuid).state,'hit');});
 test('ambiguous area encounters stop before ammunition or attack rolls',async()=>{const f=encounterFixture();game.combats.push({...f.combat,id:'second'});await assert.rejects(startAreaAttack(f.source,f.target,'w','attack'),/Multiple active/);assert.equal(f.weapon.system.magazine.value,20);assert.equal(f.messages.length,0);});
-test('area attack checks all covered token memberships before ammunition',async()=>{const f=encounterFixture();f.combat.combatants=f.combat.combatants.filter(c=>c.token.uuid!==f.target.document.uuid);await assert.rejects(startAreaAttack(f.source,f.target,'w','attack'),/participating tokens/);assert.equal(f.weapon.system.magazine.value,20);});
+test('area attack includes noncombat targets and resolves damage without tracker membership',async()=>{
+ const f=encounterFixture();f.combat.combatants=f.combat.combatants.filter(c=>c.token.uuid!==f.target.document.uuid);
+ await startAreaAttack(f.source,f.target,'w','attack');await f.request('decline');
+ await f.request('damage',{target:undefined,user:'att',damageRequest:{action:'damageClaim',nonce:'damage'}});
+ const result={html:'damage',sixes:0,values:{total:24,bonus:0,location:'body',ablation:1,ammo:'basic',ignorePercent:0,ignoreBelow:0,lethal:true}};
+ await f.request('damage',{target:undefined,user:'att',damageRequest:{action:'damageCommit',nonce:'damage',damage:result}});
+ await f.request('damage',{damageRequest:{action:'damageApply',application:'recorded',applicationId:'outside',options:{useShield:false,damageReductionRole:false,damageReductionAE:false,brainDamageReduction:false}}});
+ assert.ok(f.calls.includes('apply:b'));assert.equal(f.data().rows[0].damage.status,'applied');
+});
 test('reset area encounter rejects responses without adopting replacement',async()=>{const f=encounterFixture();await startAreaAttack(f.source,f.target,'w','attack');f.combat.flags={'pneuma-combattools':{evasionEpoch:'reset'}};await assert.rejects(f.request('decline'),/reset/);assert.equal(f.data().rows.find(r=>r.uuid===f.target.document.uuid).state,'waiting');});
 
 
@@ -465,4 +473,48 @@ test('suppression accepts covered non-combat tokens and their concentration resp
  await f.request('claim',{nonce:'one'});await f.request('commit',{nonce:'one',total:19,html:'failed'});
  assert.equal(f.data().rows[0].state,'hit');assert.equal(f.b.effects[0].name,'Suppressed');assert.equal(f.b.effects[0].flags[M].suppressionExpiry,undefined);
  combat.flags={[M]:{evasionEpoch:'reset'}};await assert.rejects(f.request('reset',{user:'gm'}),/reset/);
+});
+
+test('every special grenade accepts outside-tracker targets and resistance responses',async()=>{
+ for(const ammo of ['poison','biotoxin','flashbang','teargas','sleep','emp']){
+  const f=fixture();f.weapon._getLoadedAmmoProp=p=>p==='type'?ammo:'grenade';
+  const combat={id:'c',scene:f.scene,active:true,started:true,flags:{},combatants:[{token:f.source.document,actor:f.a}],turns:[]};game.combats=collection([combat]);
+  await startAreaAttack(f.source,f.target,'w','attack');await f.request('decline');
+  const row=f.data().rows.find(r=>r.uuid===f.target.document.uuid);assert.deepEqual(row.instant.encounter.combatTokens,[f.source.document.uuid]);
+  // Legacy pending cards had both source and target membership in their effect reference.
+  row.instant.encounter.combatTokens.push(f.target.document.uuid);
+  await f.request('instant',{instantRequest:{action:'claim',nonce:'resist'}});
+  await f.request('instant',{instantRequest:{action:'commit',nonce:'resist',total:30,html:'resisted'}});
+  assert.equal(f.data().rows[0].instant.state,'resisted',ammo);
+ }
+});
+test('shell and incendiary areas include noncombat targets and preserve encounter invalidation',async()=>{
+ for(const kind of ['shell','explosive']){
+  const f=fixture(kind);if(kind==='shell'){f.target.x=200;f.target.center.x=250;}if(kind==='explosive')f.weapon._getLoadedAmmoProp=p=>p==='type'?'incendiary':'grenade';
+  const combat={id:'c',scene:f.scene,active:true,started:true,flags:{},combatants:[{token:f.source.document,actor:f.a}],turns:[]};game.combats=collection([combat]);
+  await startAreaAttack(f.source,f.target,'w','attack');assert.ok(f.data().rows.some(r=>r.uuid===f.target.document.uuid));await f.request('decline');
+  combat.started=false;await assert.rejects(f.request('reset',{user:'gm'}),/ended/);
+ }
+});
+test('noncombat evader can relocate while optional turn-based MOVE accounting is enabled',async()=>{
+ const f=fixture();game.settings.get=(_m,k)=>k==='areaSettings'?{...defaults,evadeMove:true,evadeBorrow:true,evadeMoveRatio:1}:k==='rollMode'?'roll':false;
+ const combat={id:'c',scene:f.scene,active:true,started:true,flags:{},combatants:[{token:f.source.document,actor:f.a}],turns:[]};game.combats=collection([combat]);
+ await startAreaAttack(f.source,f.target,'w','attack');await f.request('claim',{nonce:'evade'});await f.request('commit',{nonce:'evade',total:30,html:'evaded'});
+ await f.request('move',{point:{x:1000,y:500}});assert.equal(f.data().rows[0].moved,true);assert.equal(f.data().rows[0].moveCost,0);
+});
+
+test('cancelling shared damage clears persisted reservation and permits repeated retries',async()=>{
+ const {rollDamage}=await import('../dist/scripts/damage-flow.js');const f=fixture();await startAreaAttack(f.source,f.target,'w','attack');await f.request('decline');
+ const create=f.weapon.createRoll;f.weapon.createRoll=function(mode){const roll=create.call(this,mode);roll.handleRollDialog=async()=>false;return roll;};
+ const send=async(action,extra)=>{const viewer=game.user;game.user=f.users.get('gm');try{return await f.request('damage',{target:undefined,user:'att',damageRequest:{action,...extra}});}finally{game.user=viewer;}};
+ game.user=f.users.get('att');
+ for(let i=0;i<2;i++){await rollDamage(f.messages[0].id,f.data().exchange,send);assert.equal(f.data().exchange.damage,undefined);}
+ await send('damageClaim',{nonce:'final'});assert.equal(f.data().exchange.damage.status,'rolling');
+ await send('damageCommit',{nonce:'final',damage:{html:'damage',sixes:0,values:{total:12,bonus:0,location:'body',ablation:1,ammo:'basic',ignorePercent:0,ignoreBelow:0,lethal:true}}});assert.equal(f.data().exchange.damage.status,'rolled');
+});
+test('GM reset clears a shared damage reservation under nested flag merge semantics',async()=>{
+ const f=fixture();await startAreaAttack(f.source,f.target,'w','attack');await f.request('decline');
+ await f.request('damage',{target:undefined,user:'att',damageRequest:{action:'damageClaim',nonce:'old'}});
+ await f.request('damage',{target:undefined,user:'gm',damageRequest:{action:'damageReset'}});assert.equal(f.data().exchange.damage,undefined);
+ await f.request('damage',{target:undefined,user:'att',damageRequest:{action:'damageClaim',nonce:'new'}});assert.equal(f.data().exchange.damage.nonce,'new');
 });

@@ -137,7 +137,7 @@ try {
  assert.match(result.pending,/pneumaRollDamage/);
  assert.equal(await page.locator(".pneuma-resolution-damage-roll .pneuma-damage-status-slot").count(),3);assert.equal(await page.locator("a.pneuma-apply-damage").count(),2);
  assert.equal(result.header,'DamageSmart');assert.equal(result.weaponRepeated,false);assert.equal(result.bolts,2);assert.deepEqual(result.destinations,['recorded','selected']);
- assert.deepEqual(result.applyButtons,[' Defender',' token']);
+ assert.deepEqual(result.applyButtons,[' Defender',' Selected Token']);
  assert.equal(result.nativeApply,0);assert.equal(result.detail,'22');assert.equal(result.requests.length,0);
  assert.match(result.unaware,/Defender unaware/);
  const missControls=await page.evaluate(async()=>{
@@ -536,9 +536,9 @@ try {
    cancel=true;await rollDamage("cancel",data,async action=>sent.push(action),true);
    return {events,sent,rolled};
  });
- assert.equal(damageDialogs.events[0].ctrlKey,false);
+ assert.equal(damageDialogs.events[0].ctrlKey,true);
  assert.notEqual(damageDialogs.events[0].type,"click");
- assert.equal(damageDialogs.events[1].ctrlKey,true);assert.equal(damageDialogs.rolled,2);
+ assert.equal(damageDialogs.events[1].ctrlKey,false);assert.equal(damageDialogs.rolled,2);
  assert.equal(damageDialogs.sent.filter(action=>action==="damageCommit").length,2);
  assert.equal(damageDialogs.sent.filter(action=>action==="damageRelease").length,3);
 

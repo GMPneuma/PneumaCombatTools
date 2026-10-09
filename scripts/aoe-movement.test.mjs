@@ -35,10 +35,10 @@ test("evasion cost is recorded once and debt reduces the next turn",async()=>{
  await f.participant.update({'flags.pneuma-combattools.aoeMovement':movementEntry(f.token.document).current});
  f.combat.round=3;assert.equal(movementEntry(f.token.document).remaining,12);
 });
-test("RAW relocation costs nothing; homebrew requires combat",async()=>{
+test("relocation remains available without combat and skips optional MOVE bookkeeping",async()=>{
  const f=fixture();game.combat=null;game.combats=[];
  await moveEvader(f.token,{x:1050,y:50},false,false,"raw");
- await assert.rejects(moveEvader(f.token,{x:1150,y:50},true,false,"cost"),/combat/);
+ assert.equal(await moveEvader(f.token,{x:1150,y:50},true,false,"cost"),0);
 });
 test("player-originated token movement reaches GM accounting",async()=>{
  const f=fixture(),hooks={};globalThis.Hooks={on:(key,fn)=>hooks[key]=fn};registerAreaMovement();
@@ -57,3 +57,5 @@ test("interrupted token move reuses its reserved MOVE charge",async()=>{
 
 test('saved evasion encounter survives a different GM scene and viewed encounter',async()=>{const f=fixture();const ref={combatId:'combat',combatEpoch:'',combatScene:'s',combatTokens:['t']};game.combat={id:'wrong',started:true};canvas.scene={id:'other',grid:{units:'m'}};await moveEvader(f.token,{x:250,y:50},true,false,'saved',ref);assert.equal(f.participant.flags['pneuma-combattools'].aoeMovement.spent,4);});
 test('movement reset epoch rejects an evasion before reserving MOVE',async()=>{const f=fixture();f.combat.flags={'pneuma-combattools':{evasionEpoch:'new'}};await assert.rejects(moveEvader(f.token,{x:250,y:50},true,false,'saved',{combatId:'combat',combatEpoch:''}),/reset/);assert.equal(f.participant.flags['pneuma-combattools'],undefined);});
+
+test('normal outside-tracker movement is not blocked by optional AoE accounting',()=>{const f=fixture(),hooks={};globalThis.Hooks={on:(key,fn)=>hooks[key]=fn};registerAreaMovement();f.combat.combatants=[];const options={};assert.equal(hooks.preUpdateToken(f.token.document,{x:150},options),undefined);assert.deepEqual(options,{});});
