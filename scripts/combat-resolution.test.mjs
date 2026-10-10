@@ -32,7 +32,10 @@ test("cumulative penalties count excess attempts; LUCK and hard caps",()=>{
 });
 test("mandatory LUCK and optional bonus are separate and validated",()=>{
   assert.equal(checkedLuck(5,2,1),2);
-  assert.throws(()=>checkedLuck(2,2,1),/Insufficient/);
+  assert.equal(checkedLuck(2,2,1),0);
+  assert.equal(checkedLuck(2,0,5),0);
+  assert.equal(checkedLuck(0,0,5),0);
+  assert.throws(()=>checkedLuck(1,2,0),/Insufficient/);
   assert.throws(()=>checkedLuck(5,0,-1),/Insufficient/);
   assert.throws(()=>checkedLuck(5,1,0.5),/Insufficient/);
 });
@@ -136,12 +139,12 @@ test("partial message failure resumes the exact roll without a second charge",as
   assert.equal(updates,1);
   assert.equal(get(msg,"flags.pneuma-combattools.exchange.state"),"resolved");
 });
-test("round/settings changes and insufficient combined LUCK reject before any charge",async()=>{
+test("round/settings changes and unaffordable mandatory LUCK fees reject before any charge",async()=>{
   for(const change of ["round","settings","luck"]) {
     setup();message("a");const claim=await request("a","claim");
     if(change==="round")game.combat.round=2;
     if(change==="settings")config.luckCost=3;
-    if(change==="luck")actor.system.stats.luck.value=2;
+    if(change==="luck")actor.system.stats.luck.value=1;
     await assert.rejects(request("a","commit",{nonce:claim.nonce,defense:defense()}));
     assert.equal(updates,0);
     await request("a","release",{nonce:claim.nonce});
@@ -191,9 +194,8 @@ test("shared LUCK is rechecked across independent combat claims",async()=>{
   setup();message("a","combat");message("b","other");
   const first=await request("a","claim"),second=await request("b","claim");
   await request("a","commit",{nonce:first.nonce,defense:defense()});
-  await assert.rejects(request("b","commit",{nonce:second.nonce,defense:defense()}),/Insufficient LUCK/);
-  assert.equal(actor.system.stats.luck.value,2);
-  await request("b","release",{nonce:second.nonce});
+  await request("b","commit",{nonce:second.nonce,defense:defense()});
+  assert.equal(actor.system.stats.luck.value,0);
 });
 test("failed Combat write resumes without charging twice or double-counting",async()=>{
   setup();message("a");const claim=await request("a","claim");failCombat=true;
@@ -446,13 +448,13 @@ test("native ammo rejection stops attack before dialog, confirmation, LUCK or ch
 });
 test("ammo changing during the dialog stops confirmation; sufficient ammo and melee continue",async()=>{
  const {startCombatExchange}=await import("../dist/scripts/combat-resolution.js");
- for(const scenario of ["depleted","loaded","melee"]) {
+ for(const scenario of ["depleted","loaded","melee","over-pool"]) {
   setup();game.users.filter=()=>[{id:"gm",isGM:true,active:true}];game.user={isGM:false};
   game.tables={getName:()=>({getResultsForRoll:()=>[{text:"13"}]})};
   globalThis.canvas={grid:{measurePath:()=>({distance:5})}};
   let ammo=true,confirms=0;const warnings=[];
   globalThis.ui={notifications:{warn:message=>warnings.push(message)}};
-  const roll={luck:0,handleRollDialog:async()=>{if(scenario==="depleted")ammo=false;return true;}};
+  const roll={luck:scenario==="over-pool"?6:0,handleRollDialog:async()=>{if(scenario==="depleted")ammo=false;return true;}};
   const item={system:{isRanged:scenario!=="melee",weaponType:"heavyPistol",dvTable:"Pistol"},
     createRoll:()=>roll,hasAmmo:()=>scenario==="melee"?false:ammo,
     confirmRoll:async()=>{confirms++;throw Error("confirmation reached");}};

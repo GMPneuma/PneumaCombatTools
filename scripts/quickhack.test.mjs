@@ -450,12 +450,11 @@ test('GM override clamps progress; players cannot override; pending breach cance
 test('breach dialog must not advance a wall after GM changes progress',async()=>{const f=fixture();f.target.items.push(iceItem(),iceItem(),iceItem());await executeQuickhack(f.a,f.b,'jack-in');f.state.total=11;f.state.onDialog=()=>overrideBreach(f.source,f.target,1);await executeQuickhack(f.a,f.b,'breach');console.log('progress after override during roll:',activeConnection(f.source,f.target.uuid).breachCleared,'rolls:',f.state.rolls);assert.equal(activeConnection(f.source,f.target.uuid).breachCleared,1);});
 test('breach luck must be consumed',async()=>{const f=fixture();f.target.items.push(iceItem());f.source.system={stats:{luck:{value:5}}};f.source.update=async changes=>{for(const [k,v] of Object.entries(changes))put(f.source,k,v);};await executeQuickhack(f.a,f.b,'jack-in');f.state.total=8;const create=f.role.createRoll;f.role.createRoll=()=>({...create(),luck:3});await executeQuickhack(f.a,f.b,'breach');console.log('luck after +3 breach:',f.source.system.stats.luck.value);assert.equal(f.source.system.stats.luck.value,2);});
 
-test('QuickHack LUCK is not spent on cancellation, and insufficient LUCK prevents rolling',async()=>{
+test('QuickHack LUCK cancellation spends nothing; over-pool bonuses roll and consume only available LUCK',async()=>{
  const f=fixture();f.source.system={stats:{luck:{value:2}}};const updates=[];f.source.update=async changes=>{updates.push(changes);for(const [k,v] of Object.entries(changes))put(f.source,k,v);};
- const create=f.role.createRoll;f.role.createRoll=()=>({...create(),luck:3});
- await executeQuickhack(f.a,f.b,'jack-in');assert.equal(f.state.rolls,0);assert.equal(updates.length,0);assert.match(f.notices.at(-1),/LUCK/);
- f.role.createRoll=()=>({...create(),luck:1,handleRollDialog:async()=>false});await executeQuickhack(f.a,f.b,'jack-in');assert.equal(f.state.rolls,0);assert.equal(updates.length,0);
- f.role.createRoll=()=>({...create(),luck:1});await executeQuickhack(f.a,f.b,'jack-in');assert.equal(f.source.system.stats.luck.value,1);assert.equal(updates.length,1);
+ const create=f.role.createRoll;
+ f.role.createRoll=()=>({...create(),luck:3,handleRollDialog:async()=>false});await executeQuickhack(f.a,f.b,'jack-in');assert.equal(f.state.rolls,0);assert.equal(updates.length,0);
+ f.role.createRoll=()=>({...create(),luck:3});await executeQuickhack(f.a,f.b,'jack-in');assert.equal(f.state.rolls,1);assert.equal(f.source.system.stats.luck.value,0);assert.equal(updates.length,1);
 });
 
 test('legacy QuickHack image paths are corrected in menus and stored items without changing custom artwork',async()=>{

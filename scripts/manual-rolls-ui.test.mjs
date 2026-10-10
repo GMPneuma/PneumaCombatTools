@@ -222,7 +222,8 @@ try {
  assert.equal(await page.evaluate(()=>created.flags['pneuma-combattools'].medicalParticipants.defender),undefined);
  await page.setViewportSize({width:760,height:600});
  assert.equal(await page.locator('.pneuma-treatment-list').evaluate(node=>node.scrollWidth<=node.clientWidth),true,'Treatment content fits without horizontal scrolling');
- const columns=await page.locator('[data-treatment-location=body] .pneuma-treatment-columns > div').evaluateAll(nodes=>nodes.map(node=>({x:node.getBoundingClientRect().x,y:node.getBoundingClientRect().y})));assert.equal(columns[0].y,columns[1].y);assert.equal(columns[1].y,columns[2].y);assert(columns[0].x<columns[1].x&&columns[1].x<columns[2].x);
+ const columns=await page.locator('[data-treatment-location=body] .pneuma-treatment-columns > div').evaluateAll(nodes=>nodes.map(node=>({x:node.getBoundingClientRect().x,bottom:node.getBoundingClientRect().bottom})));assert.ok(Math.abs(columns[0].bottom-columns[1].bottom)<1,"Treatment groups align at the bottom");assert.ok(Math.abs(columns[1].bottom-columns[2].bottom)<1);assert(columns[0].x<columns[1].x&&columns[1].x<columns[2].x);
+ assert.ok(await page.locator('.pneuma-treatment-columns :is(button,select)').evaluateAll(nodes=>nodes.every(node=>Math.abs(node.getBoundingClientRect().height-32)<1)),'Treatment controls use consistent 32px height');
  await page.screenshot({path:process.env.TEMP+'/pct-treatment-menu.png',fullPage:true});
  await page.setViewportSize({width:450,height:800});
  console.log('Treatment browser checks passed: wound DVs, Body/Head sections, permanent Quick Fix and native Surgery delegation.');
@@ -249,4 +250,30 @@ try {
  await page.setViewportSize({width:620,height:600});
  await page.evaluate(()=>{document.body.innerHTML='<div class="pneuma-roll-dialog"><h3>Skills — Pex</h3>'+skillListPreview+'<h3>Role Abilities — Pex</h3>'+roleListPreview+'</div>';});
  await page.screenshot({path:process.env.TEMP+'/pct-character-roll-lists.png',fullPage:true});
+
+ // Inspect every module-owned Roll-menu dialog in native-style light/dark windows.
+ await page.evaluate(async()=>{
+  const beforeUsers=game.users,beforeUser=game.user;
+  game.user={isGM:true,flags:{}};game.users=[{id:'preview-player',name:'Player',active:true,isGM:false,character:{name:'Solo',items:[{type:'skill',name:'Perception'}]}}];
+  await groupPrompt();window.groupFormPreview=promptData.content;
+  await criticalPrompt();window.criticalFormPreview=promptData.content;
+  game.users=beforeUsers;game.user=beforeUser;
+ });
+ for(const theme of ['light','dark']) {
+  const result=await page.evaluate(theme=>{
+   const ink=theme==='dark'?'#eee':'#222',surface=theme==='dark'?'#24282d':'#dedede';
+   document.body.innerHTML='';document.body.style.background=theme==='dark'?'#14171a':'#eee';document.body.style.color=ink;
+   const samples=[['General Roll',customFormPreview,380],['Damage',damageFormPreview,380],['Critical Injury',criticalFormPreview,380],['Group Check',groupFormPreview,380],['Skill / STAT',skillListPreview,630],['Role Ability',roleListPreview,590]];
+   return samples.map(([title,content,width])=>{
+    const app=document.createElement('section');app.className='window-app pneuma-roll-dialog';app.style.cssText='width:'+width+'px;max-width:calc(100vw - 24px);box-sizing:border-box;margin:12px 0;background:'+surface+';--cpr-text-normal:'+ink+';--cpr-background-window:'+surface+';--color-border-highlight:#a84048';
+    app.innerHTML='<header class="window-header" style="padding:6px 10px"><strong>'+title+'</strong></header><div class="window-content"><div class="dialog-content">'+content+'</div><div class="dialog-buttons"><button class="default">Roll</button></div></div>';document.body.append(app);
+    const footer=app.querySelector('.dialog-buttons button');return {title,fits:app.scrollWidth<=app.clientWidth,footerHeight:footer.getBoundingClientRect().height,fieldHeight:app.querySelector('select,input:not([type=checkbox]):not([type=radio])')?.getBoundingClientRect().height??32};
+   });
+  },theme);
+  assert.ok(result.every(row=>row.fits),'Roll dialogs fit the viewport in '+theme+': '+JSON.stringify(result));
+  assert.ok(result.every(row=>row.footerHeight>=34),'Consistent footer buttons in '+theme);
+  await page.screenshot({path:process.env.TEMP+'/pct-roll-dialogs-'+theme+'.png',fullPage:true});
+ }
+ console.log('Roll dialog polish checked: six forms in light/dark native-style windows, viewport fit and consistent buttons.');
+
 } finally {await browser.close()}

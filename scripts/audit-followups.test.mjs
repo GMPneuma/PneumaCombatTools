@@ -22,13 +22,13 @@ test('Slow saves its penalty before optional dice playback; rejection or pending
   assert.equal(saved[0].changes[0].value,'-4');assert.equal(shown,1);assert.equal(warnings.length,failing?1:0);
  }
 });
-test('simultaneous LUCK spends read the latest balance; insufficient balance rejects without a lost deduction',async()=>{
+test('simultaneous LUCK spends read the latest balance and follow native zero-floor consumption',async()=>{
  globalThis.foundry={utils:{getProperty:get}};
  for(const initial of [2,1]){
   const writes=[];const actor={uuid:'Actor.luck',system:{stats:{luck:{value:initial}}},async update(change){await new Promise(resolve=>setImmediate(resolve));writes.push(change);this.system.stats.luck.value=change['system.stats.luck.value'];}};
   const results=await Promise.allSettled([spendBonusLuck(actor,1),spendBonusLuck(actor,1)]);
-  assert.equal(actor.system.stats.luck.value,0);assert.equal(writes.length,initial);
-  assert.equal(results.filter(r=>r.status==='rejected').length,2-initial);
+  assert.equal(actor.system.stats.luck.value,0);assert.equal(writes.length,2);
+  assert.equal(results.filter(r=>r.status==='rejected').length,0);
  }
 });
 test('a failed LUCK write releases the actor queue for a later retry',async()=>{

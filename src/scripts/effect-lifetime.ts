@@ -20,7 +20,7 @@ export function effectLifetime(effect:ActiveEffect):EffectLifetime {
   if(isAddictionEffect(effect))return {kind:"persistent",label:"Protected: addiction",protected:true,injury};
   if(effect.statuses.has("dead")||masterStatuses.some(s=>s.name==="Dead"&&effect.statuses.has(s.id)))return {kind:"persistent",label:"Protected: Dead",protected:true,injury};
   if(effect.statuses.has("pneuma-needs-stabilization"))return {kind:"persistent",label:"Protected: Needs Stabilization; cleared by stabilization",protected:true,injury};
-  if(["disableRequest","empCombat","disabledLegPenalty","frameConsequences"].some(key=>flag(effect,key)))return {kind:"managed",label:"Equipment restoration owns this effect",injury};
+  if(["disableRequest","empCombat","disabledLegPenalty","frameConsequences","empStatus"].some(key=>flag(effect,key)))return {kind:"managed",label:"Equipment restoration owns this effect",injury};
   if(proneIds().some(id=>effect.statuses.has(id))||isSpeedheal(effect))return {kind:"combat",label:"Clears when the patient's combat ends",injury};
   if(flag(effect,"suppressionExpiry"))return {kind:"turn",label:"Expires after the target's next turn or combat end",injury};
   if(injury&&!hasDuration(effect.duration))return {kind:"persistent",label:"Permanent critical injury",injury};

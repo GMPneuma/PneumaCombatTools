@@ -10,7 +10,7 @@ export function registerEmpRefresh(report: (error: unknown) => void): void {
   let scheduled = false;
   const remember = (actor: Actor) => {
     const affected = actor.items.some(item => empReferences(item).length > 0 || Object.keys(timedDisables(item)).length > 0)
-      || actor.effects.some(effect => ["disabledLegPenalty", "frameConsequences", "disableRequest", "empCombat"]
+      || actor.effects.some(effect => ["disabledLegPenalty", "frameConsequences", "disableRequest", "empCombat", "empStatus"]
         .some(key => foundry.utils.getProperty(effect, "flags.pneuma-combattools." + key)));
     if (affected) tracked.set(actor.uuid, actor); else tracked.delete(actor.uuid);
     return affected;

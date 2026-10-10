@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.9.16 - 2026-10-10
+
+- Synchronize the native EMP token icon with actual EMP and Microwaver item disablements. Clear the owned marker when the last matching cause ends; preserve manually applied EMP markers and avoid marking pending/resisted selections or unrelated QuickHack disablements.
+- Match native CPR LUCK bonus behavior: allow the selected bonus above the current pool and consume only available LUCK, down to zero. Mandatory homebrew Evasion costs remain eligibility checks.
+- Count defeated/dead participants by actor identity instead of display names. Avoid phantom casualties from token/actor name differences while retaining distinct actors with identical names and removed participants.
+- Remove Iron Grip and Asphyxiating from the status catalog.
+- Remove invalid Blue Glass native-effect bindings that caused unavailable-effect errors. Keep primary/addiction as independent manually managed markers without altering inventory or inventing mechanics.
+- Polish Roll-menu dialogs with compact panels, clearer controls and tables, native Cyberpunk theme classes/colors, and consistent Treatment layouts.
+- Expose read-only revealed AoE effect cells for Visual Tools using native highlighted cells and wall clipping. Combat Tools retains resolution-based marker visibility.
+
+Validation: production build, strict TypeScript checks and automated regressions; Roll-menu/Treatment browser checks. Live Foundry/multiplayer verification remains pending. The AoE visual bridge requires compatible Visual Tools support.
+
+
 ## 0.9.15 - 2026-10-09
 
 - Allow all AoE attacks to affect scene tokens outside the combat tracker, including damage, special grenade responses, attached effects and evasion relocation. Retain attacker membership, ownership, scene and originating-encounter validation.

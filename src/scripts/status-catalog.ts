@@ -199,12 +199,6 @@ export const masterStatuses: StatusDefinition[] = [
     }
   },
   {
-    "id": "bbjmpwk9nkloxo1i",
-    "name": "Asphyxiating",
-    "img": "systems/cyberpunk-red-core/icons/compendium/status/asphyxiating.svg",
-    "group": "general"
-  },
-  {
     "id": "ifnqllhgdsb6uvik",
     "name": "Collapsed Lung",
     "img": "systems/cyberpunk-red-core/icons/compendium/status/collapsed_lung.svg",
@@ -475,12 +469,6 @@ export const masterStatuses: StatusDefinition[] = [
     "group": "general"
   },
   {
-    "id": "t4bv2jj1sxi5sxxy",
-    "name": "Iron Grip",
-    "img": "systems/cyberpunk-red-core/icons/compendium/status/iron_grip.svg",
-    "group": "general"
-  },
-  {
     "id": "qjcbxa38bqqz4lap",
     "name": "Netrunning",
     "img": "systems/cyberpunk-red-core/icons/compendium/status/netrunning.svg",
@@ -613,15 +601,13 @@ export const masterStatuses: StatusDefinition[] = [
     "id": "ms4wgzm5hmji55py",
     "name": "Blue Glass",
     "img": "systems/cyberpunk-red-core/icons/compendium/status/blue_glass.svg",
-    "group": "drugs",
-    "binding": {"kind":"effect","pack":"cyberpunk-red-core.core_drugs","itemId":"","itemName":"Blue Glass","effectNames":["Blue Glass","Blue Glass Primary","Blue Glass Primary Effect"]}
+    "group": "drugs"
   },
   {
     "id": "bhl2fsrzn4or72f5",
     "name": "Blue Glass Addiction",
     "img": "systems/cyberpunk-red-core/icons/compendium/status/blue_glass_addiction.svg",
-    "group": "addiction",
-    "binding": {"kind":"effect","pack":"cyberpunk-red-core.core_drugs","itemId":"","itemName":"Blue Glass","effectNames":["Blue Glass Addiction","Blue Glass Addicted"]}
+    "group": "addiction"
   },
   {
     "id": "vc6wdch7hgjnyceg",

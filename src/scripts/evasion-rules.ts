@@ -26,9 +26,10 @@ export function evasionOffer(ranged: boolean, mode: "raw" | "none" | "custom", r
   return result;
 }
 export function checkedLuck(current: number, fee: number, bonus: number): number {
-  if (![current, fee, bonus].every(n => Number.isInteger(n) && n >= 0) || fee + bonus > current)
+  if (![current, fee, bonus].every(n => Number.isInteger(n) && n >= 0) || fee > current)
     throw new Error("Insufficient LUCK for the evasion cost and selected bonus.");
-  return current - fee - bonus;
+  // Native CPR accepts the selected roll bonus and consumes only the available pool.
+  return Math.max(0,current - fee - bonus);
 }
 export function evasionButtonLabel(offer: EvasionOffer): string {
   return "Evade" + (offer.cost > 0 ? " for " + offer.cost + " Luck" : "") + (offer.penalty ? " at " + offer.penalty : "");

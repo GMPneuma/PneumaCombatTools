@@ -20,7 +20,7 @@ import {moveEvader,registerAreaMovement} from "./movement.js";
 import { MODULE, areaSettings, registerAreaSettings, type AreaSettings } from "./settings.js";
 import { isMolotov, areaKind, confirmAreaRoll, type AreaKind, type AreaWeapon } from "./weapon.js";
 import { polygon, evadeAllowed, winsAreaDefense, type Area, type Point } from "./geometry.js";
-import { placeArea, clippedPoints, templateData, areaCoverage } from "./placement.js";
+import { placeArea, clippedPoints, templateData, areaCoverage, areaCells } from "./placement.js";
 import { requireCombatSocket } from "../socket-health.js";
 import {GMRequests} from "../gm-request.js";
 import { smokeAttackDialog, diceJSON, showSavedDice, messageDiceAudience, nativeCard, rollHidden, spendBonusLuck, type RollItem, type DiceAudience } from "../native-combat.js";
@@ -572,6 +572,15 @@ export function standardizeAreaLayout(root: HTMLElement,data?:AreaAttack): void 
 }
 
 export function registerAreaAttacks() {
+  Hooks.once('ready',()=>{
+    const module=game.modules!.get(MODULE) as unknown as {api?:Record<string,unknown>};
+    module.api={...module.api,getAreaEffectCells:(messageId:string)=>{
+      const candidate=game.messages?.get(messageId);
+      const message=candidate instanceof ChatMessage?candidate:undefined,data=message&&flag(message);
+      if(!message?.visible||message.isContentVisible===false||!data||data.scene!==canvas.scene?.id||data.phase!=='responses'||!data.attackDiceRevealed)return [];
+      return areaCells(data.area);
+    }};
+  });
   const finishMarkers=(combat:Combat)=>{
     // Run after any pending creation/update so cleanup cannot leave a late-created marker.
     const next=queue.catch(()=>{}).then(()=>clearGrenadeMarkers(combat));queue=next;void next.catch(errors);

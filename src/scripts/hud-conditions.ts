@@ -46,7 +46,7 @@ export function collectHUDConditions(actor: Actor) {
     if (title === "Netrunning") return; // Jacked In is sourced from the actual connection, not this marker.
     const row = {title, icon: icon ?? definition?.img, detail: title};
     const isMedical = injury || definition?.group === "head" || definition?.group === "body"
-      || /^(Asphyxiating|Blinded|Deafened|Drowning|Lightly Wounded|Seriously Wounded|Mortally Wounded|Dead)$/.test(title);
+      || /^(Blinded|Deafened|Drowning|Lightly Wounded|Seriously Wounded|Mortally Wounded|Dead)$/.test(title);
     (isMedical ? medical : situational).set(key, row);
   };
   for (const item of actor.items) if (String(item.type) === "criticalInjury") add(item.name ?? "Injury", item.img, true);

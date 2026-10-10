@@ -64,8 +64,21 @@ export function captureCombatSummary(combat:Combat,previousRound=0):CombatSummar
   if(!data.baseline.includes(item.uuid)&&!criticals.some(entry=>entry.item===item.uuid))criticals.push({actor:actor.uuid,actorName:actor.name??"Character",item:item.uuid,name:item.name??"Critical injury"});
  }
  const dead=masterStatuses.find(status=>status.name==="Dead")?.id;
+ // Match the report's unique-actor participant counts; names are display labels only.
+ const participants=new Map((data?.participants??[]).map(row=>[row.actor,{...row}]));
+ const current=new Map<string,Participant>();
+ for(const row of combat.combatants??[])if(row.actor){
+   const previous=current.get(row.actor.uuid);
+   current.set(row.actor.uuid,{actor:row.actor.uuid,name:previous?.name??row.name??row.actor.name??"Participant",defeated:!!row.isDefeated||!!previous?.defeated});
+ }
+ // Current tracker state supersedes older saved markers, including markers explicitly cleared.
+ for(const [uuid,row] of current)participants.set(uuid,row);
+ for(const actor of actors)if(dead&&actor.effects.some(effect=>!effect.disabled&&effect.statuses.has(dead))){
+   const row=participants.get(actor.uuid);
+   participants.set(actor.uuid,{actor:actor.uuid,name:row?.name??actor.name??"Participant",defeated:true});
+ }
  return {name:combat.name??"Encounter",scene:combat.scene?.name??undefined,actors,round:Math.max(0,combat.round??0,previousRound),players:actors.filter(actor=>actor.hasPlayerOwner).length,npcs:actors.filter(actor=>!actor.hasPlayerOwner).length,
-  defeated:[...new Set([...(data?.participants??[]).filter(row=>row.defeated).map(row=>row.name),...Array.from(combat.combatants??[]).filter(row=>row.isDefeated||!!dead&&row.actor?.effects.some(effect=>!effect.disabled&&effect.statuses.has(dead))).map(row=>row.name??row.actor?.name??"Participant"),...actors.filter(actor=>!!dead&&actor.effects.some(effect=>!effect.disabled&&effect.statuses.has(dead))).map(actor=>actor.name??"Participant")])],
+  defeated:[...participants.values()].filter(row=>row.defeated).map(row=>row.name),
   criticals,partial:!data||data.partial,effects:actors.flatMap(actor=>Array.from(actor.allApplicableEffects?.()??actor.effects).filter(effect=>summaryConditionNames(effect).length).map(effect=>({actor,uuid:effect.uuid,name:summaryConditionNames(effect).join(", ")})))};
 }
 export function combatSummaryHTML(summary:CombatSummarySnapshot):string {return combatReportHTML(buildCombatReport(summary));}

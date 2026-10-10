@@ -6,7 +6,7 @@ import {applyEmpSelection,finishEmp,reconcileEmp,cleanupEndedEmp} from '../dist/
 const module='pneuma-combattools',key=`flags.${module}`;
 const get=(o,p)=>p.split('.').reduce((v,k)=>v?.[k],o);
 const collection=rows=>Object.assign(rows,{get:id=>rows.find(r=>r.id===id)});
-function update(data){for(const [path,value] of Object.entries(data)){const parts=path.split('.');let node=this;for(const part of parts.slice(0,-1))node=node[part]??={};const last=parts.at(-1);if(last.startsWith('-='))delete node[last.slice(2)];else node[last]=structuredClone(value);}return Promise.resolve(this);}
+function update(data){for(const [path,value] of Object.entries(data)){const parts=path.split('.');let node=this;for(const part of parts.slice(0,-1))node=node[part]??={};const last=parts.at(-1);if(last.startsWith('-='))delete node[last.slice(2)];else node[last]=last==="statuses"?new Set(value):structuredClone(value);}return Promise.resolve(this);}
 function fixture(){
  const gm={id:'gm',isGM:true,active:true},player={id:'p',isGM:false,active:true};
  globalThis.foundry={utils:{getProperty:get}};
@@ -59,8 +59,8 @@ test('apply stores combat references and preserves existing effect and installat
  await applyEmpSelection(f.combat,'r',['arm'],f.player);
  assert(empDisabled(f.arm));assert(empDisabled(f.weapon));assert.equal(get(f.combat,`${key}.empRecords.r`).items.length,3);
  assert.deepEqual(f.arm.system,prior);assert.deepEqual(f.arm.effects,effects);
- assert.deepEqual(f.actor.effects.map(e=>e.id),["injury"]);
- await applyEmpSelection(f.combat,'r',['arm'],f.player);assert.equal(f.actor.effects.length,1);
+ assert.deepEqual(f.actor.effects.filter(e=>!get(e,key+".empStatus")).map(e=>e.id),["injury"]);assert.equal(f.actor.effects.filter(e=>get(e,key+".empStatus")).length,1);
+ await applyEmpSelection(f.combat,'r',['arm'],f.player);assert.equal(f.actor.effects.length,2);
  f.combat.started=false;assert(!empDisabled(f.arm));await finishEmp(f.combat);
  assert.deepEqual(empReferences(f.arm),[]);assert(get(f.arm,`${key}.itemMarkers.disabled`));assert(!get(f.arm,`${key}.itemMarkers.emp`));
  assert.deepEqual(f.arm.effects,effects);assert.deepEqual(f.actor.effects.map(e=>e.id),['injury']);
@@ -382,7 +382,7 @@ test('legacy limb marker is removed without losing item causes, MOVE penalty or 
  const f=fixture();f.arm.system.type='cyberLeg';
  await applyEmpSelection(f.combat,'r',['arm'],f.player);
  const penalty=f.actor.effects.find(e=>get(e,key+'.disabledLegPenalty'));
- assert(penalty);assert.equal(f.actor.effects.length,2);
+ assert(penalty);assert.equal(f.actor.effects.length,3);
  f.actor.effects.push({id:'legacy',name:'Microwaver: Cyberleg Disabled',statuses:new Set(['pneuma-emp-limb']),changes:[],flags:{[module]:{empItem:'arm',empCombat:'c'}}});
  f.actor.effects.push({id:'unrelated',name:'Other',statuses:new Set(['pneuma-emp-limb']),changes:[],flags:{}});
  await reconcileEmp();
@@ -471,4 +471,26 @@ test('EMP cards refresh only changed requests, removed requests and combat avail
  delete f.combat.flags[module].empRequests.other;fire('updateCombat',f.combat,{flags:{[module]:{empRequests:{'-=other':null}}}});assert.deepEqual(refreshed.splice(0),['two']);
  game.user=f.player;f.combat.started=false;fire('updateCombat',f.combat,{turn:null});assert.deepEqual(refreshed.splice(0),['one']);
  fire('deleteCombat',f.combat);assert.deepEqual(refreshed.splice(0),['one']);
+});
+
+test('EMP icon follows actual disablements, survives overlaps, and clears with the last cause',async()=>{
+ const {syncEmpStatus}=await import('../dist/scripts/emp-state.js');const {masterStatuses}=await import('../dist/scripts/status-catalog.js');
+ const f=fixture(),id=masterStatuses.find(status=>status.name==='EMP').id;game.time={worldTime:100};
+ const markers=()=>f.actor.effects.filter(effect=>get(effect,key+'.empStatus'));
+ await syncEmpStatus(f.actor);assert.equal(markers().length,0,'Pending request alone has no icon');
+ await applyEmpSelection(f.combat,'r',['arm'],f.player);assert.equal(markers().length,1);assert(markers()[0].statuses.has(id));assert.deepEqual(markers()[0].changes,[]);
+ await syncEmpStatus(f.actor);assert.equal(markers().length,1,'Repeated sync does not duplicate icon');
+ await f.eye.update({[key+'.timedDisables']: {hit:{source:'microwaver',duration:{seconds:60,startTime:100}}}});
+ f.combat.started=false;await finishEmp(f.combat);assert.equal(markers().length,1,'Microwaver retains icon after another EMP cause ends');
+ game.time.worldTime=160;await syncEmpStatus(f.actor);assert.equal(markers().length,0);
+ await f.eye.update({[key+'.timedDisables']: {hit:{source:'short-circuit',duration:{seconds:60,startTime:160}}}});await syncEmpStatus(f.actor);assert.equal(markers().length,0,'QuickHack disablement does not become EMP');
+});
+test('workflow EMP icon preserves manually applied EMP statuses and repairs stale managed markers',async()=>{
+ const {syncEmpStatus}=await import('../dist/scripts/emp-state.js');const {masterStatuses}=await import('../dist/scripts/status-catalog.js');
+ const f=fixture(),id=masterStatuses.find(status=>status.name==='EMP').id;
+ f.actor.effects.push({id:'manual-emp',name:'EMP',disabled:false,statuses:new Set([id]),flags:{}});
+ await applyEmpSelection(f.combat,'r',['arm'],f.player);assert.equal(f.actor.effects.filter(effect=>effect.statuses.has(id)).length,1);
+ f.combat.started=false;await finishEmp(f.combat);assert(f.actor.effects.some(effect=>effect.id==='manual-emp'));
+ f.actor.effects.push({id:'stale-emp',name:'EMP',disabled:false,statuses:new Set([id]),flags:{[module]:{empStatus:true}}});
+ await syncEmpStatus(f.actor);assert(!f.actor.effects.some(effect=>effect.id==='stale-emp'));assert(f.actor.effects.some(effect=>effect.id==='manual-emp'));
 });

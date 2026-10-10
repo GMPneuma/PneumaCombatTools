@@ -97,3 +97,20 @@ test('late participant remains after removal and recapture',async()=>{
  const row={actor,parent:f.combat,name:actor.name,isDefeated:false};f.combat.combatants.push(row);f.fire('createCombatant',row);await waitCombatSummary();
  f.fire('deleteCombatant',row);f.combat.combatants.pop();await waitCombatSummary();assert.equal(captureCombatSummary(f.combat).npcs,2);
 });
+
+test('two dead NPCs with different actor and token names count twice, not three times',async()=>{
+ const f=fixture();f.npc.name='Default Mook';f.combat.combatants[1].name='Mook 1';
+ const second={uuid:'Actor.npc2',name:'Default Mook',hasPlayerOwner:false,items:[],effects:[]};game.actors.push(second);
+ f.combat.combatants.push({actor:second,name:'Mook 2',isDefeated:true});
+ for(const actor of [f.npc,second])actor.effects.push({uuid:actor.uuid+'.Effect.dead',disabled:false,statuses:new Set(['dead'])});
+ await f.start();const summary=captureCombatSummary(f.combat);
+ assert.equal(summary.players,1);assert.equal(summary.npcs,2);assert.deepEqual(summary.defeated,['Mook 1','Mook 2']);
+ assert.equal(buildCombatReport(summary).defeated.length,2);
+});
+test('identically named defeated actors stay separate and cleared tracker flags override saved flags',async()=>{
+ const f=fixture();const second={uuid:'Actor.npc2',name:'Guard',hasPlayerOwner:false,items:[],effects:[]};game.actors.push(second);
+ f.combat.combatants.push({actor:second,name:'Guard',isDefeated:true});await f.start();
+ assert.deepEqual(captureCombatSummary(f.combat).defeated,['Guard','Guard']);
+ f.combat.combatants[1].isDefeated=false;f.combat.combatants[2].isDefeated=false;
+ assert.deepEqual(captureCombatSummary(f.combat).defeated,[],'Current flags override previously remembered defeat');
+});

@@ -1,3 +1,4 @@
+import {masterStatuses} from "./status-catalog.js";
 import { allActors, primaryGM as empGM } from "./shared.js";
 import {resolveEncounter,type EncounterRef} from "./encounter.js";
 import {activeLegInjuryPenalty} from "./injury-rules.js";
@@ -5,7 +6,7 @@ import {penaltyFlags,missingPenaltyFlags} from "./penalty-flags.js";
 import type {EmpMethod} from "./emp-behavior.js";
 import {effectDuration,type EffectDuration} from "./effect-duration.js";
 import {registerNativeWrapper} from "./native-wrappers.js";
-import {EMP_MODULE as MODULE, empReferences, empDisabled, type EmpItem, type EmpPolicy, type EmpRandom, type DisableSource, timedDisables, activeDisables, disableExpired, disableLabel, empHardened, internalFrame, eligibleEmpItems, expandEmp, randomEmp} from "./emp-rules.js";
+import {EMP_MODULE as MODULE, hasActorEMP, empReferences, empDisabled, type EmpItem, type EmpPolicy, type EmpRandom, type DisableSource, timedDisables, activeDisables, disableExpired, disableLabel, empHardened, internalFrame, eligibleEmpItems, expandEmp, randomEmp} from "./emp-rules.js";
 export {empDisabled};
 export interface EmpRequest { encounter?:EncounterRef; id: string; actor: string; count: number; chooser: "gm" | "player" | "random"; mode: EmpRandom; policy: EmpPolicy; state: "pending" | "applied"; selected?: string[]; affectedNames?: string[]; message?: string; source?:DisableSource; sourceActor?:string; seconds?:number; duration?:EffectDuration; origin?:string; method?:EmpMethod; offered?:string[]; selectedNames?:string[]; resistedNames?:string[] }
 export interface EmpRecord {actor: string; items: string[]; timed?:boolean}
@@ -132,6 +133,7 @@ export async function syncDisableMarker(item:Item) {
 }
 /** Apply functional limb consequences without importing a physical injury or stacking repeated hits. */
 export async function syncDisabledLimbs(actor:Actor) {
+  await syncEmpStatus(actor);
   // Older releases created a second, non-mechanical limb effect. Item causes already own its state.
   const redundant=actor.effects.filter(effect=>(effect.statuses?.has("pneuma-emp-limb")||!!foundry.utils.getProperty(effect,path+".frameRequest"))&&
     !!foundry.utils.getProperty(effect,path+".empItem")&&!effect.changes.length);
@@ -188,4 +190,19 @@ async function syncDisabledFrames(actor:Actor) {
 }
 export function frameMovementBlocked(actor:Actor| null|undefined,changes:Record<string,unknown>,isGM:boolean):boolean {
   return !isGM&&!!actor&&["x","y","elevation"].some(k=>k in changes)&&disabledFrameConsequences(actor).noMove;
+}
+
+/** Own only the workflow marker; preserve manually applied EMP statuses. */
+export async function syncEmpStatus(actor:Actor):Promise<void> {
+  const status=masterStatuses.find(status=>status.name==="EMP");if(!status)return;
+  const managed=actor.effects.filter(effect=>!!foundry.utils.getProperty(effect,path+".empStatus"));
+  const active=hasActorEMP(actor)||actor.items.some(item=>activeDisables(item).some(disable=>disable.source==="microwaver"));
+  if(!active){if(managed.length)await actor.deleteEmbeddedDocuments("ActiveEffect",managed.map(effect=>effect.id!));return;}
+  const manual=actor.effects.some(effect=>!foundry.utils.getProperty(effect,path+".empStatus")&&!effect.disabled&&effect.statuses?.has(status.id));
+  if(manual){if(managed.length)await actor.deleteEmbeddedDocuments("ActiveEffect",managed.map(effect=>effect.id!));return;}
+  const data={name:status.name,img:status.img,disabled:false,statuses:[status.id],changes:[],flags:{[MODULE]:{empStatus:true}}};
+  if(managed.length){
+    const first=managed[0]!;if(first.disabled||!first.statuses.has(status.id))await first.update(data as never);
+    if(managed.length>1)await actor.deleteEmbeddedDocuments("ActiveEffect",managed.slice(1).map(effect=>effect.id!));
+  }else await actor.createEmbeddedDocuments("ActiveEffect",[data] as never);
 }

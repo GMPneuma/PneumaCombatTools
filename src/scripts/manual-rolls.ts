@@ -244,8 +244,8 @@ async function damagePrompt() {
   });
 }
 async function basePrompt() {
-  const content='<form class="pneuma-manual-form">'+field("Label",'<input name="title" value="Cyberpunk roll" maxlength="100">')
-    +field("Modifier",numeric("base",0))
+  const content='<form class="pneuma-manual-form">'+'<div class="pneuma-roll-description-modifier">'+field("Description",'<input name="title" value="Cyberpunk roll" maxlength="100">')
+    +field("Modifier",numeric("base",0))+'</div>'
     +'<div class="pneuma-roll-modes"><label class="pneuma-roll-check"><input type="radio" name="diceMode" value="standard" checked>Standard Cyberpunk 1D10</label>'
     +'<p class="pneuma-roll-hint">Natural 10: Critical Success. Natural 1: Critical Failure.</p>'
     +'<label class="pneuma-roll-check"><input type="radio" name="diceMode" value="custom">Custom</label></div>'
@@ -400,7 +400,7 @@ async function characterRollPrompt(kind: "skill" | "roleAbility") {
         ...(data.abilities??[]).map(ability=>({item,name:ability.name,subtype:"subRoleAbility",hasRoll:ability.hasRoll,rank:ability.rank}))];
     }).sort((a,b)=>a.name.localeCompare(b.name));
     const stats=kind==="skill"?'<div class="pneuma-skill-stat-roll"><label>STAT <select data-stat-choice>'+["int","ref","dex","tech","cool","will","move","body","luck","emp"].filter(stat=>foundry.utils.getProperty(actor,"system.stats."+stat+".value")!==undefined).map(stat=>'<option value="'+stat+'"'+(selectedStat===stat?' selected':'')+'>'+stat.toUpperCase()+' ('+(actor as Actor&{getStat(stat:string):number}).getStat(stat)+')</option>').join('')+'</select></label><button type="button" data-stat-roll>Roll STAT</button><small>Roll under; ties fail.</small></div><label class="pneuma-skill-filter">Filter skills <input type="search" data-skill-filter value="'+esc(filter)+'" placeholder="Type a skill name"></label>':'';
-    return stats+'<div class="pneuma-character-roll-list"><table><thead><tr><th>Favorite</th><th>'+(kind==="skill"?'Skill':'Role Ability')+'</th><th>'+(kind==="skill"?'Level':'Rank')+'</th><th>Mod</th>'+(kind==="skill"?'<th>Base</th>':'')+'<th colspan="2">Actions</th></tr></thead><tbody>'+choices.map((choice,index)=>{
+    return stats+'<div class="pneuma-character-roll-list"><table><thead><tr><th class="text-normal text-bold">Favorite</th><th class="text-normal text-bold">'+(kind==="skill"?'Skill':'Role Ability')+'</th><th class="text-normal text-bold">'+(kind==="skill"?'Level':'Rank')+'</th><th class="text-normal text-bold">Mod</th>'+(kind==="skill"?'<th class="text-normal text-bold">Base</th>':'')+'<th class="text-normal text-bold" colspan="2">Actions</th></tr></thead><tbody>'+choices.map((choice,index)=>{
       // Same modifier helper and base formula as CPR's character sheet.
       const mod=Number(Handlebars.helpers.cprGetSkillModInfo!(choice.name,actor,"modTotal",{hash:{}}));
       const base=choice.rank+mod+Number(foundry.utils.getProperty(actor,`system.stats.${choice.stat}.value`));
@@ -509,6 +509,12 @@ export function openManualRolls(anchor = document.querySelector<HTMLElement>("[d
   window.addEventListener("resize",()=>close(),{signal:events.signal});
 }
 export function registerManualRolls(): void {
+  Hooks.on('renderDialog',(_app:unknown,html:JQuery)=>{
+    const root=html[0];if(!root?.matches('.pneuma-roll-dialog'))return;
+    root.querySelector('.window-content')?.classList.add('dialog-sheet');
+    root.querySelectorAll('form').forEach(form=>form.classList.add('dialog-sheet'));
+    root.querySelectorAll('button').forEach(button=>button.classList.add('cpr-dialog-button'));
+  });
   Hooks.on("renderChatLog",(_app:unknown,html:JQuery)=>{
     const icon=html[0]?.querySelector<HTMLElement>("#chat-controls .fa-dice-d20, .chat-controls .fa-dice-d20");
     closeRollFlyout?.();
