@@ -2,6 +2,7 @@ import { attackFromHUD, attackEntries, thrownEntries, type AttackMode, type Menu
 import { areaKind } from "./aoe/weapon.js";
 import { registerNativeWrapper } from "./native-wrappers.js";
 import { primaryGM } from "./shared.js";
+import {installHazardAttackGuard} from "./hazard-attacks.js";
 
 const MODULE = "pneuma-combattools";
 declare global { interface SettingConfig { "pneuma-combattools.routeSheetAttacks": boolean; } }
@@ -64,6 +65,15 @@ export function installSheetAttackRouting(sheetClass: NativeSheetClass, utils: N
 }
 
 export function registerSheetAttacks(): void {
+  const module = game.modules?.get(MODULE) as unknown as {api?: Record<string, unknown>} | undefined;
+  if (module) module.api = {...module.api, sceneAttack: {version: 2, async execute(attacker: Token, target: Token, itemId: string, options: {mode?: AttackMode; skipDialog?: boolean} = {}) {
+    if (!game.user?.isGM) throw Error("Only a GM can initiate a scene-device attack.");
+    if (!attacker.actor?.items.has(itemId) || !target.actor || attacker === target) throw Error("Choose an existing device weapon and target.");
+    const mode = options.mode ?? "attack";
+    if (!["attack", "aimed", "autofire", "suppressive"].includes(mode)) throw Error("Unsupported scene attack mode.");
+    const message = await attackFromHUD(attacker, target, itemId, mode, {shiftKey: !!options.skipDialog} as JQuery.ClickEvent);
+    return message ? {status: "started" as const, messageId: message.id!} : {status: "cancelled" as const};
+  }}};
   game.settings!.register(MODULE, "routeSheetAttacks", {
     name: "Route character-sheet attacks through Combat Tools",
     hint: "Use Combat Tools for supported sheet attacks with an unambiguous scene token and target. Area weapons open placement without a target. Otherwise use the normal system roll.",
@@ -75,9 +85,10 @@ export function registerSheetAttacks(): void {
       const utilsPath = "/systems/cyberpunk-red-core/modules/utils/cpr-systemUtils.js";
       const [sheet, utils] = await Promise.all([import(sheetPath), import(utilsPath)]);
       installSheetAttackRouting(sheet.default as NativeSheetClass, utils.default as NativeUtils);
+      await installHazardAttackGuard();
     } catch (error) {
       console.error(MODULE + " | Character-sheet attack routing unavailable", error);
-      if (game.settings!.get(MODULE, "routeSheetAttacks")) ui.notifications!.warn("Combat Tools sheet routing is unavailable; native sheet attacks remain enabled.");
+      ui.notifications!.warn("Combat Tools native attack integration is unavailable. Check the console before using hazard sheet attacks.");
     }
   });
 }

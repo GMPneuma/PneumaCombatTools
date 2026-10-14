@@ -30,6 +30,27 @@ test('sheet routing is registered off by default',()=>{
  let config;globalThis.game={settings:{register:(m,k,c)=>{assert.equal(k,'routeSheetAttacks');config=c;}}};globalThis.Hooks={once(){}};
  registerSheetAttacks();assert.equal(config.default,false);assert.equal(config.scope,'world');
 });
+test('scene-device attack API requires a GM and reuses the existing exchange',async()=>{
+ const f=setup(),module={};game.modules=new Map([['pneuma-combattools',module]]);game.settings.register=()=>{};globalThis.Hooks={once(){}};
+ f.actor.items.has=id=>f.actor.items.some(item=>item.id===id);registerSheetAttacks();
+ assert.equal(module.api.sceneAttack.version,2);
+ game.user.isGM=false;await assert.rejects(()=>module.api.sceneAttack.execute(f.source,f.target,'gun'),/Only a GM/);
+ game.user.isGM=true;await module.api.sceneAttack.execute(f.source,f.target,'gun');assert.equal(f.calls.exchange.length,1);
+ await assert.rejects(()=>module.api.sceneAttack.execute(f.source,f.target,'missing'),/existing device weapon/);
+});
+test('scene attack API reports created cards, cancellation and area routing',async()=>{
+ const f=setup(),module={};game.modules=new Map([['pneuma-combattools',module]]);game.settings.register=()=>{};globalThis.Hooks={once(){}};
+ f.actor.items.has=id=>f.actor.items.some(item=>item.id===id);game.user.isGM=true;registerSheetAttacks();
+ globalThis.exchange=async(...args)=>{assert.equal(args[3],'aimed');assert.equal(args[4].shiftKey,true);return {id:'direct-card'};};
+ assert.deepEqual(await module.api.sceneAttack.execute(f.source,f.target,'gun',{mode:'aimed',skipDialog:true}),{status:'started',messageId:'direct-card'});
+ globalThis.exchange=async()=>undefined;
+ assert.deepEqual(await module.api.sceneAttack.execute(f.source,f.target,'gun'),{status:'cancelled'});
+ globalThis.area=async(...args)=>{assert.equal(args[3],'suppressive');return {id:'area-card'};};
+ assert.deepEqual(await module.api.sceneAttack.execute(f.source,f.target,'gun',{mode:'suppressive'}),{status:'started',messageId:'area-card'});
+ await assert.rejects(()=>module.api.sceneAttack.execute(f.source,f.target,'gun',{mode:'invalid'}),/Unsupported scene attack mode/);
+ globalThis.area=async()=>{throw Error('after ammunition was spent');};
+ await assert.rejects(()=>module.api.sceneAttack.execute(f.source,f.target,'gun',{mode:'suppressive'}),/after ammunition was spent/);
+});
 test('normal, aimed and autofire route once with exact event, item and mode',async()=>{
  for(const mode of ['attack','aimed','autofire']){const f=setup();f.sheet.mode=mode;await f.sheet._onRoll(f.event);
  assert.equal(f.calls.native,0);assert.equal(f.calls.exchange.length,1);assert.deepEqual(f.calls.exchange[0],[f.source,f.target,'gun',mode,f.event]);}

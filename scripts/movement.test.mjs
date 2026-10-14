@@ -110,3 +110,23 @@ test('sidebar preview cannot replace the scene active movement record or reset o
  await resetMovement(f.token);assert.equal(f.doc.x,0);
  f.combat.scene=null;f.commit({x:100});assert.equal(currentMovement(f.doc).combat,'c','Unlinked active encounter also tracks scene tokens');
 });
+
+test('vehicle seat placement preserves walking expenditure and rebases reset without charging MOVE',()=>{
+ const f=fixture();f.commit({x:100});assert.equal(currentMovement(f.doc).spent,1);
+ for(let i=0;i<10;i++){const options=f.commit({x:237,y:154},{vehicleSeats:true});assert.equal(options.pneumaMoveDelta,0);assert.equal(currentMovement(f.doc).spent,1);assert.equal(currentMovement(f.doc).onFoot,2);}
+ assert.deepEqual(currentMovement(f.doc).start,{x:237,y:154,elevation:5});
+ f.commit({x:337});assert.equal(currentMovement(f.doc).spent,2);
+});
+
+test('persisted seat assignment prevents movement charges even without seat update options',()=>{
+ const f=fixture();f.commit({x:100});
+ const seat={vehicleId:'car',seatId:'driver'};
+ for(const changes of [{'flags.pneuma-scenetools.vehicleSeat':seat},{flags:{'pneuma-scenetools':{vehicleSeat:seat}}}]){
+   const move={...changes,x:200};for(const fn of f.hooks.preUpdateToken)fn(f.doc,move,{});assert.equal(move['flags.pneuma-combattools.movement'].spent,1);
+ }
+ for(let i=0;i<10;i++){
+   f.doc.flags['pneuma-scenetools']={vehicleSeat:seat};
+   const options=f.commit({x:300+i*100,y:200});assert.equal(options.pneumaMoveDelta,0);assert.equal(currentMovement(f.doc).spent,1);assert.equal(currentMovement(f.doc).onFoot,2);
+ }
+ f.commit({x:1300});assert.equal(currentMovement(f.doc).spent,2);
+});

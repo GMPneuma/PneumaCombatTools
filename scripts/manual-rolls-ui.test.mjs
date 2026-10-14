@@ -10,7 +10,8 @@ try {
  await page.addStyleTag({content:'body{background:#ddd;font:14px Arial;padding:12px} .rollcard{padding:8px;border:1px solid #888;margin:8px 0} button{cursor:pointer} h3{margin:4px 0}'});
  await page.evaluate(()=>{
   window.hooks={};window.Hooks={on:(k,f)=>(hooks[k]??=[]).push(f),off:(k,id)=>{hooks[k][id-1]=()=>{};},once:()=>{}};
-  window.game={system:{id:'cyberpunk-red-core'},user:{id:'gm',isGM:true,active:true},settings:{get:()=>false},i18n:{localize:k=>k}};
+  window.rollSettings=new Map();
+  window.game={system:{id:'cyberpunk-red-core'},user:{id:'gm',isGM:true,active:true},settings:{register:(_m,key,options)=>rollSettings.set(key,options),get:(_m,key)=>rollSettings.get(key)?.default??false},i18n:{localize:k=>k}};
   const gm=game.user,p1={id:'p1',isGM:false,active:true,name:'Player 1'},p2={id:'p2',isGM:false,active:true,name:'Player 2'};
   game.users=[gm,p1,p2];game.users.get=id=>game.users.find(u=>u.id===id);game.messages=new Map();
   window.actor={isOwner:true,uuid:'Actor.1',name:'Pex',items:[],testUserPermission:u=>u.id==='p1'||u.isGM};

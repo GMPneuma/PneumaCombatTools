@@ -1,3 +1,4 @@
+import {consumeHazardAttack} from "../hazard-attacks.js";
 import {nativeItemMatches, findNativeItem} from "../native-lookup.js";
 import {attackTitle,attackHeading} from "../attack-title.js";
 import {inlineRoll} from "../inline-roll.js";
@@ -381,6 +382,7 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
     if(currentAmmo!==ammoType)throw Error("Ammunition changed during targeting. Start the attack again.");
     const blastFormula=kind==="explosive"?item.createRoll("damage",actor,{damageType:"attack"}).formula:undefined;
     validate();
+    await consumeHazardAttack(actor,roll);
     roll=await confirmAreaRoll(item,roll);await spendBonusLuck(actor,roll.luck);
     if(String(original.type)==="ammo")await original.update({"system.amount":Number(foundry.utils.getProperty(original,"system.amount"))-1} as Parameters<Item["update"]>[0]);
     await rollHidden(roll);roll.entityData={actor:actor.id!,token:source.id!,item:itemId,tokens:[]};
@@ -410,7 +412,10 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
     if(kind==="explosive"){exchange.areaAmmo={type:ammoType,variety};exchange.damageFormula=blastFormula;}
     if(data.phase==="responses")data.rows=targets(data);
     const messageData={content:areaContent(data),speaker:ChatMessage.getSpeaker({actor,token:source.document}),flags:{[MODULE]:{aoe:data}}} as Parameters<typeof ChatMessage.applyRollMode>[0];
-    ChatMessage.applyRollMode(messageData,exchange.rollMode as "roll");await ChatMessage.create(messageData);
+    ChatMessage.applyRollMode(messageData,exchange.rollMode as "roll");
+    const message = await ChatMessage.create(messageData);
+    if (!message) throw Error("Area attack card creation was cancelled after the attack roll. Check ammunition and the roll before retrying.");
+    return message;
   } finally {starting.delete(actor.uuid);}
 }
 interface SavedAreaResponse {nonce:string;roll:ReturnType<RollItem["createRoll"]>;mode:string;roller:string;audience:DiceAudience}

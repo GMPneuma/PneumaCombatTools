@@ -75,7 +75,7 @@ export async function attackFromHUD(attacker: Token, target: Token, itemId: stri
     const kind=areaKind(nativeItem, mode);
     if (kind) {
       const { startAreaAttack } = await import("./aoe/workflow.js");
-      await startAreaAttack(attacker,target,itemId,mode,!!event.shiftKey);return;
+      return await startAreaAttack(attacker,target,itemId,mode,!!event.shiftKey);
     }
     if(mode==="aimed"&&areaKind(nativeItem,"attack"))throw Error("Area attacks cannot make aimed shots.");
   }
@@ -89,9 +89,9 @@ export async function attackFromHUD(attacker: Token, target: Token, itemId: stri
     const { startCombatExchange } = await import("./combat-resolution.js");
     if (item.category === "thrown") {
       const source = itemId === "__improvised" ? await improvisedSource() : actor.items.get(itemId)!.toObject();
-      await startCombatExchange(attacker, target, itemId, "attack", event,
+      return await startCombatExchange(attacker, target, itemId, "attack", event,
         { item: thrownRollItem(source, actor), source, improvised: itemId === "__improvised" });
-    } else await startCombatExchange(attacker, target, itemId, mode, event);
+    } else return await startCombatExchange(attacker, target, itemId, mode, event);
   } finally { rolling.delete(actor.uuid); }
 }
 

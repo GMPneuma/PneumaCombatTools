@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.9.17 - 2026-10-14
+
+- Add SceneTools hazard attack integration through the existing native attack, defense and AoE workflows, returning a chat-card ID or cancellation.
+- Enforce one native weapon attack per hazard Actor per combat round across API, HUD and native sheet attacks. Report an already-spent allowance separately from uncertain attack failures.
+- Add grouped scene-effect cards with shared amounts, individual application, and condition-spawn results.
+- Add player-owned skill/DV avoidance using native CPR dialogs, modifiers and Luck. Successful checks automatically skip the effect; failed checks permit GM application.
+- Expose sceneEffects API v3 avoidance-result queries and the categorized status picker for SceneTools integrations.
+- Exclude vehicle boarding, exiting and passenger placement from walking and optional AoE MOVE expenditure. Prevent movement reset while seated and expose a CTH integration hook for vehicle controls.
+- Recognize renamed Speedheal stacks with suffixes, including split stacks lacking compendium metadata.
+- Add a per-client Show roll menu sparkles setting, applied immediately.
+- Report post-roll chat-card creation failures for GM review rather than as cancellation.
+
+Validation: strict TypeScript/build checks, automated regressions and focused browser checks. Live Foundry/multiplayer verification remains pending. Interrupted avoidance recovery and automatic invalidation of obsolete effect-card controls remain follow-up work; deactivation does not cancel existing cards.
+
 ## 0.9.16 - 2026-10-10
 
 - Synchronize the native EMP token icon with actual EMP and Microwaver item disablements. Clear the owned marker when the last matching cause ends; preserve manually applied EMP markers and avoid marking pending/resisted selections or unrelated QuickHack disablements.

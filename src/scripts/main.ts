@@ -1,4 +1,6 @@
 import {medicalMenuGroups} from "./medical-menu.js";
+import {registerSceneEffects} from "./scene-effects.js";
+import {registerDamageStatusPicker} from "./damage-status.js";
 import {registerCombatSummary} from "./combat-summary.js";
 import {registerMedical,medicalEntries,performMedical} from "./medical.js";
 import {registerDamageReversal} from "./damage-reversal.js";
@@ -81,6 +83,7 @@ Hooks.once("init", () => {
   registerChatResultDelay();
   registerAmmoChat();
   registerSheetAttacks();
+  registerSceneEffects();
   registerManualRolls();
   registerHalfArmor();
   registerChatButtons();
@@ -93,6 +96,7 @@ Hooks.once("init", () => {
   registerGrapple();
   registerResolutionScroll();
   registerCyberpunkStatuses();
+  registerDamageStatusPicker();
   registerEyeHUD();
   registerHoverDV();
   registerHoverEKG();
@@ -274,6 +278,7 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
     if (hud.object !== token || hud.element[0] !== html[0]) return;
     html.find(".col.right").first().append(controls);
   }
+  Hooks.callAll("pneumaCombatToolsRenderCTH", hud, html, data);
   const medicalSource=(selection?.target===token?selection.attacker:selectedAttacker())??(data.selfCTH?token:undefined);
   html.find("[data-medical-toggle]").on("click keydown",event=>{
     if(event.type==="keydown"&&!["Enter"," "].includes(event.key??""))return;

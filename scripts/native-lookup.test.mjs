@@ -19,6 +19,23 @@ test('source identity wins over names and supports both Foundry source fields', 
     assert.equal(nativeItemMatches({type,name:'Translated',flags:{core:{sourceId:`Compendium.cyberpunk-red-core.items.${id}`}}},name),true);
 });
 
+test('only Speedheal accepts separated name suffixes without source metadata', () => {
+  globalThis.game = {i18n:{localize:()=> 'Esquive'}};
+  for (const name of ['Speedheal', 'Speedheal (Enhanced)', ' SPEEDHEAL - Custom ', 'Speedheal+'])
+    assert.equal(nativeItemMatches({type:'drug',name},'Speedheal'),true,name);
+  for (const name of ['Speedhealing', 'Enhanced Speedheal', 'Pharma Speedheal', 'Pharma Remedy'])
+    assert.equal(nativeItemMatches({type:'drug',name},'Speedheal'),false,name);
+  assert.equal(nativeItemMatches({type:'gear',name:'Speedheal (Enhanced)'},'Speedheal'),false);
+  assert.equal(nativeItemMatches({type:'skill',name:'Evasion (Enhanced)'},'Evasion'),false);
+  assert.equal(nativeItemMatches({type:'role',name:'Medtech (Custom)'},'Medtech'),false);
+  const named={type:'drug',name:'Speedheal (Enhanced)'};
+  for (const source of [{_stats:{compendiumSource:'Compendium.cyberpunk-red-core.core_drugs.Item.3xF0I3J9RnSxf4Ux'}},
+    {flags:{core:{sourceId:'Compendium.cyberpunk-red-core.core_drugs.3xF0I3J9RnSxf4Ux'}}}]) {
+    const sourced={type:'drug',name:'Custom Remedy',...source};
+    assert.equal(findNativeItem([named,sourced],'Speedheal'),sourced);
+  }
+});
+
 test('translated grenade tables resolve by ID, remain cached, and preserve overrides', async () => {
   let reads=0, configured='cyberpunk-red-core.internal_dv-tables', world;
   const native={collection:configured,documentName:'RollTable',getIndex:async()=>[{_id:'3L5kZ8iP1Xxb6yfQ',name:'Arme lancée'}],

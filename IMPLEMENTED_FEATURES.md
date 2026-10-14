@@ -1,5 +1,9 @@
 # Combat Tools feature inventory
 
+- Shared hazard status picker (local/unreleased): exposes `game.modules.get("pneuma-combattools").api.statusPicker` version 1, with `choose(selected, slot, {allowedIds})`. It reuses the existing grouped icon picker and returns selected IDs or null on cancellation; callers may restrict choices to effects they can resolve. No effects are applied by the picker. Existing CT callers retain their full choices. Unit/API and damage-flow browser checks pass; live integration retest is pending.
+
+- Scene hazard actor integration (0.9.17): `api.sceneAttack` v2 exposes GM-only native weapon attacks and AoE with explicit created-card or cancellation results. SceneTools hazards require compatible CombatTools; no standalone attack fallback is implied.
+
 - Audit follow-ups 1–4 (unreleased, 2026-10-04): Slow saves its MOVE penalty before optional DSN playback; animation failures do not block application. Concurrent module LUCK spends on one client share the actor mutation queue and recheck the current balance. Completed fire receipts no longer subscribe to condition refresh; indexed card refreshes only update mounted chat entries. Eye HUD status menus survive unchanged refreshes, closing when their content/anchor changes; combat-bar effect hooks invalidate only the affected actor's status tooltip, preserving native control menus. Automated regression checks cover these cases; live Foundry/multiplayer verification remains pending.
 
 - Shared medical rules (unreleased, 2026-10-04): Medical patient actions and the Treatment reference use one source for stabilization states/DVs, native First Aid/Paramedic/Surgery eligibility, injury DVs, and permanent QuickFix classification. Zero-rank native skills remain eligible; reference rolls remain separate from patient mutations.
@@ -387,6 +391,8 @@ Medical actions (released in 0.9.10): optional automatic Needs Stabilization aft
 
 SpeedHeal (released in 0.9.10): consumes carried Medtech stock, heals BODY + WILL up to maximum HP, excludes mortally wounded patients and applies Speed Heal to block reuse until combat cleanup. No world-time cooldown.
 
+Speedheal name recognition (unreleased): Drug items beginning with Speedheal followed by a separator also qualify, ignoring case and surrounding whitespace, including renamed split stacks without compendium metadata. Source identity recognition remains supported. Other item matching remains exact; the generic Pharma prefix does not qualify. Live Foundry verification remains pending.
+
 QuickFix (released in 0.9.10): compact heading with separate First Aid/Paramedic choices and native DVs; zero skill ranks and full patient HP do not hide choices. Native Treatment type Quick Fix permanently removes the injury. Other fixes suppress penalties temporarily, restoring them at combat end or after 24 world hours outside combat.
 
 Skill / STAT rolls (released in 0.9.10): one window with current-stat roll-under controls above a live case-insensitive skill filter. Native skill rolls, modifiers and favorites are retained.
@@ -491,6 +497,8 @@ Roll-button sparkle visibility correction (released in 0.9.13, 2026-10-07): the 
 
 Roll-button sparkle burst (released in 0.9.13, 2026-10-07): supersedes the single sparkle with five small gold sparkles distributed around the chat Roll icon. Each burst lasts three seconds, with cycles starting every 15 seconds (12 seconds quiet). Open-menu and reduced-motion suppression remain; decorative particles do not intercept clicks.
 
+Roll-menu sparkle setting (2026-10-13, local/unreleased): the client setting "Show roll menu sparkles" defaults to enabled. Disabling it removes the decorative particles immediately; enabling it restores them without reloading. Live Foundry verification remains pending.
+
 Manual damage half-armor option (2026-10-07, local/unreleased): Damage in the chat Roll menu includes Halves Armor SP (round up), off by default. It uses native 50-percent armor ignore and saves that selection on the damage card; existing application/undo and armor toggles remain. The option is disabled when Interact with armor is off.
 
 Focused combat-end snapshot and Discord export (2026-10-07, local/unreleased): replaces the broad remaining-effects list with player HP/wound state, recognized condition IDs and current native critical injury items for all participants. Routine cyberware/equipment bonuses are excluded. Orphan injury markers are explicitly labeled; QuickFix suppression is identified. Report includes encounter/scene, round reached, final unique-actor counts, defeated markers, existing limited player injury additions and observed relevant cleanup. Saved serializable report data powers Copy Discord Markdown for all viewers, with a manual-copy fallback and escaped names/neutralized mentions. NPC HP is omitted. QuickFix restoration is awaited before capture. No damage totals, attack counts, kills or medical history are inferred.
@@ -556,3 +564,20 @@ Grenade visual footprint bridge (2026-10-10, unreleased): exposes read-only getA
 Persistent visual-area hiding (2026-10-10, unreleased): hideAreaEffect API delegates to the existing primary-GM show/hide workflow, persisting attack-area marker visibility after Visual Tools playback. GM Show attack area remains available.
 
 AoE visual ownership (2026-10-10, unreleased): removed the animation-driven hideAreaEffect API. Combat Tools retains its existing resolution-based marker visibility; Visual Tools only suppresses markers locally while presenting the unresolved area's visual effect.
+
+### Vehicle seat movement accounting fix
+
+- Seat placement updates do not spend walking MOVE or optional AoE movement. They preserve existing expenditure and rebase the reset origin; seated characters cannot reset out of a vehicle.
+- Seat positions persist as integer pixels, compare against committed source coordinates, and do not recursively synchronize from internal seat writes. Rendering retains the precise seat position. Live combat verification remains pending.
+
+- Passenger MOVE exclusion now checks persistent and incoming SceneTools seat assignments in addition to update options. Native drag previews also retain the passenger walking expenditure. This covers updates without custom seat options; live verification remains pending.
+
+- CTH exposes a post-render integration hook for vehicle controls. SceneTools also supports the standard Foundry Token HUD independently of CombatTools.
+
+- Scene attack API v2 returns a created chat-card ID or cancellation and accepts attack, aimed, autofire and suppressive modes through existing workflows. Post-roll errors propagate for GM review. SceneTools hazard actors share one native weapon attack per active combat round across API, HUD and native sheet attacks. Scene effect cards group confirmed targets, roll a shared amount, apply provider-owned effects once and display condition-instance results. See docs/scene-attack-api.md and docs/scene-effects-api.md. Automated verification only; live Foundry/multiplayer checks remain pending.
+
+- A spent hazard weapon allowance reports the typed HAZARD_ATTACK_SPENT condition. SceneTools can skip that weapon effect without treating it as an uncertain failure; ordinary failures still require review.
+
+- Hazard avoidance uses CombatTools sceneEffects API v2 with per-target skill/DV checks. Target owners (or the GM) roll through CPR native skill dialogs and Luck handling; totals above DV skip the effect automatically, while failed checks permit GM application. GM-only resistance pass/fail controls are removed. Weapon defenses and GM-confirmed condition spawning remain separate. Automated checks only; live multiplayer validation pending.
+
+- CombatTools sceneEffects API v3 exposes `getAvoidanceResult({cardId, provider, source, index, target})`. SceneTools uses this supported query rather than reading CombatTools chat flags. Avoidance requires the v3 query capability; no fallback to internal storage.

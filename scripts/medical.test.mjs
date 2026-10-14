@@ -64,6 +64,12 @@ test('Speedheal consumes one dose, caps BODY + WILL healing, and preserves stabi
  await finishTimedEffects({id:'ended',combatants:[{actor:f.target}]});assert(!f.target.effects.some(e=>e.statuses.has(speedheal.id)));assert(needsStabilization(f.target));
  await f.request('speedheal');assert.equal(f.target.system.derivedStats.hp.value,33);assert.equal(stock.system.amount,0);
 });
+test('renamed split Speedheal stock is available and consumes one dose without source metadata',async()=>{
+ const f=await setup(),stock=f.source.items.find(i=>i.name==='Speedheal');stock.name='Speedheal (Enhanced)';
+ assert(medicalEntries(f.source,f.target).some(r=>r.action==='speedheal'));
+ await f.request('speedheal');assert.equal(stock.system.amount,1);assert.equal(f.target.system.derivedStats.hp.value,40);
+});
+
 test('medical menu is always available; Speedheal requires Medtech, stock and nonmortal target',async()=>{
  const f=await setup();assert(medicalEntries(f.source,f.target).some(r=>r.action==='speedheal'));
  f.source.items.find(i=>i.name==='Medtech').system.rank=0;assert.deepEqual(medicalEntries(f.source,f.target).map(r=>r.action),['stabilize','stabilize']);

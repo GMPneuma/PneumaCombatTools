@@ -30,10 +30,12 @@ function initial(doc:TokenDocument):MoveRecord|undefined {
 const active=()=>game.settings!.get(MODULE,"movementTracking")&&canvas.grid?.type===CONST.GRID_TYPES.SQUARE;
 function nextRecord(token:Token,doc:TokenDocument,to:MovePoint):MoveRecord|undefined {
   const previous=currentMovement(doc)??initial(doc);if(!previous)return;
+  if(foundry.utils.getProperty(doc,"flags.pneuma-scenetools.vehicleSeat"))return previous;
   const {x,y}=committedPosition(doc);
   return recordStep(previous,{x,y},to,canvas.grid!.size,(from,destination)=>token.checkCollision(token.getCenterPoint(destination),{origin:token.getCenterPoint(from),type:"move",mode:"any"}));
 }
 export async function resetMovement(token:Token) {
+  if(foundry.utils.getProperty(token.document,"flags.pneuma-scenetools.vehicleSeat"))return ui.notifications!.warn("Exit the vehicle before resetting character movement.");
   const record=currentMovement(token.document);
   if(!record||!token.isOwner||!active())return;
   const grapple=grappleFor(token.document);
@@ -113,6 +115,16 @@ function draw(token:Token,previewRecord?:MoveRecord){
 export function registerMovement(){
   game.settings!.register(MODULE,"movementTracking",{name:"Enable movement counters",hint:"Enable movement tracking, counters, start markers, and Reset controls. Counters show only for the current-turn token and tokens selected by the GM. Does not block excess movement.",scope:"world",config:true,type:Boolean,default:true,onChange:()=>{for(const token of canvas.tokens?.placeables??[])draw(token);}});
   Hooks.on("preUpdateToken",(doc:TokenDocument,changes:Record<string,unknown>,options:Record<string,unknown>)=>{
+    // Boarding, exiting and being carried are placement updates, not walking.
+    if(options.vehicleSeats || foundry.utils.getProperty(doc,"flags.pneuma-scenetools.vehicleSeat")
+      || foundry.utils.getProperty(changes,"flags.pneuma-scenetools.vehicleSeat") || changes["flags.pneuma-scenetools.vehicleSeat"]){
+      options.pneumaMoveDelta=0;
+      if("x" in changes||"y" in changes){
+        const previous=currentMovement(doc)??initial(doc);
+        if(previous)changes[flag]={...previous,start:{x:Number(changes.x??doc._source.x),y:Number(changes.y??doc._source.y),elevation:Number(changes.elevation??doc._source.elevation)},last:null};
+      }
+      return;
+    }
     if(doc.actor&&isProne(doc.actor)&&!game.user?.isGM&&(["x","y","elevation"] as const).some(key=>key in changes&&Number(changes[key])!==doc._source[key])){
       if(doc.object)draw(doc.object);
       ui.notifications!.warn("Prone: Get Up before moving.");

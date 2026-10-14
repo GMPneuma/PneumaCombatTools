@@ -59,3 +59,15 @@ test('saved evasion encounter survives a different GM scene and viewed encounter
 test('movement reset epoch rejects an evasion before reserving MOVE',async()=>{const f=fixture();f.combat.flags={'pneuma-combattools':{evasionEpoch:'new'}};await assert.rejects(moveEvader(f.token,{x:250,y:50},true,false,'saved',{combatId:'combat',combatEpoch:''}),/reset/);assert.equal(f.participant.flags['pneuma-combattools'],undefined);});
 
 test('normal outside-tracker movement is not blocked by optional AoE accounting',()=>{const f=fixture(),hooks={};globalThis.Hooks={on:(key,fn)=>hooks[key]=fn};registerAreaMovement();f.combat.combatants=[];const options={};assert.equal(hooks.preUpdateToken(f.token.document,{x:150},options),undefined);assert.deepEqual(options,{});});
+
+test('seat placement does not charge optional AoE movement',async()=>{
+ const f=fixture(),hooks={};globalThis.Hooks={on:(key,fn)=>hooks[key]=fn};registerAreaMovement();
+ const options={vehicleSeats:true};hooks.preUpdateToken(f.token.document,{x:350},options);assert.equal(options.pneumaAreaFrom,undefined);
+ hooks.updateToken(f.token.document,{x:350},{vehicleSeats:true,pneumaAreaFrom:{x:50,y:50}});await movementWork(async()=>{});assert.deepEqual(f.participant.flags,{});
+});
+
+test('seated passenger never accrues AoE movement when custom update options are absent',async()=>{
+ const f=fixture(),hooks={};globalThis.Hooks={on:(key,fn)=>hooks[key]=fn};registerAreaMovement();f.token.document.flags['pneuma-scenetools']={vehicleSeat:{vehicleId:'car',seatId:'driver'}};
+ const options={};hooks.preUpdateToken(f.token.document,{x:900},options);assert.deepEqual(options,{});
+ hooks.updateToken(f.token.document,{x:900},{pneumaAreaFrom:{x:50,y:50}});await movementWork(async()=>{});assert.deepEqual(f.participant.flags,{});
+});

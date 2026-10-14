@@ -13,6 +13,8 @@ import { requireCombatSocket } from "./socket-health.js";
 import {GMRequests} from "./gm-request.js";
 import type { Exchange } from "./combat-resolution.js";
 
+declare global { interface SettingConfig { "pneuma-combattools.showRollMenuSparkles": boolean } }
+
 type ManualNativeRoll = NativeRoll & { bonusDamage: number; rollCardExtraArgs: Record<string, unknown>; calculateCritical: boolean };
 type Request = { action: "effects" | "damage" | "injury" | "review" | "claim" | "commit" | "release" | "reset"; target?: string; row?: string; nonce?: string; effects?: string[]; damage?: DamageRequest; total?: number; html?: string };
 type Wire = { manualType: "request" | "reply"; id: string; user: string; message: string; request: Request; gm?: string; error?: string };
@@ -508,7 +510,21 @@ export function openManualRolls(anchor = document.querySelector<HTMLElement>("[d
   },{signal:events.signal});
   window.addEventListener("resize",()=>close(),{signal:events.signal});
 }
+function updateRollSparkles(icon: HTMLElement, enabled: boolean): void {
+  const existing = icon.querySelector(".pneuma-roll-sparkles");
+  if (!enabled) { existing?.remove(); return; }
+  if (existing) return;
+  const sparkles=document.createElement("span");sparkles.className="pneuma-roll-sparkles";sparkles.setAttribute("aria-hidden","true");
+  for(let index=0;index<5;index++){const star=document.createElement("span");star.className="pneuma-roll-sparkle";sparkles.append(star);}
+  icon.append(sparkles);
+}
 export function registerManualRolls(): void {
+  game.settings!.register(M, "showRollMenuSparkles", {
+    name: "Show roll menu sparkles",
+    hint: "Show the sparkle effect around the chat roll menu button on this client.",
+    scope: "client", config: true, type: Boolean, default: true,
+    onChange: (enabled: boolean) => document.querySelectorAll<HTMLElement>("[data-pneuma-manual-rolls]").forEach(icon => updateRollSparkles(icon, enabled)),
+  });
   Hooks.on('renderDialog',(_app:unknown,html:JQuery)=>{
     const root=html[0];if(!root?.matches('.pneuma-roll-dialog'))return;
     root.querySelector('.window-content')?.classList.add('dialog-sheet');
@@ -519,9 +535,7 @@ export function registerManualRolls(): void {
     const icon=html[0]?.querySelector<HTMLElement>("#chat-controls .fa-dice-d20, .chat-controls .fa-dice-d20");
     closeRollFlyout?.();
     if(!icon||icon.dataset.pneumaManualRolls)return;icon.dataset.pneumaManualRolls="true";icon.setAttribute("role","button");icon.setAttribute("aria-haspopup","menu");icon.setAttribute("aria-expanded","false");icon.tabIndex=0;icon.title="Manual rolls";icon.setAttribute("aria-label","Manual rolls");
-    const sparkles=document.createElement("span");sparkles.className="pneuma-roll-sparkles";sparkles.setAttribute("aria-hidden","true");
-    for(let index=0;index<5;index++){const star=document.createElement("span");star.className="pneuma-roll-sparkle";sparkles.append(star);}
-    icon.append(sparkles);
+    updateRollSparkles(icon, game.settings!.get(M, "showRollMenuSparkles") as boolean);
     icon.addEventListener("click",event=>{event.preventDefault();event.stopPropagation();openManualRolls(icon);});
     icon.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();openManualRolls(icon);}});
   });

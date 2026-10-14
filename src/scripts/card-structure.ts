@@ -23,8 +23,8 @@ export function styleOpposedRolls(root: HTMLElement, sourceWins: boolean | undef
   Array.from(root.children).forEach((row,index) => styleRollOutcome(row as HTMLElement,
     sourceWins === undefined ? undefined : index === 0 ? sourceWins : !sourceWins));
 }
-export function combatCardKind(message: ChatMessage): "exchange" | "grapple" | "quickhack" | "aoe" | undefined {
-  return (["exchange","grapple","quickhack","aoe"] as const).find(kind =>
+export function combatCardKind(message: ChatMessage): "exchange" | "grapple" | "quickhack" | "aoe" | "sceneEffect" | undefined {
+  return (["exchange","grapple","quickhack","aoe","sceneEffect"] as const).find(kind =>
     !!foundry.utils.getProperty(message,"flags.pneuma-combattools." + kind));
 }
 export function canRenderCombatCard(message: ChatMessage): boolean {

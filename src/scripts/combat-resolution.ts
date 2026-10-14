@@ -1,3 +1,4 @@
+import {consumeHazardAttack} from "./hazard-attacks.js";
 import {findNativeItem} from "./native-lookup.js";
 import {attackTitle,attackHeading} from "./attack-title.js";
 import { allActors, primaryGM as electedGM, escapeHTML as escape } from "./shared.js";
@@ -370,7 +371,7 @@ async function respond(message: ChatMessage, evade: boolean, automatic = false, 
     if (!retry.has(message.id!)) await request(message.id!, "release", { nonce: claim.nonce });
   }
 }
-export async function startCombatExchange(attacker: Token, target: Token, itemId: string, mode: AttackMode, event: JQuery.ClickEvent, thrown?: { item: RollItem; source: object; improvised: boolean }): Promise<void> {
+export async function startCombatExchange(attacker: Token, target: Token, itemId: string, mode: AttackMode, event: JQuery.ClickEvent, thrown?: { item: RollItem; source: object; improvised: boolean }): Promise<ChatMessage | undefined> {
   if ([attacker, target].some(token => ["container", "blackIce", "demon"].includes(String(token.actor?.type)))) return;
   requireCombatSocket();
   if (!authority()) throw new Error("An active GM is required for combat resolution.");
@@ -406,6 +407,7 @@ export async function startCombatExchange(attacker: Token, target: Token, itemId
   }
   currentCombat({ combatId, combatEpoch } as Exchange);
   checkedLuck(Number(foundry.utils.getProperty(actor, "system.stats.luck.value")), 0, roll.luck);
+  await consumeHazardAttack(actor, roll);
   roll = await item.confirmRoll(roll);
   await spendBonusLuck(actor, roll.luck);
   await rollHidden(roll);
@@ -424,11 +426,13 @@ export async function startCombatExchange(attacker: Token, target: Token, itemId
     flags: { [MODULE]: { exchange: data } } } as Parameters<typeof ChatMessage.applyRollMode>[0];
   ChatMessage.applyRollMode(messageData, data.rollMode as "roll");
   const message = await ChatMessage.create(messageData);
+  if (!message) throw Error("Attack card creation was cancelled after the attack roll. Check ammunition and the roll before retrying.");
   if (thrown && !thrown.improvised) {
     const original = actor.items.get(itemId);
     if (original) await setItemMarker(original, "used", { label: "Used" });
   }
   if (data.state === "resolved") void revealDice(data,message ?? undefined).catch(error => console.warn(MODULE, error));
+  return message;
 }
 /** Resetting a Combat removes only its transient counters; deselecting it must not. */
 export function resetCombatTracking(_combat: Combat, changes: Record<string, unknown>): void {

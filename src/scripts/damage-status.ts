@@ -41,10 +41,10 @@ export function validateDamageStatuses(value: unknown): string[] {
 
 
 
-export async function chooseDamageStatuses(selected: string[], slot = selected.length): Promise<string[] | null> {
+export async function chooseDamageStatuses(selected: string[], slot = selected.length, options?:{allowedIds?:readonly string[]}): Promise<string[] | null> {
   const original = selected[slot];
   const current = original ? canonicalDamageStatus(original) : undefined;
-  const choices = damageStatusChoices();
+  const choices = damageStatusChoices().filter(effect=>!options?.allowedIds||options.allowedIds.includes(effect.id));
   const content = '<form class="pneuma-damage-status-picker">'
     + '<label class="pneuma-damage-status-choice"><input type="radio" name="statusEffect" value=""'
     + (!current ? ' checked' : '') + '>None</label>'
@@ -60,12 +60,19 @@ export async function chooseDamageStatuses(selected: string[], slot = selected.l
     title: current ? "Change status effect" : "Add effects", content, label: "Save", rejectClose: false,
     callback: html => {
       const id = html[0]!.querySelector<HTMLInputElement>('input:checked')?.value ?? "";
+      if(id&&!choices.some(effect=>effect.id===id))throw Error("The selected effect is unavailable for this workflow.");
       const next = [...selected];
       if (slot < next.length) { if (id) next[slot] = original && canonicalDamageStatus(original)===id ? original : id; else next.splice(slot, 1); }
       else if (id) next.push(id);
       return validateDamageStatuses(next);
     },
   });
+}
+
+/** Share the existing grouped picker with scene workflows, without applying effects. */
+export function registerDamageStatusPicker():void {
+  const module=game.modules!.get("pneuma-combattools") as unknown as {api?:Record<string,unknown>};
+  module.api={...module.api,statusPicker:{version:1,choose:chooseDamageStatuses}};
 }
 
 /** Read-only selection after any target starts resolution; no empty add slots. */

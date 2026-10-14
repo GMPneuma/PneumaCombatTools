@@ -23,7 +23,8 @@ export function nativeItemMatches(item: NamedItem, name: string): boolean {
   const identity = identities[name];
   if (!identity || item.type !== identity.type) return false;
   const translated = identity.key ? (typeof game !== "undefined" ? game.i18n?.localize("CPR.global.itemType." + identity.key) : undefined) ?? name : name;
-  return sourceMatches(item, identity.id) || [translated, name].some(value => normalize(value) === normalize(item.name ?? ""));
+  return sourceMatches(item, identity.id) || [translated, name].some(value => normalize(value) === normalize(item.name ?? ""))
+    || name === "Speedheal" && /^speedheal(?:$|[\s\p{P}\p{S}])/u.test(normalize(item.name ?? ""));
 }
 export function findNativeItem<T extends NamedItem>(items: Iterable<T>, name: string): T | undefined {
   const identity = identities[name], rows = Array.from(items);

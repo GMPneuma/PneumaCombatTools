@@ -321,3 +321,18 @@ Compact chat versus detailed Discord snapshot (2026-10-07, local/unreleased): ch
 Autofire outcome multiplier: `.pneuma-resolution-card .pneuma-result-summary .pneuma-autofire-multiplier` is an inline read-only span within the existing result bar. It appears only on resolved autofire outcomes with a known native maximum (or ×0 for a miss). No controls, visibility permissions or existing selectors change. Example: `.pneuma-resolution-result .pneuma-autofire-multiplier { font-weight: bold; }`.
 
 Damage roll controls retain existing selectors and permissions. `.pneuma-result-damage[data-action="pneumaRollDamage"]` and AoE `[data-aoe-action="damage"]` roll immediately on click; Shift-click opens the native damage modifier dialog. Titles describe these gestures. No markup or class removal.
+
+Vehicle CTH integration: SceneTools appends Configure and Enter/Exit controls inside `.pneuma-combat-column` after CTH rendering. Controls retain native `.control-icon` markup; Configure is GM-only. No chat-card markup changes.
+
+Shared status-picker API: external scene workflows can open the existing `.pneuma-damage-status-picker` through `api.statusPicker.choose`, restricting allowed IDs to their supported native effects. Existing category and choice selectors, icons, radio controls, chat-card markup and permissions are unchanged. Selection alone performs no Actor writes. Example retained selector: `.pneuma-damage-status-picker .pneuma-effect-category summary`.
+# Scene effect cards
+
+Hazard effect cards use `.rollcard.pneuma-scene-effect-card`, with native `.rollcard-top` and `.cpr-block` heading classes. Their message receives `.pneuma-combat-message[data-pneuma-card-kind="sceneEffect"]`. Shared sections are `result`, optional `damage-roll` (the shared effect amount), and `effects`. Native `Roll.render()` dice markup is retained inside the amount section.
+
+The root has `data-state="pending|resolved"`; each `.pneuma-scene-effect-target` has `data-state="ready|applying|applied|review"`. Controls use `data-scene-effect-action="roll|apply"`, with `data-row` for target application. Only the active GM sees actionable controls, subject to native message/blind-roll visibility. Provider result summaries and errors are escaped text. Review/applying rows have no retry button. Completed condition-spawn rows contain only the result.
+
+Example: `.pneuma-scene-effect-card .pneuma-scene-effect-target[data-state="review"]`. No existing selector was renamed or removed.
+
+### Scene-effect avoidance
+
+The `.pneuma-scene-effect-card` retains native `rollcard`/`cpr-block` structure and existing result, damage-roll and effects sections. Each `.pneuma-scene-effect-target` now supports `data-state="avoided"` as a completed state alongside `applied`; the card becomes resolved when every row is completed. `data-scene-effect-action="avoid"` appears only for pending skill/DV checks and is bound only for the target owner or GM. Native roll HTML and the automatic pass/fail total appear in that target row. Shared amount and effect application controls remain active-GM-only. Avoidance cards are public so affected players can respond regardless of the GM default roll mode. Example: `.pneuma-scene-effect-target[data-state="avoided"]`. Existing selectors remain available.

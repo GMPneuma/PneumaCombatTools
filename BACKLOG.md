@@ -1,5 +1,12 @@
 # Combat Tools backlog
 
+- Shared hazard status picker (local/unreleased): exposes `game.modules.get("pneuma-combattools").api.statusPicker` version 1, with `choose(selected, slot, {allowedIds})`. It reuses the existing grouped icon picker and returns selected IDs or null on cancellation; callers may restrict choices to effects they can resolve. No effects are applied by the picker. Existing CT callers retain their full choices. Unit/API and damage-flow browser checks pass; live integration retest is pending.
+
+## Scene Tools hazard integration (local, unreleased)
+
+- Implemented: GM-only scene-device attack API reusing the existing target-aware attack, defense, ammunition and damage workflow. Scene Tools owns areas, sensors, presets, Scanner/hazard actor links and native drone movement, and retains native CPR fallback without CT.
+- Future reusable combat effects should live here when needed by weapons/characters as well as hazards. No duplicated official hazard catalog or new condition mechanics are included in this integration. Live Foundry verification pending.
+
 Updated: 2026-10-04
 
 Edit each **Status** directly. Priorities are initial suggestions, not an agreed work order.
@@ -418,6 +425,8 @@ Roll-button sparkle visibility correction (released in 0.9.13, 2026-10-07): the 
 
 Roll-button sparkle burst (released in 0.9.13, 2026-10-07): supersedes the single sparkle with five small gold sparkles distributed around the chat Roll icon. Each burst lasts three seconds, with cycles starting every 15 seconds (12 seconds quiet). Open-menu and reduced-motion suppression remain; decorative particles do not intercept clicks.
 
+Roll-menu sparkle setting (2026-10-13, implemented locally/unreleased): add an option to disable the roll-menu button sparkle effect. "Show roll menu sparkles" is a client setting, enabled by default, that applies immediately. Live Foundry verification remains pending.
+
 Manual damage half-armor option (2026-10-07, local/unreleased): Damage in the chat Roll menu includes Halves Armor SP (round up), off by default. It uses native 50-percent armor ignore and saves that selection on the damage card; existing application/undo and armor toggles remain. The option is disabled when Interact with armor is off.
 
 Focused combat-end snapshot and Discord export (2026-10-07, local/unreleased): replaces the broad remaining-effects list with player HP/wound state, recognized condition IDs and current native critical injury items for all participants. Routine cyberware/equipment bonuses are excluded. Orphan injury markers are explicitly labeled; QuickFix suppression is identified. Report includes encounter/scene, round reached, final unique-actor counts, defeated markers, existing limited player injury additions and observed relevant cleanup. Saved serializable report data powers Copy Discord Markdown for all viewers, with a manual-copy fallback and escaped names/neutralized mentions. NPC HP is omitted. QuickFix restoration is awaited before capture. No damage totals, attack counts, kills or medical history are inferred.
@@ -455,3 +464,18 @@ Native LUCK bonus behavior (2026-10-09, local/unreleased): selected roll bonuses
 Status list correction (2026-10-09, local/unreleased): removes Asphyxiating and Iron Grip from the Combat Tools status catalog and removes the dedicated Asphyxiating HUD recognition. Existing actor effects are not automatically deleted. Historical audit documents remain as history.
 
 EMP workflow token marker (2026-10-10, local/unreleased): actual EMP and Microwaver item disablements synchronize a native EMP status icon on the affected actor/token. Pending selections and hardened-only unaffected results do not mark EMP. The managed icon persists while any matching cause remains and clears on expiry/end/restoration, including stale-state reconciliation. Other QuickHack disablements do not count; manually applied EMP markers are preserved. No additional penalties are introduced.
+
+### Vehicle seat movement accounting fix
+
+- Seat placement updates do not spend walking MOVE or optional AoE movement. They preserve existing expenditure and rebase the reset origin; seated characters cannot reset out of a vehicle.
+- Seat positions persist as integer pixels, compare against committed source coordinates, and do not recursively synchronize from internal seat writes. Rendering retains the precise seat position. Live combat verification remains pending.
+
+- Passenger MOVE exclusion now checks persistent and incoming SceneTools seat assignments in addition to update options. Native drag previews also retain the passenger walking expenditure. This covers updates without custom seat options; live verification remains pending.
+
+- CTH emits a post-render integration hook for SceneTools vehicle Configure (GM only) and Enter/Exit controls. Native bottom-token vehicle controls are removed.
+
+- Implemented locally: SceneTools hazard chat-card integration and one native weapon attack per hazard actor per round. Direct damage, status and MOVE effects do not consume this allowance. Outside combat, SceneTools permits one weapon attack per GM-confirmed activation. Condition instances retain GM-confirmed creation and publish result cards. Existing weapon AoE placement/responses and new shared scene-effect cards are reused; live Foundry/multiplayer verification remains pending.
+
+- Fixed locally: distinguish a spent hazard attack allowance from uncertain weapon failures so repeated triggers do not strand later rounds in Review. Live verification pending.
+
+- Implemented locally: hazard skill/DV avoidance now uses player-owned CombatTools responses and automatic pass/fail resolution through sceneEffects API v2. Supersedes the GM resistance roll/pass/fail workflow; retains GM trigger confirmation, native weapon defenses, and confirmed condition spawning. Live multiplayer verification pending.

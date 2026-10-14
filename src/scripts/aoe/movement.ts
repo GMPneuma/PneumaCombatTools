@@ -61,12 +61,12 @@ export function movementHUD(actor:Actor):{id:string;text:string;detail:string}[]
 }
 export function registerAreaMovement(){
   Hooks.on("preUpdateToken",(doc:TokenDocument,changes:Record<string,unknown>,options:Record<string,unknown>)=>{
-    if(options.pneumaAreaMove||!areaSettings().evadeMove||!("x" in changes||"y" in changes))return;
+    if(options.vehicleSeats||foundry.utils.getProperty(doc,"flags.pneuma-scenetools.vehicleSeat")||foundry.utils.getProperty(changes,"flags.pneuma-scenetools.vehicleSeat")||changes["flags.pneuma-scenetools.vehicleSeat"]||options.pneumaAreaMove||!areaSettings().evadeMove||!("x" in changes||"y" in changes))return;
     try{const combat=sceneEncounter(doc.parent?.id);if(!combat?.combatants.some(row=>row.token?.uuid===doc.uuid))return;options.pneumaAreaEncounter=encounterRef(combat,doc.parent?.id,[doc.uuid]);}catch(error){ui.notifications!.warn((error as Error).message);return false;}
     if(doc.object)options.pneumaAreaFrom={x:doc.object.center.x,y:doc.object.center.y};
   });
   Hooks.on("updateToken",(doc:TokenDocument,_changes:unknown,options:Record<string,unknown>)=>{
-    if(!authority()||options.pneumaAreaMove)return;
+    if(!authority()||options.vehicleSeats||foundry.utils.getProperty(doc,"flags.pneuma-scenetools.vehicleSeat")||options.pneumaAreaMove)return;
     const start=options.pneumaAreaFrom as Point|undefined;if(!start||!doc.object||![start.x,start.y].every(Number.isFinite))return;
     const distance=typeof options.pneumaMoveDelta === "number" ? options.pneumaMoveDelta : distanceMoved(start,doc.object.center);
     void movementWork(async()=>{const entry=movementEntry(doc,resolveEncounter(options.pneumaAreaEncounter as EncounterRef)??null);if(entry){entry.current.spent=Math.max(0,entry.current.spent+distance);await entry.participant.update({[`flags.${MODULE}.${key}`]:entry.current} as never);}}).catch(e=>ui.notifications!.error(String(e)));
