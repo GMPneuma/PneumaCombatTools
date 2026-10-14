@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.18 - 2026-10-14
+
+- Add Alt+Shift+Z to open the existing GM Group Skill Check dialog.
+- Register the shortcut as a GM-only, non-repeating keybinding editable in Foundry Configure Controls.
+
+Validation: strict TypeScript/build checks, automated regressions and the roll-menu browser fixture. Live Foundry verification remains pending.
+
 ## 0.9.17 - 2026-10-14
 
 - Add SceneTools hazard attack integration through the existing native attack, defense and AoE workflows, returning a chat-card ID or cancellation.

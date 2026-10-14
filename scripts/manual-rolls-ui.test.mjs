@@ -11,7 +11,8 @@ try {
  await page.evaluate(()=>{
   window.hooks={};window.Hooks={on:(k,f)=>(hooks[k]??=[]).push(f),off:(k,id)=>{hooks[k][id-1]=()=>{};},once:()=>{}};
   window.rollSettings=new Map();
-  window.game={system:{id:'cyberpunk-red-core'},user:{id:'gm',isGM:true,active:true},settings:{register:(_m,key,options)=>rollSettings.set(key,options),get:(_m,key)=>rollSettings.get(key)?.default??false},i18n:{localize:k=>k}};
+  window.rollKeybindings=new Map();
+  window.game={keybindings:{register:(_m,key,options)=>rollKeybindings.set(key,options)},system:{id:'cyberpunk-red-core'},user:{id:'gm',isGM:true,active:true},settings:{register:(_m,key,options)=>rollSettings.set(key,options),get:(_m,key)=>rollSettings.get(key)?.default??false},i18n:{localize:k=>k}};
   const gm=game.user,p1={id:'p1',isGM:false,active:true,name:'Player 1'},p2={id:'p2',isGM:false,active:true,name:'Player 2'};
   game.users=[gm,p1,p2];game.users.get=id=>game.users.find(u=>u.id===id);game.messages=new Map();
   window.actor={isOwner:true,uuid:'Actor.1',name:'Pex',items:[],testUserPermission:u=>u.id==='p1'||u.isGM};

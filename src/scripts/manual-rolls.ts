@@ -519,6 +519,18 @@ function updateRollSparkles(icon: HTMLElement, enabled: boolean): void {
   icon.append(sparkles);
 }
 export function registerManualRolls(): void {
+  game.keybindings!.register(M, "groupSkillCheck", {
+    name: "GM Group Skill Check",
+    hint: "Open the group skill check dialog to request rolls from player characters.",
+    editable: [{key: "KeyZ", modifiers: ["Alt", "Shift"]}],
+    restricted: true,
+    repeat: false,
+    onDown: () => {
+      if (!game.user?.isGM) return false;
+      void groupPrompt().catch(report);
+      return true;
+    },
+  });
   game.settings!.register(M, "showRollMenuSparkles", {
     name: "Show roll menu sparkles",
     hint: "Show the sparkle effect around the chat roll menu button on this client.",

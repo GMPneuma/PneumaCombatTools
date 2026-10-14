@@ -581,3 +581,5 @@ AoE visual ownership (2026-10-10, unreleased): removed the animation-driven hide
 - Hazard avoidance uses CombatTools sceneEffects API v2 with per-target skill/DV checks. Target owners (or the GM) roll through CPR native skill dialogs and Luck handling; totals above DV skip the effect automatically, while failed checks permit GM application. GM-only resistance pass/fail controls are removed. Weapon defenses and GM-confirmed condition spawning remain separate. Automated checks only; live multiplayer validation pending.
 
 - CombatTools sceneEffects API v3 exposes `getAvoidanceResult({cardId, provider, source, index, target})`. SceneTools uses this supported query rather than reading CombatTools chat flags. Avoidance requires the v3 query capability; no fallback to internal storage.
+
+- GM Group Skill Check hotkey (0.9.18): Alt+Shift+Z opens the existing group-check dialog. Registered as a GM-only, non-repeating, editable Foundry keybinding under CombatTools; configurable in Configure Controls.
