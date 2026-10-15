@@ -68,6 +68,17 @@ function setup(handler) {
  globalThis.canvas={tokens:new Map([[attacker.id,attacker],[target.id,target]])};
  return {actor,sheet,attacker,target};
 }
+
+test("x2 second-attack cancellation or failure releases the guard for a later single attack",async()=>{
+ for(const failure of [false,true]){
+  let calls=0;const f=setup(async()=>{calls++;if(calls===2){if(failure)throw Error('second attack failed');return undefined;}return {id:'card-'+calls};});
+  f.actor.items[0].system.rof=2;
+  if(failure)await assert.rejects(attackFromHUD(f.attacker,f.target,'SMG','attack',{},2),/second attack failed/);
+  else await attackFromHUD(f.attacker,f.target,'SMG','attack',{},2);
+  await attackFromHUD(f.attacker,f.target,'SMG','attack',{});
+  assert.equal(calls,3,'later click creates one attack, not another pair');
+ }
+});
 test("rechecks current magazine before routing stale HUD attacks",async()=>{
  let calls=0;const f=setup(async()=>{calls++;});
  f.actor.items[0].system.magazine={value:9,max:30};

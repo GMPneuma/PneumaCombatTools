@@ -338,3 +338,7 @@ Example: `.pneuma-scene-effect-card .pneuma-scene-effect-target[data-state="revi
 ### Scene-effect avoidance
 
 The `.pneuma-scene-effect-card` retains native `rollcard`/`cpr-block` structure and existing result, damage-roll and effects sections. Each `.pneuma-scene-effect-target` now supports `data-state="avoided"` as a completed state alongside `applied`; the card becomes resolved when every row is completed. `data-scene-effect-action="avoid"` appears only for pending skill/DV checks and is bound only for the target owner or GM. Native roll HTML and the automatic pass/fail total appear in that target row. Shared amount and effect application controls remain active-GM-only. Avoidance cards are public so affected players can respond regardless of the GM default roll mode. Example: `.pneuma-scene-effect-target[data-state="avoided"]`. Existing selectors remain available.
+
+CTH weapon hover text: .combat-weapon-name uses the full weapon name without an Attack: prefix; ammunition binding appends Right click to reload. No layout or selector changes.
+
+Ranged heading hover: .pneuma-target-menu[data-open="attack"]:has(.combat-heading:hover) shows .combat-ammo-count in the mode-control columns and hides the row mode/ammunition controls. Labels use data-weapon-ammo-count, native magazine values, and the loaded ammo type followed by (x / y), with only the type ellipsized inside a fixed 96px area. Pointer exit restores normal controls through CSS without changing disabled or reload-menu state.

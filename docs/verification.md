@@ -68,3 +68,5 @@ Build/typecheck and full suite passed: 366 passed, four optional native-Foundry 
 ## 0.8.4 release validation
 
 Production build/typecheck passed. Automated suite: 366 passed, four optional native-Foundry checks skipped, zero failures. Bow loading, AoE, EMP settings save/reopen, and full EMP browser fixtures passed. The EMP fixture now supplies the active scene encounter and expands the optional settings sections before editing. Live Foundry multiplayer and installed-system bow behavior remain unverified.
+
+Chat duplication regression: scripts/chat-render-native.test.mjs executes native v12 ChatLog postOne/updateMessage from PNEUMA_FOUNDRY_SOURCE (a local Foundry v12 foundry.js file). These optional tests skip when the source is unavailable. Covers x2 plus later attacks behind a blocked queue, sidebar/popout, updates before posting, and the production result-delay wrapper at 0, 0.5 and 5 seconds. Rendering and document lifecycle outside these methods are fixtures, not a live multiplayer world.

@@ -5,13 +5,14 @@ export function gunAmmo(item: EquipmentItem) {
   const data = item.system;
   if (!data.isRanged || ["bow", "thrownWeapon", "unarmed", "martialArts"].includes(data.weaponType ?? "")
     || (data.weaponType ?? "").toLowerCase().includes("melee") || !data.magazine || !(data.magazine.max > 0)) return undefined;
-  return { rounds: Math.max(0, Number(data.magazine.value) || 0) };
+  return { rounds: Math.max(0, Number(data.magazine.value) || 0), capacity: Number(data.magazine.max) };
 }
 export function ammoBlocks(item: EquipmentItem, mode: string): boolean {
   const ammo = gunAmmo(item);
   return !!ammo && ammo.rounds < (["autofire", "suppressive"].includes(mode) ? 10 : 1);
 }
 interface Loadable extends Item {
+  _getLoadedAmmoProp?(prop: string): unknown;
   reload(): Promise<unknown>;
   load(): Promise<unknown>;
   getMagazineSpace(): number;
@@ -40,6 +41,16 @@ export function refreshWeaponAmmo(root: HTMLElement, actor: Actor) {
     const item = actor.items.get(row.dataset.weaponAmmo!) as Loadable | undefined;
     const ammo = item && gunAmmo(item as unknown as EquipmentItem);
     if (!item || !ammo) return;
+    const count = row.querySelector<HTMLElement>("[data-weapon-ammo-count]");
+    if (count) {
+      const type = String(item._getLoadedAmmoProp?.("type") ?? "");
+      const key = `CPR.global.ammo.type.${type}`;
+      const translated = type ? game.i18n?.localize(key) : undefined;
+      const label = type ? (translated && translated !== key ? translated : type) : "Unloaded";
+      count.querySelector<HTMLElement>('[data-ammo-type]')!.textContent = label;
+      count.querySelector<HTMLElement>('[data-ammo-quantity]')!.textContent = `(${ammo.rounds} / ${ammo.capacity})`;
+      count.title = `${label} (${ammo.rounds} / ${ammo.capacity})`;
+    }
     const pending = busy.has(item.uuid);
     const showAmmo = ammo.rounds === 0 || row.dataset.ammoOpen === "true";
     row.querySelectorAll<HTMLButtonElement>("[data-attack-mode]").forEach(button => {
@@ -50,7 +61,7 @@ export function refreshWeaponAmmo(root: HTMLElement, actor: Actor) {
         button.disabled = blocked || pending || button.dataset.unavailable === "true";
         button.hidden = showAmmo;
       }
-      button.title = blocked ? (["autofire", "suppressive"].includes(button.dataset.attackMode!) ? "Requires 10 rounds" : "Empty — right-click to reload or change ammo") : button.dataset.originalTitle!;
+      button.title = blocked ? (["autofire", "suppressive"].includes(button.dataset.attackMode!) ? "Requires 10 rounds" : "Empty — Right click to reload") : button.dataset.originalTitle!;
     });
     const menu = row.querySelector<HTMLElement>(".combat-ammo-menu")!;
     menu.hidden = !showAmmo;
@@ -62,6 +73,7 @@ export function refreshWeaponAmmo(root: HTMLElement, actor: Actor) {
   });
 }
 export function bindWeaponAmmo(root: HTMLElement, actor: Actor) {
+  root.querySelector('.pneuma-target-menu .combat-heading')?.addEventListener('mouseenter',()=>refreshWeaponAmmo(root,actor));
   root.querySelectorAll<HTMLElement>("[data-weapon-ammo]").forEach(row => {
     const name = row.querySelector<HTMLButtonElement>(".combat-weapon-name")!;
     row.querySelectorAll<HTMLButtonElement>("[data-attack-mode]").forEach(button => {
@@ -69,7 +81,7 @@ export function bindWeaponAmmo(root: HTMLElement, actor: Actor) {
       button.dataset.unavailable = String(button.disabled);
     });
     name.disabled = false;
-    name.title += " — Right-click for Reload / Change Ammo";
+    name.title += " — Right click to reload";
     name.dataset.originalTitle = name.title;
     const toggle = (event: Event) => {
       event.preventDefault(); event.stopPropagation();

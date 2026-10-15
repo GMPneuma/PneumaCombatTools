@@ -5,6 +5,7 @@ import {registerCombatSummary} from "./combat-summary.js";
 import {registerMedical,medicalEntries,performMedical} from "./medical.js";
 import {registerDamageReversal} from "./damage-reversal.js";
 import {registerChatResultDelay} from "./chat-result-delay.js";
+import {installChatRenderGuard} from "./chat-render-guard.js";
 import {registerStatusCleanup} from "./status-cleanup.js";
 import {selfIce} from "./quickhack/self-ice.js";
 import {overrideBreach} from "./quickhack/connections.js";
@@ -81,6 +82,7 @@ Hooks.once("init", () => {
   if (game.system!.id !== "cyberpunk-red-core") return;
   registerSocketHealth();
   registerChatResultDelay();
+  Hooks.once("ready",()=>installChatRenderGuard(ChatLog.prototype));
   registerAmmoChat();
   registerSheetAttacks();
   registerSceneEffects();

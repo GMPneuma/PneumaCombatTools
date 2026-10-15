@@ -481,3 +481,7 @@ EMP workflow token marker (2026-10-10, local/unreleased): actual EMP and Microwa
 - Fixed locally: distinguish a spent hazard attack allowance from uncertain weapon failures so repeated triggers do not strand later rounds in Review. Live verification pending.
 
 - Implemented locally: hazard skill/DV avoidance now uses player-owned CombatTools responses and automatic pass/fail resolution through sceneEffects API v2. Supersedes the GM resistance roll/pass/fail workflow; retains GM trigger confirmation, native weapon defenses, and confirmed condition spawning. Live multiplayer verification pending.
+
+- CTH Ranged heading ammo preview (implemented locally): hover the Ranged title to replace fire buttons with loaded ammo type (current / capacity); restore controls on pointer exit. Live Foundry verification pending.
+
+- Duplicate rendered attack cards (fixed locally; live player verification pending): reproduced update-before-insertion race with one message and two rendered cards. Guard native chat insertion/update concurrency, including sidebar/popout and render failures.

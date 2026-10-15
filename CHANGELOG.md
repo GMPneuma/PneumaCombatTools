@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.20 - 2026-10-14
+
+- Show loaded ammo type and current/capacity counts while hovering the Ranged HUD heading; restore attack and reload controls on pointer exit.
+- Simplify weapon-name tooltips and add Right click to reload for loadable weapons.
+- Prevent duplicate rendered chat cards when updates arrive before initial rendering finishes. Serialize updates separately for the chat sidebar and popout, including delayed results and failed renders.
+
+Validation: strict TypeScript/build, automated regressions and the ammunition HUD browser fixture. Live Foundry/multiplayer verification remains pending.
+
 ## 0.9.19 - 2026-10-14
 
 - Close the Combat Tools HUD when selecting weapon attacks, throws, grapple actions or quickhacks.

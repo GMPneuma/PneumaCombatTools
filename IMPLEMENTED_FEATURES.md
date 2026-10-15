@@ -585,3 +585,11 @@ AoE visual ownership (2026-10-10, unreleased): removed the animation-driven hide
 - CombatTools sceneEffects API v3 exposes `getAvoidanceResult({cardId, provider, source, index, target})`. SceneTools uses this supported query rather than reading CombatTools chat flags. Avoidance requires the v3 query capability; no fallback to internal storage.
 
 - GM Group Skill Check hotkey (0.9.18): Alt+Shift+Z opens the existing group-check dialog. Registered as a GM-only, non-repeating, editable Foundry keybinding under CombatTools; configurable in Configure Controls.
+
+CTH weapon hover text (0.9.20): weapon-name buttons omit the Attack: prefix. Loadable weapons append Right click to reload; the existing reload/change-ammo controls are unchanged.
+
+CTH Ranged heading ammo preview (0.9.20): hovering the Ranged heading temporarily replaces fire-mode/reload controls with loaded ammo type (current / capacity) for magazine-fed weapons. Leaving restores existing controls and their enabled/disabled states. Counts refresh from native magazine data on hover and inventory refresh. Other categories and weapons without magazines are unchanged.
+
+Chat rendering race guard (0.9.20): overlapping native ChatLog updates wait for the same message's initial insertion, preventing duplicate DOM cards while getHTML is delayed. Replacements are serialized per message and per sidebar/popout instance; failed renders release pending state. This does not create or delete ChatMessage documents. Reproduced in a Foundry v12 behavior fixture; live multiplayer verification pending.
+
+Chat race follow-up audit: tests execute cached Foundry v12 postOne/updateMessage methods with deferred rendering. Unguarded x2 plus later single attacks each duplicate while the render queue is blocked; after it drains, a fresh single does not inherit duplicate state. The local guard keeps one card per message in sidebar/popout with 0, 0.5 and 5 second result delays, updates before insertion and repeated resolution/damage updates. x2 second-shot cancellation/failure releases its attack lock. Live player-session confirmation remains pending.
