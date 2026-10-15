@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.19 - 2026-10-14
+
+- Close the Combat Tools HUD when selecting weapon attacks, throws, grapple actions or quickhacks.
+- Add an x2 button beside Aimed Shot for ROF 2 weapons, starting two separate ordinary attacks against the same target.
+- Stop the sequence on cancellation and recheck ammunition, equipment, ownership, ROF and token presence before the second attack.
+- Await native ammunition discharge before proceeding to the next attack.
+
+Validation: strict TypeScript/build checks, automated regressions and the self-CTH browser fixture. Live Foundry verification remains pending.
+
 ## 0.9.18 - 2026-10-14
 
 - Add Alt+Shift+Z to open the existing GM Group Skill Check dialog.

@@ -1,5 +1,7 @@
 # Combat Tools feature inventory
 
+CTH attack selection (0.9.19): selecting a weapon attack, throw, grapple action or quickhack clears the native Token HUD before opening its workflow. ROF 2 weapons show an `x2` button immediately after Aimed Shot. It creates two sequential ordinary attacks against the captured target, each with its own native modifier dialog, roll, defense and damage card. Canceling an attack stops the sequence. Ammunition, ownership, equipment, ROF and token presence are rechecked before the second attack. Native discharge writes complete before the next attack. Automated checks are separate from live Foundry verification.
+
 - Shared hazard status picker (local/unreleased): exposes `game.modules.get("pneuma-combattools").api.statusPicker` version 1, with `choose(selected, slot, {allowedIds})`. It reuses the existing grouped icon picker and returns selected IDs or null on cancellation; callers may restrict choices to effects they can resolve. No effects are applied by the picker. Existing CT callers retain their full choices. Unit/API and damage-flow browser checks pass; live integration retest is pending.
 
 - Scene hazard actor integration (0.9.17): `api.sceneAttack` v2 exposes GM-only native weapon attacks and AoE with explicit created-card or cancellation results. SceneTools hazards require compatible CombatTools; no standalone attack fallback is implied.

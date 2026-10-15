@@ -20,6 +20,44 @@ test("autofire matches CPR capability checks",()=>{
   const rows=attackEntries([weapon("Pistol"),weapon("SMG",{weaponType:"smg"}),weapon("Exotic",{fireModes:{suppressiveFire:true}})]);
   assert.deepEqual(rows.filter(r=>r.autofire).map(r=>r.name),["Exotic","SMG"]);
 });
+
+test("x2 eligibility follows native ROF for ranged, melee and cyberweapons",()=>{
+ const rows=attackEntries([weapon("Pistol",{rof:2}),weapon("Blade",{rof:2,isRanged:false,weaponType:"lightMelee"}),
+  weapon("Cyber",{rof:2,isWeapon:true,isInstalled:true,equipped:"owned"},{type:"cyberware"}),weapon("Slow",{rof:1}),weapon("Unknown")]);
+ assert.deepEqual(rows.filter(row=>row.doubleAttack).map(row=>row.name),["Blade","Cyber","Pistol"]);
+});
+
+test("x2 creates separate ordinary exchanges on the captured target, retargeting before each",async()=>{
+ const received=[];const f=setup(async(...args)=>{received.push(args);return {id:'card-'+received.length};});
+ f.actor.items[0].system.rof=2;
+ let targets=0;f.target.setTarget=()=>targets++;
+ const event={shiftKey:true};await attackFromHUD(f.attacker,f.target,"SMG","attack",event,2);
+ assert.equal(received.length,2);assert.equal(targets,2);
+ for(const args of received)assert.deepEqual(args,[f.attacker,f.target,"SMG","attack",event]);
+});
+
+test("x2 rejects ROF1 and aimed combinations and stops after cancellation",async()=>{
+ let calls=0;const f=setup(async()=>{calls++;return undefined;});
+ await attackFromHUD(f.attacker,f.target,"SMG","attack",{},2);assert.equal(calls,0);
+ f.actor.items[0].system.rof=2;
+ await attackFromHUD(f.attacker,f.target,"SMG","aimed",{},2);assert.equal(calls,0);
+ await attackFromHUD(f.attacker,f.target,"SMG","attack",{},2);assert.equal(calls,1);
+});
+
+test("x2 rechecks ammunition, eligibility, ownership and target presence after the first attack",async()=>{
+ for(const change of ['ammo','rof','equipped','owner','target']){
+  let calls=0;const f=setup(async()=>{calls++;
+   if(change==='ammo')f.actor.items[0].system.magazine.value=0;
+   if(change==='rof')f.actor.items[0].system.rof=1;
+   if(change==='equipped')f.actor.items[0].system.equipped='carried';
+   if(change==='owner')f.actor.isOwner=false;
+   if(change==='target')canvas.tokens.delete(f.target.id);
+   return {id:'first'};
+  });
+  Object.assign(f.actor.items[0].system,{rof:2,magazine:{value:2,max:30}});
+  await attackFromHUD(f.attacker,f.target,"SMG","attack",{},2);assert.equal(calls,1,change);
+ }
+});
 function setup(handler) {
  globalThis.exchangeHandler=(...args)=>sheet._onRoll(...args);
  const sheet={_getFireCheckbox:()=>"suppressive",_onRoll:handler};

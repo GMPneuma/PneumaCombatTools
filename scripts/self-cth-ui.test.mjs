@@ -7,11 +7,11 @@ try{
  await page.addScriptTag({content:await readFile(process.env.PNEUMA_JQUERY_SOURCE,'utf8')});await page.addScriptTag({content:await readFile(process.env.PNEUMA_HANDLEBARS_SOURCE,'utf8')});
  await page.evaluate(template=>{
   Handlebars.registerHelper('eq',(a,b)=>a===b);Handlebars.registerHelper('localize',s=>s);window.renderTemplate=async()=>Handlebars.compile(template)(window.renderData);
-  window.hooks={};window.Hooks={on:(n,f)=>(hooks[n]??=[]).push(f),once:(n,f)=>(hooks[n]??=[]).push(f)};
+  window.hooks={};window.Hooks={on:(n,f)=>(hooks[n]??=[]).push(f),once:(n,f)=>(hooks[n]??=[]).push(f),callAll:(n,...args)=>(hooks[n]??[]).forEach(fn=>fn(...args))};
   window.foundry={utils:{getProperty:(o,p)=>p.split('.').reduce((v,k)=>v?.[k],o)},data:{fields:{ColorField:class{}}}};
   window.settings={};window.game={system:{id:'cyberpunk-red-core'},user:{isGM:false},settings:{register:(_m,k,c)=>settings[k]=c.default,get:(_m,k)=>settings[k],set:async(_m,k,v)=>{settings[k]=v;}},i18n:{localize:s=>s,format:s=>s}};
   class NativeToken{_canHUD(){return true;}_onClickRight(){canvas.tokens.controlled=[this];}_onUnclickRight(){}_onClickRight2(){}}
-  class NativeHUD{get template(){return 'native';}getData(){return{id:'token-hud',classes:'placeable-hud'};}activateListeners(){}render(){window.renders=(window.renders??0)+1;}}
+  class NativeHUD{get template(){return 'native';}getData(){return{id:'token-hud',classes:'placeable-hud'};}activateListeners(){}render(){window.renders=(window.renders??0)+1;}clear(){this.object=null;this.element.empty();window.hudCleared=true;}}
   window.CONFIG={Token:{objectClass:NativeToken,hudClass:NativeHUD}};window.BasePlaceableHUD=class{};window.Ruler={STATES:{MEASURING:1}};
   const layer={controlled:[]};window.canvas={tokens:layer,activeLayer:layer,stage:{},controls:{ruler:{state:0}}};window.ui={notifications:{error:text=>window.failure=text}};
  },await readFile('src/templates/combat-hud.hbs','utf8'));
@@ -28,7 +28,7 @@ try{
   window.event={shiftKey:false,getLocalPosition:()=>({x:0,y:0}),stopPropagation(){}};
   window.rolls=[];game.combat={uuid:'Combat.c',started:true,combatants:[{id:'c',initiative:15,token:own.document}],rollInitiative:async(...args)=>rolls.push(args)};
   game.combats=new Map();canvas.tokens.controlled=[own];window.hud=new CONFIG.Token.hudClass();canvas.tokens.hud=hud;
-  window.show=async(token,shift=false)=>{event.shiftKey=shift;token._onClickRight(event);hud.object=token;hud.element=$('#token-hud');hud.element.find('.pneuma-combat-column').remove();window.renderData=hud.getData();if(renderData.standalone)hud.element.html(Handlebars.compile(window.sourceTemplate)(renderData));for(const fn of hooks.renderTokenHUD)await fn(hud,hud.element,renderData);};
+  window.show=async(token,shift=false)=>{event.shiftKey=shift;token._onClickRight(event);hud.object=token;hud.element=$('#token-hud');if(!hud.element.find('.col.right').length)hud.element.html('<div class="col right"></div>');hud.element.find('.pneuma-combat-column').remove();window.renderData=hud.getData();if(renderData.standalone)hud.element.html(Handlebars.compile(window.sourceTemplate)(renderData));for(const fn of hooks.renderTokenHUD)await fn(hud,hud.element,renderData);};
  });
  await page.evaluate(template=>window.sourceTemplate=template,await readFile('src/templates/combat-hud.hbs','utf8'));
  await page.evaluate(()=>show(own));assert.equal(await page.locator('[data-self-cth]').count(),1);assert.equal(await page.locator('[data-combat-action]').count(),0);assert.equal(await page.locator('[data-self-initiative]').count(),0);assert.equal(await page.locator('[data-native]').count(),1);
@@ -126,6 +126,31 @@ try{
  assert.equal(await page.locator('[data-medical-menu] [data-wake-action]').count(),1);assert.equal(await page.locator('.pneuma-combat-column > [data-wake-action]').count(),0);
  await page.locator('[data-medical-toggle]').click();assert.equal(await page.locator('[data-wake-action]').isVisible(),true);
  await page.evaluate(()=>{window.wakeAvailable=false;document.querySelector('#token-hud').innerHTML='<div class="col right"></div>';return show(own);});assert.equal(await page.locator('[data-medical-toggle]').count(),0);assert.equal(await page.locator('[data-medical-action="stabilize"]').count(),0);
+ await page.evaluate(()=>{
+  canvas.tokens.controlled=[own];window.hudCleared=false;
+  window.attackFromHUD=async(source,target,item,mode,event,count)=>{window.selectedAttack={source:source.document.uuid,target:target.document.uuid,item,mode,count,cleared:hudCleared};};
+  document.querySelector('#token-hud').innerHTML='<div class="col right"></div>';
+  return show(enemy);
+ });
+ // Render the production controls with ROF eligibility supplied by attackEntries' unit tests.
+ await page.evaluate(()=>{
+  const panel=Handlebars.compile(sourceTemplate)({weapons:[{id:'rof2',name:'ROF 2',category:'attack',doubleAttack:true,autofire:true},{id:'rof1',name:'ROF 1',category:'attack'}]});
+  document.querySelector('#token-hud').innerHTML=panel;
+  renderData={...hud.getData(),standalone:true};return Promise.all(hooks.renderTokenHUD.map(fn=>fn(hud,hud.element,renderData)));
+ });
+ assert.equal(await page.locator('[data-item-id="rof1"][data-attack-count]').count(),0);
+ const doubleButton=page.locator('[data-attack-count="2"]');
+ assert.equal(await doubleButton.innerText(),'x2');
+ assert.equal(await doubleButton.evaluate(el=>el.previousElementSibling.dataset.attackMode),'aimed');
+ await page.evaluate(()=>{document.querySelector('.pneuma-target-menu').classList.add('active');document.querySelector('.combat-weapons').hidden=false;});
+ const boxes=await doubleButton.evaluate(el=>[el.previousElementSibling,el,el.nextElementSibling,el.nextElementSibling.nextElementSibling].map(button=>{const r=button.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width};}));
+ assert.ok(boxes.every(box=>box.width===24&&box.y===boxes[0].y),'mode buttons share one row at native size');
+ assert.ok(boxes.every((box,i)=>i===0||box.x>=boxes[i-1].x+24),'x2 sits between aimed and Autofire without overlap');
+ await page.screenshot({path:process.env.TEMP+'/pct-x2-hud.png'});
+ await doubleButton.dispatchEvent('click');
+ assert.deepEqual(await page.evaluate(()=>selectedAttack),{source:'Token.own',target:'Token.enemy',item:'rof2',mode:'attack',count:2,cleared:true});
+ assert.equal(await page.locator('#token-hud button').count(),0,'native clear dismisses HUD before attack starts');
+ console.log('Attack selection clears the native HUD and routes x2 with captured attacker/target.');
  console.log('Medical browser checks passed: top-level self/target menu, disabled actions and actor selection.');
  console.log('Self CTH browser checks passed: own-token replacement, native controls retained, setting toggle, Shift-right-click, D10 native reroll and target actions.');
 }finally{await browser.close();}

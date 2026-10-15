@@ -1,4 +1,5 @@
 import {consumeHazardAttack} from "./hazard-attacks.js";
+import {confirmAreaRoll} from "./aoe/weapon.js";
 import {findNativeItem} from "./native-lookup.js";
 import {attackTitle,attackHeading} from "./attack-title.js";
 import { allActors, primaryGM as electedGM, escapeHTML as escape } from "./shared.js";
@@ -408,7 +409,7 @@ export async function startCombatExchange(attacker: Token, target: Token, itemId
   currentCombat({ combatId, combatEpoch } as Exchange);
   checkedLuck(Number(foundry.utils.getProperty(actor, "system.stats.luck.value")), 0, roll.luck);
   await consumeHazardAttack(actor, roll);
-  roll = await item.confirmRoll(roll);
+  roll = await confirmAreaRoll(item,roll);
   await spendBonusLuck(actor, roll.luck);
   await rollHidden(roll);
   roll.entityData = { actor: actor.id!, token: attacker.id, item: itemId, tokens: [target.id] };

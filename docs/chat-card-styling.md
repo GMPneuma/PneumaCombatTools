@@ -324,6 +324,8 @@ Damage roll controls retain existing selectors and permissions. `.pneuma-result-
 
 Vehicle CTH integration: SceneTools appends Configure and Enter/Exit controls inside `.pneuma-combat-column` after CTH rendering. Controls retain native `.control-icon` markup; Configure is GM-only. No chat-card markup changes.
 
+CTH attack selection (2026-10-14): `.pneuma-combat-menu` ROF 2 rows add a native `button.combat-weapon-mode[data-attack-mode="attack"][data-attack-count="2"]` labeled `x2`, immediately after Aimed Shot. Mode columns flow at 24px beside the flexible weapon name. Existing selectors remain. Selecting an enabled attack clears the native Token HUD before opening the workflow. Two ordinary attacks create independent existing resolution cards; chat-card markup, response permissions and visibility rules are unchanged. Example: `#token-hud .pneuma-combat-menu [data-attack-count="2"]`.
+
 Shared status-picker API: external scene workflows can open the existing `.pneuma-damage-status-picker` through `api.statusPicker.choose`, restricting allowed IDs to their supported native effects. Existing category and choice selectors, icons, radio controls, chat-card markup and permissions are unchanged. Selection alone performs no Actor writes. Example retained selector: `.pneuma-damage-status-picker .pneuma-effect-category summary`.
 # Scene effect cards
 

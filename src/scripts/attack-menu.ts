@@ -39,6 +39,7 @@ export function attackEntries(items: MenuWeapon[]) {
       category: ["unarmed", "martialArts"].includes(item.system.weaponType ?? "") ? "brawling"
         : (item.system.weaponType ?? "").toLowerCase().includes("melee") ? "melee" : "attack",
       deferred: false, area: !!areaKind(item,"attack"),
+      doubleAttack: Number(item.system.rof) === 2,
       gunAmmo: !!gunAmmo(item),
       brawling: ["unarmed", "martialArts"].includes(item.system.weaponType ?? ""),
       autofire: !!item.system.isRanged && (!!item.system.fireModes?.suppressiveFire
@@ -57,7 +58,7 @@ export function grenadeEntries(items: MenuWeapon[]) {
 
 const rolling = new Set<string>();
 export async function attackFromHUD(attacker: Token, target: Token, itemId: string, mode: AttackMode,
-  event: JQuery.ClickEvent) {
+  event: JQuery.ClickEvent, count=1) {
   const actor = attacker.actor;
   if (!actor?.isOwner || ["container", "blackIce", "demon"].includes(String(actor.type)) || !target.isVisible || !target.actor || ["container", "blackIce", "demon"].includes(String(target.actor.type))
     || canvas.tokens?.get(attacker.id) !== attacker || canvas.tokens.get(target.id) !== target
@@ -67,31 +68,45 @@ export async function attackFromHUD(attacker: Token, target: Token, itemId: stri
     {id:"__improvised",category:"thrown",autofire:false,deferred:false}].find(row => row.id === itemId);
   if ((!item && !grenadeEntries(items).some(row=>row.id===itemId)) || (["autofire","suppressive"].includes(mode) && !item?.autofire)) return;
   const originalItem = items.find(entry => entry.id === itemId);
+  if(count!==1&&count!==2)return;
+  if(count===2&&(mode!=="attack"||Number(originalItem?.system.rof)!==2||item?.category==="thrown"))return;
   if (originalItem && ammoBlocks(originalItem, mode)) return;
   if (originalItem && item?.category !== "thrown" && grappleWeaponBlocked(actor, originalItem))
     throw new Error("Grappled characters cannot use weapons requiring two hands.");
   const nativeItem = originalItem;
-  if (nativeItem) {
-    const kind=areaKind(nativeItem, mode);
-    if (kind) {
-      const { startAreaAttack } = await import("./aoe/workflow.js");
-      return await startAreaAttack(attacker,target,itemId,mode,!!event.shiftKey);
-    }
-    if(mode==="aimed"&&areaKind(nativeItem,"attack"))throw Error("Area attacks cannot make aimed shots.");
-  }
-  if(!item)return;
+  if(nativeItem&&mode==="aimed"&&areaKind(nativeItem,"attack"))throw Error("Area attacks cannot make aimed shots.");
+  const kind=nativeItem?areaKind(nativeItem,mode):undefined;
+  if(!item&&!kind)return;
   if (rolling.has(actor.uuid)) return;
   rolling.add(actor.uuid);
   try {
+   for(let shot=0;shot<count;shot++){
+    // Recheck state after the first native workflow; it may consume ammo or change tokens.
+    if(shot){
+      const current=Array.from(actor.items).find(entry=>entry.id===itemId) as unknown as MenuWeapon|undefined;
+      if(!actor.isOwner||!target.isVisible||!target.actor||canvas.tokens?.get(attacker.id)!==attacker||canvas.tokens.get(target.id)!==target||!attacker.can(game.user!,"control")
+        ||!current||Number(current.system.rof)!==2||!attackEntries(Array.from(actor.items) as unknown as MenuWeapon[]).some(entry=>entry.id===itemId)||ammoBlocks(current,mode))return;
+      if(grappleWeaponBlocked(actor,current))throw Error("Grappled characters cannot use weapons requiring two hands.");
+    }
     // Restore the captured attacker/defender before entering the native workflow.
     if (!attacker.control({ releaseOthers: true })) return;
     target.setTarget(true, { releaseOthers: true });
+    if(kind){
+      const {startAreaAttack}=await import("./aoe/workflow.js");
+      const result=await startAreaAttack(attacker,target,itemId,mode,!!event.shiftKey);
+      if(!result||shot===count-1)return result;
+      continue;
+    }
     const { startCombatExchange } = await import("./combat-resolution.js");
-    if (item.category === "thrown") {
+    if (item?.category === "thrown") {
       const source = itemId === "__improvised" ? await improvisedSource() : actor.items.get(itemId)!.toObject();
       return await startCombatExchange(attacker, target, itemId, "attack", event,
         { item: thrownRollItem(source, actor), source, improvised: itemId === "__improvised" });
-    } else return await startCombatExchange(attacker, target, itemId, mode, event);
+    } else {
+      const result=await startCombatExchange(attacker,target,itemId,mode,event);
+      if(!result||shot===count-1)return result;
+    }
+   }
   } finally { rolling.delete(actor.uuid); }
 }
 

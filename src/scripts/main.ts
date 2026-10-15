@@ -318,6 +318,7 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
     });
     html.find<HTMLButtonElement>("[data-self-grapple]").on("click",async event=>{
       event.preventDefault();event.stopPropagation();if(event.currentTarget.disabled)return;
+      hud.clear();
       await useGrapple(token,token,event.currentTarget.dataset.selfGrapple!,!!event.shiftKey);
       if(hud.object===token)hud.render(true);
     });
@@ -326,8 +327,8 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
       try{
         const id=button.dataset.selfThrow!;
         const grenade=grenadeEntries(Array.from(token.actor!.items) as unknown as MenuWeapon[]).some(item=>item.id===id);
-        if(grenade){const {startAreaAttack}=await import("./aoe/workflow.js");await startAreaAttack(token,token,id,"attack",!!event.shiftKey);}
-        else {const targets=[...game.user!.targets].filter(target=>target!==token);if(targets.length!==1)throw Error("Target one other token for a thrown weapon. Grenades use ground placement.");await attackFromHUD(token,targets[0]!,id,"attack",event);}
+        if(grenade){hud.clear();const {startAreaAttack}=await import("./aoe/workflow.js");await startAreaAttack(token,token,id,"attack",!!event.shiftKey);}
+        else {const targets=[...game.user!.targets].filter(target=>target!==token);if(targets.length!==1)throw Error("Target one other token for a thrown weapon. Grenades use ground placement.");hud.clear();await attackFromHUD(token,targets[0]!,id,"attack",event);}
       }catch(error){ui.notifications!.error((error as Error).message);}finally{button.disabled=false;}
     });
     html.find<HTMLButtonElement>("[data-self-action]").on("click",async event=>{
@@ -358,7 +359,7 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
   if (attacker?.actor && html[0]) decorateItemList(html[0], attacker.actor);
   html.find<HTMLButtonElement>("[data-grapple-action]").on("click", async event => {
     event.preventDefault(); event.stopPropagation();
-    if (attacker) await useGrapple(attacker, token, event.currentTarget.dataset.grappleAction!,!!event.shiftKey);
+    if (attacker&&!event.currentTarget.disabled) {hud.clear();await useGrapple(attacker, token, event.currentTarget.dataset.grappleAction!,!!event.shiftKey);}
   });
   html.find<HTMLButtonElement>("[data-breach-override]").on("click", async event => {
     event.preventDefault(); event.stopPropagation();
@@ -379,6 +380,7 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
     const button = event.currentTarget;
     if (!attacker?.actor || !token.actor || !quickhackEnabled() || button.disabled) return;
     button.disabled = true;
+    hud.clear();
     try {
       if (button.dataset.quickhackId === "jack-out") await jackOut(attacker.actor, token.actor.uuid);
       else await executeQuickhack(attacker, token, button.dataset.quickhackId!,!!event.shiftKey);
@@ -391,8 +393,10 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
     if (!attacker) return ui.notifications!.warn(label("SelectAttacker"));
     const button = event.currentTarget;
     if (button.disabled || button.getAttribute("aria-disabled") === "true") return;
+    const itemId=button.dataset.itemId!,mode=button.dataset.attackMode as AttackMode,count=Number(button.dataset.attackCount??1);
+    hud.clear();
     try {
-      await attackFromHUD(attacker, token, button.dataset.itemId!, button.dataset.attackMode as AttackMode, event);
+      await attackFromHUD(attacker, token, itemId, mode, event, count);
     } catch (error) {
       console.error(MODULE_ID, error);
       ui.notifications!.error(label("AttackFailed"));

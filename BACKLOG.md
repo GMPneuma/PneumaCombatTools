@@ -1,5 +1,7 @@
 # Combat Tools backlog
 
+- CTH dismissal and ROF 2 shortcut (0.9.19; live verification pending): close CTH after attack selection; add `x2` beside Aimed Shot for ROF 2 weapons, creating two separate ordinary attacks on the same target through existing native workflows. Preserve cancellation, ammunition and current-state checks.
+
 - Shared hazard status picker (local/unreleased): exposes `game.modules.get("pneuma-combattools").api.statusPicker` version 1, with `choose(selected, slot, {allowedIds})`. It reuses the existing grouped icon picker and returns selected IDs or null on cancellation; callers may restrict choices to effects they can resolve. No effects are applied by the picker. Existing CT callers retain their full choices. Unit/API and damage-flow browser checks pass; live integration retest is pending.
 
 ## Scene Tools hazard integration (local, unreleased)

@@ -6,6 +6,7 @@ export interface EquipmentItem {
   flags?: unknown;
   system: {
     isRanged?: boolean;
+    rof?: number;
     isWeapon?: boolean;
     isInstalledInActor?: boolean;
     modifiers?: { secondaryWeapon?: { configured?: boolean } };
