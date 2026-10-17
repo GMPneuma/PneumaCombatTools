@@ -4,7 +4,7 @@ const {chromium}=await import(process.env.PNEUMA_PLAYWRIGHT_MODULE||'playwright'
 const browser=await chromium.launch({channel:'msedge',headless:true});
 try {
  const page=await browser.newPage({viewport:{width:760,height:740}});
- await page.setContent(`<main class="chat-message"><h3>Chat button states</h3>
+ await page.setContent(`<main class="chat-message"><section class="pneuma-trap-card"><button data-trap-action="apply">Resolve damage</button><a id="hazard-chat-link" class="content-link" data-uuid="ChatMessage.attack"><i class="fas fa-comments"></i>Combat Tools attack</a><a id="hazard-journal-link" class="content-link" data-uuid="JournalEntry.notes">Journal</a></section><section class="pneuma-scene-effect-card"><button data-scene-effect-action="roll">Roll damage</button><button data-scene-effect-action="avoid">Roll Evasion</button></section><h3>Chat button states</h3>
  <section class="pneuma-defense-controls"><button>Evade</button><button>Do not Evade</button><button class="pneuma-cancel-exchange" data-gm-only="true">Cancel exchange</button></section>
  <section class="pneuma-manual-controls"><button id="apply">Apply to selected token</button><button data-gm-only="true" data-chat-action="review">Mark resolved after GM review</button><button disabled title="Waiting for damage roll">Apply injury</button><button class="pneuma-damage-status-slot">+</button></section>
  <section><button id="half" class="pneuma-half-armor" aria-pressed="false">Half Armor SP</button><button class="pneuma-half-armor" aria-pressed="true">Half Armor SP</button></section>
@@ -14,7 +14,7 @@ try {
  <section><button data-emp-select data-gm-only="true">Choose affected items</button><button data-instant-action="roll">Resist DV15</button><button data-ribs-apply>Apply 5 damage</button></section>
  <section class="pneuma-group-action"><button>Roll</button></section><a class="pneuma-group-total">15</a><button id="native">Native control</button></main>`);
  await page.addStyleTag({content:await readFile('dist/styles/pneuma-combattools.css','utf8')});
- await page.addStyleTag({content:`body{font:14px Arial;background:#ddd;padding:20px}section{margin:12px 0}.test-bolt::before{content:"ϟ"}.test-reset::before{content:"↻"} .pneuma-defense-controls{display:flex;gap:4px} button:hover { padding:20px; border-width:7px; font-size:25px; font-weight:bold; transform:scale(1.3); margin:10px; width:500px; }`});
+ await page.addStyleTag({content:`.content-link{background:white;color:cyan}body{font:14px Arial;background:#ddd;padding:20px}section{margin:12px 0}.test-bolt::before{content:"ϟ"}.test-reset::before{content:"↻"} .pneuma-defense-controls{display:flex;gap:4px} button:hover { padding:20px; border-width:7px; font-size:25px; font-weight:bold; transform:scale(1.3); margin:10px; width:500px; }`});
  await page.addScriptTag({type:'module',content:(await readFile('dist/scripts/chat-buttons.js','utf8'))+'\nwindow.styleChatButtons=styleChatButtons;'});
  await page.waitForFunction(()=>!!window.styleChatButtons);
  await page.evaluate(()=>{
@@ -27,6 +27,17 @@ try {
    row.innerHTML='<button class="pneuma-interact-armor" aria-pressed="true">Interact With Armor</button><button class="pneuma-half-armor" aria-pressed="false">Half Armor SP</button>';
    document.querySelector('main').append(row);styleChatButtons(row);
  });
+ const hazardRoles=await page.locator('[data-trap-action],[data-scene-effect-action]').evaluateAll(nodes=>nodes.map(n=>[n.classList.contains('pneuma-chat-button'),n.dataset.chatRole]));
+ assert.deepEqual(hazardRoles,[[true,'gm'],[true,'gm'],[true,'player']]);
+ await page.locator('main').evaluate(root=>root.style.setProperty('--pneuma-chat-button-background','#123456'));
+ await page.waitForFunction(()=>getComputedStyle(document.querySelector('#hazard-chat-link')).backgroundColor==='rgb(18, 52, 86)');
+ assert.equal(await page.locator('#hazard-chat-link').getAttribute('data-uuid'),'ChatMessage.attack');
+ assert.equal(await page.locator('#hazard-chat-link i').count(),1);
+ assert.equal(await page.locator('#hazard-journal-link').evaluate(link=>link.classList.contains('pneuma-chat-button')),false);
+ await page.evaluate(()=>{window.linkClicks=0;document.querySelector('#hazard-chat-link').addEventListener('click',()=>linkClicks++);});
+ await page.locator('#hazard-chat-link').click();assert.equal(await page.evaluate(()=>linkClicks),1);
+ await page.locator('main').evaluate(root=>root.style.removeProperty('--pneuma-chat-button-background'));
+
  const armorButtons=page.locator('#armor-layout button');
  const left=await armorButtons.nth(0).boundingBox(),right=await armorButtons.nth(1).boundingBox();
  assert.equal(left.y,right.y,'Armor controls stay side by side at chat width');
@@ -54,7 +65,7 @@ try {
  await page.evaluate(()=>{const b=document.createElement('button');b.dataset.instantAction='review';b.textContent='GM: mark resolved';document.querySelector('main').append(b)});
  await page.waitForFunction(()=>document.querySelector('[data-instant-action=review]').classList.contains('pneuma-chat-button'));
  const gmButtons=page.locator('[data-chat-role="gm"]');
- assert.equal(await gmButtons.count(),6,'GM controls across card families and asynchronous controls share the role');
+ assert.equal(await gmButtons.count(),8,'GM controls across card families and asynchronous controls share the role');
  await page.mouse.move(740,720);await page.locator('#apply').blur();
  const normal=await page.locator('#apply').evaluate(n=>getComputedStyle(n).backgroundColor);
  const skins=await gmButtons.evaluateAll(nodes=>nodes.map(n=>{const s=getComputedStyle(n);return [s.backgroundColor,s.color,s.borderColor,getComputedStyle(n,'::before').content]}));

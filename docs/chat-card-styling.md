@@ -342,3 +342,17 @@ The `.pneuma-scene-effect-card` retains native `rollcard`/`cpr-block` structure 
 CTH weapon hover text: .combat-weapon-name uses the full weapon name without an Attack: prefix; ammunition binding appends Right click to reload. No layout or selector changes.
 
 Ranged heading hover: .pneuma-target-menu[data-open="attack"]:has(.combat-heading:hover) shows .combat-ammo-count in the mode-control columns and hides the row mode/ammunition controls. Labels use data-weapon-ammo-count, native magazine values, and the loaded ammo type followed by (x / y), with only the type ellipsized inside a fixed 96px area. Pointer exit restores normal controls through CSS without changing disabled or reload-menu state.
+
+## Hazard effects (unreleased)
+
+`.rollcard.pneuma-scene-effect-card` retains native top/cpr-block markup, result/damage-roll/effects sections and pending/resolved state. Target rows `.pneuma-scene-effect-target[data-scene-damage-row]` expose ready/applying/applied/avoided/review. Damage reuses `.pneuma-damage-result`, native dice details, recorded-target `.pneuma-apply-damage`, `.pneuma-damage-application-box` and captured `.pneuma-damage-applications` receipts/Undo. Only the active GM sees damage controls after avoidance; target owners may roll avoidance. No selected-target bolt is offered.
+
+`[data-scene-effect-action]` and SceneTools approval `[data-trap-action]` controls now join the shared `.pneuma-chat-button` skin and theme tokens. Scene effect roll/apply and hazard approval controls carry GM role; avoidance retains player role. Existing action selectors are retained. Example: `.pneuma-scene-effect-card [data-scene-effect-action="avoid"]`.
+
+
+### Hazard damage and attached effects
+
+The root now also carries .pneuma-resolution-card. Visual Tools lays its damage/effects sections out at full width, preserving native roll wrappers, dice actions, captured receipts and Undo. The outer heading uses the effect label; the redundant top-level result section is removed for scene-effect cards. Per-target .pneuma-damage-effects-slot hosts the standard three Add effects controls. Active GM selections persist through damageStatuses, lock when resolution starts, and feed the existing damage pipeline. Damage is applied before CT creates its normal resistance/application cards for attached effects. Configured hazard avoidance remains a separate pre-damage check. Native message visibility and owner/GM avoidance permissions remain unchanged. Example: .pneuma-scene-effect-card .pneuma-damage-effects-slot.
+
+
+Hazard activation ChatMessage UUID links within .pneuma-trap-card join .pneuma-chat-button, using the normal action palette without a GM badge. Both data-uuid ChatMessage paths and native data-type=ChatMessage anchors are recognized. Native content-link classes, data attributes and navigation handlers remain intact; unrelated document links are unchanged. Example: .pneuma-trap-card a.content-link.pneuma-chat-button.

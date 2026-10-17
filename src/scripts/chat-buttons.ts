@@ -3,7 +3,8 @@ const controls=[
   ".pneuma-defense-controls button", ".pneuma-evasion-override", ".pneuma-result-damage", ".pneuma-apply-damage", ".pneuma-apply-critical",
   ".pneuma-damage-status-slot", ".pneuma-damage-recovery-controls button", ".pneuma-quickhack-actions button",
   ".pneuma-grapple-controls button", "[data-aoe-action]", "[data-instant-action]", "[data-emp-select]", "[data-status-cleanup]", "[data-copy-combat-summary]",
-  "[data-ribs-apply]", ".pneuma-manual-controls button", ".pneuma-group-action button", ".pneuma-half-armor", ".pneuma-interact-armor"
+  "[data-scene-effect-action]", "[data-trap-action]", "[data-ribs-apply]", ".pneuma-manual-controls button", ".pneuma-group-action button", ".pneuma-half-armor", ".pneuma-interact-armor"
+  , '.pneuma-trap-card a.content-link[data-uuid^="ChatMessage."]', '.pneuma-trap-card a.content-link[data-type="ChatMessage"]'
 ].join(",");
 const observed=new WeakSet<HTMLElement>();
 const cardRoots='.pneuma-combat-message,.pneuma-manual-card,.pneuma-aoe-card,.pneuma-instant-card,.pneuma-emp-card,.pneuma-grapple-card,.pneuma-quickhack-card,.pneuma-status-cleanup-card';
@@ -17,8 +18,8 @@ function decorate(node:HTMLElement):void {
     const icon=document.createElement("i");icon.className="fas fa-rotate-left";icon.setAttribute("aria-hidden","true");
     node.replaceChildren(icon);
   }
-  const text=node.textContent?.trim()??"",action=node.dataset.chatAction??node.dataset.aoeAction??node.dataset.instantAction??node.dataset.quickhackAction??"";
-  const gmOnly=node.dataset.gmOnly==="true"
+  const text=node.textContent?.trim()??"",action=node.dataset.chatAction??node.dataset.sceneEffectAction??node.dataset.trapAction??node.dataset.aoeAction??node.dataset.instantAction??node.dataset.quickhackAction??"";
+  const gmOnly=!!node.dataset.trapAction || !!node.dataset.sceneEffectAction && action!=="avoid" || node.dataset.gmOnly==="true"
     || !!node.dataset.aoeAction && ["show","removeSmoke","scatter","hit","miss","exclude","forcehit","add","reset","damageReset","damageResolved","effectsResolved"].includes(action)
     || !!node.dataset.instantAction && ["skip","reset","review"].includes(action);
   node.dataset.chatRole=gmOnly?"gm":"player";

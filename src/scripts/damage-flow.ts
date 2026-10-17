@@ -288,7 +288,7 @@ export async function applyFromCard(data: Exchange, send: Send, shiftKey: boolea
   await send("damageApply", { encounter, halfArmor, interactArmor, targetUuid, application, applicationId: foundry.utils.randomID(), options,
     statusEffects: (data.damage?.statusEffects ?? inherentDamageStatuses(data.damage?.result?.ammoType)).slice(0, 3) });
 }
-export async function renderDamage(message: ChatMessage, data: Exchange, html: JQuery, send: Send, manual?: {canEditEffects: boolean}): Promise<void> {
+export async function renderDamage(message: ChatMessage, data: Exchange, html: JQuery, send: Send, manual?: {canEditEffects: boolean; recordedOnly?: boolean}): Promise<void> {
   if (!manual && !data.weaponId || html.find(".pneuma-damage-controls, .pneuma-damage-recovery-controls").length) return;
   const attacker = manual ? {isOwner:false} : await damageActor(data.attacker);
   const defender = manual ? {isOwner:true} : await damageActor(data.defender);
@@ -368,9 +368,9 @@ export async function renderDamage(message: ChatMessage, data: Exchange, html: J
     renderDamageStatusPicker(statusBox,selected,damageEffectsLocked(data.damage),
       manual?.canEditEffects===false||!["rolled","applied"].includes(status!),
       statusEffects=>send("damageStatuses",{statusEffects}));
-    effectsPanel.append(statusBox);
-    if (!manual) button(data.defenderName, event => applyFromCard(data, send, event.shiftKey, data.defender, "recorded", halfArmorSelected(event), interactArmorSelected(event)), "recorded");
-    button("Selected Token", event => applyFromCard(data, send, event.shiftKey, selectedDamageTarget(), "selected", halfArmorSelected(event), interactArmorSelected(event)), "selected");
+    if (!manual?.recordedOnly || manual.canEditEffects) effectsPanel.append(statusBox);
+    if (!manual || manual.recordedOnly) button(data.defenderName, event => applyFromCard(data, send, event.shiftKey, data.defender, "recorded", halfArmorSelected(event), interactArmorSelected(event)), "recorded");
+    if (!manual?.recordedOnly) button("Selected Token", event => applyFromCard(data, send, event.shiftKey, selectedDamageTarget(), "selected", halfArmorSelected(event), interactArmorSelected(event)), "selected");
   }
   if (!manual && game.user!.isGM && status === "rolling") button("Release unfinished damage roll", () => send("damageReset"), undefined, true);
   if (!manual && game.user!.isGM && (status === "review" || status === "applying"))

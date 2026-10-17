@@ -27,7 +27,7 @@ async function setup(){
  const sourceToken={uuid:'Scene.scene.Token.s',actor:source,parent:scene,x:0,y:0},targetToken={uuid:'Scene.scene.Token.t',actor:target,parent:scene,x:100,y:0};
  globalThis.fromUuid=async uuid=>[sourceToken,targetToken,source,target].find(d=>d.uuid===uuid);
  await source.createEmbeddedDocuments('Item',[{name:'First Aid',type:'skill',system:{level:0}},{name:'Paramedic',type:'skill',system:{level:4}},{name:'Medtech',type:'role',system:{rank:4}},{name:'Speedheal',type:'drug',system:{amount:2}}]);
- await markMedicalDamage(target,40);
+ await target.createEmbeddedDocuments('ActiveEffect',[{name:'Needs Stabilization',statuses:['pneuma-needs-stabilization'],changes:[]}]);
  const request=(action,extra={})=>resolveMedical({medicalType:'request',id:String(++serial),user:'owner',source:sourceToken.uuid,target:targetToken.uuid,action,hp:target.system.derivedStats.hp.value,...extra});
  return {source,target,sourceToken,targetToken,request};
 }
@@ -138,7 +138,7 @@ test('medical native-card rendering failure retains the paid roll for retry',asy
  await r.perform();assert(!needsStabilization(f.target));assert.equal(f.source.system.stats.luck.value,1);assert.deepEqual(r.counts(),{rolls:1,cards:1});
 });
 test('healing before the queued marker write does not erase a recorded damage event',async()=>{
- const f=await setup();f.target.effects.clear();const pending=markMedicalDamage(f.target,40);f.target.system.derivedStats.hp.value=40;await pending;assert(needsStabilization(f.target));
+ const f=await setup();f.target.effects.clear();game.combats.set('active',{active:true,started:true,combatants:new Collection([['target',{actor:f.target,token:f.targetToken}]])});const pending=markMedicalDamage(f.target,40);f.target.system.derivedStats.hp.value=40;await pending;assert(needsStabilization(f.target));
 });
 test('poison and fire share HP serialization; simultaneous burn calls apply once per turn',async()=>{
  const f=await setup(),fire=masterStatuses.find(s=>s.name==='On Fire (Mild)');

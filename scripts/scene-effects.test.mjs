@@ -2,7 +2,9 @@ import {registerHooks} from 'node:module';
 registerHooks({resolve(s,c,next){if(s==='/systems/cyberpunk-red-core/modules/extern/cpr-dice-handler.js')return {shortCircuit:true,url:'data:text/javascript,export default {handle3dDice:async()=>{}}'};return next(s,c);}});
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createSceneEffect,resolveSceneEffect,resolveSceneAvoidance,getSceneAvoidanceResult,rollSceneAvoidance,sceneEffectContent} from '../dist/scripts/scene-effects.js';
+globalThis.FormApplication=class {};
+globalThis.Hooks={once(){},on(){}};
+const {createSceneEffect,resolveSceneEffect,resolveSceneAvoidance,getSceneAvoidanceResult,rollSceneAvoidance,sceneEffectContent}=await import('../dist/scripts/scene-effects.js');
 const get=(o,p)=>p.split('.').reduce((v,k)=>v?.[k],o);
 function setup(){
  let rolls=0,applied=0,seq=0;const messages=new Map();messages.find=fn=>[...messages.values()].find(fn);

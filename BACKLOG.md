@@ -485,3 +485,11 @@ EMP workflow token marker (2026-10-10, local/unreleased): actual EMP and Microwa
 - CTH Ranged heading ammo preview (implemented locally): hover the Ranged title to replace fire buttons with loaded ammo type (current / capacity); restore controls on pointer exit. Live Foundry verification pending.
 
 - Duplicate rendered attack cards (fixed locally; live player verification pending): reproduced update-before-insertion race with one message and two rendered cards. Guard native chat insertion/update concurrency, including sidebar/popout and render failures.
+
+
+Hazard damage reuses normal CT Add effects, native damage application and follow-up resistance/application cards. Shared card layout replaces the nested-looking presentation. Live retest pending.
+
+
+Removed white native backgrounds from hazard attack/effect card links by including scoped ChatMessage content links in the shared button renderer. Native UUID click handling retained.
+
+- Automatic Needs Stabilization now requires HP loss by an Actor/token participating in an active, started combat. Prep edits, inactive/unstarted encounters, and unrelated Actors do not mark; queued applications recheck combat eligibility. The setting remains optional and off by default; existing conditions and medical actions are unchanged.

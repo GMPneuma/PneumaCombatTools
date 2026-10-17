@@ -59,14 +59,18 @@ export function medicalEntries(source:Actor|undefined,target:Actor|undefined):Me
   }
   return rows;
 }
-/** Every real character/token HP decrease is eligible, including native and direct damage. */
+function inActiveCombat(actor:Actor):boolean {
+  return Array.from(game.combats?.values()??[]).some(combat=>combat.active&&combat.started&&combat.combatants.some(row=>
+    actor.isToken ? row.token?.uuid===actor.token?.uuid : row.actor?.uuid===actor.uuid));
+}
+/** Only HP loss by a participant in an active, started encounter is eligible. */
 const damageWork=new Map<string,Promise<void>>();
 export async function markMedicalDamage(actor:Actor,before:number):Promise<void> {
-  const damaged=medicalEnabled()&&["character","mook"].includes(String(actor.type))&&medicalHP(actor)<before;
+  const damaged=medicalEnabled()&&inActiveCombat(actor)&&["character","mook"].includes(String(actor.type))&&medicalHP(actor)<before;
   if(!damaged)return;
   const key=actor.uuid;
   const next=(damageWork.get(key)??Promise.resolve()).catch(()=>{}).then(async()=>{
-    if(!medicalEnabled())return;
+    if(!medicalEnabled()||!inActiveCombat(actor))return;
     if(!needsStabilization(actor))await actor.createEmbeddedDocuments("ActiveEffect",[{name:"Needs Stabilization",img:"icons/svg/regen.svg",statuses:[STATUS],changes:[]}]);
   });
   damageWork.set(key,next);
@@ -239,7 +243,7 @@ export function expireQuickFixes(combat?:Combat):Promise<void> {
   return next;
 }
 export function registerMedical() {
-  game.settings!.register(M,"enableStabilization",{name:"Enable Stabilization Function",hint:"Automatically apply Needs Stabilization after character/token HP loss. Medical actions are always available.",scope:"world",config:true,type:Boolean,default:false});
+  game.settings!.register(M,"enableStabilization",{name:"Enable Stabilization Function",hint:"Automatically apply Needs Stabilization after HP loss to characters participating in active combat. Medical actions are always available.",scope:"world",config:true,type:Boolean,default:false});
   const previousHP=new Map<string,number>();
   const remember=(actor:Actor)=>previousHP.set(actor.uuid,medicalHP(actor));
   Hooks.on("createActor",remember);Hooks.on("createToken",(token:TokenDocument)=>{if(token.actor)remember(token.actor);});

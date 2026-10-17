@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.21 - 2026-10-17
+
+- Restrict automatic Needs Stabilization to HP loss by Actors/tokens participating in an active, started combat. Preparation edits and unrelated Actors no longer trigger the condition. Recheck combat eligibility before queued effect creation.
+- Preserve the optional setting, existing stabilization conditions, and medical treatment actions. Update the setting hint to explain combat-only marking.
+- Integrate hazard damage cards with the standard Combat Tools damage flow, including attached effects and resistance after damage, while retaining native armor handling.
+- Improve hazard card layout integration and shared chat-button styling for hazard attack message links.
+
+Validation: production build, automated runtime tests, medical regressions, and targeted hazard/chat browser fixtures. Live Foundry/multiplayer verification remains separate.
+
+
 ## 0.9.20 - 2026-10-14
 
 - Show loaded ammo type and current/capacity counts while hovering the Ranged HUD heading; restore attack and reload controls on pointer exit.

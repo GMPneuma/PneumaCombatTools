@@ -593,3 +593,13 @@ CTH Ranged heading ammo preview (0.9.20): hovering the Ranged heading temporaril
 Chat rendering race guard (0.9.20): overlapping native ChatLog updates wait for the same message's initial insertion, preventing duplicate DOM cards while getHTML is delayed. Replacements are serialized per message and per sidebar/popout instance; failed renders release pending state. This does not create or delete ChatMessage documents. Reproduced in a Foundry v12 behavior fixture; live multiplayer verification pending.
 
 Chat race follow-up audit: tests execute cached Foundry v12 postOne/updateMessage methods with deferred rendering. Unguarded x2 plus later single attacks each duplicate while the render queue is blocked; after it drains, a fresh single does not inherit duplicate state. The local guard keeps one card per message in sidebar/popout with 0, 0.5 and 5 second result delays, updates before insertion and repeated resolution/damage updates. x2 second-shot cancellation/failure releases its attack lock. Live player-session confirmation remains pending.
+
+- Hazard effect cards (local/unreleased): shared Combat Tools button styling now includes hazard approvals and effect actions. New direct-damage effects require sceneEffects API v4 and reuse native CPR damage rolls, Combat Tools recorded-target application/Shift-click options, and embedded native damage receipts/Undo. GM approval, per-target avoidance, shared rolls, stale-source validation and effect cleanup remain enforced. Generic MOVE/status effects keep their provider workflow. Live Foundry verification pending.
+
+
+Hazard damage exposes the same Add effects slots as ordinary damage. Per-target selections use the existing native damage pipeline: damage applies first, then selected effects create the standard CT resistance/application cards. Selection locks once resolution starts. Hazard effect cards use the common resolution-card root and effect label as their heading.
+
+
+Hazard activation links to attack/effect chat messages now use the shared themed chat-button styling. Native UUID navigation and unrelated document links are preserved.
+
+- Automatic Needs Stabilization now requires HP loss by an Actor/token participating in an active, started combat. Prep edits, inactive/unstarted encounters, and unrelated Actors do not mark; queued applications recheck combat eligibility. The setting remains optional and off by default; existing conditions and medical actions are unchanged.

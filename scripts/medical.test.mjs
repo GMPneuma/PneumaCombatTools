@@ -19,7 +19,7 @@ const {masterStatuses}=await import('../dist/scripts/status-catalog.js');
 const {finishTimedEffects}=await import('../dist/scripts/instant-lifetime.js');
 const {injuryTreatmentChoices,stabilizationStates,nativeTreatmentSkill}=await import('../dist/scripts/medical-rules.js');
 let enabled;
-async function setup(){
+async function setup(inCombat=false){
  enabled=true;const users=[{id:'gm',isGM:true,active:true},{id:'owner',active:true}];users.get=id=>users.find(u=>u.id===id);
  globalThis.game={user:users[0],users,time:{worldTime:100},settings:{get:()=>enabled},combats:new Collection(),actors:[],scenes:[]};
  globalThis.CONFIG={statusEffects:masterStatuses};globalThis.canvas={tokens:{hud:null}};
@@ -28,12 +28,15 @@ async function setup(){
  const sourceToken={uuid:'Scene.scene.Token.s',actor:source,parent:scene,x:0,y:0},targetToken={uuid:'Scene.scene.Token.t',actor:target,parent:scene,x:100,y:0};
  globalThis.fromUuid=async uuid=>[sourceToken,targetToken,source,target].find(d=>d.uuid===uuid);
  await source.createEmbeddedDocuments('Item',[{name:'First Aid',type:'skill',system:{level:0,stat:'tech'}},{name:'Paramedic',type:'skill',system:{level:4,stat:'tech'}},{name:'Medtech',type:'role',system:{rank:4}},{name:'Speedheal',type:'drug',system:{amount:2}}]);
+ const combat={id:'combat',active:true,started:true,scene,combatants:new Collection([['target',{actor:target,token:targetToken}]])};
+ game.combats.set(combat.id,combat);
  await markMedicalDamage(target,40);
+ if(!inCombat)game.combats.clear();
  const request=(action,extra={})=>resolveMedical({medicalType:'request',id:String(++serial),user:'owner',source:sourceToken.uuid,target:targetToken.uuid,action,hp:target.system.derivedStats.hp.value,...extra});
  return {source,target,sourceToken,targetToken,request};
 }
 test('Needs Stabilization has no penalties, is optional, and marks real HP loss regardless of ownership',async()=>{
- const f=await setup();assert(needsStabilization(f.target));assert.deepEqual([...f.target.effects][0].changes,[]);
+ const f=await setup(true);assert(needsStabilization(f.target));assert.deepEqual([...f.target.effects][0].changes,[]);
  f.target.effects.clear();enabled=false;await markMedicalDamage(f.target,40);assert.equal(f.target.effects.size,0);
  enabled=true;await markMedicalDamage(f.target,20);assert.equal(f.target.effects.size,0);
  f.target.hasPlayerOwner=false;await markMedicalDamage(f.target,40);assert.equal(f.target.effects.size,1);f.target.effects.clear();
@@ -41,7 +44,7 @@ test('Needs Stabilization has no penalties, is optional, and marks real HP loss 
  await finishTimedEffects({id:'ended',combatants:[{actor:f.target}]});assert(needsStabilization(f.target));
 });
 test('native HP hooks recognize flat and nested damage updates, not healing',async()=>{
- const f=await setup(),hooks={};game.settings.register=()=>{};Hooks.on=(name,fn)=>(hooks[name]??=[]).push(fn);Hooks.once=()=>{};registerMedical();
+ const f=await setup(true),hooks={};game.settings.register=()=>{};Hooks.on=(name,fn)=>(hooks[name]??=[]).push(fn);Hooks.once=()=>{};registerMedical();
  for(const changes of [{'system.derivedStats.hp.value':29},{system:{derivedStats:{hp:{value:29}}}}]){const options={};hooks.preUpdateActor[0](f.target,changes,options);assert.equal(options.pneumaMedicalHP,30);}
  const options={};hooks.preUpdateActor[0](f.target,{'system.derivedStats.hp.value':35},options);assert.equal(options.pneumaMedicalHP,undefined);
  f.target.effects.clear();f.target.system.derivedStats.hp.value=29;
@@ -157,4 +160,24 @@ test('medical submenus group dual skills and preserve direct single-skill action
  const single=medicalMenuGroups(medicalEntries(f.source,f.target).filter(row=>row.item===injury.id));
  assert.equal(single[0].submenu,false);assert.equal(single[0].choices[0].label,'Broken Arm — DV13 (Para 12)');
  assert.equal(single[0].choices[0].item,injury.id);assert.equal(single[0].choices[0].skill,'Paramedic');
+});
+
+
+test('automatic stabilization ignores prep edits and inactive, unstarted or unrelated combats',async()=>{
+ const f=await setup();f.target.effects.clear();
+ await markMedicalDamage(f.target,40);assert.equal(f.target.effects.size,0,'No encounter');
+ const combat={id:'combat',active:true,started:false,combatants:new Collection([['target',{actor:f.target,token:f.targetToken}]])};game.combats.set(combat.id,combat);
+ await markMedicalDamage(f.target,40);assert.equal(f.target.effects.size,0,'Encounter not started');
+ combat.started=true;combat.active=false;await markMedicalDamage(f.target,40);assert.equal(f.target.effects.size,0,'Inactive encounter');
+ combat.active=true;combat.combatants.clear();await markMedicalDamage(f.target,40);assert.equal(f.target.effects.size,0,'Actor not participating');
+ combat.combatants.set('target',{actor:f.target,token:f.targetToken});await markMedicalDamage(f.target,40);assert(needsStabilization(f.target));
+});
+
+test('synthetic actors require their own token in combat and queued marking rechecks combat state',async()=>{
+ const f=await setup(true);f.target.effects.clear();f.target.isToken=true;f.target.token=f.targetToken;
+ const combat=game.combats.get('combat');combat.combatants.get('target').token={uuid:'Scene.other.Token.copy'};
+ await markMedicalDamage(f.target,40);assert.equal(f.target.effects.size,0);
+ combat.combatants.get('target').token=f.targetToken;
+ const pending=markMedicalDamage(f.target,40);combat.started=false;await pending;assert.equal(f.target.effects.size,0,'Combat ended before queued effect creation');
+ combat.started=true;await markMedicalDamage(f.target,40);assert(needsStabilization(f.target));
 });
