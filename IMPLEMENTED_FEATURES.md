@@ -135,6 +135,7 @@ Current source: release 0.8.3, reviewed 2026-09-24. “Implemented” means pres
 - Separate follow-up results preserve the original grapple card. Managed penalties, held-token following/scale and cleanup; held-object transfer remains manual.
 - Jack-In, detection, connection tracking, Jack Out, eleven QuickHacks, Force Out and encounter-long ejection.
 - Configurable QuickHack availability and result audiences; native Interface/Concentration rolls, range/wall sight and installed-program checks.
+- Optional target Neuroport filter (0.9.22): QuickHack settings includes “Hide QuickHack menu without installed Neuroport”, a GM-controlled world checkbox, default off. When enabled, target QuickHack controls require installed Neuroport cyberware; renamed foundational Neuroport items are recognized by native type. Neuroport accessories alone do not qualify. Open HUDs refresh on setting and target inventory changes. Automated checks are separate from live Foundry verification.
 - Neural Intrusion and Jacked In indicators; multiple detected incoming connections have separate ejection choices. Connection awareness survives chat deletion.
 - Implemented QuickHack condition/damage/disablement handling; Puppet, Lure and Shard Ejection outcomes require table adjudication. See [coverage](docs/quickhack.md).
 - Shared EMP/Short Circuit/Cyberware Malfunction/Microwaver disablement, source-specific durations, overlapping causes and restoration.

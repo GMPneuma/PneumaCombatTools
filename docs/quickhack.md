@@ -36,6 +36,8 @@ Repeated matching movement effects refresh their duration and preserve the stron
 
 Configure Quickhack Messages groups source/target/result audience, totals and identity options. Respect public/owner/GM and private native dice handling; ejection reuses recorded awareness audience. Connection state is `Combat.flags.pneuma-combattools.quickhackConnections`; result cards use `ChatMessage.flags.pneuma-combattools.quickhack`.
 
-Custom hacks, Net Action spending, Neuroport requirements and Self-ICE/Passwall automation remain manual/deferred. See [EMP](emp.md) for disablement options and [flow map](flow-map.md) for recovery.
+QuickHack settings includes **Hide QuickHack menu without installed Neuroport** (default off, GM-controlled world setting). When enabled, the target HUD hides its QuickHack menu unless the target has installed Neuroport cyberware. Detection uses CPR's `isInstalledInActor` and either the Neuroport name or foundational Neuroport type; accessories alone do not qualify. This is menu visibility only; macros and existing connections retain their behavior.
+
+Custom hacks and Net Action spending remain manual/deferred. Neuroport action validation beyond this optional target-menu filter remains manual. See [EMP](emp.md) for disablement options and [flow map](flow-map.md) for recovery.
 
 Implementation: [quickhack/workflow.ts](../src/scripts/quickhack/workflow.ts), [quickhack/connections.ts](../src/scripts/quickhack/connections.ts), [quickhack/force-out.ts](../src/scripts/quickhack/force-out.ts), [quickhack/effects.ts](../src/scripts/quickhack/effects.ts), [quickhack/conditions.ts](../src/scripts/quickhack/conditions.ts), [quickhack/catalog.ts](../src/scripts/quickhack/catalog.ts).

@@ -4,6 +4,7 @@ import { DEFAULT_ROUTING_CONFIG, normalizeRoutingConfig, type RoutingConfig } fr
 declare global {
   interface SettingConfig {
     "pneuma-combattools.quickhackEnabled": boolean;
+    "pneuma-combattools.quickhackRequireNeuroport": boolean;
     "pneuma-combattools.quickhackMode": QuickhackMode;
     "pneuma-combattools.quickhackRouting": RoutingConfig;
   }
@@ -33,7 +34,7 @@ class QuickhackSettings extends FormApplication {
       { key: "npcToPlayerQuickhackRevealAttacker", title: "Attacker identity", choices: { true: "Show NPC name", false: "Unknown Netrunner" } },
       { key: "playerToNpcJackInAudience", title: "Who sees NPC awareness?", choices: { sourceOwners: "Only the Attacker and GM", public: "Everyone", gm: "Only GM" } },
     ].map(row => ({ ...row, value: String(config[row.key as keyof RoutingConfig]) }));
-    return {mode:mode(),modes:{raw:"RAW",owned:"Must Buy QuickHack",loaded:"Must Be Loaded in Equipped Cyberdeck"}, groups: [
+    return {requireNeuroport:game.settings!.get(MODULE,"quickhackRequireNeuroport"),mode:mode(),modes:{raw:"RAW",owned:"Must Buy QuickHack",loaded:"Must Be Loaded in Equipped Cyberdeck"}, groups: [
       {title:"NPC → Player: Jack-In", rows:rows.slice(0,3)},
       {title:"NPC → Player: QuickHack", rows:rows.slice(3,5)},
       {title:"Player → NPC: Jack-In", rows:rows.slice(5)},
@@ -41,6 +42,7 @@ class QuickhackSettings extends FormApplication {
   }
   protected override async _updateObject(_event: Event, data: Record<string, unknown>) {
     if (!game.user!.isGM) return;
+    await game.settings!.set(MODULE,"quickhackRequireNeuroport",data.requireNeuroport === true);
     if(["raw","owned","loaded"].includes(String(data.mode)))await game.settings!.set(MODULE,"quickhackMode",data.mode as QuickhackMode);
     await game.settings!.set(MODULE, "quickhackRouting", normalizeRoutingConfig({
       npcToPlayerJackInAudience: String(data.npcToPlayerJackInAudience),
@@ -53,6 +55,8 @@ class QuickhackSettings extends FormApplication {
   }
 }
 export function registerQuickhackSettings(refresh: () => void) {
+  game.settings!.register(MODULE, "quickhackRequireNeuroport", { name: "Hide QuickHack menu without installed Neuroport",
+    scope: "world", config: false, type: Boolean, default: false, onChange: refresh });
   game.settings!.register(MODULE, "quickhackEnabled", { name: "Enable QuickHack", hint: "Enable QuickHack controls, rolls, effects and macros. Disable the standalone Pneuma Quickhack module before using this integration.",
     scope: "world", config: true, type: Boolean, default: true, onChange: refresh });
   game.settings!.register(MODULE, "quickhackMode", { name: "QuickHack rules mode", scope: "world", config: false,

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.22 - 2026-10-21
+
+- Add an optional GM-controlled world setting to hide the target QuickHack menu unless the target has installed Neuroport cyberware. The setting defaults off.
+- Recognize renamed foundational Neuroports, exclude accessories alone, and refresh open HUDs when the setting or target inventory changes. Macros and existing connections retain their behavior.
+
+Validation: strict TypeScript checks, production build and automated runtime regressions. Live Foundry/multiplayer verification remains pending.
+
 ## 0.9.21 - 2026-10-17
 
 - Restrict automatic Needs Stabilization to HP loss by Actors/tokens participating in an active, started combat. Preparation edits and unrelated Actors no longer trigger the condition. Recheck combat eligibility before queued effect creation.

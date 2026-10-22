@@ -8,7 +8,7 @@ test('QuickHack Configure includes and saves rules mode alongside routing, while
  registerQuickhackSettings(()=>{});assert.equal(settings.get('quickhackMode').config,false);assert.equal(settings.get('quickhackEnabled').config,true);
  const form=new (menus.get('quickhackMessages').type)();assert.equal(form.getData().mode,'raw');
  const data=Object.fromEntries(form.getData().groups.flatMap(g=>g.rows.map(r=>[r.key,r.value])));await form._updateObject({}, {...data,mode:'loaded'});
- assert.equal(values.get('quickhackMode'),'loaded');assert.deepEqual(writes,['quickhackMode','quickhackRouting']);
+ assert.equal(values.get('quickhackMode'),'loaded');assert.deepEqual(writes,['quickhackRequireNeuroport','quickhackMode','quickhackRouting']);
  game.user.isGM=false;await form._updateObject({}, {...data,mode:'raw'});assert.equal(values.get('quickhackMode'),'loaded');
 });
 

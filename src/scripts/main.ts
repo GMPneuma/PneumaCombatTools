@@ -44,6 +44,7 @@ import { grappleMenu, grappleWeaponBlocked } from "./grapple/state.js";
 import { registerQuickhack } from "./quickhack/integration.js";
 import { registerSettingsLayout } from "./settings-layout.js";
 import { enabled as quickhackEnabled } from "./quickhack/settings.js";
+import { quickhackTargetVisible } from "./quickhack/availability.js";
 import { actorQuickhacks, executeQuickhack } from "./quickhack/workflow.js";
 import { connectionFor, trackingCombat, jackOut } from "./quickhack/connections.js";
 import { hasQuickhackSight } from "./quickhack/sight.js";
@@ -232,6 +233,7 @@ Hooks.once("init", () => {
       const ice = selfIce(this.object?.actor ?? undefined, connection?.breachCleared ?? 0);
       const sight = !!attacker && !!this.object && quickhackEnabled() && hasQuickhackSight(attacker, this.object);
       const offensiveQuickhacks = !!attacker?.actor && attacker.actor.uuid !== this.object?.actor?.uuid
+        && quickhackTargetVisible(this.object?.actor?.items ?? [], game.settings!.get(MODULE_ID, "quickhackRequireNeuroport"))
         && quickhackEnabled() && canShowQuickhack(Array.from(attacker.actor.items) as unknown as MenuWeapon[]);
       return {
         ...super.getData(options),
@@ -438,6 +440,8 @@ Hooks.on("canvasTearDown", () => {
 for (const hook of ["createItem", "updateItem", "deleteItem"]) Hooks.on(hook, (item: Item) => {
   const hud = canvas.tokens?.hud, token = hud?.object;
   const attacker = selection?.target === token ? selection?.attacker : selectedAttacker();
+  if (item.parent?.uuid === token?.actor?.uuid && hud?.element[0]
+    && game.settings!.get(MODULE_ID, "quickhackRequireNeuroport")) hud.render(true);
   if (attacker?.actor && item.parent?.uuid === attacker.actor.uuid && hud?.element[0]) {
     refreshWeaponAmmo(hud.element[0], attacker.actor);
     refreshAttackAmmoLabels(hud.element[0], attacker.actor);

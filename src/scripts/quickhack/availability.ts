@@ -2,6 +2,18 @@ import { QUICKHACKS, getQuickhack } from "./catalog.js";
 
 export const MODULE = "pneuma-combattools";
 export const LEGACY_MODULE = "pneuma-quickhack";
+/** CPR's derived installation state includes installation through parent cyberware. */
+export function quickhackTargetVisible(items: Iterable<{
+  type: string; name?: string | null;
+  system: object;
+}>, requireNeuroport: boolean): boolean {
+  return !requireNeuroport || Array.from(items).some(item => {
+    const system = item.system as { isInstalledInActor?: boolean; isFoundational?: boolean; type?: string };
+    return item.type === "cyberware" && system.isInstalledInActor === true
+      && (item.name?.trim().toLowerCase() === "neuroport"
+        || system.type === "neuroport" && system.isFoundational === true);
+  });
+}
 export function isQuickhackLauncher(item: { type: string; flags?: Record<string, unknown> }) {
   return item.type === "weapon" && [MODULE, LEGACY_MODULE].some(scope =>
     (item.flags?.[scope] as { action?: string } | undefined)?.action === "quickhack");
