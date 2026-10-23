@@ -29,7 +29,7 @@ try{
   window.foundry={utils:{randomID:()=>String(window.testMessageId=(window.testMessageId??0)+1),getProperty:(o,p)=>p.split(".").reduce((v,k)=>v?.[k],o)}};
   window.ui={sidebar:{activateTab:()=>{window.openedChat=true;}},notifications:{info:()=>{}}};
  });
- await page.addScriptTag({type:"module",content:(await readFile("dist/scripts/socket-health.js","utf8")).replace('const MODULE = "pneuma-combattools";','const SOCKET_MODULE = "pneuma-combattools";').replace("get(MODULE)","get(SOCKET_MODULE)")+"\n"+(await readFile("dist/scripts/hud-messages.js","utf8")).replace(/^import .*;\s*/gm,"")+"\n"+(await readFile("dist/scripts/update-path.js","utf8"))+"\n"+(await readFile("dist/scripts/item-markers.js","utf8")).replace(/^import .*;\s*/gm,"").replace('const MODULE = "pneuma-combattools";', "")+"\n"+(await readFile("dist/scripts/biomonitor.js","utf8"))+"\n"+(await readFile("dist/scripts/grapple/rules.js","utf8"))+"\n"+(await readFile("dist/scripts/grapple/state.js","utf8")).replace(/^import .*;\s*/gm,"").replace('export const MODULE = "pneuma-combattools";', "")+"\nconst forceOutEntries=()=>window.testIncoming??[]; const beginForceOut=async()=>{}; const hasInstantCondition=()=>true; const clearInstantCondition=async()=>{}; const escapeHTML=s=>String(s??'');\n"+(await readFile("dist/scripts/neural-intrusion.js","utf8")).replace(/^import .*;\s*/gm,"")+"\n const movementHUD=()=>[]; const grappleProperty = property;\n"+(await readFile("dist/scripts/status-catalog.js","utf8"))+"\n"+(await readFile("dist/scripts/hud-conditions.js","utf8")).replace(/^import .*;\s*/gm,"")+"\n"+(await readFile("dist/scripts/eye-hud.js","utf8")).replace(/^import .*;\s*/gm,"")+"\nObject.assign(window,{sendHUDMessage,hasBiomonitor,collectHUDConditions,actorInFocus});registerEyeHUD();"});
+ await page.addScriptTag({type:"module",content:(await readFile("dist/scripts/socket-health.js","utf8")).replace('const MODULE = "pneuma-combattools";','const SOCKET_MODULE = "pneuma-combattools";').replace("get(MODULE)","get(SOCKET_MODULE)")+"\n"+(await readFile("dist/scripts/hud-messages.js","utf8")).replace(/^import .*;\s*/gm,"")+"\n"+(await readFile("dist/scripts/update-path.js","utf8"))+"\n"+(await readFile("dist/scripts/item-markers.js","utf8")).replace(/^import .*;\s*/gm,"").replace('const MODULE = "pneuma-combattools";', "")+"\n"+(await readFile("dist/scripts/biomonitor.js","utf8"))+"\n"+(await readFile("dist/scripts/grapple/rules.js","utf8"))+"\n"+(await readFile("dist/scripts/grapple/state.js","utf8")).replace(/^import .*;\s*/gm,"").replace('export const MODULE = "pneuma-combattools";', "")+"\nconst forceOutEntries=()=>window.testIncoming??[]; const beginForceOut=async()=>{}; const hasInstantCondition=()=>true; const clearInstantCondition=async()=>{}; const escapeHTML=s=>String(s??'');\n"+(await readFile("dist/scripts/neural-intrusion.js","utf8")).replace(/^import .*;\s*/gm,"")+"\n const movementHUD=()=>[]; const grappleProperty = property;\n"+(await readFile("dist/scripts/status-catalog.js","utf8"))+"\n"+(await readFile("dist/scripts/hud-conditions.js","utf8")).replace(/^import .*;\s*/gm,"")+"\n"+(await readFile("dist/scripts/eye-hud.js","utf8")).replace(/^import .*;\s*/gm,"")+"\nObject.assign(window,{sendHUDMessage,hasBiomonitor,collectHUDConditions,actorInFocus});const originalGrappleHUD=grappleHUD;grappleHUD=(...args)=>{window.grappleCollections=(window.grappleCollections??0)+1;return originalGrappleHUD(...args);};const originalCollect=collectHUDConditions; collectHUDConditions=(...args)=>{window.medicalCollections=(window.medicalCollections??0)+1;return originalCollect(...args);};registerEyeHUD();"});
  const ts = (await import("../node_modules/typescript/lib/typescript.js")).default;
  const crewRoot = process.env.PNEUMA_CREWTOOLS_ROOT ?? "../PneumaCrewTools";
  const shortcutSource = await readFile(crewRoot + "/src/hud-shortcuts.ts", "utf8").catch(()=>null);
@@ -45,6 +45,20 @@ try{
  await page.waitForFunction(()=>hooks.ready?.length);
  await page.evaluate(()=>{hooks.ready.forEach(f=>f());});
  await page.waitForSelector('.pneuma-eye-medical');
+ await page.evaluate(()=>{
+  window.movementToken={actor,document:{actor,actorId:'test'}};canvas.tokens.controlled=[movementToken];
+  hooks.controlToken.forEach(fn=>fn(movementToken,true));
+ });
+ await page.evaluate(()=>new Promise(requestAnimationFrame));
+ const medicalBefore=await page.evaluate(()=>medicalCollections);
+ const grappleBefore=await page.evaluate(()=>grappleCollections);
+ await page.evaluate(()=>{for(let i=0;i<100;i++)hooks.updateToken.forEach(fn=>fn(movementToken.document,{x:i,flags:{'pneuma-combattools':{movement:{spent:i}}}}));});
+ await page.evaluate(()=>new Promise(requestAnimationFrame));
+ assert.equal(await page.evaluate(()=>medicalCollections),medicalBefore,'Movement reuses medical collection');
+ assert.equal(await page.evaluate(()=>grappleCollections),grappleBefore,'Movement reuses grapple HUD state');
+ await page.evaluate(()=>{hooks.updateActor.forEach(fn=>fn(actor,{}));});await page.evaluate(()=>new Promise(requestAnimationFrame));
+ assert.ok(await page.evaluate(()=>medicalCollections)>medicalBefore,'Actor changes invalidate medical collection');
+ await page.evaluate(()=>{canvas.tokens.controlled=[];hooks.controlToken.forEach(fn=>fn(movementToken,false));});await page.evaluate(()=>new Promise(requestAnimationFrame));
  assert.equal(await page.evaluate(()=>moduleEntry.api.hud.list().length),0,'Saved pending cards do not recreate Incoming Attack on startup');
  assert.equal(await page.evaluate(()=>settings.eyeHUDAnimateMessages.scope),'client');
  assert.equal(await page.evaluate(()=>values.eyeHUDAnimateMessages),true);

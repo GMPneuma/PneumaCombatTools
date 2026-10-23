@@ -17,6 +17,7 @@ function viewer():Actor|undefined {
 }
 let hovered:Token|undefined,panel:HTMLDivElement|undefined;
 let shownState="";
+let cachedTarget:Token|undefined, cachedAllowed=false;
 function clear(){panel?.remove();panel=undefined;shownState="";}
 function permitted(){return game.settings!.get(MODULE,"alwaysShowEKG")||isMedtech(viewer())||!!hovered?.actor&&hasBiomonitor(hovered.actor);}
 function position(){
@@ -29,9 +30,10 @@ function position(){
   panel.style.left=`${Math.max(8,Math.min(x-panel.offsetWidth/2,window.innerWidth-panel.offsetWidth-8))}px`;
   panel.style.top=`${y}px`;
 }
-function refresh(){
+function refresh(recheck=true){
+  if(recheck||cachedTarget!==hovered){cachedTarget=hovered;cachedAllowed=permitted();}
   const target=hovered;
-  if(!target?.actor||["container", "blackIce", "demon"].includes(String(target.actor.type))||!target.isVisible||target.isPreview||canvas.activeLayer!==canvas.tokens||!permitted()){clear();return;}
+  if(!target?.actor||["container", "blackIce", "demon"].includes(String(target.actor.type))||!target.isVisible||target.isPreview||canvas.activeLayer!==canvas.tokens||!cachedAllowed){clear();return;}
   const hp=Number(foundry.utils.getProperty(target.actor,"system.derivedStats.hp.value"));
   const max=Number(foundry.utils.getProperty(target.actor,"system.derivedStats.hp.max"));
   const state=Number.isFinite(hp)&&Number.isFinite(max)&&max>0?vitalState(hp,max):"unknown";
@@ -43,14 +45,14 @@ function refresh(){
   position();
 }
 export function registerHoverEKG(){
-  game.settings!.register(MODULE,"alwaysShowEKG",{name:"Allow everyone to see hover EKG",hint:"Show the hovered token EKG to everyone. When off, a selected owned Medtech (or assigned Medtech when none is selected) can see it, and anyone can see a target with an installed Biomonitor. No numeric HP is shown.",scope:"world",config:true,type:Boolean,default:false,onChange:refresh});
+  game.settings!.register(MODULE,"alwaysShowEKG",{name:"Allow everyone to see hover EKG",hint:"Show the hovered token EKG to everyone. When off, a selected owned Medtech (or assigned Medtech when none is selected) can see it, and anyone can see a target with an installed Biomonitor. No numeric HP is shown.",scope:"world",config:true,type:Boolean,default:false,onChange:()=>refresh()});
   Hooks.on("hoverToken",(token:Token,entered:boolean)=>{if(entered)hovered=token;else if(hovered===token)hovered=undefined;else return;refresh();});
-  Hooks.on("controlToken",refresh);
-  Hooks.on("updateUser",refresh);
+  Hooks.on("controlToken",()=>refresh());
+  Hooks.on("updateUser",()=>refresh());
   Hooks.on("updateActor",(actor:Actor)=>{if(actor.uuid===hovered?.actor?.uuid||actor.uuid===viewer()?.uuid)refresh();});
   for(const hook of ["createItem","updateItem","deleteItem"])Hooks.on(hook,(item:Item)=>{if(item.parent?.uuid===viewer()?.uuid||item.parent?.uuid===hovered?.actor?.uuid)refresh();});
   Hooks.on("updateToken",(token:TokenDocument)=>{if(token===hovered?.document||token.actor?.uuid===viewer()?.uuid)refresh();});
-  Hooks.on("refreshToken",(token:Token)=>{if(token===hovered){if(!token.isVisible)clear();else refresh();}});
+  Hooks.on("refreshToken",(token:Token)=>{if(token===hovered){if(!token.isVisible||token.isPreview||canvas.activeLayer!==canvas.tokens)clear();else if(panel)position();else refresh(false);}});
   Hooks.on("deleteToken",(token:TokenDocument)=>{if(token===hovered?.document){hovered=undefined;clear();}});
   Hooks.on("canvasPan",position);
   Hooks.on("canvasTearDown",()=>{hovered=undefined;clear();});

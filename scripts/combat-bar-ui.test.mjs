@@ -81,7 +81,7 @@ try {
  const state=(await readFile(output+'/scripts/encounter.js','utf8'))+'\n'+(await readFile(output+'/scripts/combat-bar-state.js','utf8')).replace(/^import .*;\s*/gm,'');
  const source=(await readFile(output+'/scripts/combat-bar.js','utf8')).replace(/^import .*;\s*/gm,'').replace('const MODULE = "pneuma-combattools";','');
  const flyouts=(await readFile(output+'/scripts/combat-bar-flyout.js','utf8')).replace(/^import .*;\s*/gm,'');
- await page.addScriptTag({type:'module',content:state+'\n'+flyouts+'\nconst registerBarTurns=()=>{};const requestEndTurn=async combat=>{calls.gmRequests=(calls.gmRequests??0)+1;return combat.nextTurn();};\n'+source+'\nregisterCombatBar();emit("canvasReady");'});
+ await page.addScriptTag({type:'module',content:(await readFile(output+'/scripts/update-path.js','utf8'))+'\n'+state+'\n'+flyouts+'\nconst registerBarTurns=()=>{};const requestEndTurn=async combat=>{calls.gmRequests=(calls.gmRequests??0)+1;return combat.nextTurn();};\n'+source+'\nregisterCombatBar();emit("canvasReady");'});
  const bar=page.locator('#pneuma-combat-bar');await bar.waitFor();
  assert.equal(await bar.locator('li').count(),3);
  for(const layout of ['vertical','horizontal']){

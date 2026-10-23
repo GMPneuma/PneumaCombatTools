@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.23 - 2026-10-23
+
+- Reduce token-movement overhead by caching hover EKG eligibility and Biomonitor medical, disabled-cyberware, and grapple data.
+- Skip combat-bar and turn-marker recalculation for position-only updates; preserve visibility, permissions, health, and profile changes.
+- Index movement-injury cards by actor, encounter, turn, and epoch instead of repeatedly searching chat history.
+- Read each encounter once when collecting actor grapples and skip smoke-expiry scans on unrelated combat updates.
+
+Validation: strict TypeScript/module builds and automated runtime/browser regression fixtures. Live Foundry performance and multiplayer verification remain pending.
+
 ## 0.9.22 - 2026-10-21
 
 - Add an optional GM-controlled world setting to hide the target QuickHack menu unless the target has installed Neuroport cyberware. The setting defaults off.

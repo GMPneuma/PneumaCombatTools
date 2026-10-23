@@ -12,3 +12,12 @@ test('combat smoke uses twenty rounds, ignoring world-time drift until its end t
  game.time.worldTime=1000;c.round=22;c.turn=0;await expireSmoke();assert.equal(scene.templates.length,1);
  c.turn=1;await expireSmoke();assert.equal(scene.templates.length,0);
 });
+
+
+test('movement flags never scan smoke templates; turn changes still expire manually added smoke',async()=>{
+ const scene=setup();const hooks={};globalThis.Hooks={on:(name,fn)=>hooks[name]=fn,once:()=>{}};registerSmoke();
+ let scans=0;const filter=scene.templates.filter;scene.templates.filter=function(fn){scans++;return filter.call(this,fn);};
+ for(let i=0;i<100;i++)hooks.updateCombat({started:true},{flags:{movement:{spent:i}}});assert.equal(scans,0);
+ scene.templates.push({id:'manual',flags:{[M]:{smoke:{expires:0}}}});
+ hooks.updateCombat({started:true},{turn:1});await Promise.resolve();assert.equal(scans,1);assert.equal(scene.templates.length,0);
+});

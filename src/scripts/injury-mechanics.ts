@@ -13,6 +13,26 @@ let queue:Promise<unknown>=Promise.resolve();
 function work<T>(fn:()=>Promise<T>):Promise<T>{const next=queue.catch(()=>{}).then(fn);queue=next;return next;}
 const movementInjuries=["Broken Ribs","Foreign Object (Body)","Foreign Object (Head)"] as const;
 interface RibsCard {injury?:string;actor:string;token:string;name:string;combat:string;turn:string;epoch:string;distance:number;applied?:boolean}
+let indexedMessages: typeof game.messages;
+const injuryCards = new Map<string,Map<string,ChatMessage>>();
+const injuryKeys = new Map<string,string>();
+const cardKey=(actor:string,combat:string,turn:string,epoch:string)=>JSON.stringify([actor,combat,turn,epoch]);
+function removeInjuryCard(message:ChatMessage){
+ const key=injuryKeys.get(message.id!);if(key===undefined)return;
+ const group=injuryCards.get(key);group?.delete(message.id!);if(!group?.size)injuryCards.delete(key);injuryKeys.delete(message.id!);
+}
+function indexInjuryCard(message:ChatMessage) {
+ removeInjuryCard(message);const data=get<RibsCard>(message);if(!data)return;
+ const key=cardKey(data.actor,data.combat,data.turn,data.epoch),group=injuryCards.get(key)??new Map<string,ChatMessage>();
+ group.set(message.id!,message);injuryCards.set(key,group);injuryKeys.set(message.id!,key);
+}
+function existingInjuryCards(actor:string,record:MoveRecord,epoch:string): Iterable<ChatMessage> {
+ if(indexedMessages!==game.messages){
+  indexedMessages=game.messages;injuryCards.clear();injuryKeys.clear();
+  for(const message of game.messages??[])indexInjuryCard(message);
+ }
+ return injuryCards.get(cardKey(actor,record.combat,record.turn,epoch))?.values()??[];
+}
 const injuryId=(data:RibsCard)=>data.injury==="Foreign Object (Body)"?"foreign-object-body":data.injury==="Foreign Object (Head)"?"foreign-object-head":"broken-ribs";
 export function ribsContent(data:RibsCard):string {
   const eligible=data.distance>4;
@@ -25,14 +45,16 @@ export async function warnBrokenRibs(doc:TokenDocument,record:MoveRecord):Promis
   return work(async()=>{
     const combat=game.combats?.get(record.combat);if(!combat?.started)return;
     const epoch=get<string>(combat,`flags.${MODULE}.evasionEpoch`)??"";
+    const cards=Array.from(existingInjuryCards(actor.uuid,record,epoch));
     for(const injury of movementInjuries){
-    const message=game.messages?.find(m=>{const d=get<RibsCard>(m);return (d?.injury??"Broken Ribs")===injury&&d?.actor===actor.uuid&&d.combat===record.combat&&d.turn===record.turn&&d.epoch===epoch;});
+    const message=cards.find(m=>{const d=get<RibsCard>(m);return (d?.injury??"Broken Ribs")===injury&&d?.actor===actor.uuid&&d.combat===record.combat&&d.turn===record.turn&&d.epoch===epoch;});
     if(message){const d=foundry.utils.deepClone(get<RibsCard>(message)!);if(!d.applied&&(d.distance!==record.onFoot||!hasInjury(actor,injury))){d.distance=hasInjury(actor,injury)?record.onFoot!:0;await message.update({content:ribsContent(d),[path]:d} as never);}continue;}
     if(record.onFoot!<=4||!hasInjury(actor,injury))continue;
     const data:RibsCard={injury,actor:actor.uuid,token:doc.uuid,name:doc.name??actor.name??"Character",combat:record.combat,turn:record.turn,epoch,distance:record.onFoot!};
     // Injury reminders are shared with the affected player's owners and GMs, never other players' private NPC data.
     const whisper=game.users?.filter(u=>u.isGM||actor.testUserPermission(u,"OWNER")).map(u=>u.id!)??[];
-    await ChatMessage.create({content:ribsContent(data),speaker:ChatMessage.getSpeaker({actor,token:doc}),whisper,flags:{[MODULE]:{brokenRibs:data}}} as never);
+    const created=await ChatMessage.create({content:ribsContent(data),speaker:ChatMessage.getSpeaker({actor,token:doc}),whisper,flags:{[MODULE]:{brokenRibs:data}}} as never);
+    if(created)indexInjuryCard(created);
     }
   });
 }
@@ -83,6 +105,8 @@ function requestDamage(message:string):Promise<void>{
   });
 }
 export function registerInjuryMechanics():void {
+  for(const hook of ["createChatMessage","updateChatMessage"])Hooks.on(hook,indexInjuryCard);
+  Hooks.on("deleteChatMessage",removeInjuryCard);
   Hooks.on("updateToken",(doc:TokenDocument,changes:Record<string,unknown>)=>{
     const record=get<MoveRecord>(changes,`flags.${MODULE}.movement`)??changes[`flags.${MODULE}.movement`] as MoveRecord|undefined;
     if(record)void warnBrokenRibs(doc,foundry.utils.deepClone({...get<MoveRecord>(doc,`flags.${MODULE}.movement`),...record})).catch(e=>ui.notifications!.error(String(e)));

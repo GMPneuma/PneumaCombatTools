@@ -135,3 +135,12 @@ test('display dropdown has only Animated/Static; legacy Off migrates to master d
  assert.equal(f.values.get('turnMarkerEnabled'),false);assert.equal(f.values.get('turnMarkerDisplay'),'animated');assert.equal(f.ticks.size,0);
  f.set('turnMarkerEnabled',true);assert.equal(f.ticks.size,1);
 });
+
+
+test('animation position refreshes skip settings and profile lookup; visibility still updates',()=>{
+ const f=fixture();refreshTurnMarker();f.emit('refreshToken',f.tokens[0]);
+ let reads=0;const get=game.settings.get;game.settings.get=(...args)=>{reads++;return get(...args);};
+ for(let i=0;i<100;i++){f.tokens[0].x=i;f.emit('refreshToken',f.tokens[0]);}
+ assert.equal(reads,0);f.tokens[0].visible=false;f.emit('refreshToken',f.tokens[0]);assert.equal(f.tokens[0].children.length,0);
+ f.tokens[0].visible=true;f.emit('refreshToken',f.tokens[0]);assert.equal(f.tokens[0].children.length,1);
+});

@@ -1,3 +1,4 @@
+import {tokenPositionOnly} from "./update-path.js";
 import {viewedTokenIndicator,viewerDefaultIndicator,type IndicatorProfile} from "./turn-marker-profile.js";
 import {displayedEncounter} from "./encounter.js";
 import {createMarkerArt,MARKER_STYLES,type MarkerStyle} from "./turn-marker-art.js";
@@ -78,7 +79,12 @@ export function registerTurnMarker(){
   game.settings!.register(M,"turnMarkerOpacity",{name:"Indicator opacity",scope:"world",config:false,type:Number,default:.85,range:{min:.5,max:1,step:.05},onChange:refreshTurnMarker});
   game.settings!.register(M,"turnMarkerSpeed",{name:"Indicator speed",hint:"1 is one cycle every four seconds. 0 is static.",scope:"world",config:false,type:Number,default:1,range:{min:0,max:2,step:.25},onChange:refreshTurnMarker});
   game.settings!.register(M,"turnMarkerDisplay",{name:"Turn Indicator Display",scope:"client",config:true,type:String,default:window.matchMedia?.("(prefers-reduced-motion: reduce)").matches?"static":"animated",choices:{animated:"Animated",static:"Static"},onChange:refreshTurnMarker});
-  for(const event of ["updateUser","createUser","deleteUser","updateActor","updateToken","canvasReady","createCombat","updateCombat","deleteCombat","createCombatant","updateCombatant","deleteCombatant"])Hooks.on(event,refreshTurnMarker);
+  for(const event of ["updateUser","createUser","deleteUser","updateActor","canvasReady","createCombat","updateCombat","deleteCombat","createCombatant","updateCombatant","deleteCombatant"])Hooks.on(event,refreshTurnMarker);
+  Hooks.on("updateToken",(doc:TokenDocument,changes?:Record<string,unknown>)=>{
+    if(doc.id!==targetId&&doc!==current?.token.document)return;
+    if(changes&&tokenPositionOnly(changes))return;
+    refreshTurnMarker();
+  });
   Hooks.on("ready",async()=>{
     if(game.settings!.get(M,"turnMarkerDisplay")==="off"){
       await game.settings!.set(M,"turnMarkerEnabled",false);
@@ -86,7 +92,14 @@ export function registerTurnMarker(){
     }
     if(game.user?.isGM&&game.settings!.get(M,"turnMarkerStyle")==="circuit")await game.settings!.set(M,"turnMarkerStyle","netrunner");refreshTurnMarker();});
   Hooks.on("canvasTearDown",()=>{previews.clear();clear();targetId=undefined;});
-  for(const event of ["drawToken","refreshToken"])Hooks.on(event,(token:Token)=>{if(token.id===targetId||token===current?.token)refreshTurnMarker();});
+  const rendered = new WeakMap<Token,string>();
+  Hooks.on("drawToken",(token:Token)=>{rendered.delete(token);if(token.id===targetId)refreshTurnMarker();});
+  Hooks.on("refreshToken",(token:Token)=>{
+    if(token.id!==targetId&&token!==current?.token)return;
+    const state=JSON.stringify([token.visible,token.isPreview,token.destroyed,token.w,token.h,token.document.hidden,token.document.isSecret]);
+    if(rendered.get(token)===state&&(!current||!current.art.root.destroyed))return;
+    rendered.set(token,state);refreshTurnMarker();
+  });
   Hooks.on("destroyToken",(token:Token)=>{for(const [owner,preview] of previews)if(preview.token===token.document)previews.delete(owner);if(token===current?.token)clear();});
   document.addEventListener("visibilitychange",refreshTurnMarker);
 }

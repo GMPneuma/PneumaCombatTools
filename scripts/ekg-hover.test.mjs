@@ -34,6 +34,12 @@ try{
  assert.equal(await traceDot.evaluate(n=>getComputedStyle(n).animationPlayState),'paused','Health changes retain pause');
  await page.evaluate(()=>setEKGPaused(false));
  assert.equal(await traceDot.evaluate(n=>getComputedStyle(n).animationPlayState),'running');
+ await page.evaluate(()=>{
+  const original=viewer.items.some.bind(viewer.items);window.eligibilityScans=0;
+  viewer.items.some=(...args)=>{eligibilityScans++;return original(...args);};
+  for(let i=0;i<100;i++){target.x++;hooks.refreshToken.forEach(fn=>fn(target));}
+ });
+ assert.equal(await page.evaluate(()=>eligibilityScans),0,'Animation frames must not rescan eligibility');
  await page.evaluate(()=>{window.trace= document.querySelector('.pneuma-hover-ekg svg');hooks.refreshToken.forEach(fn=>fn(target));});assert.equal(await page.evaluate(()=>trace===document.querySelector('.pneuma-hover-ekg svg')),true);
  await page.evaluate(()=>{viewer.items[0].system.rank=0;hooks.updateItem.forEach(fn=>fn({parent:viewer}));});assert.equal(await panel.count(),0);
  await page.evaluate(()=>{game.user.isGM=true;hooks.updateUser.forEach(fn=>fn(game.user));});assert.equal(await panel.count(),0,'GM still needs role or world override');

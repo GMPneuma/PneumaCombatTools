@@ -1,3 +1,4 @@
+import {tokenPositionOnly} from "./update-path.js";
 import {playNotificationSound} from "./notification-sounds.js";
 import {displayedEncounter} from "./encounter.js";
 import {bindStatusActions, closeStatusActions} from "./neural-intrusion.js";
@@ -199,7 +200,12 @@ function refreshChatNotice(message:ChatMessage) {
   if(!message.visible||!message.isContentVisible||!["waiting","applying"].includes(String(data?.state)))dismissHUDMessage(ATTACK_NOTICE_SOURCE,message.id!);
   if(foundry.utils.getProperty(message,"flags.pneuma-combattools.quickhack"))schedule();
 }
+let medicalCache: {actor: Actor; data: HUDConditions; grapples: ReturnType<typeof grappleHUD>; disabled: {name: string; detail: string; item: Item}[]} | undefined;
 function schedule() {
+  medicalCache = undefined;
+  schedulePosition();
+}
+function schedulePosition() {
   if (queued) return;
   queued = true;
   requestAnimationFrame(() => { queued = false; render(); });
@@ -498,7 +504,16 @@ function render() {
   const prefersMinimized = game.settings!.get(MODULE, "eyeHUDMinimized");
   const ownActor = actorInFocus();
   const actor = displayedActor();
-  const data: HUDConditions = actor ? collectHUDConditions(actor) : { medical: [], situational: [], drugs: [], exposures: [] };
+  if (actor && medicalCache?.actor !== actor) {
+    const disabled = Array.from(actor.items).flatMap(item => {
+      if (String(item.type) !== "cyberware") return [];
+      const markers = getItemMarkers(item);
+      if (!markers.disabled && !markers.emp && !markers.cyberware) return [];
+      return [{name: item.name ?? "Cyberware", detail: [markers.emp?.label, markers.cyberware?.label, markers.disabled?.description].filter(Boolean).join("; ") || "Disabled", item}];
+    });
+    medicalCache = {actor, data: collectHUDConditions(actor), grapples: grappleHUD(actor), disabled};
+  }
+  const data: HUDConditions = actor ? medicalCache!.data : { medical: [], situational: [], drugs: [], exposures: [] };
   const shared = !!actor && actor.uuid !== ownActor?.uuid;
   const monitor = !!actor;
   const savedMessage = game.settings!.get(MODULE, "eyeHUDMessage");
@@ -580,12 +595,10 @@ function render() {
     messageSignature = nextMessages;
   }
   if (!minimized) {
-    const disabled = Array.from(actor?.items ?? [])
-      .filter(item => String(item.type) === "cyberware" && (!!getItemMarkers(item).disabled || !!getItemMarkers(item).emp || !!getItemMarkers(item).cyberware))
-      .map(item => ({ name: item.name ?? "Cyberware", detail: [getItemMarkers(item).emp?.label,getItemMarkers(item).cyberware?.label,getItemMarkers(item).disabled?.description].filter(Boolean).join("; ") || "Disabled", item }));
+    const disabled = actor ? medicalCache!.disabled : [];
     const lampStates = monitor ? indicatorState(actor!.uuid, data.exposures,
       game.settings!.get(MODULE, "biomonitorFlashSeconds"), !!displayedEncounter()) : [];
-    const grappleRows = actor ? [...grappleHUD(actor),...movementHUD(actor)] : [];
+    const grappleRows = actor ? [...medicalCache!.grapples,...movementHUD(actor)] : [];
     const nextMedical = JSON.stringify([monitor, actor?.uuid, actor?.isOwner, grappleRows, data,
       actor && foundry.utils.getProperty(actor, "system.derivedStats.hp"), rows,
       disabled.map(entry => [entry.item?.id, entry.name, entry.detail]), lampStates, actor && forceOutEntries(actor),
@@ -697,7 +710,11 @@ export function registerEyeHUD() {
   Hooks.on("pneumaCombatBarDockChanged", schedule);
   for (const hook of ["controlToken", "canvasReady", "createToken", "deleteToken"]) Hooks.on(hook, schedule);
   Hooks.on("updateUser", (user: User) => { if (user.id === game.user?.id) schedule(); });
-  Hooks.on("updateToken", (token: TokenDocument) => { if (hoveredHUDToken?.document === token || canvas.tokens?.controlled.some(controlled => controlled.document === token) || !game.user?.isGM && (token.actor?.isOwner || token.actorId === game.user?.character?.id)) schedule(); });
+  Hooks.on("updateToken", (token: TokenDocument, changes: Record<string, unknown>) => {
+    if (hoveredHUDToken?.document !== token && !canvas.tokens?.controlled.some(controlled => controlled.document === token) && (game.user?.isGM || !(token.actor?.isOwner || token.actorId === game.user?.character?.id))) return;
+    if (tokenPositionOnly(changes)) schedulePosition();
+    else schedule();
+  });
   Hooks.on("hoverToken", (token: Token, entered: boolean) => {
     if (entered) hoveredHUDToken = token;
     else if (hoveredHUDToken === token) hoveredHUDToken = undefined;

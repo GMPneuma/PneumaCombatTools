@@ -1,3 +1,4 @@
+import {tokenPositionOnly} from "../dist/scripts/update-path.js";
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
@@ -41,4 +42,22 @@ test('movement batches repeated token refreshes and filters combat flags; reorde
  combat.turn=1;f.fire('updateCombat',combat,{turn:1});f.flush();assert.deepEqual(draws,['a','b']);draws.length=0;
  combat.turns.reverse();f.fire('updateCombatant',{parent:combat,token:{object:tokens[0]}},{initiative:20});f.flush();assert.deepEqual(draws,['a','b']);draws.length=0;
  f.fire('refreshToken',tokens[1]);f.fire('canvasTearDown');f.flush();assert.deepEqual(draws,[]);
+});
+
+
+test('combat bar ignores position/accounting refreshes while retaining visibility and document changes',()=>{
+ let renders=0;const f=fixture('dist/scripts/combat-bar.js',{
+  tokenPositionOnly,WeakMap,window:{addEventListener(){}},game:{settings:{register(){}}},
+  registerBarMovement(){},registerBarTurns(){},invalidateBarStatuses(){},count:()=>renders++
+ });
+ vm.runInContext('render=()=>{frame=0;count();};registerCombatBar();',f.ctx);
+ const token={isVisible:true};f.fire('refreshToken',token);f.flush();renders=0;
+ for(let i=0;i<100;i++){
+  f.fire('updateToken',{}, {x:i,flags:{'pneuma-combattools':{movement:{spent:i}}}});
+  f.fire('refreshToken',token);
+ }
+ f.flush();assert.equal(renders,0);
+ token.isVisible=false;f.fire('refreshToken',token);f.flush();assert.equal(renders,1);
+ f.fire('updateToken',{}, {hidden:true});f.flush();assert.equal(renders,2);
+ f.fire('updateToken',{}, {'delta.items':[]});f.flush();assert.equal(renders,3);
 });

@@ -61,7 +61,7 @@ function refreshSmokeCard(document:MeasuredTemplateDocument) {
 export function registerSmoke() {
   Hooks.on("canvasTearDown",()=>{for(const id of [...drawings.keys()])remove(id);});
   Hooks.on("canvasReady",()=>{for(const d of canvas.scene?.templates??[])if(smoke(d))draw(d);void expireSmoke();});
-  Hooks.on("updateCombat",(combat:Combat,changes:{round?:number})=>{if(changes.round!==undefined&&!combat.started)void finishCombatSmoke(combat);else void expireSmoke();});
+  Hooks.on("updateCombat",(combat:Combat,changes:{round?:number;turn?:number})=>{if(changes.round===undefined&&changes.turn===undefined)return;if(changes.round!==undefined&&!combat.started)void finishCombatSmoke(combat);else void expireSmoke();});
   Hooks.on("deleteCombat",(combat:Combat)=>{void finishCombatSmoke(combat);});
   Hooks.once("ready",()=>{void expireSmoke();});
   Hooks.on("updateWorldTime",()=>{for(const d of canvas.scene?.templates??[])if(smoke(d)&&(smoke(d)!.duration?durationExpired(smoke(d)!.duration):smoke(d)!.expires<=game.time!.worldTime))remove(d.id!);void expireSmoke();});

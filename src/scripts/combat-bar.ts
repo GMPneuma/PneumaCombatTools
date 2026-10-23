@@ -1,3 +1,4 @@
+import {tokenPositionOnly} from "./update-path.js";
 import {openCombatBarSettings} from "./combat-bar-settings.js";
 import {barCombat, barEntries, canEndTurn, movementMode, MOVEMENT_MODES, registerBarMovement, validMode, type BarEntry} from "./combat-bar-state.js";
 import {requestEndTurn,registerBarTurns} from "./combat-bar-turn.js";
@@ -393,9 +394,17 @@ export function registerCombatBar(): void {
       row.classList.toggle("controlled",!!entries.find(entry=>entry.id===row.dataset.entryId)?.token?.controlled);
     });
   });
-  for (const hook of ["ready", "canvasReady", "renderPlayerList", "renderSceneNavigation", "renderSceneControls", "collapseSidebar", "renderSidebar", "renderCombatTracker", "createToken", "updateToken", "deleteToken",
+  for (const hook of ["ready", "canvasReady", "renderPlayerList", "renderSceneNavigation", "renderSceneControls", "collapseSidebar", "renderSidebar", "renderCombatTracker", "createToken", "deleteToken",
     "updateActor", "updateUser", "userConnected", "createCombat", "updateCombat", "deleteCombat", "createCombatant", "updateCombatant", "deleteCombatant"])
     Hooks.on(hook, refresh);
+  const visibility = new WeakMap<Token, boolean>();
+  Hooks.on("refreshToken", (token: Token) => {
+    const before = visibility.get(token); visibility.set(token, token.isVisible);
+    if (before !== token.isVisible) refresh();
+  });
+  Hooks.on("updateToken", (_token: TokenDocument, changes: Record<string, unknown>) => {
+    if (!tokenPositionOnly(changes)) refresh();
+  });
   Hooks.on("canvasTearDown", () => {cancelAnimationFrame(frame); frame = 0; remove();});
   Hooks.on("renderHotbar", refresh);
   window.addEventListener("resize", position);

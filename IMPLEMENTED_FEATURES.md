@@ -604,3 +604,14 @@ Hazard damage exposes the same Add effects slots as ordinary damage. Per-target 
 Hazard activation links to attack/effect chat messages now use the shared themed chat-button styling. Native UUID navigation and unrelated document links are preserved.
 
 - Automatic Needs Stabilization now requires HP loss by an Actor/token participating in an active, started combat. Prep edits, inactive/unstarted encounters, and unrelated Actors do not mark; queued applications recheck combat eligibility. The setting remains optional and off by default; existing conditions and medical actions are unchanged.
+
+## Refresh performance
+
+- Hover EKG animation frames reuse eligibility; actor, item, selection, user, token, and setting changes still refresh it.
+- Biomonitor position/movement-accounting updates reuse medical-condition and disabled-cyberware data; other existing refresh triggers invalidate that cache. Movement rows remain live.
+- Combat-bar position/movement-accounting updates skip portrait preparation; visibility changes still refresh the bar.
+- Smoke expiry ignores combat updates without round or turn changes. Native template scanning remains authoritative, including manually added smoke.
+
+Validated with local compilation and automated regression fixtures; live Foundry performance is not established by those checks.
+
+Movement injury cards are indexed by actor, encounter, turn, and epoch, with chat-document invalidation. Grapple HUD data is reused across movement-only updates; actor grapple lookup reads each encounter once. Turn markers skip profile reconstruction for unchanged animation frames and position-only writes.

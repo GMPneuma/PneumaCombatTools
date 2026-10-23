@@ -26,7 +26,13 @@ export function grappleFor(token: TokenDocument): Grapple | undefined {
   return grapples(token.parent as Scene).find(g => g.state === "active" && [g.source.token, g.target.token].includes(token.uuid));
 }
 export function actorGrapples(actor: Actor): Grapple[] {
-  return Array.from(game.scenes ?? []).flatMap(scene => grapples(scene)).filter(g => g.state === "active" && [g.source.actor, g.target.actor].includes(actor.uuid));
+  const scenes = Array.from(game.scenes ?? []);
+  const byScene=new Map<string,Grapple[]>();
+  for(const combat of game.combats?.values()??[])for(const g of Object.values(property<Record<string,Grapple>>(combat,"grapples")??{})){
+    const group=byScene.get(g.scene)??[];group.push(g);byScene.set(g.scene,group);
+  }
+  return scenes.flatMap(scene=>[...Object.values(property<Record<string,Grapple>>(scene,"grapples")??{}),...(byScene.get(scene.id!)??[])])
+    .filter(g=>g.state==="active"&&[g.source.actor,g.target.actor].includes(actor.uuid));
 }
 export function grappleHUD(actor: Actor): { id: string; text: string; detail: string }[] {
   return actorGrapples(actor).flatMap(g => {

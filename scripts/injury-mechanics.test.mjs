@@ -86,3 +86,15 @@ test("removed Foreign Object cannot apply stale damage; renamed source qualifies
  f.actor.items=[];await assert.rejects(applyRibsDamage(f.messages[0].id,f.users[1]),/no longer active/);
  await warnBrokenRibs(f.doc,f.record);assert.doesNotMatch(f.messages[0].content,/data-ribs-apply/);
 });
+
+
+test('movement uses indexed injury cards after one initial history load',async()=>{
+ const f=fixture();for(let i=0;i<1000;i++)f.messages.push({id:'history'+i,flags:{}});
+ let historyReads=0;const iterator=f.messages[Symbol.iterator].bind(f.messages);
+ f.messages[Symbol.iterator]=function*(){historyReads++;yield* iterator();};
+ await warnBrokenRibs(f.doc,f.record);assert.equal(historyReads,1);
+ for(let i=0;i<100;i++)await warnBrokenRibs(f.doc,{...f.record,onFoot:5+i});
+ assert.equal(historyReads,1);f.ribs();await warnBrokenRibs(f.doc,f.record);
+ assert.equal(f.messages.length,1001);await warnBrokenRibs(f.doc,{...f.record,onFoot:2});
+ assert.equal(get(f.messages.at(-1),path).distance,2);assert.equal(historyReads,1);
+});
