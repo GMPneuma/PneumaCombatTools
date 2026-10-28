@@ -160,7 +160,7 @@ async function applyPatient(req:Request,healer:Actor,patient:Actor,target:TokenD
   }
 }
 const requests=new GMRequests();
-function preflightMedical() {requireCombatSocket();const gm=primaryGM();if(!gm)throw Error("An active GM is required.");return gm;}
+function preflightMedical() {requireCombatSocket();const gm=primaryGM();if(!gm)throw Error("This function does not work without an active GM logged in.");return gm;}
 async function send(req:Request) {
   const gm=preflightMedical();
   if(game.user!.id===gm.id)return resolveMedical(req);

@@ -170,7 +170,7 @@ export async function handleInstantRequest(w:Wire) {
   await handleInstant(data.effect,w.request,user,()=>w.scope?message.update({["flags."+M+".attachedEffects."+w.scope]:data}):message.update({content:'<section class="rollcard pneuma-instant-card"><h3>'+esc(data.effect.name)+'</h3>'+instantContent(data.effect)+'</section>',["flags."+M+".instant"]:data} as never),data.rollMode,messageDiceAudience(message));
 }
 function send(message:string,request:InstantRequest,scope?:string) {
-  requireCombatSocket();const gm=empGM();if(!gm)throw Error("An active GM is required.");
+  requireCombatSocket();const gm=empGM();if(!gm)throw Error("This function does not work without an active GM logged in.");
   const w:Wire={instantType:"request",id:foundry.utils.randomID(),message,user:game.user!.id!,request,scope};
   if(game.user!.id===gm.id){const next=queue.catch(()=>{}).then(()=>handleInstantRequest(w));queue=next;return next;}
   return new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(w.id);reject(Error("Effect not confirmed by GM."));},30000);pending.set(w.id,{resolve,reject,timer});game.socket!.emit("module."+M,w);});

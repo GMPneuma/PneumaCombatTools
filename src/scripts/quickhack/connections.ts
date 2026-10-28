@@ -53,7 +53,8 @@ function serialized<T>(combat: Combat, operation: () => Promise<T>): Promise<T> 
   return next;
 }
 async function connect(request: ConnectRequest) {
-  if (!primaryGM() || !enabled()) throw new Error("QuickHack is disabled or no active GM is available.");
+  if (!primaryGM()) throw new Error("This function does not work without an active GM logged in.");
+  if (!enabled()) throw new Error("QuickHack is disabled.");
   const message = await waitForResult(request.messageId);
   const result = message && resultFlag(message);
   if (!message || !result || (request.quickhackType === "connect" ? result.type !== "jackIn" : result.type !== (request.quickhackType === "breach" ? "breach" : "quickhack")) || message.author?.id !== request.requesterId) throw new Error("Invalid Jack-In result.");
@@ -105,7 +106,7 @@ export async function establishConnection(message: ChatMessage) {
   requireCombatSocket();
   const request: ConnectRequest = { quickhackType: resultFlag(message)?.type === "breach" ? "breach" : resultFlag(message)?.type === "quickhack" ? "awareness" : "connect", id: foundry.utils.randomID(), messageId: message.id!, requesterId: game.user!.id };
   if (primaryGM()) return connect(request);
-  if (!game.users!.some(user => user.active && user.isGM)) throw new Error("An active GM is required to track Jack-In connections.");
+  if (!game.users!.some(user => user.active && user.isGM)) throw new Error("This function does not work without an active GM logged in.");
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => { requests.delete(request.id); reject(new Error("Jack-In connection was not confirmed by the GM.")); }, 10000);
     requests.set(request.id, { resolve, reject, timer }); game.socket!.emit(channel, request);
@@ -122,7 +123,8 @@ export async function ejectConnection(source: Actor, targetUuid: string, connect
   });
 }
 async function disconnect(request: DisconnectRequest) {
-  if (!enabled() || !primaryGM()) throw new Error("QuickHack is disabled or no active GM is available.");
+  if (!primaryGM()) throw new Error("This function does not work without an active GM logged in.");
+  if (!enabled()) throw new Error("QuickHack is disabled.");
   const combat = resolveEncounter(request.encounter);
   const source = await fromUuid(request.sourceUuid) as Actor | null;
   const user = game.users!.get(request.requesterId) as User | undefined;
@@ -143,7 +145,7 @@ export async function jackOut(source: Actor, targetUuid: string) {
   const request: DisconnectRequest = { quickhackType: "disconnect", id: foundry.utils.randomID(), requesterId: game.user!.id,
     encounter:encounterRef(combat,connection.combatScene,connection.combatTokens), combatUuid: combat.uuid, sourceUuid: source.uuid, targetUuid, connectionId: connection.id };
   if (primaryGM()) return disconnect(request);
-  if (!game.users!.some(user => user.active && user.isGM)) throw new Error("An active GM is required to track Jack Out.");
+  if (!game.users!.some(user => user.active && user.isGM)) throw new Error("This function does not work without an active GM logged in.");
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => { requests.delete(request.id); reject(new Error("Jack Out was not confirmed by the GM.")); }, 10000);
     requests.set(request.id, { resolve, reject, timer }); game.socket!.emit(channel, request);

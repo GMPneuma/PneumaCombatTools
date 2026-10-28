@@ -126,7 +126,7 @@ export function registerEvasionSettings() {
   });
   game.settings!.registerMenu(MODULE, "configureEvasion", {
     name: "PNEUMA_COMBAT_TOOLS.EvasionConfigure", label: "PNEUMA_COMBAT_TOOLS.EvasionHomebrewLabel",
-    hint: "", icon: "fas fa-sliders", type: EvasionHomebrewForm, restricted: true,
+    hint: "", icon: "fas fa-beer-mug-empty pneuma-homebrew-rule-icon", type: EvasionHomebrewForm, restricted: true,
   });
   // Preserve previously saved draft values without displaying the old controls.
   for (const [key, defaultValue] of [["evasionReflex", "free"], ["evasionCoprocessor", "free"],

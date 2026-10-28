@@ -283,7 +283,7 @@ export async function handleGrappleRequest(r: GrappleRequest): Promise<string | 
 }
 async function request(data: Omit<GrappleRequest,"grappleType"|"request"|"user">): Promise<string | undefined> {
   requireCombatSocket();
-  if (!gm()) throw new Error("An active GM is required for grappling.");
+  if (!gm()) throw new Error("This function does not work without an active GM logged in.");
   const wire: GrappleRequest = {...data,grappleType:"request",request:foundry.utils.randomID(),user:game.user!.id};
   if (gm()?.id === game.user?.id) return serialized(() => handleGrappleRequest(wire));
   return requests.request(wire.request,()=>game.socket!.emit(CHANNEL,wire),15000,"GM did not confirm. Check the updated card before retrying.");
@@ -307,7 +307,7 @@ export async function useGrapple(source: Token, target: Token, action: string, s
   try {
     if (!source.actor?.isOwner || !target.actor || !target.isVisible) throw new Error("Select an owned character and visible target.");
     requireCombatSocket();
-    if (!gm()) throw new Error("An active GM is required for grappling.");
+    if (!gm()) throw new Error("This function does not work without an active GM logged in.");
     const scene = source.document.parent as Scene;
     if (target.document.parent !== scene) throw new Error("Both characters must be in the same scene.");
     const own = grappleFor(source.document);

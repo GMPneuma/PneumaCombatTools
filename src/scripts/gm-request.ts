@@ -6,7 +6,7 @@ export class GMRequests<T=void> {
   private pending=new Map<string,{gm:string;resolve:(value:T)=>void;reject:(error:Error)=>void;timer:ReturnType<typeof setTimeout>}>();
   request(id:string,emit:()=>void,timeout:number,message:string):Promise<T> {
     const gm=primaryGM()?.id;
-    if(!gm)return Promise.reject(Error("An active GM is required."));
+    if(!gm)return Promise.reject(Error("This function does not work without an active GM logged in."));
     if(this.pending.has(id))return Promise.reject(Error("This request is already awaiting GM confirmation."));
     return new Promise<T>((resolve,reject)=>{
       const timer=setTimeout(()=>{

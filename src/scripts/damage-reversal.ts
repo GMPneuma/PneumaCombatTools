@@ -52,7 +52,7 @@ async function reverse({message:messageId,instance,user:userId}:Request):Promise
 const pending=new Map<string,{resolve:()=>void;reject:(error:Error)=>void;timer:ReturnType<typeof setTimeout>}>();
 function send(message:string,instance:string):Promise<void> {
   if(!game.user?.isGM)throw Error("Only a GM can reverse damage.");
-  requireCombatSocket();const gm=primaryGM();if(!gm)throw Error("An active GM is required to reverse damage.");
+  requireCombatSocket();const gm=primaryGM();if(!gm)throw Error("This function does not work without an active GM logged in.");
   const wire:Wire={reversalType:"request",id:foundry.utils.randomID(),message,instance,user:game.user!.id!};
   if(game.user!.id===gm.id)return reverseDamageOnce(wire);
   return new Promise((resolve,reject)=>{

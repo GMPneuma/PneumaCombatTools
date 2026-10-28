@@ -20,7 +20,7 @@ export async function requestEndTurn(combat: Combat): Promise<void> {
   if (game.user?.isGM) return advanceBarTurn(request);
   requireCombatSocket();
   const authority = gm();
-  if (!authority) throw Error("An active GM is required to end your turn.");
+  if (!authority) throw Error("This function does not work without an active GM logged in.");
   return new Promise<void>((resolve,reject) => {
     const timer = setTimeout(() => {pending.delete(request.id);reject(Error("GM response timed out. Check the current turn before retrying."));},15000);
     pending.set(request.id,{gm:authority.id!,resolve,reject,timer});

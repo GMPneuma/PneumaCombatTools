@@ -19,7 +19,7 @@ export async function resolveWake(sourceId:string,targetId:string,user:User,acti
   await target.actor.toggleStatusEffect(unconscious,{active:false});
 }
 export async function wakeUsingAction(source:Token,target:Token,action?:"extinguish"):Promise<void> {
-  requireCombatSocket();const gm=primaryGM();if(!gm)throw Error(action==="extinguish"?"An active GM is required to extinguish a character.":"An active GM is required to wake another character.");
+  requireCombatSocket();const gm=primaryGM();if(!gm)throw Error("This function does not work without an active GM logged in.");
   if(action==="extinguish"?(!source.actor?.isOwner||isUnconscious(source.actor)||!target.actor||!hasInstantCondition(target.actor,"fire")):!canWake(source,target))throw Error(action==="extinguish"?"Select your conscious character and a burning patient.":"Select your conscious character and an unconscious target.");
   if(game.user!.id===gm.id)return resolveWake(source.document.uuid,target.document.uuid,game.user!,action);
   const id=foundry.utils.randomID();

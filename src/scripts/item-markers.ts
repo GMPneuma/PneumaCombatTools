@@ -1,4 +1,6 @@
 import {updateTouchesPath} from "./update-path.js";
+import {primaryGM} from "./shared.js";
+import {isCombatBoomerang} from "./thrown-weapons.js";
 const MODULE = "pneuma-combattools";
 export interface ItemMarker { label: string; description?: string }
 export interface MarkedItem { flags?: unknown }
@@ -50,7 +52,31 @@ export function decorateItemList(root: HTMLElement, actor: Actor): void {
     if (item) renderItemMarkers(target, item);
   });
 }
+/** Return boomerangs on a forward round change; preserve every other marker. */
+export async function returnCombatBoomerangs(combat: Combat, previousRound: number): Promise<void> {
+  if (!game.user?.id || primaryGM()?.id !== game.user.id || !combat.started
+    || Number(combat.round) <= previousRound) return;
+  const seen = new Set<string>();
+  for (const combatant of combat.combatants) {
+    const actor = combatant.actor;
+    if (!actor || seen.has(actor.uuid)) continue;
+    seen.add(actor.uuid);
+    for (const item of actor.items) {
+      if (String(item.type) === "weapon" && isCombatBoomerang(item)) await clearItemMarker(item, "used");
+    }
+  }
+}
 export function registerItemMarkers(): void {
+  const rounds = new Map<string, number>();
+  for (const combat of game.combats ?? []) rounds.set(combat.id!, Number(combat.round));
+  Hooks.on("createCombat", (combat: Combat) => { rounds.set(combat.id!, Number(combat.round)); });
+  Hooks.on("updateCombat", (combat: Combat) => {
+    const previous = rounds.get(combat.id!);
+    rounds.set(combat.id!, Number(combat.round));
+    if (previous !== undefined) void returnCombatBoomerangs(combat, previous)
+      .catch(error => { console.error(MODULE, error); ui.notifications?.error("Could not clear the Combat Boomerang's Used marker."); });
+  });
+  Hooks.on("deleteCombat", (combat: Combat) => { rounds.delete(combat.id!); });
   const module = game.modules!.get(MODULE) as unknown as { api?: Record<string, unknown> };
   module.api = { ...module.api, itemMarkers: Object.freeze({
     get: getItemMarkers, set: setItemMarker, clear: clearItemMarker,

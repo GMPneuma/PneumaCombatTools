@@ -83,5 +83,5 @@ export function registerAreaSettings() {
     type:new foundry.data.fields.ObjectField(),default:defaults,onChange:()=>ui.chat?.render(true)});
   game.settings!.registerMenu(MODULE,"areaSettingsMenu",{name:"Area Attacks & Suppressive Fire",label:"Configure",
     hint:"RAW sizes and evasion; configurable area sizes, evasion and suppressive-fire shapes.",
-    icon:"fas fa-burst",type:AreaSettingsForm,restricted:true});
+    icon:"fas fa-beer-mug-empty pneuma-homebrew-rule-icon",type:AreaSettingsForm,restricted:true});
 }

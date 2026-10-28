@@ -16,7 +16,7 @@ const pending = new Map<string,{resolve:()=>void;reject:(error:Error)=>void;time
 interface Wire {empType:"select"|"reply"; id:string;combat:string;request:string;user:string;selected:string[];gm?:string;error?:string}
 async function submit(combat:Combat, request:string, selected:string[]) {
   requireCombatSocket();
-  if (!empGM()) throw Error("An active GM is required to apply EMP.");
+  if (!empGM()) throw Error("This function does not work without an active GM logged in.");
   if (game.user!.isGM && empGM()?.id === game.user!.id) return empWork(() => applyEmpSelection(combat,request,selected,game.user!));
   const id=foundry.utils.randomID();
   await new Promise<void>((resolve,reject) => {

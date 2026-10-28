@@ -154,7 +154,7 @@ export async function handleManualRequest(wire: Pick<Wire,"message" | "user" | "
   } else throw Error("Unknown manual roll action.");
 }
 function send(message: string, request: Request): Promise<void> {
-  requireCombatSocket();const gm=authority();if(!gm)throw Error("An active GM is required to update this card.");
+  requireCombatSocket();const gm=authority();if(!gm)throw Error("This function does not work without an active GM logged in.");
   const wire:Wire={manualType:"request",id:foundry.utils.randomID(),message,user:game.user!.id!,request};
   if (gm.id===game.user!.id) { const next=queue.catch(()=>{}).then(()=>handleManualRequest(wire));queue=next;return next; }
   return requests.request(wire.id,()=>game.socket!.emit(channel,wire),30000,"The GM did not confirm this action. Check the card before retrying.");

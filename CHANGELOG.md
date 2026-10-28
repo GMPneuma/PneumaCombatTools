@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.25 - 2026-10-28
+
+- Show the explicit active-GM-required notification instead of a generic attack failure, and use consistent wording across GM-dependent workflows.
+- Always halve armor for Combat Boomerang, Utility Tomahawk and Mono-Star throws. Clear Combat Boomerang Used markers when combat advances to the next round, without a Targeting Scope check; keep double attack unavailable.
+- Add red beer-mug homebrew icons to the selected evasion, AoE, critical damage type, EMP and QuickHack rules settings.
+
+Validation: production build and automated checks. Live Foundry multiplayer verification remains pending.
+
 ## 0.9.24 - 2026-10-28
 
 - Guard CombatTools HUD paths against tokens with missing Actors; clear stale controls on orphan-token clicks and Actor deletion, and recheck cached attackers before rendering.

@@ -27,3 +27,21 @@ test("validate keys, labels, ownership, and clear description when replaced",asy
  doc.isOwner=false;await assert.rejects(setItemMarker(doc,"used",{label:"Used"}),/owner/);
  await assert.rejects(clearItemMarker(doc,"used"),/owner/);
 });
+
+
+test("boomerangs return only on forward rounds under the elected GM, preserving other items and markers",async()=>{
+ const {returnCombatBoomerangs}=await import("../dist/scripts/item-markers.js");
+ const gm={id:"gm",active:true,isGM:true};globalThis.game={user:gm,users:[gm]};
+ const boom=item();boom.name="Ranger Combat Boomerang";boom.type="weapon";
+ const knife=item();knife.type="weapon";
+ await setItemMarker(boom,"used",{label:"Used"});await setItemMarker(boom,"disabled",{label:"Disabled"});
+ await setItemMarker(knife,"used",{label:"Used"});
+ const actor={uuid:"Actor.a",items:[boom,knife]};
+ const combat={started:true,round:2,combatants:[{actor},{actor},{}]};
+ await returnCombatBoomerangs(combat,2);assert.ok(getItemMarkers(boom).used);
+ await returnCombatBoomerangs(combat,3);assert.ok(getItemMarkers(boom).used);
+ game.user={id:"player"};await returnCombatBoomerangs(combat,1);assert.ok(getItemMarkers(boom).used);
+ game.user=gm;await returnCombatBoomerangs(combat,1);
+ assert.equal(getItemMarkers(boom).used,undefined);assert.ok(getItemMarkers(boom).disabled);assert.ok(getItemMarkers(knife).used);
+ assert.equal(boom.writes,3);
+});

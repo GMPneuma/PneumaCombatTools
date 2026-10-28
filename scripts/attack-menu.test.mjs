@@ -230,3 +230,15 @@ test('duplicate ranged weapons show native ammo type and matching types include 
  b._getLoadedAmmoProp=()=>undefined;assert.equal(attackEntries([a,b])[1].ammoDetail,'Unloaded');
  b.name='heavy pistol';assert.equal(attackEntries([a,b]).find(row=>row.id==='a').ammoDetail,'Basic');
 });
+
+
+test("special thrown weapons halve armor without cyberware and preserve source data",async()=>{
+ const {thrownRollItem}=await import("../dist/scripts/thrown-weapons.js");
+ globalThis.foundry={utils:{deepClone:structuredClone}};
+ globalThis.CONFIG={Item:{documentClass:class {constructor(data){Object.assign(this,data);}}}};
+ for(const name of ["Ranger Combat Boomerang","Combat Boomerang","Combat Boomarang","Utility Tomahawk","Tomahawk","Mono-Star","Mono Star"]){
+ const source={name,system:{weaponType:"thrownWeapon",damage:"3d6",ignoreArmorPercent:0}};
+ const roll=thrownRollItem(source,{});
+ assert.equal(roll.system.ignoreArmorPercent,50);assert.equal(source.system.ignoreArmorPercent,0);
+ }
+});

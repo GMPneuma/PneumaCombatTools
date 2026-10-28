@@ -322,7 +322,7 @@ export function serialized(request: Request): Promise<Claim | undefined> {
 async function request(message: string, action: Request["action"], extra: Partial<Request> = {}): Promise<Claim | undefined> {
   requireCombatSocket();
   const gm = authority();
-  if (!gm) throw new Error("An active GM is required for combat resolution.");
+  if (!gm) throw new Error("This function does not work without an active GM logged in.");
   const packet: Request = { ...extra, id: foundry.utils.randomID(), user: game.user!.id, message, action };
   if (gm.id === game.user!.id) return serialized(packet);
   return new Promise((resolve, reject) => {
@@ -375,7 +375,7 @@ async function respond(message: ChatMessage, evade: boolean, automatic = false, 
 export async function startCombatExchange(attacker: Token, target: Token, itemId: string, mode: AttackMode, event: JQuery.ClickEvent, thrown?: { item: RollItem; source: object; improvised: boolean }): Promise<ChatMessage | undefined> {
   if ([attacker, target].some(token => ["container", "blackIce", "demon"].includes(String(token.actor?.type)))) return;
   requireCombatSocket();
-  if (!authority()) throw new Error("An active GM is required for combat resolution.");
+  if (!authority()) throw new Error("This function does not work without an active GM logged in.");
   const combat = combatForAttack(attacker, target);
   const combatId = combat?.id ?? null;
   const combatEpoch = combat ? flag<string>(combat, "evasionEpoch") ?? "" : "";

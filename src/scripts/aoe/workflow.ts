@@ -328,7 +328,7 @@ export async function handleAreaRequest(req:Request) {
   await save(message,data);
 }
 function send(message:string,action:string,extra:Partial<Request>={}) {
-  requireCombatSocket();const authority=gm();if(!authority)throw Error("An active GM must be connected for area attacks.");
+  requireCombatSocket();const authority=gm();if(!authority)throw Error("This function does not work without an active GM logged in.");
   const req:Request={...extra,aoeType:"request",id:foundry.utils.randomID(),user:game.user!.id,message,action};
   if(authority.id===game.user!.id){const next=queue.catch(()=>{}).then(()=>handleAreaRequest(req));queue=next;return next;}
   return requests.request(req.id,()=>game.socket!.emit(`module.${MODULE}`,req),30000,"Area response was not confirmed by the GM. Check the card before retrying.");
@@ -339,7 +339,7 @@ export async function startAreaAttack(source:Token,target:Token,itemId:string,mo
   const actor=source.actor, original=actor?.items.get(itemId) as AreaWeapon|undefined;
   if(!actor||!original||!owns(actor)||starting.has(actor.uuid))return;
   const kind=areaKind(original,mode);if(!kind)return;
-  requireCombatSocket();if(!gm())throw Error("An active GM is required for area attacks.");
+  requireCombatSocket();if(!gm())throw Error("This function does not work without an active GM logged in.");
   if(String(original.type)!=="ammo"&&grappleWeaponBlocked(actor,original))throw Error("Grappled characters cannot use weapons requiring two hands.");
   const molotov=isMolotov(original);
   const ammoType=molotov?"incendiary":String(String(original.type)==="ammo"?foundry.utils.getProperty(original,"system.type")??"":original._getLoadedAmmoProp?.("type")??"");

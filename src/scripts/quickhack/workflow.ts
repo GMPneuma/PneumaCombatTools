@@ -48,7 +48,7 @@ export async function executeQuickhack(source: Token, target: Token, id: string,
   if (id === "jack-in" && isEjected(actor, target.actor!.uuid,combat)) { ui.notifications!.warn("Ejected: cannot Jack In to this target again during this encounter."); return; }
   if (id !== "jack-in" && !connection) { ui.notifications!.warn("An active Jack-In connection to this target is required. Start combat to track connections."); return; }
   if (id === "jack-in" && connection) { ui.notifications!.info("Already jacked into this target."); return; }
-  if (combat && id === "jack-in" && !game.users!.some(user => user.isGM && user.active)) { ui.notifications!.warn("An active GM is required to track Jack-In connections."); return; }
+  if (combat && id === "jack-in" && !game.users!.some(user => user.isGM && user.active)) { ui.notifications!.warn("This function does not work without an active GM logged in."); return; }
   const connectionId = connection?.id;
   const breachCleared = connection?.breachCleared ?? 0;
   const ice = selfIce(target.actor!, breachCleared);

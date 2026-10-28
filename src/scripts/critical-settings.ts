@@ -39,6 +39,6 @@ export function registerCriticalSettings(): void {
   game.settings!.registerMenu(MODULE, "criticalInjuries", {
     name: "Critical injuries", label: "Configure damage types",
     hint: "Choose which damage types allow critical injuries.",
-    icon: "fas fa-table", type: CriticalInjurySettings, restricted: true,
+    icon: "fas fa-beer-mug-empty pneuma-homebrew-rule-icon", type: CriticalInjurySettings, restricted: true,
   });
 }

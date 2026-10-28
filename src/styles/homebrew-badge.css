@@ -1,3 +1,8 @@
+/* General homebrew options; distinct from the illustrated Pneuma badge. */
+i.pneuma-homebrew-rule-icon {
+  color: #c62828 !important;
+  font-size: 14px;
+}
 .pneuma-homebrew-badge {
   display: inline-flex;
   width: 18px;

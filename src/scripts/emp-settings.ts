@@ -50,5 +50,5 @@ export function registerEmpSettings(){
     type:new foundry.data.fields.ObjectField(),default:normalizeEmpBehavior({})});
   game.settings!.registerMenu(MODULE,"empBehaviorMenu",{name:"EMP Effect behavior",label:"Configure",
     hint:"GM and player selection methods, random weighting, and limited player shortlists.",
-    icon:"fas fa-bolt",type:EmpSettingsForm,restricted:true});
+    icon:"fas fa-beer-mug-empty pneuma-homebrew-rule-icon",type:EmpSettingsForm,restricted:true});
 }

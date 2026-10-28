@@ -412,7 +412,8 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
       await attackFromHUD(attacker, token, itemId, mode, event, count);
     } catch (error) {
       console.error(MODULE_ID, error);
-      ui.notifications!.error(label("AttackFailed"));
+      ui.notifications!.error(error instanceof Error && error.message === "This function does not work without an active GM logged in."
+        ? error.message : label("AttackFailed"));
     }
   });
   html.find("[data-combat-action]").on("click keydown", event => {

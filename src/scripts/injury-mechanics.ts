@@ -97,7 +97,7 @@ export function installInjuryRollGuards(itemPrototype:object,rollPrototype:objec
 interface Packet {ribsType:"apply"|"result";id:string;user:string;message?:string;error?:string;gm?:string}
 const pending=new Map<string,{resolve:()=>void;reject:(error:Error)=>void;timer:ReturnType<typeof setTimeout>}>();
 function requestDamage(message:string):Promise<void>{
-  requireCombatSocket();const authority=gm();if(!authority)throw Error("An active GM is required to apply injury damage.");
+  requireCombatSocket();const authority=gm();if(!authority)throw Error("This function does not work without an active GM logged in.");
   if(game.user!.id===authority.id)return applyRibsDamage(message,game.user!);
   const id=foundry.utils.randomID();return new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>{pending.delete(id);reject(Error("GM response timed out. Retry the injury card."));},15000);

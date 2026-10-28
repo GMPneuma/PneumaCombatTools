@@ -1,5 +1,7 @@
 # Combat Tools feature inventory
 
+- General homebrew marker (local/unreleased): small red beer-mug icons replace the AoE Configure, ranged-evasion Homebrew, Configure damage types and EMP Configure button icons, and appear beside QuickHack Rules mode. Only these user-designated controls are tagged; the illustrated Pneuma Homebrew badge remains separate. No rule or setting values change.
+
 Release status (2026-10-28): the CombatTools changes listed in CHANGELOG.md for 0.9.24 are released in v0.9.24. Earlier local/unreleased labels describe implementation history. Live Foundry verification remains pending; planned TODOs remain unimplemented.
 
 - Missing-actor HUD guards (local/unreleased): orphan tokens cannot enter self/standalone CombatTools HUD paths. Right-click/release and direct HUD binding clear stale controls for missing actors; data preparation and positioning also guard actor loss. Deleting an actor clears an affected HUD/selection, and cached attackers are rechecked before building controls. Build, nine self-CTH tests and the HUD browser fixture passed, including player/GM orphan clicks and healthy-token recovery. Live Foundry verification pending; separate player-role permissions report remains unaddressed.
@@ -633,3 +635,9 @@ Validated with local compilation and automated regression fixtures; live Foundry
 Movement injury cards are indexed by actor, encounter, turn, and epoch, with chat-document invalidation. Grapple HUD data is reused across movement-only updates; actor grapple lookup reads each encounter once. Turn markers skip profile reconstruction for unchanged animation frames and position-only writes.
 
 QuickHack HUD wording: "Quickhacking only works with an active combat". Connection requirements and behavior are unchanged.
+
+- Missing-GM workflow failures show "This function does not work without an active GM logged in."; the HUD attack handler preserves this notification instead of replacing it with the generic attack error. Local change; live multiplayer verification pending.
+
+- Combat Boomerang throws always halve armor SP and clear only their Used marker when the combat round advances. No Targeting Scope check; no double-attack shortcut. Recognizes Ranger Combat Boomerang / Combat Boomerang (also Boomarang spelling). Uses native thrown rolls and the existing marker API. Automated verification only; live multiplayer verification pending.
+
+- Utility Tomahawk and Mono-Star thrown attacks and damage rolls retain half-armor SP through the native ignoreArmorPercent field. Ordinary thrown weapons still use full SP. These weapons do not receive the Combat Boomerang round-return behavior. Build/automated checks only; live verification pending.

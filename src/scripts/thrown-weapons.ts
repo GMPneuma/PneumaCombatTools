@@ -1,9 +1,15 @@
 
 import type { RollItem } from "./native-combat.js";
+export function isCombatBoomerang(item: {name?: string | null}): boolean {
+  return /^(?:ranger\s+)?combat\s+boom[ae]rang$/i.test(item.name?.trim() ?? "");
+}
+function halvesArmorWhenThrown(item: {name?: string | null}): boolean {
+  return isCombatBoomerang(item) || /^(?:(?:utility\s+)?tomahawk|mono[\s-]*star)$/i.test(item.name?.trim() ?? "");
+}
 export function thrownRollItem(source: object, actor: Actor, dice?: number): RollItem {
-  const data = foundry.utils.deepClone(source) as { system: Record<string, unknown> };
+  const data = foundry.utils.deepClone(source) as { name?: string; system: Record<string, unknown> };
   data.system = { ...data.system, isRanged: true, weaponType: "thrownWeapon", weaponSkill: "Athletics",
-    ignoreArmorPercent: 0, magazine: { value: 1, max: 1 }, ...(dice ? { damage: dice + "d6" } : {}) };
+    ignoreArmorPercent: halvesArmorWhenThrown(data) ? 50 : 0, magazine: { value: 1, max: 1 }, ...(dice ? { damage: dice + "d6" } : {}) };
   const DocumentClass = CONFIG.Item.documentClass as unknown as new (data: object, context: { parent: Actor }) => RollItem;
   const item = new DocumentClass(data, { parent: actor });
   // A thrown object is marked used, not discharged like a magazine weapon.
