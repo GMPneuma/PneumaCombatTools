@@ -4,7 +4,7 @@ const MODULE="pneuma-combattools";
 declare global {interface SettingConfig {"pneuma-combattools.pneumaHomebrew":boolean}}
 /** GM ownership covers every token: retain target actions when acting as a different token. */
 export function isSelfCTH(token:Token|undefined,attacker:Token|undefined):boolean {
-  return !["container", "blackIce", "demon"].includes(String(token?.actor?.type))&&!!token?.isOwner&&(!game.user?.isGM||(token.controlled&&(!attacker||attacker===token)));
+  return !!token?.actor&&!["container", "blackIce", "demon"].includes(String(token.actor.type))&&!!token.isOwner&&(!game.user?.isGM||(token.controlled&&(!attacker||attacker===token)));
 }
 export function hasSpeedware(actor:Actor|undefined):boolean {
   return !!actor?.items.some(item=>{

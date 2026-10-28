@@ -56,7 +56,7 @@ export function observeWeaponAmmo(item: AmmoWeapon): void {
 
 export function registerAmmoChat(): void {
   game.settings!.register("pneuma-combattools", "reportWeaponReloads", {
-    name: "Report player weapon reloads",
+    name: "Weapon Reloads shown in chat",
     hint: "During combat, reports reloads and ammunition changes for player-owned characters, including actions performed by the GM. Does not report bows.",
     scope: "world", config: true, type: Boolean, default: true,
   });

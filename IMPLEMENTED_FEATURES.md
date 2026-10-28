@@ -1,5 +1,21 @@
 # Combat Tools feature inventory
 
+Release status (2026-10-28): the CombatTools changes listed in CHANGELOG.md for 0.9.24 are released in v0.9.24. Earlier local/unreleased labels describe implementation history. Live Foundry verification remains pending; planned TODOs remain unimplemented.
+
+- Missing-actor HUD guards (local/unreleased): orphan tokens cannot enter self/standalone CombatTools HUD paths. Right-click/release and direct HUD binding clear stale controls for missing actors; data preparation and positioning also guard actor loss. Deleting an actor clears an affected HUD/selection, and cached attackers are rechecked before building controls. Build, nine self-CTH tests and the HUD browser fixture passed, including player/GM orphan clicks and healthy-token recovery. Live Foundry verification pending; separate player-role permissions report remains unaddressed.
+
+- QuickHack window sight (local/unreleased): Jack-In and QuickHack use the native sight polygon with proximity thresholds and threshold attenuation before sampling the target. The source remains the attacking token; visibility, range and mid-dialog rechecks remain. Actual Foundry window verification remains pending.
+
+- SceneTools access points are excluded from new AoE target collection and rejected by manual Add target, including APs using non-container Actor types. Recognition uses AP token, Actor-template and prototype-token flags, not names. Existing saved cards are unchanged. Build and focused classification checks passed; live Foundry verification pending.
+
+- Evasion settings grouping: eligibility, modifier and Cover Up are in the left column; "Evasion requires MOVE" and "Borrow from next turn" are in the right column. Existing movement rules and borrowing dependency are unchanged.
+
+- Compact area settings (local/unreleased, 2026-10-28): shared Evasion & Cover Up controls use two columns, full explanations remain under a collapsed Rule details disclosure, and tighter spacing reduces the default dialog height from 720 to 560 pixels. The left AoE picklist and right settings panel remain. Build and focused browser checks passed; live theme verification pending.
+
+- Reload reporting setting label: "Weapon Reloads shown in chat". Existing behavior and saved setting are unchanged.
+
+- Area settings layout (BL-027, local/unreleased, 2026-10-28): Evasion & Cover Up controls appear first, followed by a left-side attack-type picklist and the selected type's settings on the right. Switching types retains unsaved values; native form saving and dependent controls remain. TypeScript/build and browser fixture checks pass; live Foundry/theme verification remains pending.
+
 CTH attack selection (0.9.19): selecting a weapon attack, throw, grapple action or quickhack clears the native Token HUD before opening its workflow. ROF 2 weapons show an `x2` button immediately after Aimed Shot. It creates two sequential ordinary attacks against the captured target, each with its own native modifier dialog, roll, defense and damage card. Canceling an attack stops the sequence. Ammunition, ownership, equipment, ROF and token presence are rechecked before the second attack. Native discharge writes complete before the next attack. Automated checks are separate from live Foundry verification.
 
 - Shared hazard status picker (local/unreleased): exposes `game.modules.get("pneuma-combattools").api.statusPicker` version 1, with `choose(selected, slot, {allowedIds})`. It reuses the existing grouped icon picker and returns selected IDs or null on cancellation; callers may restrict choices to effects they can resolve. No effects are applied by the picker. Existing CT callers retain their full choices. Unit/API and damage-flow browser checks pass; live integration retest is pending.
@@ -615,3 +631,5 @@ Hazard activation links to attack/effect chat messages now use the shared themed
 Validated with local compilation and automated regression fixtures; live Foundry performance is not established by those checks.
 
 Movement injury cards are indexed by actor, encounter, turn, and epoch, with chat-document invalidation. Grapple HUD data is reused across movement-only updates; actor grapple lookup reads each encounter once. Turn markers skip profile reconstruction for unchanged animation frames and position-only writes.
+
+QuickHack HUD wording: "Quickhacking only works with an active combat". Connection requirements and behavior are unchanged.

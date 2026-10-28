@@ -73,7 +73,7 @@ const MODULE_ID = "pneuma-combattools";
 const TEMPLATE = `modules/${MODULE_ID}/templates/combat-hud.hbs`;
 const label = (key: string) => game.i18n!.localize(`PNEUMA_COMBAT_TOOLS.${key}`);
 let selection: { target: Token; attacker: Token | undefined; combatOnly?: boolean; anchor: { x: number; y: number } } | undefined;
-const isStandalone = (token: Token) => !["container", "blackIce", "demon"].includes(String(token.actor?.type)) && !isSelfCTH(token, selection?.target === token ? selection.attacker : selectedAttacker()) && (!!game.user?.isGM || !token.isOwner || (selection?.target === token && !!selection.combatOnly));
+const isStandalone = (token: Token) => !!token?.actor && !["container", "blackIce", "demon"].includes(String(token.actor.type)) && !isSelfCTH(token, selection?.target === token ? selection.attacker : selectedAttacker()) && (!!game.user?.isGM || !token.isOwner || (selection?.target === token && !!selection.combatOnly));
 const selectedAttacker = () => {
   const tokens = canvas.tokens!.controlled.filter(token => token.actor?.isOwner && !["container", "blackIce", "demon"].includes(String(token.actor.type)));
   return tokens.length === 1 ? tokens[0] : undefined;
@@ -175,6 +175,7 @@ Hooks.once("init", () => {
     }
 
     protected override _onClickRight(event: PIXI.FederatedPointerEvent) {
+      if (!this.actor) { this.combatClick = false; selection = undefined; canvas.tokens?.hud?.clear(); event.stopPropagation(); return; }
       this.combatClick = this.useCombatMenu(event);
       selection = { target: this, attacker: selectedAttacker(), combatOnly: this.combatClick && event.shiftKey, anchor: event.getLocalPosition(canvas.stage!) };
       if (!this.combatClick) return super._onClickRight(event);
@@ -182,6 +183,7 @@ Hooks.once("init", () => {
     }
 
     protected override _onUnclickRight(event: PIXI.FederatedPointerEvent) {
+      if (!this.actor) { this.combatClick = false; selection = undefined; canvas.tokens?.hud?.clear(); event.stopPropagation(); return; }
       if (!this.combatClick) return super._onUnclickRight(event);
       this.combatClick = false;
       event.stopPropagation();
@@ -200,6 +202,10 @@ Hooks.once("init", () => {
   };
   // Extend the configured HUD: retain native positioning, lifecycle, and renderTokenHUD hooks.
   CONFIG.Token.hudClass = class CombatTokenHUD extends CONFIG.Token.hudClass {
+    override bind(object: Token) {
+      if (!object.actor) { selection = undefined; this.clear(); return; }
+      super.bind(object);
+    }
     override get template() {
       return this.object && isStandalone(this.object) ? TEMPLATE : super.template;
     }
@@ -207,6 +213,7 @@ Hooks.once("init", () => {
     override setPosition() {
       const token = this.object;
       if (!token || !this.element.length) return;
+      if (!token.actor) { selection = undefined; this.clear(); return; }
       super.setPosition();
       if (["container", "blackIce", "demon"].includes(String(token.actor?.type))) return;
       const oneByOne = token.document.width === 1 && token.document.height === 1;
@@ -222,8 +229,10 @@ Hooks.once("init", () => {
         .toggleClass("pneuma-tight-hud", game.settings!.get(MODULE_ID, "tightHUD"));
     }
     override getData(options = {}) {
+      if (!this.object?.actor) { selection = undefined; this.clear(); return {}; }
       if (["container", "blackIce", "demon"].includes(String(this.object?.actor?.type))) return super.getData(options);
-      const attacker = selection && selection.target === this.object ? selection.attacker : selectedAttacker();
+      const candidate = selection && selection.target === this.object ? selection.attacker : selectedAttacker();
+      const attacker = candidate?.actor?.isOwner ? candidate : undefined;
       const selfCTH = isSelfCTH(this.object ?? undefined, attacker);
       const selfGrapple = selfCTH ? grappleMenu(this.object ?? undefined, this.object ?? undefined) : [];
       const medical = medicalEntries(attacker?.actor??(selfCTH?this.object?.actor??undefined:undefined),this.object?.actor??undefined);
@@ -256,7 +265,7 @@ Hooks.once("init", () => {
         quickhackJackInDisabled: connection?.state === "ejected" || (connection?.state !== "active" && !sight),
         quickhackJackAction: connection?.state === "active" ? "jack-out" : "jack-in",
         quickhackStatus: connection?.state === "active" ? "Jacked-In" : connection?.state === "ejected" ? "Ejected" : "Not Jacked-In",
-        quickhackNote: (!trackingCombat() ? "Outside combat — QuickHack requires a tracked connection" : "") + (sight ? "" : " — No line of sight"),
+        quickhackNote: (!trackingCombat() ? "Quickhacking only works with an active combat" : "") + (sight ? "" : " — No line of sight"),
         controls: [
           { action: "attack", icon: "fa-gun", title: label("Attack") },
           { action: "melee", icon: "", title: label("CloseCombat") },
@@ -435,6 +444,14 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
 
 Hooks.on("canvasTearDown", () => {
   selection = undefined;
+});
+
+Hooks.on("deleteActor", (actor: Actor) => {
+  const hud = canvas.tokens?.hud;
+  if ([hud?.object, selection?.target, selection?.attacker].some(token => token && (token.document.actorId === actor.id || token.actor === actor))) {
+    selection = undefined;
+    hud?.clear();
+  }
 });
 
 for (const hook of ["createItem", "updateItem", "deleteItem"]) Hooks.on(hook, (item: Item) => {

@@ -15,6 +15,7 @@ import {inherentDamageStatuses,renderDamageStatusPicker} from "../damage-status.
 import {newInstant,instantContent,instantDone,handleInstant,bindInstantControls,arrangeAreaEffectControls,type InstantState,type InstantRequest} from "../instant-effects.js";
 import {createSmoke,registerSmoke} from "./smoke.js";
 import {clearGrenadeMarkers} from "./marker-cleanup.js";
+import {isAccessPoint} from "./access-points.js";
 import {empDisabled} from "../emp-state.js";
 import {masterStatuses} from "../status-catalog.js";
 import {moveEvader,registerAreaMovement} from "./movement.js";
@@ -84,7 +85,7 @@ function targets(data:AreaAttack):TargetRow[] {
   if(canvas.scene?.id!==data.scene)throw Error("Open the original scene to collect area targets.");
   if(data.ammoType==="smoke")return [];
   const covered=areaCoverage(data.area);
-  return (canvas.tokens?.placeables??[]).filter(t=>t.actor && !["container","blackIce","demon"].includes(String(t.actor.type))
+  return (canvas.tokens?.placeables??[]).filter(t=>t.actor && !isAccessPoint(t.document) && !["container","blackIce","demon"].includes(String(t.actor.type))
     && (data.kind==="explosive"||t.document.uuid!==data.exchange.attacker)
     && covered({x:t.x,y:t.y,width:t.w,height:t.h})
     ).map(t=>({
@@ -221,6 +222,7 @@ export async function handleAreaRequest(req:Request) {
     if(!user.isGM||!req.target||data.phase==="scatter")throw Error("GM only.");
     const token=await fromUuid(req.target) as TokenDocument|null;
     if(!token?.actor||token.parent?.id!==data.scene)throw Error("Select a token in the attack scene.");
+    if(isAccessPoint(token))throw Error("Access points cannot be area attack targets.");
     if(row)return;
     data.effectsResolved=false;
     data.rows.push({...(instantId(data.ammoType)&&data.ammoType!=="incendiary"?{instant:newInstant(data.ammoType,token.actor.uuid,token.name??"",rowEncounter(data,token.uuid))} : {}),uuid:token.uuid,actor:token.actor.uuid,name:token.name??"",img:token.texture.src??"",eligible:!evasionBlocked(token.actor)&&evadeAllowed(Number(foundry.utils.getProperty(token.actor,"system.stats.ref.value")),data.settings.evade),state:"waiting"});

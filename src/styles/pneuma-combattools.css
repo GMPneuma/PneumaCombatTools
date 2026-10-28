@@ -461,13 +461,22 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 .pneuma-area-editor { display: flex; flex-direction: column; height: 100%; min-height: 0; gap: 8px; }
 .pneuma-area-editor-body { overflow-y: auto; flex: 1; min-height: 0; padding-right: 6px; }
 .pneuma-area-profile, .pneuma-area-rules { margin: 0 0 10px; border: 1px solid var(--color-border-light-primary, #999); border-radius: 4px; }
-.pneuma-area-profile > summary, .pneuma-area-rules > summary { cursor: pointer; padding: 10px; font-weight: bold; }
-.pneuma-area-profile > summary > span { margin-left: 4px; }
-.pneuma-area-profile-body { padding: 0 12px 12px; }
-.pneuma-area-rules > :not(summary) { margin-left: 12px; margin-right: 12px; }
-.pneuma-area-rules .form-group { display: flex; align-items: center; gap: 12px; padding: 5px 0; }
+.pneuma-area-layout { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(0, 2.5fr); gap: 12px; align-items: start; }
+.pneuma-area-picklist { display: flex; flex-direction: column; gap: 6px; }
+.pneuma-area-picklist button { margin: 0; padding: 5px 8px; line-height: 1.3; text-align: left; white-space: normal; }
+.pneuma-area-picklist button[aria-pressed="true"] { font-weight: bold; border-color: var(--color-border-highlight, #ff6400); box-shadow: inset 3px 0 var(--color-border-highlight, #ff6400); }
+.pneuma-area-panels { min-width: 0; }
+.pneuma-area-profile[hidden] { display: none; }
+.pneuma-area-profile > h3, .pneuma-area-rules > h3 { margin: 0; padding: 6px 10px; font-size: 1em; font-weight: bold; }
+.pneuma-area-profile-body { padding: 0 10px 8px; }
+.pneuma-area-rules > :not(h3) { margin-left: 12px; margin-right: 12px; }
+.pneuma-area-rule-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; padding: 6px 0; }
+.pneuma-area-rule-column { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.pneuma-area-rules .form-group { display: flex; align-items: center; gap: 6px; padding: 0; margin: 0; min-height: 28px; min-width: 0; }
+.pneuma-area-help { margin-bottom: 6px; }
+.pneuma-area-help > summary { cursor: pointer; font-size: 12px; }
 .pneuma-area-rules .form-group label { flex: 1; }
-.pneuma-area-rules select { flex: 0 1 180px; }
+.pneuma-area-rules select { flex: 0 1 140px; min-width: 0; }
 .pneuma-area-rules input[type="number"] { flex: 0 0 64px; width: 64px; }
 .pneuma-area-rules input[type="checkbox"] { flex: 0 0 auto; }
 .pneuma-area-editor .notes { margin: 4px 0 8px; }
@@ -477,7 +486,7 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 .pneuma-area-fields input, .pneuma-area-fields select { width: 100%; min-width: 0; flex: none; }
 .pneuma-area-presets { display: flex; gap: 4px; }
 .pneuma-area-presets button { width: auto; flex: 1; margin: 0; line-height: 22px; white-space: nowrap; }
-.pneuma-area-editor output { display: block; margin: 4px 0 0 18px; font-size: 12px; font-weight: normal; }
+.pneuma-area-editor output { display: block; margin: 0 12px 8px; font-size: 12px; font-weight: normal; }
 
 .pneuma-area-editor .sheet-footer { flex: 0 0 auto; }
 

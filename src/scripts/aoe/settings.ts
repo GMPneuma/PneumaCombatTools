@@ -28,7 +28,7 @@ export const areaSettings = () => normalizeArea(game.settings!.get(MODULE,"areaS
 class AreaSettingsForm extends FormApplication {
   constructor(){super({});}
   static override get defaultOptions() { return foundry.utils.mergeObject(super.defaultOptions, {
-    title:"Area Attacks & Suppressive Fire", id:"pneuma-area-settings", width:560, height:620, resizable:true, scrollY:[".pneuma-area-editor-body"],
+    title:"Area Attacks & Suppressive Fire", id:"pneuma-area-settings", width:720, height:560, resizable:true, scrollY:[".pneuma-area-editor-body"],
     template:`modules/${MODULE}/templates/area-settings.hbs`, closeOnSubmit:true }); }
   override getData() {
     const settings=areaSettings();
@@ -45,6 +45,11 @@ class AreaSettingsForm extends FormApplication {
   override activateListeners(html:JQuery) {
     super.activateListeners(html);const root=html[0];if(!root)return;
     const label=root.querySelector<HTMLElement>("[data-cover-up-label]");if(label)markHomebrew(label);
+    root.querySelectorAll<HTMLButtonElement>("[data-area-select]").forEach(button=>button.addEventListener("click",()=>{
+      const selected=button.dataset.areaSelect;
+      root.querySelectorAll<HTMLButtonElement>("[data-area-select]").forEach(choice=>choice.setAttribute("aria-pressed",String(choice.dataset.areaSelect===selected)));
+      root.querySelectorAll<HTMLElement>("[data-area-profile]").forEach(panel=>{panel.hidden=panel.dataset.areaProfile!==selected;});
+    }));
     const update=()=>{
       const borrowing=root.querySelector<HTMLInputElement>('[name="evadeBorrow"]');if(borrowing)borrowing.disabled=!root.querySelector<HTMLInputElement>('[name="evadeMove"]')?.checked;
       for(const prefix of ["shell","blast","suppression"]){

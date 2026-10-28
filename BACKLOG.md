@@ -1,5 +1,7 @@
 # Combat Tools backlog
 
+Release status (2026-10-28): the CombatTools changes listed in CHANGELOG.md for 0.9.24 are released in v0.9.24. Earlier local/unreleased labels describe implementation history. Live Foundry verification remains pending; planned TODOs remain unimplemented.
+
 - Optional QuickHack target Neuroport filter (0.9.22; 2026-10-21): GM world toggle under QuickHack settings hides the target menu without installed Neuroport cyberware. Defaults off; live Foundry verification pending.
 
 - CTH dismissal and ROF 2 shortcut (0.9.19; live verification pending): close CTH after attack selection; add `x2` beside Aimed Shot for ROF 2 weapons, creating two separate ordinary attacks on the same target through existing native workflows. Preserve cancellation, ammunition and current-state checks.
@@ -11,7 +13,7 @@
 - Implemented: GM-only scene-device attack API reusing the existing target-aware attack, defense, ammunition and damage workflow. Scene Tools owns areas, sensors, presets, Scanner/hazard actor links and native drone movement, and retains native CPR fallback without CT.
 - Future reusable combat effects should live here when needed by weapons/characters as well as hazards. No duplicated official hazard catalog or new condition mechanics are included in this integration. Live Foundry verification pending.
 
-Updated: 2026-10-04
+Updated: 2026-10-28
 
 Edit each **Status** directly. Priorities are initial suggestions, not an agreed work order.
 
@@ -23,6 +25,136 @@ Keep IDs permanent. Add new items by copying an entry. Move finished or dropped 
 This remains the master feature roadmap. The [complete previous backlog](docs/history/backlog-before-standard-template-2026-09-29.md) preserves every original request, revision and completion note; the [earlier roadmap](docs/history/pre-0.8.0-refresh/BACKLOG.md) preserves older history. Source manifest: 0.9.8. Historical version/unreleased labels are not current release verification. Existing uncommitted gameplay work was not evaluated or changed by this documentation task.
 
 ## Open items
+
+### BL-027 — Reorganize Area Attacks & Suppressive Fire settings
+
+**Follow-up (2026-10-28):** Compacted the shared controls into two columns, moved full explanations into a collapsed Rule details disclosure, tightened spacing and reduced the default window height to 560 pixels. Browser fixture checks passed at two widths; live theme verification pending.
+
+**Priority:** Medium\
+**Status:** In progress — implemented locally; live Foundry verification pending
+
+**Problem:** The current stacked AoE disclosures place shared Evasion & Cover Up settings below the attack types and make the configuration cumbersome to navigate.
+
+**Desired result:** Put all Evasion & Cover Up controls at the top. Below them, use a two-column layout with an AoE type picklist on the left and the selected type's settings on the right.
+
+**Done when:**
+
+- [x] Move the complete Evasion & Cover Up section above the attack-type configuration, including its explanations and dependent controls.
+- [x] Replace stacked attack-type disclosures with a left-side picklist: Shotgun shells, Grenades & rockets, Suppressive fire.
+- [x] Display only the selected type's settings in the right-hand panel, with a clear selected state in the picklist.
+- [x] Preserve unsaved edits when switching types, existing values, dependencies and Save AoE settings behavior.
+- [ ] Verify layout, keyboard navigation and saving in the supported Foundry UI.
+
+**Notes:** Layout requested and implementation authorized 2026-10-28. Implemented using the existing native FormApplication, inputs and save handler. Build/type checks and browser fixture checks passed, including keyboard selection, draft retention, save/reopen, dependent controls and two editor widths. Live Foundry/theme verification remains pending. The broader AoE browser suite stops later on an unrelated resistance-card hover-popup assertion; this is not an all-suite pass.
+
+### BL-023 — Clear shotgun AoE after damage resolution
+
+**Priority:** High\
+**Status:** Ready
+
+**Problem:** User reports shotgun AoE remains after dealing damage and requires manual removal.
+
+**Desired result:** Automatically remove the shotgun area when its attack resolution is complete.
+
+**Done when:**
+
+- [ ] Reproduce the reported lingering template and identify the completion point.
+- [ ] Remove the template after all affected targets finish resolution, without removing it while responses or damage applications remain pending.
+- [ ] Verify misses, multiple targets and damage completion in Foundry.
+
+**Notes:** Definite TODO requested 2026-10-28. Reported defect; not yet reproduced or fixed. Listing does not authorize implementation.
+
+### BL-024 — Investigate NET damage incorrectly interacting with armor
+
+**Priority:** High\
+**Status:** Idea
+
+**Problem:** User reports damage during Netrunning interacts with armor when the applicable damage should bypass it.
+
+**Desired result:** Preserve the correct armor behavior for each NET damage source, including whether armor can ablate.
+
+**Done when:**
+
+- [ ] Identify affected NET actions/cards and reproduce their damage application.
+- [ ] Check each source's rules and native CPR behavior; distinguish NET damage from physical attacks made during a Netrun.
+- [ ] Correct the responsible integration and verify HP and armor outcomes.
+
+**Notes:** Reported 2026-10-28. Cause and affected actions remain unconfirmed; do not apply a blanket armor bypass to everything occurring during Netrunning.
+
+### BL-025 — Hotkey to switch chat roll visibility
+
+**Priority:** Medium\
+**Status:** Idea
+
+**Desired result:** A configurable hotkey switches between the requested Public/Private/Self-GM modes using native Foundry roll visibility.
+
+**Done when:**
+
+- [ ] Confirm the mode list and order: native Public, Private GM, Self, and whether Blind GM should be included. Self and GM-only are distinct for players.
+- [ ] Reuse native keybinding registration and the native roll-mode setting/dropdown.
+- [ ] Verify supported native CPR and CombatTools actions, including dice visibility.
+
+**Notes:** Requested 2026-10-28. Recommend a compact cycling shortcut; exact key and mode list remain open.
+
+### BL-026 — Consider hold-to-self visibility override
+
+**Priority:** Medium\
+**Status:** Idea
+
+**Desired result:** While a configurable key is held, actions initiated by the user produce Self-visible output.
+
+**Done when:**
+
+- [ ] Agree supported actions and timing for dialogs, delayed results and follow-up cards.
+- [ ] Evaluate native key-down/key-up handling; capture visibility when an action starts so releasing the key does not expose a delayed result.
+- [ ] Show that Self override is active and clear held state on release or focus loss, preserving the normal selected mode.
+- [ ] Verify message and dice audiences, and identify actions that explicitly choose recipients or require other players' responses.
+
+**Notes:** Exploratory request 2026-10-28, not a definite implementation decision. Technically feasible for supported workflows; universal coverage of all native/module actions is unverified. Foundry v12 keybinding API supports onDown/onUp: https://foundryvtt.com/api/v12/interfaces/foundry.types.KeybindingActionConfig.html. Existing CT paths include captured roll modes and explicitly selected audiences, so changing only the global mode would not cover every action.
+
+### BL-020 — Homebrew armor ablation on non-penetrating hits
+
+**Priority:** Medium\
+**Status:** Idea
+
+**Desired result:** Add a homebrew option: "Ablate Armor even if hit doesn't penetrate."
+
+**Done when:**
+
+- [ ] Define ablation amount and applicable attack/damage cases.
+- [ ] Add the optional rule and verify penetrating and non-penetrating hit behavior.
+
+**Notes:** Requested 2026-10-27. Exact mechanics remain open; implementation is not yet authorized.
+
+### BL-021 — Visually identify all homebrew settings
+
+**Priority:** Medium\
+**Status:** Idea
+
+**Desired result:** Visually tag all homebrew settings, with a distinction from the existing "Pneuma Homebrew" tagging.
+
+**Done when:**
+
+- [ ] Review which settings qualify with the user.
+- [ ] Obtain the user's guidance on the visual distinction and apply the agreed treatment consistently.
+
+**Notes:** Requested 2026-10-27. The user will guide classification and presentation; these choices remain open.
+
+### BL-022 — Expand EKG visibility and medical information options
+
+**Priority:** Medium\
+**Status:** Idea
+
+**Desired result:** Greatly enhance EKG options for MedTech/Biomonitor use and friendly-token visibility.
+
+**Done when:**
+
+- [ ] Define MedTech/Biomonitor requirements and their interaction.
+- [ ] Add an option to always show EKG to friendlies; define how friendlies are identified.
+- [ ] Allow MedTechs to see exact HP rather than only approximate health; define eligibility and any Biomonitor requirement.
+- [ ] Verify the agreed viewer/target combinations.
+
+**Notes:** Requested 2026-10-27. Additional EKG requirements remain open. This extends the visual review in BL-014; implementation is not yet authorized.
 
 ### BL-004 — Define smoke and sensory exceptions
 

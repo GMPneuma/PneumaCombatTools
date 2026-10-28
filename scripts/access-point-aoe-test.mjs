@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {isAccessPoint} from '../dist/scripts/aoe/access-points.js';
+globalThis.foundry={utils:{getProperty:(o,p)=>p.split('.').reduce((v,k)=>v?.[k],o)}};
+const flag={'pneuma-scenetools':{accessPoint:true}};
+assert.equal(isAccessPoint({flags:flag,actor:{type:'character'}}),true);
+assert.equal(isAccessPoint({flags:{},actor:{type:'character',flags:{'pneuma-scenetools':{templateType:'camera'}}}}),true);
+assert.equal(isAccessPoint({flags:{},actor:{prototypeToken:{flags:flag}}}),true);
+assert.equal(isAccessPoint({name:'AP - Camera',flags:{},actor:{type:'character'}}),false);
+assert.equal(isAccessPoint({flags:{},actor:{type:'vehicle'}}),false);
+assert.equal(isAccessPoint({flags:{},actor:null}),false);
+console.log('AoE AP classification covers custom actor types, actor templates and prototype flags; ordinary characters, vehicles and names are unaffected.');

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.9.24 - 2026-10-28
+
+- Guard CombatTools HUD paths against tokens with missing Actors; clear stale controls on orphan-token clicks and Actor deletion, and recheck cached attackers before rendering.
+- Respect proximity windows and threshold attenuation in Jack-In and QuickHack sight checks using Foundry's native sight polygon.
+- Exclude SceneTools access points from automatic AoE target collection and manual Add target, including access points using non-container Actor types.
+- Reorganize Area Attacks & Suppressive Fire settings with shared Evasion & Cover Up controls above a left-side attack-type picklist and right-side settings panel. Preserve drafts when switching types.
+- Compact shared settings into two columns: eligibility, modifier and Cover Up on the left; Evasion requires MOVE and Borrow from next turn on the right. Collapse detailed rule explanations and reduce default dialog height.
+- Rename reload reporting to Weapon Reloads shown in chat.
+- Clarify the QuickHack HUD note: Quickhacking only works with an active combat.
+
+Validation: production build/type checks; 651 automated tests passed, 10 optional checks skipped; focused settings/HUD browser fixtures passed. Live Foundry window, orphan-token and multiplayer verification remains pending. The broader AoE browser fixture has a separate resistance-card hover-popup assertion failure.
+
 ## 0.9.23 - 2026-10-23
 
 - Reduce token-movement overhead by caching hover EKG eligibility and Biomonitor medical, disabled-cyberware, and grapple data.

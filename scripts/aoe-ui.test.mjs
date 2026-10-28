@@ -227,21 +227,31 @@ try {
    Handlebars.registerHelper("checked",v=>v?"checked":"");
    Handlebars.registerHelper("selectOptions",(choices,options)=>new Handlebars.SafeString(Object.entries(choices).map(([value,label])=>'<option value="'+Handlebars.escapeExpression(value)+'" '+(value===options.hash.selected?'selected':'')+'>'+Handlebars.escapeExpression(label)+'</option>').join('')));
    window.openAreaEditor=()=>{
-    const app=new SettingsForm();const host=document.createElement("div");host.id="rendered-area-editor";host.style.cssText="width:580px;height:660px";
+    const app=new SettingsForm();window.renderedSettingsEditor=app;const host=document.createElement("div");host.id="rendered-area-editor";host.style.cssText="width:700px;height:520px";
     host.innerHTML=Handlebars.compile(template)(app.getData());document.body.replaceChildren(host);app.activateListeners({0:host});
    };
    const button=document.createElement("button");button.id="open-editor";button.textContent="Configure";button.onclick=openAreaEditor;document.body.replaceChildren(button);
   },template);
   await page.locator("#open-editor").click();
+  await page.setViewportSize({width:760,height:760});
   assert.equal(await page.locator('[data-area-profile]').count(),3);
-  assert.equal(await page.locator('[data-area-profile][open]').count(),1);
+  assert.equal(await page.locator('[data-area-profile]:visible').count(),1);
+  assert.equal(await page.locator('[name="evadeMove"]').isVisible(),true);
+  assert.equal(await page.locator('[name="evadeBorrow"]').isDisabled(),true);
+  await page.locator('[name="evadeMove"]').check();
+  await page.locator('[name="evadeBorrow"]').check();
+  await page.locator('[name="shellAngle"]').fill('75');
   assert.equal(await page.locator('[name="blastShape"]').isVisible(),false);
-  await page.locator('[data-area-profile="blast"] > summary').click();
+  await page.locator('[data-area-select="blast"]').focus();
+  await page.keyboard.press('Enter');
+  assert.equal(await page.locator('[data-area-select="blast"]').getAttribute('aria-pressed'),'true');
   assert.equal(await page.locator('[name="blastShape"]').isVisible(),true);
   await page.locator('[name="blastShape"]').selectOption("square");
+  await page.locator('[name="blastSize"]').fill('12');
   assert.equal(await page.locator('[name="blastRadius"]').isVisible(),false);
   assert.equal(await page.locator('[name="blastSize"]').isVisible(),true);
-  await page.locator('[data-area-profile="blast"] > summary').click();
+  await page.locator('[data-area-select="shell"]').click();
+  assert.equal(await page.locator('[name="shellAngle"]').inputValue(),'75');
   assert.match(await page.locator('[data-area-summary="blast"]').textContent(),/square/);
 
   assert.equal(await page.locator('[name="evade"] option').count(),3);
@@ -251,6 +261,40 @@ try {
   await page.locator('[data-area-field="shellAngle"][data-area-value="45"]').click();
   assert.match(await page.locator('[data-area-summary="shell"]').textContent(),/45° cone/);
   assert.equal(await page.locator('button[type="submit"]').isVisible(),true);
+  await page.locator('[data-area-select="suppression"]').focus();
+  await page.keyboard.press('Space');
+  assert.equal(await page.locator('[data-area-profile]:visible').count(),1);
+  await page.locator('[name="suppressionShape"]').selectOption('ray');
+  await page.locator('[name="corridorMax"]').fill('40');
+  await page.evaluate(async()=>{
+    const form=document.querySelector('.pneuma-area-editor');
+    const data=Object.fromEntries(new FormData(form));
+    for(const input of form.querySelectorAll('input[type="checkbox"]'))data[input.name]=input.checked;
+    await renderedSettingsEditor._updateObject(new Event('submit'),data);
+    const saved=new SettingsForm().getData();
+    if(saved.shellAngle!==45||saved.blastSize!==12||saved.corridorMax!==40||!saved.evadeMove||!saved.evadeBorrow)throw Error('Cross-profile draft values did not save');
+  });
+  for(const width of [700,540]){
+    await page.locator('#rendered-area-editor').evaluate((host,width)=>host.style.width=width+'px',width);
+    await page.evaluate(()=>{
+      const rules=document.querySelector('.pneuma-area-rules').getBoundingClientRect(),list=document.querySelector('.pneuma-area-picklist').getBoundingClientRect(),panel=document.querySelector('[data-area-profile]:not([hidden])').getBoundingClientRect();
+      if(rules.bottom>list.top||list.right>panel.left||Math.abs(list.top-panel.top)>1)throw Error('Rules must be above the left picklist and right panel');
+      const body=document.querySelector('.pneuma-area-editor-body');
+      if(body.scrollWidth>body.clientWidth)throw Error('Editor overflows horizontally');
+    });
+  }
+  await page.locator('#rendered-area-editor').evaluate(host=>host.style.width='700px');
+  assert.equal(await page.locator('.pneuma-area-help').getAttribute('open'),null);
+  await page.locator('.pneuma-area-help > summary').click();
+  assert.equal(await page.locator('.pneuma-area-help .notes').first().isVisible(),true);
+  await page.locator('.pneuma-area-help > summary').click();
+  await page.locator('#rendered-area-editor').screenshot({path:'docs/area-settings-layout-check.png'});
+  await page.setViewportSize({width:380,height:700});
+ }
+ if(process.env.PNEUMA_AREA_SETTINGS_ONLY){
+  assert.ok(process.env.PNEUMA_HANDLEBARS_SOURCE,'Settings-only checks require the actual Handlebars template');
+  console.log('Area settings browser checks passed: selection, keyboard, drafts, save/reopen, dependencies and layout.');
+  await browser.close();process.exit(0);
  }
  await page.evaluate(async()=>{
   game.user={id:'gm',isGM:true};game.users=[{id:'gm',active:true,isGM:true}];let deleted;

@@ -51,7 +51,9 @@ test("fresh initialization creates eleven programs and launcher in the requested
 function fixture({combat=true,mode="raw"}={}) {
  let serial=0;
  const docs=new Map(); const cards=[]; const notices=[];
- globalThis.CONFIG={Canvas:{polygonBackends:{sight:{testCollision:()=>false}}}};
+ globalThis.CONFIG={Canvas:{polygonBackends:{sight:{testCollision:()=>false,
+  create(origin,options){assert.deepEqual(options,{type:"sight",useThreshold:true});return {contains:(x,y)=>!this.testCollision(origin,{x,y},{type:"sight",mode:"any"})};},
+  applyThresholdAttenuation:polygon=>polygon}}}};
  const state={enabled:true,mode,rolls:0,total:1,onDialog:()=>{},writes:0,routing:{},messageUpdates:[]};
  globalThis.foundry={utils:{getProperty:get,randomID:()=>String(++serial),mergeObject:(a,b)=>({...a,...b})}};
  globalThis.ui={notifications:{warn:t=>notices.push(t),error:t=>notices.push(t),info:t=>notices.push(t)}};
@@ -198,6 +200,17 @@ test("nine target samples allow partial sight but reject a completely blocked ta
  assert.equal(hasQuickhackSight(f.a,f.b),false);assert.equal(points.length,9);assert.equal(new Set(points.map(p=>JSON.stringify(p))).size,9);
  CONFIG.Canvas.polygonBackends.sight.testCollision=(_origin,p)=>!(p.x===40&&p.y===40);
  assert.equal(hasQuickhackSight(f.a,f.b),true);
+});
+test("QuickHack samples the attenuated window polygon, not unattenuated coverage or bare collision rays",()=>{
+ const f=fixture(),backend=CONFIG.Canvas.polygonBackends.sight;
+ const base={contains:()=>{throw Error('Must sample the attenuated polygon');}};
+ backend.create=(origin,options)=>{assert.deepEqual(origin,f.a.center);assert.deepEqual(options,{type:'sight',useThreshold:true});return base;};
+ backend.testCollision=()=>{throw Error('Bare ray must not override window visibility');};
+ let allowed=true,applied=0;
+ backend.applyThresholdAttenuation=polygon=>{assert.equal(polygon,base);applied++;return {contains:(x,y)=>allowed&&x===40&&y===40};};
+ assert.equal(hasQuickhackSight(f.a,f.b),true);
+ allowed=false;assert.equal(hasQuickhackSight(f.a,f.b),false);
+ assert.equal(applied,2);
 });
 test("blocked sight prevents Jack-In and QuickHack without ejecting an existing connection",async()=>{
  const f=fixture();let blocked=true;CONFIG.Canvas.polygonBackends.sight.testCollision=()=>blocked;

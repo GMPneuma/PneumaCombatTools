@@ -237,6 +237,8 @@ Treatment dialog uses .pneuma-treatment-list, .pneuma-treatment-section and .pne
 
 Treatment result cards use .pneuma-treatment-card, native roll HTML inside .pneuma-roll-winner/.pneuma-roll-loser, and .pneuma-combat-outcome. flags.pneuma-combattools.medicalParticipants preserves acting token and patient token/actor identity. The metadata is available to Visual Tools; Combat Tools does not create a participant rail.
 
+Visual Tools treatment sidebar integration (2026-10-28, local/unreleased): when the visible `.pneuma-treatment-patient` line can be represented in the existing participant rail, Visual Tools adds `.pneuma-treatment-rail` to the message and `.pneuma-relocated-heading` to that line. The rail shows actor, Treatment and patient; the native title, dice, controls and `.pneuma-combat-outcome` remain in the content. Patient portrait lookup uses `medicalParticipants.defender`/`defenderActor` with existing hidden-token and permission checks. Custom patients without UUIDs retain their saved name. CombatTools alone retains the original visible line; no source selectors were removed. Example: `.pneuma-treatment-rail .pneuma-participant-rail .pneuma-exchange-defender`.
+
 .pneuma-stabilize-table replaces the wound dropdown; data-wound-name/data-wound-dv preserve each button's wound state and DV. .pneuma-treatment-columns arranges Crit, QuickFix and Treatment horizontally.
 
 Medical toggle renders only when medical entries exist or canWake is true; an empty menu has no control.

@@ -14,6 +14,12 @@ test('player-owned tokens are always self; GM can target another token while act
  const f=fixture(),other={isOwner:true};assert(isSelfCTH(f.token,other));assert(!isSelfCTH({isOwner:false},f.token));
  game.user.isGM=true;assert(!isSelfCTH(f.token,undefined));assert(!isSelfCTH(f.token,f.token));f.token.controlled=true;assert(isSelfCTH(f.token,f.token));assert(isSelfCTH(f.token,undefined));assert(!isSelfCTH(other,f.token));f.token.controlled=false;assert(!isSelfCTH(f.token,undefined));game.user.isGM=false;assert(isSelfCTH(f.token,undefined));
 });
+test('missing actors never qualify for self CTH, including owned GM tokens',()=>{
+ fixture();
+ for(const isGM of [false,true])for(const controlled of [false,true]){
+  game.user.isGM=isGM;assert.equal(isSelfCTH({actor:null,isOwner:true,controlled},undefined),false);
+ }
+});
 test('speedware requires installed, non-EMP cyberware; native source supports renamed items',()=>{
  const f=fixture();assert(hasSpeedware(f.token.actor));f.item.flags={'pneuma-combattools':{itemMarkers:{disabled:{label:'Disabled'}}}};assert(!hasSpeedware(f.token.actor));f.item.flags={};f.item.system.isInstalledInActor=false;assert(!hasSpeedware(f.token.actor));
  f.item.system.isInstalledInActor=true;f.item.name='Translated';assert(!hasSpeedware(f.token.actor));f.item._stats={compendiumSource:'Compendium.cpr.Item.nSdoCKRscSOeaZUH'};assert(hasSpeedware(f.token.actor));

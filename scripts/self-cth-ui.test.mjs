@@ -18,7 +18,7 @@ try{
  await page.addScriptTag({content:(await readFile('dist/scripts/medical-menu.js','utf8')).replaceAll('export ','')});
  const main=(await readFile('dist/scripts/main.js','utf8')).replace(/^import .*;\s*/gm,'');
  const names=[...new Set([...main.matchAll(/^\s+(register\w+)\(\);/gm)].map(m=>m[1]))].filter(n=>n!=='registerSelfCTH');
- const stubs=names.map(name=>`const ${name}=()=>{};`).join('\n')+'\nconst DEFAULT_ICON_COLOR="#ffc36a",installIconColorNormalization=()=>{},tokenEncounter=()=>game.combat,displayedEncounter=()=>game.combat;const openTurnMarkerSettings=token=>{window.animationOpened=true;window.indicatorToken=token;},registerQuickhack=()=>{},bindWeaponAmmo=()=>{},refreshAttackAmmoLabels=()=>{},decorateItemList=()=>{},connectionFor=()=>undefined,quickhackEnabled=()=>true,forceOutEntries=()=>[{messageId:"intrusion",label:"Eject Netrunner"}],attackEntries=()=>[],thrownEntries=()=>[],grenadeEntries=()=>window.grenades??[],grappleMenu=()=>window.grappleActions??[],useGrapple=async(s,t,a)=>{window.grappleUsed=a;},trackingCombat=()=>undefined,medicalEntries=()=>window.medicalRows??[],performMedical=async(s,t,a,i)=>{window.medicalUsed={source:s.document.uuid,target:t.document.uuid,action:a,item:i};},selfActions=()=>[],performSelfAction=async()=>{},canWake=()=>!!window.wakeAvailable,hasQuickhackSight=()=>true,actorQuickhacks=()=>[];';
+ const stubs=names.map(name=>`const ${name}=()=>{};`).join('\n')+'\nconst DEFAULT_ICON_COLOR="#ffc36a",installIconColorNormalization=()=>{},tokenEncounter=()=>game.combat,displayedEncounter=()=>game.combat;const openTurnMarkerSettings=token=>{window.animationOpened=true;window.indicatorToken=token;},registerQuickhack=()=>{},bindWeaponAmmo=()=>{},refreshAttackAmmoLabels=()=>{},decorateItemList=()=>{},connectionFor=()=>undefined,quickhackEnabled=()=>true,quickhackTargetVisible=()=>true,forceOutEntries=()=>[{messageId:"intrusion",label:"Eject Netrunner"}],attackEntries=()=>[],thrownEntries=()=>[],grenadeEntries=()=>window.grenades??[],grappleMenu=()=>window.grappleActions??[],useGrapple=async(s,t,a)=>{window.grappleUsed=a;},trackingCombat=()=>undefined,medicalEntries=()=>window.medicalRows??[],performMedical=async(s,t,a,i)=>{window.medicalUsed={source:s.document.uuid,target:t.document.uuid,action:a,item:i};},selfActions=()=>[],performSelfAction=async()=>{},canWake=()=>!!window.wakeAvailable,hasQuickhackSight=()=>true,actorQuickhacks=()=>[];';
  const eligibility=(await readFile('dist/scripts/attack-menu.js','utf8')).match(/export function canShowQuickhack[\s\S]*?\n}/)[0];
  const emp=(await readFile('dist/scripts/effect-duration.js','utf8'))+'\n'+(await readFile('dist/scripts/emp-rules.js','utf8')).replace(/^import .*;\s*/gm,''),self=(await readFile('dist/scripts/self-cth.js','utf8')).replace(/^import .*;\s*/gm,'');
  await page.addScriptTag({type:'module',content:(await readFile('dist/scripts/native-lookup.js','utf8'))+'\n'+eligibility+'\n'+emp+'\n'+(await readFile('dist/scripts/quickhack/self-ice.js','utf8')).replace(/^import .*;\s*/gm,'')+'\n'+self+'\n'+stubs+'\n'+main+'\nhooks.init.forEach(fn=>fn());window.loaded=true;'});await page.waitForFunction(()=>window.loaded);
@@ -150,6 +150,21 @@ try{
  await doubleButton.dispatchEvent('click');
  assert.deepEqual(await page.evaluate(()=>selectedAttack),{source:'Token.own',target:'Token.enemy',item:'rof2',mode:'attack',count:2,cleared:true});
  assert.equal(await page.locator('#token-hud button').count(),0,'native clear dismisses HUD before attack starts');
+ await page.evaluate(async()=>{
+  own.actor.type='character';own.actor.isOwner=true;game.user.isGM=true;canvas.tokens.controlled=[own];
+  const orphan=Object.assign(new CONFIG.Token.objectClass(),{actor:null,isOwner:true,isVisible:true,controlled:true,document:{uuid:'Token.orphan',actorId:'missing'}});
+  for(const gm of [false,true]){
+   game.user.isGM=gm;await show(own);orphan._onClickRight(event);orphan._onUnclickRight(event);
+   if(hud.object!==null||hud.element.find('button').length)throw Error('Orphan click left stale HUD controls');
+   await show(own);if(!hud.element.find('[data-self-cth]').length)throw Error('Healthy token did not recover after orphan click');
+   hud.bind(orphan);if(hud.object!==null)throw Error('Direct orphan binding was accepted');
+   hud.object=orphan;const data=hud.getData();if(Object.keys(data).length||hud.object!==null)throw Error('Orphan data preparation retained HUD');
+  }
+  await show(own);own.document.actorId='medic';for(const fn of hooks.deleteActor??[])fn({id:'medic'});
+  if(hud.object!==null)throw Error('Deleting the open actor did not clear HUD');
+  await show(own);if(!hud.element.find('[data-self-cth]').length)throw Error('HUD failed after actor-deletion cleanup');
+ });
+ console.log('Orphan HUD checks passed: player/GM clicks, direct binding, data guard, actor deletion and healthy-token recovery.');
  console.log('Attack selection clears the native HUD and routes x2 with captured attacker/target.');
  console.log('Medical browser checks passed: top-level self/target menu, disabled actions and actor selection.');
  console.log('Self CTH browser checks passed: own-token replacement, native controls retained, setting toggle, Shift-right-click, D10 native reroll and target actions.');
