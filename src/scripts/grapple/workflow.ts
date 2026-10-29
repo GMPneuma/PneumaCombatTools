@@ -91,11 +91,11 @@ async function save(scene: Scene, g: Grapple) {
           flags:{[MODULE]:{grappleParticipants:{source:g.source,target:g.target},rollsRevealed:true}}} as never);
       }
       await message.update(changes);
-      // Completed history belongs in chat, not in the encounter active-state map.
-      if (g.state === "ended") await owner.update({[`flags.${MODULE}.grapples.-=${g.id}`]:null});
     }
     catch (error) { console.warn(MODULE, "Grapple saved; chat refresh failed", error); }
   }
+  // Encounter cleanup must not depend on a surviving or writable chat card.
+  if (g.state === "ended") await owner.update({[`flags.${MODULE}.grapples.-=${g.id}`]:null});
 }
 async function status(actor: Actor, name: string) {
   const definition = masterStatuses.find(s => s.name === name);

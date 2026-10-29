@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.26 - 2026-10-28
+
+- Clear ended grapple encounter records even when the chat card is missing or its update fails.
+- Record the deferred native damage integration refactor and remove obsolete standalone release notes.
+
+Validation: production build and automated checks. Live Foundry multiplayer verification remains pending.
+
 ## 0.9.25 - 2026-10-28
 
 - Show the explicit active-GM-required notification instead of a generic attack failure, and use consistent wording across GM-dependent workflows.

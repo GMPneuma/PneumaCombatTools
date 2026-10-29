@@ -26,6 +26,26 @@ This remains the master feature roadmap. The [complete previous backlog](docs/hi
 
 ## Open items
 
+### BL-028 — Refactor native CPR damage integration
+
+**Priority:** High\
+**Status:** Ready
+
+**Problem:** Native damage integration mixes CPR method/markup knowledge, damage capture, actor mutation sequencing, armor/injury corrections and chat rendering. Damage values are extracted from native card HTML, and presentation failures share failure handling with gameplay application, making changes and diagnosis difficult.
+
+**Desired result:** Introduce a small typed CPR adapter that returns structured captured damage results. Separate damage application and correction sequencing from card rendering, retaining native CPR calculations and current behavior.
+
+**Done when:**
+
+- [ ] Isolate native damage invocation, capture context and unavoidable CPR markup parsing behind a clear adapter boundary, reusing the existing native-wrapper helper.
+- [ ] Return structured application results to workflow and presentation code; keep native HP, armor, shield and injury behavior unchanged.
+- [ ] Make actor mutation-queue ownership explicit and preserve duplicate-application protection, saved receipts and conservative handling of uncertain applications.
+- [ ] Distinguish a confirmed gameplay application from a subsequent presentation failure without rerunning damage.
+- [ ] Preserve native Undo, damage breakdowns, roll visibility and existing saved-card compatibility across ordinary, AoE, manual and effect damage paths.
+- [ ] Verify native integration, capture, wrapper, damage-flow and browser regressions, followed by live Foundry GM/player checks.
+
+**Notes:** Backlogged at user request on 2026-10-28 as item #3 of the subsystem-refactoring assessment. Starting points: `src/scripts/damage-flow.ts`, `src/scripts/damage-application.ts`, `src/scripts/native-effect-integration.ts` and `src/scripts/native-wrappers.ts`. This is a behavior-preserving refactor, not a replacement damage engine or new recovery framework. No implementation authorized or started by this entry.
+
 ### BL-027 — Reorganize Area Attacks & Suppressive Fire settings
 
 **Follow-up (2026-10-28):** Compacted the shared controls into two columns, moved full explanations into a collapsed Rule details disclosure, tightened spacing and reduced the default window height to 560 pixels. Browser fixture checks passed at two widths; live theme verification pending.

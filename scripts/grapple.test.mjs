@@ -101,6 +101,18 @@ test('Release clears managed and manually applied choking but preserves unrelate
  b.effects.push({id:'other',name:'Prone',flags:{},statuses:new Set()});
  await f.request('release');assert.deepEqual(b.effects.map(e=>e.id),['other']);
 });
+
+for(const failure of ['missing','update','create'])test(`Release removes encounter state when grapple chat is ${failure}`,async()=>{
+ const f=setup();await f.hold();
+ const card=f.messages.get(f.read().message);
+ if(failure==='missing')f.messages.delete(card.id);
+ if(failure==='update')card.update=async()=>{throw new Error('chat unavailable');};
+ if(failure==='create')ChatMessage.create=async()=>{throw new Error('chat unavailable');};
+ await f.request('release');
+ assert.equal(get(f.combat,`flags.${M}.grapples.g`),undefined);
+ assert.equal(f.actors[0].effects.length,0);assert.equal(f.actors[1].effects.length,0);
+ assert.equal(f.tokens[1].texture.scaleX,1);
+});
 test('A skipped choke round clears the managed stage without ending the grapple',async()=>{
  const f=setup();await f.hold();await f.request('choke');registerGrapple();f.combat.round=4;
  for(const callback of f.hooks.updateCombat)callback(f.combat,{round:4});

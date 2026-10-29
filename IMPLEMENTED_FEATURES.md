@@ -1,5 +1,7 @@
 # Combat Tools feature inventory
 
+- Ended grapples leave encounter active-state flags even when the original chat card is missing or a chat write fails. Native effect and token-placement cleanup remains intact. v0.9.26; live Foundry verification pending.
+
 - General homebrew marker (local/unreleased): small red beer-mug icons replace the AoE Configure, ranged-evasion Homebrew, Configure damage types and EMP Configure button icons, and appear beside QuickHack Rules mode. Only these user-designated controls are tagged; the illustrated Pneuma Homebrew badge remains separate. No rule or setting values change.
 
 Release status (2026-10-28): the CombatTools changes listed in CHANGELOG.md for 0.9.24 are released in v0.9.24. Earlier local/unreleased labels describe implementation history. Live Foundry verification remains pending; planned TODOs remain unimplemented.
