@@ -60,7 +60,7 @@ try {
  await page.addScriptTag({type:'module',content:'const esc=manualEscape,rollOutcomeClass=won=>won===undefined?"":won?"pneuma-roll-winner":"pneuma-roll-loser";'+treatmentCardSource+';window.postTreatment=postTreatment;window.checkedLuck=()=>{};'});
  const treatmentSource=(await readFile('dist/scripts/treatment.js','utf8')).replace(/^import .*$/gm,'').replace(/^export \{.*\} from .*;$/gm,'');
  await page.addScriptTag({type:'module',content:'const esc=manualEscape;\n'+treatmentSource+'\nwindow.openTreatment=openTreatment;'});
- const presentationSource=(await readFile('dist/scripts/native-combat.js','utf8')).replace(/^import .*$/gm,'');
+ const presentationSource=(await readFile('dist/scripts/self-chat-operation.js','utf8')).replace(/^import .*$/gm,'')+'\n'+(await readFile('dist/scripts/native-combat.js','utf8')).replace(/^import .*$/gm,'');
  await page.addScriptTag({type:'module',content:presentationSource+'\nObject.assign(window,{markRollResult,messageDiceAudience});'});
  await page.waitForFunction(()=>window.groupContent&&window.manualNativeClasses);
  const damageStatuses=await readFile('dist/scripts/damage-status.js','utf8');

@@ -1001,6 +1001,17 @@ i.pneuma-neural-plug::before { content: ""; display: inline-block; width: 1em; h
   content:"GM"; font-size:9px; font-weight:700; line-height:14px;
   border:1px solid currentColor; border-radius:2px; padding:0 2px; flex:0 0 auto;
 }
+#pneuma-self-chat-held.pneuma-chat-button {
+  position:fixed; bottom:24px; right:min(320px, 10vw); top:auto; left:auto; z-index:2147483647;
+  --pct-control-height:56px; --pct-control-padding:12px 20px; --pct-control-margin:0;
+  --pneuma-chat-button-font-size:20px !important;
+  --pneuma-chat-button-line-height:26px !important;
+  --pneuma-chat-button-font-weight:700 !important;
+  pointer-events:none; cursor:default;
+}
+#pneuma-self-chat-held[data-chat-role="gm"]::before {
+  content:"SELF"; font-size:12px; line-height:20px; padding:0 4px;
+}
 .pneuma-chat-button.pneuma-chat-icon[data-chat-role="gm"] {
   --pct-icon-width:auto; --pct-icon-padding:4px 6px; flex:0 0 auto;
 }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.27 - 2026-10-28
+
+- Fix Self capture startup on Foundry v12: use CPR's roll-card renderer and the CombatTools card helper instead of attempting to wrap the non-configurable global renderTemplate function.
+- Capture Self visibility per native roll at initiation/Confirm, preserving it through delayed dice and new card creation after ALT is released. Persist captured attack/AoE visibility and retain QuickHack dice audiences.
+- Add Hold for SELF chat, defaulting to either ALT key and configurable in native controls. Native rolls confirmed while held retain Self visibility after release. Existing shared cards keep their audience; arbitrary third-party delayed actions are not universally captured.
+- Enlarge the Self indicator and reuse the GM chat-button skin with a SELF badge and current theme colors.
+- Clarify the missing-combat-participant warning and align its regression checks.
+- Add the optional GM setting **Ablate Armor even if hit doesn't penetrate.**, disabled by default. Armor-blocked hits use their native ablation amount, preserving armor bypass, shield-only hits, MA no-ablation, Cover Up and native Undo.
+
+Validation: production build, automated runtime/native-method checks and settings/damage browser fixtures. Live Foundry verification remains pending.
+
 ## 0.9.26 - 2026-10-28
 
 - Clear ended grapple encounter records even when the chat card is missing or its update fails.

@@ -1,4 +1,5 @@
 import {medicalMenuGroups} from "./medical-menu.js";
+import {registerSelfChatKey} from "./self-chat-key.js";
 import {registerSceneEffects} from "./scene-effects.js";
 import {registerDamageStatusPicker} from "./damage-status.js";
 import {registerCombatSummary} from "./combat-summary.js";
@@ -61,6 +62,7 @@ import { registerEvasionSettings } from "./evasion-settings.js";
 declare global {
 interface SettingConfig {
   "pneuma-combattools.maNoAblation": boolean;
+  "pneuma-combattools.ablateBlockedHits": boolean;
   "pneuma-combattools.targetedRightClick": boolean;
   "pneuma-combattools.tightHUD": boolean;
   "pneuma-combattools.iconColor": string | null;
@@ -82,6 +84,7 @@ const selectedAttacker = () => {
 Hooks.once("init", () => {
   if (game.system!.id !== "cyberpunk-red-core") return;
   registerSocketHealth();
+  registerSelfChatKey();
   registerChatResultDelay();
   Hooks.once("ready",()=>installChatRenderGuard(ChatLog.prototype));
   registerAmmoChat();
@@ -127,6 +130,11 @@ Hooks.once("init", () => {
   registerSettingsLayout();
   game.settings!.register(MODULE_ID, "maNoAblation", {
     name: "MA does not ablate armor", hint: "Martial Arts retains half SP, but does not ablate armor when applying damage from a resolution card.",
+    scope: "world", config: true, type: Boolean, default: false,
+  });
+  game.settings!.register(MODULE_ID, "ablateBlockedHits", {
+    name: "Ablate Armor even if hit doesn't penetrate.",
+    hint: "Homebrew: positive damage stopped by armor still applies the attack's normal ablation amount. Armor bypass, zero-ablation attacks and shield-only hits remain excluded; Cover Up keeps its existing double ablation.",
     scope: "world", config: true, type: Boolean, default: false,
   });
   game.settings!.register(MODULE_ID, "targetedRightClick", {
@@ -412,7 +420,7 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
       await attackFromHUD(attacker, token, itemId, mode, event, count);
     } catch (error) {
       console.error(MODULE_ID, error);
-      ui.notifications!.error(error instanceof Error && error.message === "This function does not work without an active GM logged in."
+      ui.notifications!.error(error instanceof Error && error.message
         ? error.message : label("AttackFailed"));
     }
   });

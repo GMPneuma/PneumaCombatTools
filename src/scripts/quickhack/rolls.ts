@@ -1,4 +1,5 @@
 import {findNativeItem} from "../native-lookup.js";
+import {selfOperationUser} from "../self-chat-operation.js";
 import { rollHidden, nativeCard, diceJSON, showSavedDice, spendBonusLuck, type NativeRoll, type RollItem } from "../native-combat.js";
 import { MODULE } from "./availability.js";
 import { enabled } from "./settings.js";
@@ -20,6 +21,7 @@ export async function nativeQuickhackRoll(actor: Actor, item: RollItem, title: s
   if (luck !== 0) await spendBonusLuck(actor, luck);
   await rollHidden(roll);
   const content = await nativeCard(roll);
+  const self=selfOperationUser(roll);if(self)audience={whisper:[self],blind:false};
   if (!validate()) return null;
   const message = publish ? await ChatMessage.create({ content, ...audience,
     speaker: ChatMessage.getSpeaker({ actor, token: sourceToken?.document }),

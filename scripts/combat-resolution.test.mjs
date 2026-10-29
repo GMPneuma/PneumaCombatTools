@@ -525,7 +525,7 @@ test("armor interaction off bypasses SP and ablation without changing stored rol
 test("selected damage rejects a recipient removed before GM processing without changing HP",async()=>{
  setup();const msg=await rolled();let calls=0;actor._applyDamage=async()=>calls++;
  combats.get("combat").combatants=combats.get("combat").combatants.filter(p=>p.token.uuid!=="Token.selected");
- await assert.rejects(request("damage","damageApply",{application:"selected",targetUuid:"Token.selected",options:damageOptions}),/participating tokens/);
+ await assert.rejects(request("damage","damageApply",{application:"selected",targetUuid:"Token.selected",options:damageOptions}),/missing from the current combat/);
  assert.equal(calls,0);assert.equal(get(msg,"flags.pneuma-combattools.exchange.damage.status"),"rolled");
 });
 

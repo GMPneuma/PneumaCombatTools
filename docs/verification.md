@@ -11,6 +11,10 @@ Release: Combat Tools 0.8.4, reviewed 2026-09-24. Includes consistent encounter 
 
 ## Local checks
 
+BL-020 (2026-10-28): production build/typecheck passed; the default automated suite passed 666 tests with 14 optional checks skipped. The focused blocked-ablation suite passed all 14 tests with the official CPR v0.92.4 actor source supplied, including four native-method tests. Settings layout, existing damage flow/Cover Up, and native blocked-ablation receipt browser fixtures passed. The receipt fixture executes CPR's actual damage method, chat renderer and Handlebars template for enabled/disabled rules, native/managed capture and blocked hits with/without critical bonus HP damage; it checks Undo values, visibility and explanation text. These are local fixtures, not live Foundry/multiplayer evidence.
+
+The focused runtime fixture uses `PNEUMA_CPR_ACTOR_SOURCE`. Run the dedicated receipt fixture with `node scripts/blocked-ablation-ui.test.mjs` and the normal browser dependencies below, plus `PNEUMA_CPR_CHAT_SOURCE` and `PNEUMA_CPR_DAMAGE_TEMPLATE` pointing to the same CPR version's `cpr-chat.js` and `cpr-damage-application-card.hbs`.
+
 ```sh
 pnpm check
 pnpm test

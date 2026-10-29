@@ -26,6 +26,15 @@ export function markHomebrew(label: HTMLElement): HTMLElement {
 }
 
 function decorateSettings(root: HTMLElement) {
+  const ablationLabel = root.querySelector('[name="pneuma-combattools.ablateBlockedHits"]')?.closest(".form-group")?.querySelector("label");
+  if (ablationLabel && !ablationLabel.querySelector(".pneuma-homebrew-rule-icon")) {
+    const icon = document.createElement("i");
+    icon.className = "fas fa-beer-mug-empty pneuma-homebrew-rule-icon";
+    icon.setAttribute("role", "img");
+    icon.setAttribute("aria-label", "Homebrew rule");
+    icon.title = "Homebrew rule";
+    ablationLabel.append(" ", icon);
+  }
   for (const [key, homebrewValues] of [
     ["maNoAblation", null],
     ["pneumaHomebrew", null],

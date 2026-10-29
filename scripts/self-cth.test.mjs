@@ -48,6 +48,6 @@ test('NPC automation requires opt-in and RAW, never player-owned actors',async()
  for(mode of ['custom','none'])assert(!automaticNPCEvasion({hasPlayerOwner:false}));mode='raw';on=false;assert(!automaticNPCEvasion({hasPlayerOwner:false}));
 });
 
-test('nonparticipant HUD remains usable but reroll fails clearly',async()=>{const f=fixture();f.combat.combatants=[];assert.equal(selfInitiativeControl(f.token).disabled,true);await assert.rejects(rerollSelfInitiative(f.token),/participating tokens/);});
+test('nonparticipant HUD remains usable but reroll fails clearly',async()=>{const f=fixture();f.combat.combatants=[];assert.equal(selfInitiativeControl(f.token).disabled,true);await assert.rejects(rerollSelfInitiative(f.token),/missing from the current combat/);});
 
 test('initiative entry is hidden without combat participation or working installed speedware',()=>{const f=fixture();assert.equal(selfInitiativeControl(f.token).show,true);f.item.system.isInstalledInActor=false;assert.equal(selfInitiativeControl(f.token).show,false);f.item.system.isInstalledInActor=true;f.combat.started=false;assert.equal(selfInitiativeControl(f.token).show,false);f.combat.started=true;f.combat.combatants=[];assert.equal(selfInitiativeControl(f.token).show,false);});

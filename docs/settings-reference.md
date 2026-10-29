@@ -10,6 +10,7 @@ Module Settings groups: Attack & Damage Cards; Evasion & Area Attacks; Movement 
 - Top-right combat bar temporarily forces Biomonitor left without changing its saved preference.
 - Crew HUD integration appears only when Crew Tools is active.
 - Show armor controls on normal damage cards defaults off; ad-hoc damage always shows them.
+- BL-020 (implemented locally, 2026-10-28): **Ablate Armor even if hit doesn't penetrate.** is a GM world setting under Attack & Damage Cards beside **MA does not ablate armor**, disabled by default and marked with the red homebrew beer mug. Positive damage stopped by armor applies the attack's normal ablation amount. Armor bypass, zero-ablation attacks and shield-only hits are excluded; Cover Up retains its existing double ablation without an extra application. Live Foundry verification remains pending.
 - Automatic NPC evasion requires RAW and excludes player-owned characters.
 - Homebrew Evasion, area profiles, EMP behavior, custom statuses and QuickHack audiences have dedicated subforms.
 - The combat-resolution master switch and Test status HUD are removed.
@@ -41,6 +42,7 @@ Module Settings groups: Attack & Damage Cards; Evasion & Area Attacks; Movement 
 | `showArmorControls` | Show armor controls on normal damage cards | world | false | [half-armor.ts:47](../src/scripts/half-armor.ts) |
 | `injuryTurnEndReminder` | Injury damage: turn-end HUD reminder | world | true | [injury-notices.ts:54](../src/scripts/injury-notices.ts) |
 | `maNoAblation` | MA does not ablate armor | world | false | [main.ts:86](../src/scripts/main.ts) |
+| `ablateBlockedHits` | Ablate Armor even if hit doesn't penetrate. | world | false | [main.ts](../src/scripts/main.ts) (added 2026-10-28) |
 | `targetedRightClick` | Open Combat Tools when right-clicking an owned target | client | true | [main.ts:90](../src/scripts/main.ts) |
 | `tightHUD` | Tight HUD | client | false | [main.ts:95](../src/scripts/main.ts) |
 | `iconColor` | Combat Tools icon color | world | null | [main.ts:99](../src/scripts/main.ts) |

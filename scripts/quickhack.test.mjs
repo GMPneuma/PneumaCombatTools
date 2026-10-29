@@ -428,7 +428,7 @@ test('QuickHack follows active scene encounter when player and GM view unrelated
  assert.equal(await ejectConnection(f.source,f.target.uuid,f.cards[0].id,saved),true);
 });
 test('ambiguous QuickHack encounters stop before rolling',async()=>{const f=fixture();game.combats.push({...f.encounter,id:'second'});await executeQuickhack(f.a,f.b,'jack-in');assert.equal(f.state.rolls,0);assert.match(f.notices.at(-1),/Multiple active/);});
-test('QuickHack cannot use another token of the same actor as membership',async()=>{const f=fixture();f.encounter.combatants[1].token={...f.b.document,uuid:'Scene.scene.Token.copy'};await executeQuickhack(f.a,f.b,'jack-in');assert.equal(f.state.rolls,0);assert.match(f.notices.at(-1),/participating tokens/);});
+test('QuickHack cannot use another token of the same actor as membership',async()=>{const f=fixture();f.encounter.combatants[1].token={...f.b.document,uuid:'Scene.scene.Token.copy'};await executeQuickhack(f.a,f.b,'jack-in');assert.equal(f.state.rolls,0);assert.match(f.notices.at(-1),/missing from the current combat/);});
 test('QuickHack result rejects reset epoch even if connection flags remain',async()=>{const f=fixture();await executeQuickhack(f.a,f.b,'jack-in');const saved=f.cards[0].flags[MODULE].quickhack;f.encounter.flags[MODULE].evasionEpoch='reset';assert.equal(resultConnectionValid(f.source,{...saved,connectionId:f.cards[0].id}),false);await assert.rejects(establishConnection(f.cards[0]),/reset/);});
 
 const {selfIce}=await import('../dist/scripts/quickhack/self-ice.js');

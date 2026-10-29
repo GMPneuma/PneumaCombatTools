@@ -13,7 +13,7 @@ export function displayedEncounter(sceneId:string|null|undefined=(typeof canvas 
 }
 export function requireParticipants(combat:Combat,tokens:string[]):void {
   if(!tokens.every(uuid=>combat.combatants.some(p=>p.token?.uuid===uuid)))
-    throw Error("Add all participating tokens to the active encounter for this scene before continuing.");
+    throw Error("One or more tokens involved in this action are missing from the current combat. Ask the GM to add them to the Combat Tracker, then try again.");
 }
 export function tokenEncounter(sceneId:string|null|undefined,tokens:string[]):Combat|undefined {
   const combat=sceneEncounter(sceneId);if(combat)requireParticipants(combat,tokens);return combat;

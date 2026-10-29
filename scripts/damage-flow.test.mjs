@@ -17,7 +17,7 @@ try {
    prop:(key,value)=>{nodes.forEach(n=>n[key]=value);return window.wrap(nodes);},attr:(key,value)=>{nodes.forEach(n=>n.setAttribute(key,value));return window.wrap(nodes);},remove:()=>nodes.forEach(n=>n.remove()),first:()=>window.wrap(nodes.slice(0,1)),before:n=>nodes[0]?.before(n),after:n=>nodes[0]?.after(n),
    append:n=>nodes[0]?.append(n),on:(event,fn)=>nodes.forEach(n=>n.addEventListener(event,fn))});
  });
- const native=(await readFile(new URL('../dist/scripts/native-combat.js',import.meta.url),'utf8')).replace(/^import .*$/gm,'');
+ const native=(await readFile('dist/scripts/self-chat-operation.js','utf8')).replace(/^import .*$/gm,'')+'\n'+(await readFile(new URL('../dist/scripts/native-combat.js',import.meta.url),'utf8')).replace(/^import .*$/gm,'');
  await page.addScriptTag({type:'module',content:native+'\nObject.assign(window,{attackDialog,registerAttackDialog});'});
  await page.waitForFunction(()=>!!window.attackDialog);
  const aware=await page.evaluate(async()=>{
@@ -49,7 +49,7 @@ try {
  await page.addScriptTag({type:'module',content:criticalSource.replace('import(utilsPath)', 'Promise.resolve({default:window.criticalUtils})')+'\nObject.assign(window,{hasCriticalInjury,criticalLocation,damageSixes,applyCriticalInjury});'});
  await page.waitForFunction(()=>!!window.hasCriticalInjury);
  const applicationSource = (await readFile('dist/scripts/actor-mutation.js','utf8'))+'\n'+(await readFile(new URL('../dist/scripts/native-wrappers.js', import.meta.url), 'utf8'))+'\n'+(await readFile(new URL('../dist/scripts/damage-application.js', import.meta.url), 'utf8')).replace(/^import .*$/gm,'');
- await page.addScriptTag({type:'module',content:applicationSource+'\nObject.assign(window,{compactDamageApplication,captureWithChat,captureDamageApplication,isDamageCaptureView,withActorMutation,registerNativeWrapper});'});
+ await page.addScriptTag({type:'module',content:applicationSource+'\nObject.assign(window,{compactDamageApplication,captureWithChat,captureDamageApplication,isDamageCaptureView,blockedArmorApplication,withActorMutation,registerNativeWrapper});'});
  await page.waitForFunction(()=>!!window.compactDamageApplication);
  const skullResult=await page.evaluate(async()=>{
    const actor={items:[{name:"Cracked Skull"}],system:{derivedStats:{hp:{value:30}}},async update(data){this.system.derivedStats.hp.value=data["system.derivedStats.hp.value"];}};

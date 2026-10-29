@@ -20,6 +20,20 @@ function installDamageCapture(chat: NativeDamageChat) {
   installedChats.add(chat);
 }
 
+/** Native CPR assumes any ablation on a zero-HP hit means damage reduction. */
+export function blockedArmorApplication(html:string):string {
+  const doc=new DOMParser().parseFromString(html,"text/html");
+  const details=doc.querySelector(".d6-data-details");
+  if(!details)return html;
+  const nativeReason=game.i18n!.localize("CPR.chat.damageApplication.damageNegatedByDamageReduction");
+  const note=Array.from(details.querySelectorAll<HTMLElement>(".text-center"))
+    .find(row=>row.textContent?.trim()===nativeReason)??doc.createElement("div");
+  note.classList.add("text-center","text-normal","pneuma-blocked-armor-note");
+  note.textContent="Armor stopped the hit; homebrew armor ablation applies.";
+  if(!note.parentElement)details.append(note);
+  return doc.body.innerHTML;
+}
+
 /** Repack the native result and breakdown; no damage formula is calculated here. */
 export function compactDamageApplication(html: string, name: string, location: string, id: string, actorUuid?:string): string {
   const doc = new DOMParser().parseFromString(html, "text/html");
@@ -90,9 +104,11 @@ async function captureLocked(chat: NativeDamageChat, actor: Actor, name: string,
     }
     for (const data of captured) inspect?.(data);
     if (!captured.length) throw new Error("Native damage applied without a captured result. Check the recipient before continuing.");
-    return await Promise.all(captured.map(async (data, index) => compactDamageApplication(
-      await renderTemplate("systems/cyberpunk-red-core/templates/chat/cpr-damage-application-card.hbs", data),
-      name, data.location ?? location, id + "-" + index, actor.uuid)+(data.pneumaCrackedSkull?'<p class="pneuma-injury-damage">Cracked Skull: penetrating headshot damage ×3; bonus damage unchanged.</p>':"")+(coverUp?'<p class="pneuma-cover-up-damage">Cover Up: armor SP ×2; all worn head and body armor ablates ×2, including blocked damage.</p>':"")));
+    return await Promise.all(captured.map(async (data, index) => {
+      const html=await renderTemplate("systems/cyberpunk-red-core/templates/chat/cpr-damage-application-card.hbs",data);
+      return compactDamageApplication(data.pneumaBlockedAblation?blockedArmorApplication(html):html,
+      name, data.location ?? location, id + "-" + index, actor.uuid)+(data.pneumaCrackedSkull?'<p class="pneuma-injury-damage">Cracked Skull: penetrating headshot damage ×3; bonus damage unchanged.</p>':"")+(coverUp?'<p class="pneuma-cover-up-damage">Cover Up: armor SP ×2; all worn head and body armor ablates ×2, including blocked damage.</p>':"");
+    }));
   } finally {
     damageCaptures.delete(view);
   }

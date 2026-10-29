@@ -1,4 +1,5 @@
 import { checkedLuck } from "./evasion-rules.js";
+import {markSelfContent} from "./self-chat-operation.js";
 import { withActorMutation } from "./actor-mutation.js";
 import { registerNativeWrapper } from "./native-wrappers.js";
 export interface NativeRoll {
@@ -120,7 +121,7 @@ export function markRollResult(html: string, roll: object): string {
 }
 export async function nativeCard(roll: NativeRoll): Promise<string> {
   roll.criticalCard = roll.wasCritical();
-  return markRollResult(await renderTemplate(roll.rollCard, roll), roll);
+  return markSelfContent(markRollResult(await renderTemplate(roll.rollCard, roll), roll),roll);
 }
 const dialogNotes = new WeakMap<NativeRoll, { penalty: number; fee: number }>();
 export function registerEvasionDialog(): void {

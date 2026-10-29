@@ -118,8 +118,12 @@ This remains the master feature roadmap. The [complete previous backlog](docs/hi
 
 ### BL-026 — Consider hold-to-self visibility override
 
+**Follow-up:** User confirmed the held override works and requested initiating-click capture for skills, attacks and other actions. Native CPR roll initiation/Confirm now tags the individual roll; raw/critical dice and rendered cards retain that audience after release. New attack/AoE/manual cards persist Self mode and QuickHack roll dice inherit the captured recipient. This supersedes the hold-through-output limitation for these roll paths; existing shared-card updates and arbitrary third-party asynchronous actions still need separate integration/verification.
+
 **Priority:** Medium\
-**Status:** Idea
+**Status:** In progress — initial implementation local; live Foundry verification pending
+
+**Implementation (2026-10-28):** User authorized an initial hold-for-Self hotkey, defaulting to either ALT key. Configurable under Configure Controls → Combat Tools → Hold for SELF chat. New local chat creation while held forces Self, including explicit whisper/blind destinations; native roll-mode reads temporarily return Self without saving a setting. An on-screen indicator clears on release, focus loss or hiding the tab. New-message creation captures its audience before asynchronous processing. Existing shared-card updates and work performed on another client retain their audience; arbitrary actions delayed until after release are not universally tracked, so hold through confirmation/output. Dice So Nice calls for the local roller are private while held. Build and automated checks passed; live Foundry/module coverage remains pending.
 
 **Desired result:** While a configurable key is held, actions initiated by the user produce Self-visible output.
 
@@ -135,16 +139,17 @@ This remains the master feature roadmap. The [complete previous backlog](docs/hi
 ### BL-020 — Homebrew armor ablation on non-penetrating hits
 
 **Priority:** Medium\
-**Status:** Idea
+**Status:** In progress — implemented locally; live Foundry verification pending
 
 **Desired result:** Add a homebrew option: "Ablate Armor even if hit doesn't penetrate."
 
 **Done when:**
 
-- [ ] Define ablation amount and applicable attack/damage cases.
-- [ ] Add the optional rule and verify penetrating and non-penetrating hit behavior.
+- [x] Define ablation amount and applicable attack/damage cases: retain the attack's native amount (normally 1 SP; AP 2 SP), applied through CPR to equipped armor at the hit location when positive damage is stopped by armor.
+- [x] Add the optional rule and verify penetrating and non-penetrating hit behavior with automated tests, including native CPR methods.
+- [ ] Verify the setting, damage receipts and Undo in a live Foundry GM/player session.
 
-**Notes:** Requested 2026-10-27. Exact mechanics remain open; implementation is not yet authorized.
+**Notes:** Requested 2026-10-27; implementation authorized 2026-10-28. Added the GM world setting **Ablate Armor even if hit doesn't penetrate.** under Attack & Damage Cards, off by default and marked as homebrew. Applies through the shared native damage integration to native and CombatTools ordinary, area, manual and scene damage. Retains native HP, critical bonus damage, half armor, armor layering, ablation amounts and Undo. Zero damage, zero-ablation attacks, armor bypass, brain damage and hits stopped by a shield receive no additional armor ablation; explosives reaching armor after destroying a shield remain eligible. Cover Up keeps its existing double-ablation handling without another application, and the existing CombatTools MA no-ablation setting remains authoritative. Build and focused native-method checks passed; live Foundry verification remains pending. Not released.
 
 ### BL-021 — Visually identify all homebrew settings
 
