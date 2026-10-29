@@ -362,3 +362,7 @@ The root now also carries .pneuma-resolution-card. Visual Tools lays its damage/
 
 
 Hazard activation ChatMessage UUID links within .pneuma-trap-card join .pneuma-chat-button, using the normal action palette without a GM badge. Both data-uuid ChatMessage paths and native data-type=ChatMessage anchors are recognized. Native content-link classes, data attributes and navigation handlers remain intact; unrelated document links are unchanged. Example: .pneuma-trap-card a.content-link.pneuma-chat-button.
+
+### Per-application armor ablation control
+
+When ablateBlockedHits is enabled, damage cards include a `.pneuma-ablate-armor` toggle within `.pneuma-armor-controls`, including when the other armor controls are hidden. Label: Ablate Armor. Its `aria-pressed="true"` default uses the shared chat toggle styling; `false` suppresses armor ablation for this application without changing SP. It applies to native CPR damage cards and managed attack/manual/AoE damage. Existing zero-ablation and armor-bypass behavior remains. Example: `.pneuma-armor-controls .pneuma-ablate-armor[aria-pressed="false"]`.

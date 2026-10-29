@@ -626,3 +626,7 @@ test('autofire result bar displays capped damage multiplier against DV or evasio
  data.hit=false;assert.equal(autofireResultMultiplier(data),0);assert.match(exchangeContent(data),/Autofire ×0/);
  data.attackMode='attack';assert.doesNotMatch(exchangeContent(data),/pneuma-autofire-multiplier/);
 });
+
+test("per-application armor ablation opt out retains SP and original roll",async()=>{
+ for(const ablateArmor of [false,true,undefined]){setup();const msg=await rolled();let args;actor._applyDamage=async(...values)=>{args=values;};await request("damage","damageApply",{options:damageOptions,ablateArmor});assert.equal(args[3],ablateArmor===false?0:2);assert.equal(args[5],0.5);assert.equal(msg.flags["pneuma-combattools"].exchange.damage.result.values.ablation,2);}
+});

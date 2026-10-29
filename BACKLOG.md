@@ -24,6 +24,10 @@ Keep IDs permanent. Add new items by copying an entry. Move finished or dropped 
 
 This remains the master feature roadmap. The [complete previous backlog](docs/history/backlog-before-standard-template-2026-09-29.md) preserves every original request, revision and completion note; the [earlier roadmap](docs/history/pre-0.8.0-refresh/BACKLOG.md) preserves older history. Source manifest: 0.9.8. Historical version/unreleased labels are not current release verification. Existing uncommitted gameplay work was not evaluated or changed by this documentation task.
 
+## Bottom-Docked Combat Bar (implemented locally, 2026-10-29)
+
+User-requested fifth position: Players icon button opening the native player list; movement and gear controls without minimize; participants; previous/next turn controls; native macro bar. Portrait size also sizes Players and macro buttons. Native controls and listeners are retained, with restoration on exit and rerender handling. Build, 20 Combat Bar tests, and Combat Bar/settings browser fixtures pass. Live Foundry/theme/multiplayer validation remains pending; not released.
+
 ## Open items
 
 ### BL-028 — Refactor native CPR damage integration
@@ -165,21 +169,19 @@ This remains the master feature roadmap. The [complete previous backlog](docs/hi
 
 **Notes:** Requested 2026-10-27. The user will guide classification and presentation; these choices remain open.
 
-### BL-022 — Expand EKG visibility and medical information options
+### BL-022 — GM-controlled hover EKG visibility
 
 **Priority:** Medium\
-**Status:** Idea
+**Status:** Implemented locally; live Foundry verification pending
 
-**Desired result:** Greatly enhance EKG options for MedTech/Biomonitor use and friendly-token visibility.
+**Desired result:** GM controls EKG and exact HP visibility using GM, Player and MedTech Player rows, with Owned, other player-owned, Friendly and Neutral/Hostile columns.
 
-**Done when:**
+- Each cell offers None, Show EKG or Show EKG + HP, with current/max HP overlaid on the waveform.
+- MedTech eligibility uses the assigned character's native Medtech rank of at least 1, independent of token selection.
+- Biomonitor grants are configurable as No One, Anyone or MedTechs only; they add EKG without granting HP or downgrading matrix access.
+- Categories resolve Owned, other player-owned, Friendly disposition, then Neutral/Hostile. Hidden targets remain hidden.
+- Supersedes the original 2026-10-27 role/equipment automatic-access design, per user direction on 2026-10-29.
 
-- [ ] Define MedTech/Biomonitor requirements and their interaction.
-- [ ] Add an option to always show EKG to friendlies; define how friendlies are identified.
-- [ ] Allow MedTechs to see exact HP rather than only approximate health; define eligibility and any Biomonitor requirement.
-- [ ] Verify the agreed viewer/target combinations.
-
-**Notes:** Requested 2026-10-27. Additional EKG requirements remain open. This extends the visual review in BL-014; implementation is not yet authorized.
 
 ### BL-004 — Define smoke and sensory exceptions
 
@@ -652,3 +654,9 @@ Hazard damage reuses normal CT Add effects, native damage application and follow
 Removed white native backgrounds from hazard attack/effect card links by including scoped ChatMessage content links in the shared button renderer. Native UUID click handling retained.
 
 - Automatic Needs Stabilization now requires HP loss by an Actor/token participating in an active, started combat. Prep edits, inactive/unstarted encounters, and unrelated Actors do not mark; queued applications recheck combat eligibility. The setting remains optional and off by default; existing conditions and medical actions are unchanged.
+
+Bottom-Docked Players popup: every opening resets the native list to show all users, including offline users, and expands the list.
+
+Bottom-Docked offers a client-only **Use full screen width** option (off by default), visible only for that position. It extends the dock beneath the native sidebar and reserves the measured dock height above it for all sidebar tabs, including chat. Resizing portraits updates that space; disabling the option, switching positions, or removing the bar restores native sidebar sizing. Live Foundry/theme verification remains pending.
+
+Bottom-Docked checkbox **Resize Macro Bar to match Combat Bar** is client-only and on by default. Turning it off retains native macro slot sizing while Players and combat portraits continue to use Combat Bar size.

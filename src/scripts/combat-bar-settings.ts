@@ -66,6 +66,6 @@ export function openCombatBarSettings():void {
 }
 
 export function registerCombatBarSettings():void{
- for(const key of ["combatBarDock","combatBarSize","combatBarOrientation","combatBarNameOnly"]){const setting=game.settings!.settings.get(MODULE+"."+key as keyof SettingConfig);if(setting)setting.config=false;}
+ for(const key of ["combatBarDock","combatBarFullWidth","combatBarResizeMacros","combatBarSize","combatBarOrientation","combatBarNameOnly"]){const setting=game.settings!.settings.get(MODULE+"."+key as keyof SettingConfig);if(setting)setting.config=false;}
  game.settings!.registerMenu(MODULE,"combatBarSettings",{name:"Combat Bar",label:"Configure",hint:"Position, portrait size and tooltip instructions.",icon:"fas fa-users",type:CombatBarSettings,restricted:false});
 }

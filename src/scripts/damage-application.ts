@@ -107,7 +107,7 @@ async function captureLocked(chat: NativeDamageChat, actor: Actor, name: string,
     return await Promise.all(captured.map(async (data, index) => {
       const html=await renderTemplate("systems/cyberpunk-red-core/templates/chat/cpr-damage-application-card.hbs",data);
       return compactDamageApplication(data.pneumaBlockedAblation?blockedArmorApplication(html):html,
-      name, data.location ?? location, id + "-" + index, actor.uuid)+(data.pneumaCrackedSkull?'<p class="pneuma-injury-damage">Cracked Skull: penetrating headshot damage ×3; bonus damage unchanged.</p>':"")+(coverUp?'<p class="pneuma-cover-up-damage">Cover Up: armor SP ×2; all worn head and body armor ablates ×2, including blocked damage.</p>':"");
+      name, data.location ?? location, id + "-" + index, actor.uuid)+(data.pneumaCrackedSkull?'<p class="pneuma-injury-damage">Cracked Skull: penetrating headshot damage ×3; bonus damage unchanged.</p>':"")+(coverUp?'<p class="pneuma-cover-up-damage">Cover Up: armor SP ×2; '+(coverUp.ablation>0?'all worn head and body armor ablates ×2, including blocked damage.':'no armor ablation for this application.')+'</p>':"");
     }));
   } finally {
     damageCaptures.delete(view);

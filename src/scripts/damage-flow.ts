@@ -1,6 +1,6 @@
 import { escapeHTML as escape } from "./shared.js";
 import {requireParticipants,resolveEncounter,encounterRef,tokenEncounter,type EncounterRef} from "./encounter.js";
-import {interactArmorSelected, halfArmorSelected, halfArmorControl, armorIgnorePercent} from "./half-armor.js";
+import {ablateArmorSelected, interactArmorSelected, halfArmorSelected, halfArmorControl, armorIgnorePercent} from "./half-armor.js";
 import {reportExposure} from "./effect-events.js";
 import {instantId} from "./instant-catalog.js";
 import {createInstantCard} from "./instant-effects.js";
@@ -27,7 +27,7 @@ export interface DamageOptions { useShield: boolean; damageReductionRole: boolea
 export interface DamageRequest {
   encounter?:EncounterRef;
   action: "damageAllowMiss" | "damageClaim" | "damageRelease" | "damageCommit" | "damageApply" | "damageReset" | "damageResolved" | "damageStatuses";
-  interactArmor?: boolean; halfArmor?: boolean; statusEffects?: string[]; nonce?: string; damage?: DamageResult; options?: DamageOptions; targetUuid?: string; application?: "recorded" | "selected"; applicationId?: string;
+  ablateArmor?: boolean; interactArmor?: boolean; halfArmor?: boolean; statusEffects?: string[]; nonce?: string; damage?: DamageResult; options?: DamageOptions; targetUuid?: string; application?: "recorded" | "selected"; applicationId?: string;
 }
 export async function damageActor(uuid: string): Promise<Actor> {
   const token = await fromUuid(uuid) as TokenDocument | null;
@@ -195,8 +195,8 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
   try {
     const token = await fromUuid(destination) as TokenDocument | null;
     const summaries = await captureDamageApplication(actor, token?.name ?? actor.name ?? "", v.location, damage.applicationId!,
-      view => target._applyDamage.call(view, v.total, v.bonus, v.location, (interact===false || data.coverUp || data.weaponType === "martialArts" && game.settings!.get("pneuma-combattools", "maNoAblation")) ? 0 : v.ablation, v.ammo, data.coverUp?2*armorIgnorePercent(v.ignorePercent,request.halfArmor,interact)-100:armorIgnorePercent(v.ignorePercent,request.halfArmor,interact), data.coverUp?v.ignoreBelow/2:v.ignoreBelow, v.lethal, request.options),
-      data.coverUp?{ablation:interact===false?0:2*v.ablation,ignorePercent:armorIgnorePercent(v.ignorePercent,request.halfArmor,interact),ignoreBelow:v.ignoreBelow}:undefined, native=>{damage.penetrated=Number(native.rawDamageDealt)>0&&native.hpReduction>0;},data.attackMode==="aimed"&&v.location==="head");
+      view => target._applyDamage.call(view, v.total, v.bonus, v.location, (request.ablateArmor===false || interact===false || data.coverUp || data.weaponType === "martialArts" && game.settings!.get("pneuma-combattools", "maNoAblation")) ? 0 : v.ablation, v.ammo, data.coverUp?2*armorIgnorePercent(v.ignorePercent,request.halfArmor,interact)-100:armorIgnorePercent(v.ignorePercent,request.halfArmor,interact), data.coverUp?v.ignoreBelow/2:v.ignoreBelow, v.lethal, request.options),
+      data.coverUp?{ablation:request.ablateArmor===false||interact===false?0:2*v.ablation,ignorePercent:armorIgnorePercent(v.ignorePercent,request.halfArmor,interact),ignoreBelow:v.ignoreBelow}:undefined, native=>{damage.penetrated=Number(native.rawDamageDealt)>0&&native.hpReduction>0;},data.attackMode==="aimed"&&v.location==="head");
     if(damage.penetrated) {
       const ammo=damage.result.ammoType;
       if(ammo&&ammo!=="incendiary")await reportExposure(actor,ammo);
@@ -264,7 +264,7 @@ export function selectedDamageTarget(): string {
   if (!token.actor?.isOwner) throw new Error("Only the selected actor’s owner or GM can apply damage.");
   return token.document.uuid;
 }
-export async function applyFromCard(data: Exchange, send: Send, shiftKey: boolean, targetUuid = data.defender, application: "recorded" | "selected" = "recorded", halfArmor?: boolean, interactArmor?: boolean): Promise<void> {
+export async function applyFromCard(data: Exchange, send: Send, shiftKey: boolean, targetUuid = data.defender, application: "recorded" | "selected" = "recorded", halfArmor?: boolean, interactArmor?: boolean, ablateArmor?: boolean): Promise<void> {
   const token=await fromUuid(targetUuid) as TokenDocument|null;
   const encounter=data.combatId!==undefined?encounterRef(resolveEncounter(data),data.combatScene,[...(data.combatTokens??[]),...(data.areaTarget?[]:[targetUuid])]):encounterRef(tokenEncounter(token?.parent?.id,[targetUuid]),token?.parent?.id,[targetUuid]);
   resolveEncounter(encounter);
@@ -285,7 +285,7 @@ export async function applyFromCard(data: Exchange, send: Send, shiftKey: boolea
     options = { useShield: !!chosen.useShield, damageReductionRole: !!chosen.damageReductionRole,
       damageReductionAE: !!chosen.damageReductionAE, brainDamageReduction: !!chosen.brainDamageReduction };
   }
-  await send("damageApply", { encounter, halfArmor, interactArmor, targetUuid, application, applicationId: foundry.utils.randomID(), options,
+  await send("damageApply", { encounter, halfArmor, interactArmor, ablateArmor, targetUuid, application, applicationId: foundry.utils.randomID(), options,
     statusEffects: (data.damage?.statusEffects ?? inherentDamageStatuses(data.damage?.result?.ammoType)).slice(0, 3) });
 }
 export async function renderDamage(message: ChatMessage, data: Exchange, html: JQuery, send: Send, manual?: {canEditEffects: boolean; recordedOnly?: boolean}): Promise<void> {
@@ -369,8 +369,8 @@ export async function renderDamage(message: ChatMessage, data: Exchange, html: J
       manual?.canEditEffects===false||!["rolled","applied"].includes(status!),
       statusEffects=>send("damageStatuses",{statusEffects}));
     if (!manual?.recordedOnly || manual.canEditEffects) effectsPanel.append(statusBox);
-    if (!manual || manual.recordedOnly) button(data.defenderName, event => applyFromCard(data, send, event.shiftKey, data.defender, "recorded", halfArmorSelected(event), interactArmorSelected(event)), "recorded");
-    if (!manual?.recordedOnly) button("Selected Token", event => applyFromCard(data, send, event.shiftKey, selectedDamageTarget(), "selected", halfArmorSelected(event), interactArmorSelected(event)), "selected");
+    if (!manual || manual.recordedOnly) button(data.defenderName, event => applyFromCard(data, send, event.shiftKey, data.defender, "recorded", halfArmorSelected(event), interactArmorSelected(event), ablateArmorSelected(event)), "recorded");
+    if (!manual?.recordedOnly) button("Selected Token", event => applyFromCard(data, send, event.shiftKey, selectedDamageTarget(), "selected", halfArmorSelected(event), interactArmorSelected(event), ablateArmorSelected(event)), "selected");
   }
   if (!manual && game.user!.isGM && status === "rolling") button("Release unfinished damage roll", () => send("damageReset"), undefined, true);
   if (!manual && game.user!.isGM && (status === "review" || status === "applying"))

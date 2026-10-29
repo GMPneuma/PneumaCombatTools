@@ -89,3 +89,5 @@ The exact grouping code is [settings-layout.ts](../src/scripts/settings-layout.t
 | evasionFlatPenalty, evasionCumulativePenalty | World/internal; false | Older penalty compatibility fields. |
 
 The authoritative homebrew payload is saved by its subform; these compatibility defaults do not add extra visible controls.
+
+When blocked-hit ablation is enabled, every damage card shows a default-on **Ablate Armor** toggle, even when normal armor controls are hidden. Turn it off to suppress armor ablation for that application while retaining SP protection. Native, attack, manual and AoE damage paths honor the choice; Cover Up retains doubled SP but also honors the ablation opt-out.

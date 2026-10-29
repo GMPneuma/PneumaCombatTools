@@ -1,5 +1,5 @@
 const MODULE = "pneuma-combattools";
-export const COMBAT_BAR_SETTING_KEYS = ["combatBar", "combatBarDock", "combatBarSize", "combatBarOrientation", "combatBarNameOnly", "combatBarDefaultMovement"] as const;
+export const COMBAT_BAR_SETTING_KEYS = ["combatBar", "combatBarDock", "combatBarFullWidth","combatBarResizeMacros", "combatBarSize", "combatBarOrientation", "combatBarNameOnly", "combatBarDefaultMovement"] as const;
 /** Order existing native rows; settings remain registered under their original keys/scopes. */
 const groups = [
   { id: "combat", title: "Attack & Damage Cards", keys: ["routeSheetAttacks", "hideAttackWeapon", "chatResultDelay", "showArmorControls", "maNoAblation", "ablateBlockedHits", "reportWeaponReloads"] },
@@ -9,7 +9,7 @@ const groups = [
   { id: "injuries", title: "Injuries & Effects", keys: ["enableStabilization", "criticalInjuries", "injuryTurnEndReminder", "empBehaviorMenu", "customStatusesMenu", "statusCleanup"] },
   { id: "quickhack", title: "QuickHack", keys: ["quickhackEnabled", "quickhackMode", "quickhackMessages"] },
   { id: "combat-bar", title: "Combat Bar", keys: [...COMBAT_BAR_SETTING_KEYS,"combatBarSettings"] },
-  { id: "token-hud", title: "Token HUD & Targeting", keys: ["tokenHUDSettings", "hoverDV", "hoverAutofire", "hoverDVEncounterOnly", "alwaysShowEKG"] },
+  { id: "token-hud", title: "Token HUD & Targeting", keys: ["tokenHUDSettings", "hoverDV", "hoverAutofire", "hoverDVEncounterOnly", "ekgVisibilitySettings"] },
   { id: "status-hud", title: "Biomonitor", keys: ["eyeHUD", "biomonitorSettings", "eyeHUDDock", "crewHUDIntegration", "biomonitorShowHP", "forcePlayerHUDAnimations", "eyeHUDAnimateMessages", "biomonitorFlashSeconds"] },
 ] as const;
 
@@ -20,7 +20,26 @@ export function combatBarPositionControls(root: HTMLElement): void {
   if (!dock || !orientation) return;
   const dockRow = dock.closest<HTMLElement>(".form-group")!;
   const orientationRow = orientation.closest<HTMLElement>(".form-group")!;
+  const dockOnlyRows = ["combatBarFullWidth", "combatBarResizeMacros"].map(key => root.querySelector('[name="'+MODULE+'.'+key+'"]')?.closest<HTMLElement>(".form-group"));
+  dockRow.classList.add("pneuma-bar-position-row");
+  let options = dockRow.querySelector<HTMLElement>(".pneuma-bar-dock-options");
+  if (!options) {
+    options = document.createElement("div");
+    options.className = "pneuma-bar-dock-options";
+    dockRow.append(options);
+  }
+  // Reattach native setting rows after repeated Module Settings grouping.
+  for (const row of dockOnlyRows) if (row) {row.hidden = false; options.append(row);}
+  const updateFullWidth = () => {
+    const visible = dock.value === "bottom-docked";
+    options.style.visibility = visible ? "visible" : "hidden";
+    options.inert = !visible;
+  };
+  updateFullWidth();
+  if (!dockRow.querySelector(".pneuma-bar-positions")) dock.addEventListener("change", updateFullWidth);
   dock.hidden = true;
+  const nativeFields = dock.closest<HTMLElement>(".form-fields");
+  if (nativeFields) nativeFields.hidden = true;
   orientationRow.hidden = true;
   if (dockRow.querySelector(".pneuma-bar-positions")) return;
   const choices = document.createElement("div");
@@ -33,12 +52,13 @@ export function combatBarPositionControls(root: HTMLElement): void {
     ["bottom-left", "vertical", "Bottom left vertical"],
     ["top-right", "horizontal", "Top right horizontal"],
     ["top-right", "vertical", "Top right vertical"],
+    ["bottom-docked", "horizontal", "Bottom-Docked"],
   ] as const) {
     const label = document.createElement("label");
     const radio = document.createElement("input");
     radio.type = "radio";
     // Unnamed presentation controls never enter Foundry's settings submission.
-    radio.checked = dock.value === position && orientation.value === direction;
+    radio.checked = dock.value === position && (position === "bottom-docked" || orientation.value === direction);
     radio.tabIndex = radio.checked ? 0 : -1;
     radio.addEventListener("change", () => {
       for (const sibling of radios) { sibling.checked = sibling === radio; sibling.tabIndex = sibling === radio ? 0 : -1; }
@@ -59,7 +79,7 @@ export function combatBarPositionControls(root: HTMLElement): void {
     label.append(radio, document.createTextNode(title));
     choices.append(label);
   }
-  dock.after(choices);
+  dockRow.append(choices);
 }
 
 

@@ -27,7 +27,7 @@ try {
   window.damageContent=ex=>'<div class="pneuma-damage-result"><section class="pneuma-resolution-damage-roll">'+ex.damage.result.html+halfArmorControl(ex.damage.result.values.ignorePercent,ex.damage.result.values.interactArmor!==false)+'<div class="pneuma-damage-effects-slot"></div></section><div class="pneuma-damage-application"><div class="pneuma-damage-application-box"></div></div></div>';
   window.canonicalDamageStatus=id=>id;window.inherentDamageStatuses=()=>[];window.validateDamageStatuses=effects=>effects??[];window.damageStatusChoices=()=>[];window.chooseDamageStatuses=async()=>['prone'];
   window.selectedDamageTarget=()=> 'Token.1';window.handleDamage=async(req,user,ex,save)=>{window.applied=req;await save();};
-  window.applyFromCard=async(ex,send,shift,target,application,halfArmor)=>send('damageApply',{targetUuid:target,halfArmor});
+  window.applyFromCard=async(ex,send,shift,target,application,halfArmor,interactArmor,ablateArmor)=>send('damageApply',{targetUuid:target,halfArmor,interactArmor,ablateArmor});
   window.DiceHandler={handle3dDice:async()=>{}};window.LOGGER={debug:()=>{}};
   window.SystemUtils={Localize:k=>k,getUserTargetedOrSelected:()=>[]};
   window.facesQueue=[];
@@ -47,7 +47,7 @@ try {
  const nativeRoot=process.env.TEMP+'/crewtools-cpr-native/fvtt-cyberpunk-red-core-v0.92.4-75b8c9d7cb76ed1ea2797a3404ce77172d424b6b/src';
  const native=await readFile(process.env.PNEUMA_CPR_ROLLS || nativeRoot+'/modules/rolls/cpr-rolls.js','utf8');
  await page.addScriptTag({type:'module',content:native.replace(/^import .*$/gm,'')+'\nwindow.manualNativeClasses={CPRRoll,CPRDamageRoll,CPRTableRoll};'});
- for(const [file,names] of [['half-armor','armorIgnorePercent,halfArmorControl,halfArmorSelected,interactArmorSelected,bindHalfArmor,registerHalfArmor'],['manual-roll-state','MANUAL_MODULE,manualEscape,manualNumber,groupOutcome,groupContent']]) {
+ for(const [file,names] of [['half-armor','armorIgnorePercent,halfArmorControl,ablateArmorSelected,halfArmorSelected,interactArmorSelected,bindHalfArmor,registerHalfArmor'],['manual-roll-state','MANUAL_MODULE,manualEscape,manualNumber,groupOutcome,groupContent']]) {
   const code=(await readFile('dist/scripts/'+file+'.js','utf8')).replace(/^import .*$/gm,'').replace(/^export \{ escapeHTML as manualEscape \} from .*;$/gm,'');await page.addScriptTag({type:'module',content:code+'\nObject.assign(window,{'+names+'});'});
  }
  const favoriteSource=(await readFile('dist/scripts/roll-favorites.js','utf8')).replace(/^import .*$/gm,'');
@@ -180,6 +180,12 @@ try {
   const normal={flags:{'pneuma-combattools':{exchange:{damage:damage.damage}}}};
   armorHook(normal,[cards]);check(!cards.querySelector('.pneuma-half-armor')&&!cards.querySelector('.pneuma-interact-armor'),'normal hides both controls');
   game.settings.get=()=>true;armorHook(normal,[cards]);check(cards.querySelector('.pneuma-interact-armor'),'normal setting restores controls');
+  game.settings.get=(_m,key)=>key==='ablateBlockedHits';
+  cards.innerHTML=manualContent(damage);armorHook(dm,[cards]);bindManualCard(dm,cards);await new Promise(requestAnimationFrame);
+  const ablate=cards.querySelector('.pneuma-ablate-armor');check(ablate?.getAttribute('aria-pressed')==='true','ablation defaults checked');ablate.click();cards.querySelector('.pneuma-apply-damage').click();await new Promise(resolve=>setTimeout(resolve,20));check(applied.ablateArmor===false,'per-application opt out is sent');
+  cards.innerHTML='<div class="rollcard"><a data-action="applyDamage" data-ablation="2" data-ignore-armor-percent="50"></a></div>';bindHalfArmor(cards,false);bindHalfArmor(cards,false);
+  check(cards.querySelectorAll('button').length===1,'ablation shown alone when normal armor controls hidden');const toggle=cards.querySelector('.pneuma-ablate-armor'),link=cards.querySelector('a');toggle.click();check(link.dataset.ablation==='0'&&link.dataset.ignoreArmorPercent==='50','opt out preserves SP');toggle.click();check(link.dataset.ablation==='2','restores AP ablation');
+  cards.innerHTML='<div class="rollcard"><a data-action="applyDamage" data-ablation="0" data-ignore-armor-percent="0"></a></div>';bindHalfArmor(cards,false);cards.querySelector('button').click();cards.querySelector('button').click();check(cards.querySelector('a').dataset.ablation==='0','zero-ablation attack stays zero');
   const injury={uuid:'Compendium.injury',name:'Broken Ribs',type:'criticalInjury',img:'',system:{penalty:5},effects:[{toObject:()=>({name:'Effect'})}]};
   const table={name:'Critical Injuries (Body)',async roll(){return {results:[{text:injury.name}],roll:await new Roll('2d6').evaluate()}}};
   game.packs=new Map([['tables',{getIndex:async()=>{},index:[{name:table.name}]}],['injuries',{getIndex:async()=>{}}]]);

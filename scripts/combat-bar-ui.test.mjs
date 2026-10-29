@@ -20,7 +20,7 @@ try {
   window.gm={id:'gm',isGM:true,active:true,hasPermission:()=>true};window.player={id:'p',isGM:false,active:true,hasPermission:()=>window.pingPermission};window.pingPermission=true;
   const scene={id:'scene'};
   window.makeToken=(id,name,color)=>{
-   const actor={id,uuid:'Actor.'+id,name,img:'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="120" height="180"><rect width="120" height="180" fill="${color}"/><text x="60" y="95" font-size="44" text-anchor="middle" fill="white">${name.slice(0,1)}</text></svg>`),testUserPermission:u=>u===player};
+   const actor={system:{derivedStats:{hp:{value:23,max:40}}},id,uuid:'Actor.'+id,name,img:'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="120" height="180"><rect width="120" height="180" fill="${color}"/><text x="60" y="95" font-size="44" text-anchor="middle" fill="white">${name.slice(0,1)}</text></svg>`),testUserPermission:u=>u===player};
    const token={id,name,actor,isOwner:true,isVisible:true,controlled:false,center:{x:100,y:200},control:()=>{calls.select.push(id);token.controlled=true;emit('controlToken');}};
    token.document={id,uuid:'Scene.scene.Token.'+id,parent:scene,hidden:false,_source:{x:0,y:0,elevation:0},object:token,texture:{src:'WRONG-TOKEN-ART.png'}};
    actor.temporaryEffects=[{img:actor.img,name:'Prone'},{img:actor.img,name:'Dead',getFlag:()=>true}];
@@ -84,6 +84,15 @@ try {
  await page.addScriptTag({type:'module',content:(await readFile(output+'/scripts/update-path.js','utf8'))+'\n'+state+'\n'+flyouts+'\nconst registerBarTurns=()=>{};const requestEndTurn=async combat=>{calls.gmRequests=(calls.gmRequests??0)+1;return combat.nextTurn();};\n'+source+'\nregisterCombatBar();emit("canvasReady");'});
  const bar=page.locator('#pneuma-combat-bar');await bar.waitFor();
  assert.equal(await bar.locator('li').count(),3);
+ assert.equal(await bar.locator('.pneuma-bar-health').count(),3,'GM sees every health strip');
+ await page.evaluate(()=>{game.user=player;emit('updateUser',player);});
+ assert.equal(await bar.locator('.pneuma-bar-health').count(),1,'Players see only owned health');
+ await page.evaluate(()=>{window.healthPortrait=document.querySelector('[data-entry-id="c0"] button');tokens[0].actor.system.derivedStats.hp.value=12;emit('updateActor',tokens[0].actor);});
+ assert.equal(await bar.locator('.pneuma-bar-health').getAttribute('aria-valuenow'),'12');
+ assert(await page.evaluate(()=>healthPortrait===document.querySelector('[data-entry-id="c0"] button')),'HP updates retain portrait nodes');
+ await page.evaluate(()=>{game.user=gm;emit('updateUser',gm);});
+ await page.screenshot({path:'../.ekg-validation/health-preview.png'});
+
  for(const layout of ['vertical','horizontal']){
   await page.evaluate(value=>game.settings.set('pneuma-combattools','combatBarOrientation',value),layout);
   for(const [action,label] of [['rollAll','Roll Initiative All'],['rollNPC','Roll Initiative NPC'],['resetAll','Reset Initiative']]){
@@ -340,6 +349,122 @@ try {
  assert.equal(await bar.locator('li').count(),0,'Offline players are removed from the GM bar');
  await page.evaluate(()=>{game.user=player;emit('updateUser');});
  assert.equal(await bar.locator('li').count(),1,'Player sees own assigned character');
+ // Load the actual three-state integration: it overrides _showOffline in getData.
+ await page.evaluate(()=>{
+   Hooks.once=Hooks.on;
+   window.registerNativeWrapper=(owner,key,fn)=>{const old=owner[key];owner[key]=function(...args){return fn.call(this,old.bind(this),...args);};};
+   window.PlayerList=class {
+     constructor(){this._showOffline=false;}
+     getData(){return {users:[{name:'Online',active:true},{name:'Offline',active:false}].filter(u=>this._showOffline||u.active)};}
+     _onToggleOfflinePlayers(event){event.preventDefault();}
+     render(){
+       const root=document.getElementById('players');root.replaceChildren();
+       const heading=document.createElement('h3');heading.textContent='Players';root.append(heading);
+       const list=document.createElement('ol');
+       for(const user of this.getData().users){const row=document.createElement('li');row.textContent=user.name;list.append(row);}
+       root.append(list);heading.addEventListener('click',this._onToggleOfflinePlayers.bind(this));
+       this.element=[root];emit('renderPlayerList',this,[root]);return this;
+     }
+   };
+   ui.players=new PlayerList();
+ });
+ await page.addScriptTag({type:'module',content:(await readFile(output+'/scripts/players-control.js','utf8')).replace(/^import .*;\s*/gm,'')+'\nregisterPlayersControl();emit("setup");ui.players.render();'});
+ await page.addStyleTag({content:':root{--macro-size:50px;--hotbar-height:52px}'});
+ // Native-node lifecycle and responsive Bottom-Docked geometry.
+ await page.evaluate(()=>{
+   game.user=gm;combat.started=true;canvas.tokens.placeables=tokens;
+   const hotbar=document.getElementById('hotbar');hotbar.removeAttribute('style');
+   hotbar.innerHTML='<div id="hotbar-directory-controls" class="bar-controls"><a>⌄</a><a>▣</a></div><nav id="action-bar"><ol id="macro-list">'+Array.from({length:10},(_,i)=>'<li class="macro">'+(i+1)+'</li>').join('')+'</ol><div class="bar-controls">1</div></nav>';
+   window.nativeHotbar=hotbar;window.nativePlayers=document.getElementById('players');
+   window.hotbarParent=hotbar.parentElement;window.playersParent=nativePlayers.parentElement;
+
+   hotbar.querySelector('.macro').addEventListener('click',()=>calls.macro=(calls.macro??0)+1);
+   game.settings.set('','combatBarMinimized',true);game.settings.set('','combatBarDock','bottom-docked');
+ });
+ await page.addStyleTag({content:'#hotbar #action-bar{display:flex}#hotbar #macro-list{display:grid;grid-template-columns:repeat(10,var(--macro-size));list-style:none;margin:0;padding:0}#hotbar .macro{width:var(--macro-size);height:var(--macro-size);border:1px solid #777}#hotbar .bar-controls{flex:0 0 32px}'});
+ assert.equal(await bar.locator('[data-action=minimize]').count(),0);
+ assert.equal(await bar.getAttribute('data-orientation'),'horizontal');
+ assert.equal(await page.evaluate(()=>nativeHotbar===document.querySelector('#pneuma-bottom-dock #hotbar')&&nativePlayers===document.querySelector('#pneuma-bottom-dock #players')),true);
+ assert.equal(await page.evaluate(()=>settings.combatBarResizeMacros),true);
+ const playersToggle=page.locator('#pneuma-bottom-dock > button');
+ await click(playersToggle);assert.equal(await page.locator('#players').isVisible(),true);
+ assert.equal(await page.evaluate(()=>settings.playersMode),'all');
+ assert.equal(await page.locator('#players li').count(),2);
+ assert.equal(await page.locator('.pneuma-players-mode').textContent(),'All');
+ assert.equal(await page.locator('#players > ol').isVisible(),true);
+ await click(playersToggle);
+ await page.evaluate(()=>game.settings.set('','playersMode','minimized'));
+ await click(playersToggle);
+ assert.equal(await page.evaluate(()=>settings.playersMode),'all','Every opening resets the actual saved mode');
+ assert.equal(await page.locator('#players li').count(),2);
+ assert.equal(await page.locator('.pneuma-players-mode').textContent(),'All');
+ assert.equal(await page.locator('#players').evaluate(e=>e.classList.contains('pneuma-players-minimized')),false);
+ await page.keyboard.press('Escape');assert.equal(await page.locator('#players').isVisible(),false);
+ await click(page.locator('#hotbar .macro').first());assert.equal(await page.evaluate(()=>calls.macro),1);
+ for(const size of [32,40,48,64,80,96]){
+   await page.evaluate(size=>game.settings.set('','combatBarSize',String(size)),size);
+   const dimensions=await page.evaluate(()=>{
+     const box=s=>document.querySelector(s).getBoundingClientRect();
+     return {player:box('#pneuma-bottom-dock > button').width,macro:box('#hotbar .macro').width,portrait:box('.pneuma-bar-token').width,right:box('#pneuma-bottom-dock').right,
+       controls:box('#pneuma-combat-bar footer').left,list:box('#pneuma-combat-bar ol').left,turns:box('#pneuma-combat-bar header').left,hotbar:box('#hotbar').left};
+   });
+   assert.equal(dimensions.player,size+2);assert.equal(dimensions.macro,size+2);assert.equal(dimensions.portrait,size+2);
+   assert.ok(dimensions.controls<dimensions.list&&dimensions.list<dimensions.turns&&dimensions.turns<dimensions.hotbar);
+   assert.ok(dimensions.right<=1000);
+ }
+ await page.evaluate(()=>game.settings.set('','combatBarResizeMacros',false));
+ assert.equal(await page.locator('#hotbar .macro').first().evaluate(e=>e.getBoundingClientRect().width),50);
+ assert.equal(await page.locator('.pneuma-bar-token').first().evaluate(e=>e.getBoundingClientRect().width),98);
+ await page.evaluate(()=>game.settings.set('','combatBarSize','64'));
+ assert.equal(await page.locator('#hotbar .macro').first().evaluate(e=>e.getBoundingClientRect().width),50);
+ await page.evaluate(()=>game.settings.set('','combatBarResizeMacros',true));
+ assert.equal(await page.locator('#hotbar .macro').first().evaluate(e=>e.getBoundingClientRect().width),66);
+ await page.evaluate(()=>{
+   const right=document.createElement('div');right.id='ui-right';right.style.cssText='position:fixed;right:0;top:0;height:100%;width:300px';
+   right.innerHTML='<div id="sidebar" style="width:290px;margin:5px;background:#333"></div>';document.body.append(right);
+   emit('renderSidebar');
+ });
+ await page.addStyleTag({content:'#sidebar{height:calc(100% - 10px)}#sidebar.collapsed{height:auto}'});
+ await page.evaluate(()=>game.settings.set('','combatBarFullWidth',true));
+ await page.waitForFunction(()=>document.getElementById('sidebar').getBoundingClientRect().bottom<document.getElementById('pneuma-bottom-dock').getBoundingClientRect().top);
+ assert.equal(await page.locator('#pneuma-bottom-dock').evaluate(e=>e.getBoundingClientRect().right),992);
+ await page.evaluate(()=>game.settings.set('','combatBarSize','32'));
+ await page.waitForFunction(()=>parseFloat(document.body.style.getPropertyValue('--pneuma-dock-space'))===Math.ceil(document.getElementById('pneuma-bottom-dock').getBoundingClientRect().height)+16);
+ await page.evaluate(()=>game.settings.set('','combatBarFullWidth',false));
+ assert.equal(await page.evaluate(()=>document.body.classList.contains('pneuma-dock-full-width')),false);
+ assert.equal(await page.locator('#sidebar').evaluate(e=>e.getBoundingClientRect().height),790);
+ assert.ok(await page.locator('#pneuma-bottom-dock').evaluate(e=>e.getBoundingClientRect().right<=document.getElementById('sidebar').getBoundingClientRect().left));
+ await page.evaluate(()=>game.settings.set('','combatBarFullWidth',true));
+ await page.setViewportSize({width:640,height:800});
+ assert.ok(await page.locator('#pneuma-bottom-dock').evaluate(e=>e.getBoundingClientRect().right<=640));
+ await page.setViewportSize({width:1000,height:800});
+ await page.evaluate(()=>game.settings.set('','combatBarSize','40'));
+ await page.setViewportSize({width:1600,height:800});
+ await page.addStyleTag({content:'#hotbar #action-bar.collapsed{display:none}'});
+ for(const collapsed of [false,true]) {
+   await page.evaluate(collapsed=>document.getElementById('action-bar').classList.toggle('collapsed',collapsed),collapsed);
+   const geometry=await page.evaluate(()=>{
+     const box=s=>document.querySelector(s).getBoundingClientRect();
+     return {last:box('#pneuma-combat-bar ol li:last-child').right,turns:box('#pneuma-combat-bar header').left,
+       macroRight:box('#hotbar').right,dockRight:box('#pneuma-bottom-dock').right};
+   });
+   assert.ok(geometry.turns-geometry.last>=0&&geometry.turns-geometry.last<=8,'Turn controls immediately follow final combatant');
+   assert.ok(Math.abs(geometry.dockRight-geometry.macroRight-5)<1,'Macro bar remains right aligned');
+ }
+ await page.screenshot({path:process.env.TEMP+'/pct-bottom-docked.png'});
+ await page.evaluate(()=>{
+   const old=document.getElementById('hotbar'),replacement=old.cloneNode(true);old.replaceWith(replacement);emit('renderHotbar');
+   const oldPlayers=document.getElementById('players');oldPlayers.replaceWith(oldPlayers.cloneNode(true));emit('renderPlayerList',ui.players,[document.getElementById('players')]);
+ });
+ await page.evaluate(()=>game.settings.set('','combatBarDock','bottom-left'));
+ assert.equal(await page.locator('#pneuma-bottom-dock').count(),0);
+ assert.equal(await page.evaluate(()=>document.body.classList.contains('pneuma-dock-full-width')),false);
+ assert.equal(await page.evaluate(()=>document.getElementById('hotbar').parentElement===hotbarParent&&document.getElementById('players').parentElement===playersParent),true);
+ await page.evaluate(()=>game.settings.set('','combatBarDock','bottom-docked'));
+ await page.evaluate(()=>game.settings.set('','combatBar',false));
+ assert.equal(await page.locator('#pneuma-bottom-dock').count(),0);
+ assert.equal(await page.evaluate(()=>document.getElementById('hotbar').parentElement===hotbarParent&&document.getElementById('players').parentElement===playersParent),true);
+ await page.evaluate(()=>game.settings.set('','combatBar',true));
  await page.evaluate(()=>{emit('canvasTearDown');canvas.ready=false;});assert.equal(await bar.count(),0);
  assert.deepEqual(errors,[]);console.log('Combat bar browser checks passed: portraits, positioning, selection, ping, pan, visibility, turn controls, mode writes, scroll and cleanup.');
 }finally{await browser.close();}

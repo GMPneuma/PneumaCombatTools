@@ -1,5 +1,9 @@
 # Combat Tools feature inventory
 
+- Per-application armor ablation (local/unreleased): enabling blocked-hit armor ablation adds a default-on Ablate Armor toggle to native and managed damage cards. Turning it off preserves armor SP but suppresses armor ablation for that application, including Cover Up. Zero-ablation attacks remain zero. Live Foundry verification pending.
+
+- Hover EKG visibility (local/unreleased): GM-only 3 × 4 matrix controls no display, EKG, or EKG with current/max HP overlay. HP text inherits the waveform color. The compact settings matrix includes a single-line Biomonitor label with a fixed-width dropdown. Assigned-character Medtech rank determines the MedTech Player row. Optional installed-Biomonitor grants add EKG only. Combat-bar segmented health strips appear for GMs and owners, update in place and preserve portrait controls. Live Foundry verification pending.
+
 - Self capture compatibility correction: no wrapper is installed on Foundry's non-configurable global `renderTemplate`. Captured native rolls use CPR's template and chat setup through its roll-card renderer; CombatTools applies the recipient marker in its own native-card helper. Uncaptured native rolls delegate normally.
 - Self visibility capture at native confirmation: CPR skill, attack and other roll objects retain the initiating/Confirm Self recipient through asynchronous evaluation, critical dice and card rendering. Captured new cards retain Self after ALT release, including saved attack/AoE/manual visibility; QuickHack dice use the captured audience. Separate overlapping rolls do not share a pending flag. Existing shared-card updates retain their audience; unrelated third-party asynchronous operations are not universally covered.
 - Self chat held indicator: enlarged to 56px minimum height and 20px text, using the shared GM chat-button skin with a SELF badge. Copies public button theme tokens from a rendered chat card on each press so card-scoped skins apply to the body-level overlay. Remains informational and ignores pointer input.
@@ -653,3 +657,23 @@ QuickHack HUD wording: "Quickhacking only works with an active combat". Connecti
 # Attack error notifications (local/unreleased)
 
 Attack HUD failures display the specific error message instead of replacing it with a generic console instruction. Missing combat participants are described as tokens missing from the current combat, with instructions to ask the GM to add them to the Combat Tracker and retry. Encounter membership requirements are unchanged.
+
+### Bottom-Docked Combat Bar (local/unreleased)
+
+Fifth position: Players icon popup, movement and gear controls, participants, turn controls, then the native macro bar. Omits minimize; portrait sizing also scales Players and macro slots. Native player-list and hotbar nodes retain their listeners and are restored on mode exit, disable, or canvas teardown. Native rerenders are reattached. Overflow lists scroll horizontally. Live Foundry/theme/multiplayer verification remains pending.
+
+Validation: strict build, 20 Combat Bar unit tests, and Combat Bar/settings browser fixtures passed. Browser coverage includes all six sizes, section order, popup dismissal, native-node retention/rerenders and restoration.
+
+Bottom-Docked Players popup: every opening resets the native list to show all users, including offline users, and expands the list.
+
+Bottom-Docked offers a client-only **Use full screen width** option (off by default), visible only for that position. It extends the dock beneath the native sidebar and reserves the measured dock height above it for all sidebar tabs, including chat. Resizing portraits updates that space; disabling the option, switching positions, or removing the bar restores native sidebar sizing. Live Foundry/theme verification remains pending.
+
+Bottom-Docked spacing: turn controls immediately follow the final combatant; spare width falls after the turn controls, keeping the native macro bar right-aligned whether expanded or collapsed.
+
+Correction: opening docked Players sets the module's persisted `playersMode` to `all` before rendering. Setting only native `_showOffline` was overridden by the three-state Players integration. Regression coverage now loads that integration and checks actual rows, All label, and removal of minimized state.
+
+Bottom-Docked checkbox **Resize Macro Bar to match Combat Bar** is client-only and on by default. Turning it off retains native macro slot sizing while Players and combat portraits continue to use Combat Bar size.
+
+Combat Bar position settings place radios below the position label, with Bottom-Docked options in a right-hand column. That column reserves its height when hidden, keeping the window height stable as positions change. Native input names and save behavior are preserved.
+
+Release 0.9.28 (2026-10-29): Bottom-Docked Combat Bar and its settings, health-display policy/portrait strips, and per-application armor-ablation controls are included. Prior local/unreleased labels describe implementation history. Live Foundry verification remains pending.

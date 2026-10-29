@@ -7,17 +7,18 @@ try{
  const page=await browser.newPage({viewport:{width:900,height:700}});
  await page.setContent('<body></body>');await page.addStyleTag({content:await readFile(output+'/styles/pneuma-combattools.css','utf8')});
  await page.evaluate(()=>{
-  window.hooks={};window.Hooks={on:(k,f)=>(hooks[k]??=[]).push(f)};
+  window.FormApplication=class {};window.CONST={TOKEN_DISPOSITIONS:{FRIENDLY:1},DOCUMENT_OWNERSHIP_LEVELS:{OWNER:3}};window.hooks={};window.Hooks={on:(k,f)=>(hooks[k]??=[]).push(f)};
   window.foundry={utils:{getProperty:(o,p)=>p.split('.').reduce((v,k)=>v?.[k],o)}};
   window.PIXI={Point:class{constructor(x,y){this.x=x;this.y=y;}}};
   window.viewer={uuid:'Actor.viewer',isOwner:true,items:[{type:'role',name:'Medtech',system:{rank:4}}]};
-  window.target={id:'t',x:200,y:200,w:100,h:100,isVisible:true,isPreview:false,actor:{uuid:'Actor.target',items:[],system:{derivedStats:{hp:{value:40,max:40}}}}};target.document={actor:target.actor};
-  window.values={alwaysShowEKG:false};window.game={user:{id:'player',isGM:false,character:viewer},settings:{register:(_m,k,c)=>{window.setting=c;},get:(_m,k)=>values[k]}};
+  window.target={id:'t',x:200,y:200,w:100,h:100,isVisible:true,isPreview:false,actor:{uuid:'Actor.target',items:[],system:{derivedStats:{hp:{value:40,max:40}}}}};target.document={actor:target.actor,disposition:-1};target.actor.getUserLevel=u=>target.actor.owner===u.id?3:0;target.actor.testUserPermission=u=>u.isGM||target.actor.owner===u.id;
+  window.values={ekgVisibility:{matrix:{medtech_other:'ekg'},biomonitor:'none'}};window.game={user:{id:'player',isGM:false,character:viewer},users:[{id:'player',isGM:false},{id:'other',isGM:false}],settings:{registerMenu:()=>{},register:(_m,k,c)=>{window.setting=c;},get:(_m,k)=>values[k]}};
   const layer={controlled:[]};window.canvas={tokens:layer,activeLayer:layer,stage:{toGlobal:p=>p},app:{screen:{width:900,height:700},view:{getBoundingClientRect:()=>({left:0,top:0,width:900,height:700})}}};
  });
  const biomonitor=await readFile(output+'/scripts/biomonitor.js','utf8'),hover=(await readFile(output+'/scripts/ekg-hover.js','utf8')).replace(/^import .*;\s*/gm,'');
+ const policy=(await readFile(output+'/scripts/ekg-settings.js','utf8')).replace(/const MODULE = [^;]+;/,'');
  const helper=(await readFile(output+'/scripts/eye-hud.js','utf8')).match(/export function hasBiomonitor[\s\S]*?\n}/)[0];
- await page.addScriptTag({type:'module',content:helper+'\n'+biomonitor+'\n'+hover+'\nregisterHoverEKG();window.setEKGPaused=setEKGPaused;window.loaded=true;'});await page.waitForFunction(()=>window.loaded);
+ await page.addScriptTag({type:'module',content:policy+'\n'+helper+'\n'+biomonitor+'\n'+hover+'\nregisterHoverEKG();window.setEKGPaused=setEKGPaused;window.hoverEKGAccess=hoverEKGAccess;window.EKGSettings=EKGSettings;window.loaded=true;'});await page.waitForFunction(()=>window.loaded);
  await page.evaluate(()=>hooks.hoverToken.forEach(fn=>fn(target,true)));
  const panel=page.locator('.pneuma-hover-ekg'),state=page.locator('.pneuma-hover-ekg .pneuma-eye-vitals');
  await panel.waitFor();assert.equal(await state.getAttribute('data-state'),'normal');
@@ -41,20 +42,24 @@ try{
  });
  assert.equal(await page.evaluate(()=>eligibilityScans),0,'Animation frames must not rescan eligibility');
  await page.evaluate(()=>{window.trace= document.querySelector('.pneuma-hover-ekg svg');hooks.refreshToken.forEach(fn=>fn(target));});assert.equal(await page.evaluate(()=>trace===document.querySelector('.pneuma-hover-ekg svg')),true);
- await page.evaluate(()=>{viewer.items[0].system.rank=0;hooks.updateItem.forEach(fn=>fn({parent:viewer}));});assert.equal(await panel.count(),0);
- await page.evaluate(()=>{game.user.isGM=true;hooks.updateUser.forEach(fn=>fn(game.user));});assert.equal(await panel.count(),0,'GM still needs role or world override');
- await page.evaluate(()=>{values.alwaysShowEKG=true;setting.onChange();});assert.equal(await panel.count(),1);assert.equal(await page.evaluate(()=>setting.scope),'world');assert.equal(await page.evaluate(()=>setting.default),false);
- await page.evaluate(()=>{target.isVisible=false;hooks.refreshToken.forEach(fn=>fn(target));});assert.equal(await panel.count(),0);
- await page.evaluate(()=>{target.isVisible=true;values.alwaysShowEKG=false;viewer.items[0]={type:'role',name:'Localized',system:{rank:1},_stats:{compendiumSource:'Compendium.cyberpunk-red-core.core_roles.Item.8wRoRsRQnpt3Je00'}};hooks.hoverToken.forEach(fn=>fn(target,true));});assert.equal(await panel.count(),1);
- await page.evaluate(()=>{canvas.tokens.controlled=[{actor:{isOwner:true,items:[]}}];hooks.controlToken.forEach(fn=>fn());});assert.equal(await panel.count(),0,'Selected non-Medtech overrides assigned Medtech');
- await page.evaluate(()=>{target.actor.items=[{type:'cyberware',name:'Biomonitor',system:{isInstalledInActor:true}}];hooks.createItem.forEach(fn=>fn({parent:target.actor}));});assert.equal(await panel.count(),1,'Non-Medtech sees installed target Biomonitor');
- await page.evaluate(()=>{target.actor.items[0].system.isInstalledInActor=false;hooks.updateItem.forEach(fn=>fn({parent:target.actor}));});assert.equal(await panel.count(),0,'Uninstalled Biomonitor grants no visibility');
- await page.evaluate(()=>{target.actor.items[0]={type:'cyberware',name:'Renamed monitor',system:{isInstalledInActor:true},_stats:{compendiumSource:'Compendium.core.Item.0d2bEozOFhfPgkUP'}};hooks.updateItem.forEach(fn=>fn({parent:target.actor}));});assert.equal(await panel.count(),1,'Native source identifies renamed Biomonitor');
- await page.evaluate(()=>{target.actor.items=[];hooks.deleteItem.forEach(fn=>fn({parent:target.actor}));});assert.equal(await panel.count(),0,'Removing target Biomonitor refreshes visibility');
- await page.evaluate(()=>{canvas.tokens.controlled=[];hooks.controlToken.forEach(fn=>fn());});assert.equal(await panel.count(),1);
- await page.evaluate(()=>hooks.hoverToken.forEach(fn=>fn(target,false)));assert.equal(await panel.count(),0);
- for(const type of ['container','blackIce','demon']) {
-  await page.evaluate(type=>{target.actor.type=type;values.alwaysShowEKG=true;hooks.hoverToken.forEach(fn=>fn(target,true));},type);assert.equal(await panel.count(),0,type+' never shows EKG, including with world override');
+ await page.evaluate(()=>{canvas.tokens.controlled=[{actor:{items:[]}}];hooks.controlToken.forEach(fn=>fn());});assert.equal(await panel.count(),1,'Selection does not override assigned character');
+ for(const row of ['gm','player','medtech'])for(const col of ['owned','playerOwned','friendly','other'])for(const level of ['none','ekg','hp']){
+  const actual=await page.evaluate(({row,col,level})=>{game.user.isGM=row==='gm';viewer.items[0].system.rank=row==='medtech'?1:0;target.actor.owner=col==='owned'?'player':col==='playerOwned'?'other':undefined;target.document.disposition=col==='friendly'?1:-1;values.ekgVisibility={matrix:{[row+'_'+col]:level},biomonitor:'none'};return hoverEKGAccess(target);},{row,col,level});assert.equal(actual,level,row+'/'+col);
  }
- console.log('Hover EKG browser checks passed: Medtech gating, GM override, all health states, stable animation, placement, visibility, ownership selection and hover cleanup.');
+ await page.evaluate(()=>{game.user.isGM=false;viewer.items[0].system.rank=0;target.actor.owner='player';target.actor.system.derivedStats.hp.value=23;values.ekgVisibility={matrix:{player_owned:'hp'},biomonitor:'none'};setting.onChange();});
+ assert.equal(await panel.innerText(),'23 / 40');
+ await page.evaluate(()=>{target.actor.system.derivedStats.hp.value=24;hooks.updateActor.forEach(fn=>fn(target.actor));});assert.equal(await panel.innerText(),'24 / 40','HP updates within the same waveform state');
+ await page.evaluate(()=>{values.ekgVisibility.matrix.player_owned='ekg';setting.onChange();});assert.equal(await panel.innerText(),'');assert(!(await panel.getAttribute('aria-label')).includes('24'));
+ for(const audience of ['none','anyone','medtech'])for(const rank of [0,1]){
+  const actual=await page.evaluate(({audience,rank})=>{viewer.items[0].system.rank=rank;target.actor.owner=undefined;target.actor.items=[{type:'cyberware',name:'Biomonitor',system:{isInstalledInActor:true}}];values.ekgVisibility={matrix:{player_other:'none',medtech_other:'none'},biomonitor:audience};return hoverEKGAccess(target);},{audience,rank});assert.equal(actual,audience==='anyone'||audience==='medtech'&&rank?'ekg':'none');
+ }
+ await page.evaluate(()=>{values.ekgVisibility.matrix.medtech_other='hp';setting.onChange();});assert.equal(await panel.innerText(),'24 / 40','Free EKG never downgrades HP');
+ await page.evaluate(()=>{target.isVisible=false;hooks.refreshToken.forEach(fn=>fn(target));});assert.equal(await panel.count(),0);
+ await page.evaluate(()=>{target.isVisible=true;hooks.hoverToken.forEach(fn=>fn(target,true));});assert.equal(await panel.count(),1);
+ await page.evaluate(()=>hooks.canvasTearDown.forEach(fn=>fn()));assert.equal(await panel.count(),0);
+ await page.evaluate(async()=>{window.savedPolicies=[];game.settings.set=async(_m,_k,value)=>savedPolicies.push(value);game.user.isGM=false;await new EKGSettings()._updateObject(null,{gm_owned:'hp'});});assert.equal(await page.evaluate(()=>savedPolicies.length),0);
+ await page.evaluate(async()=>{game.user.isGM=true;await new EKGSettings()._updateObject(null,{gm_owned:'hp',player_owned:'ekg',biomonitor:'medtech'});});assert.equal(await page.evaluate(()=>savedPolicies[0].matrix.player_owned),'ekg');assert.equal(await page.evaluate(()=>savedPolicies[0].biomonitor),'medtech');
+ const settingsData=await page.evaluate(()=>new EKGSettings().getData());
+ assert.equal(settingsData.rows.length,3);assert(settingsData.rows.every(row=>row.cells.length===4&&row.cells.every(cell=>cell.options.length===3)));assert.equal(settingsData.biomonitor.length,3);
+ console.log('Hover EKG: 36 matrix combinations, assigned Medtech rank, Biomonitor grants, HP overlays, cached motion and teardown passed.');
 }finally{await browser.close();}

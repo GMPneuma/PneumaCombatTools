@@ -3,7 +3,7 @@ const controls=[
   ".pneuma-defense-controls button", ".pneuma-evasion-override", ".pneuma-result-damage", ".pneuma-apply-damage", ".pneuma-apply-critical",
   ".pneuma-damage-status-slot", ".pneuma-damage-recovery-controls button", ".pneuma-quickhack-actions button",
   ".pneuma-grapple-controls button", "[data-aoe-action]", "[data-instant-action]", "[data-emp-select]", "[data-status-cleanup]", "[data-copy-combat-summary]",
-  "[data-scene-effect-action]", "[data-trap-action]", "[data-ribs-apply]", ".pneuma-manual-controls button", ".pneuma-group-action button", ".pneuma-half-armor", ".pneuma-interact-armor"
+  "[data-scene-effect-action]", "[data-trap-action]", "[data-ribs-apply]", ".pneuma-manual-controls button", ".pneuma-group-action button", ".pneuma-half-armor", ".pneuma-interact-armor", ".pneuma-ablate-armor"
   , '.pneuma-trap-card a.content-link[data-uuid^="ChatMessage."]', '.pneuma-trap-card a.content-link[data-type="ChatMessage"]'
 ].join(",");
 const observed=new WeakSet<HTMLElement>();
@@ -28,7 +28,7 @@ function decorate(node:HTMLElement):void {
   const recovery=["reset","damageReset","damageResolved","effectsResolved","review","forcehit","exclude","skip","retry","release"].includes(action)
     || node.closest(".pneuma-damage-recovery-controls");
   const cancel=node.classList.contains("pneuma-cancel-exchange")||action==="cancel"||action==="removeSmoke";
-  node.dataset.chatKind=node.matches(".pneuma-half-armor, .pneuma-interact-armor")?"toggle":cancel?"cancel":recovery?"recovery":"action";
+  node.dataset.chatKind=node.matches(".pneuma-half-armor, .pneuma-interact-armor, .pneuma-ablate-armor")?"toggle":cancel?"cancel":recovery?"recovery":"action";
   if(!iconOnly&&node.dataset.chatKind!=="toggle"&&!node.querySelector("i,img,svg")) {
     const icon=document.createElement("i");icon.setAttribute("aria-hidden","true");
     const inferred=node.matches('.pneuma-evasion-override')?'evade':node.matches('.pneuma-result-damage')?'damage'

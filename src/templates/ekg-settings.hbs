@@ -1,0 +1,8 @@
+<form autocomplete="off">
+<p class="notes">MedTech Player uses the assigned character's Medtech rank (1 or higher). Categories use the first match: Owned, other player-owned, Friendly disposition, then Neutral/Hostile.</p>
+<table><thead><tr><th>Viewer</th><th>Owned</th><th>Player-owned</th><th>Friendly</th><th>Neutral/Hostile</th></tr></thead><tbody>
+{{#each rows}}<tr><th scope="row">{{label}}</th>{{#each cells}}<td><select name="{{name}}" aria-label="{{../label}} {{name}}">{{#each options}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}</select></td>{{/each}}</tr>{{/each}}
+</tbody></table>
+<div class="form-group pneuma-ekg-biomonitor"><label for="ekg-biomonitor">If Token has BioMonitor who sees EKG for free</label><select id="ekg-biomonitor" name="biomonitor">{{#each biomonitor}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}</select></div>
+<p class="notes">Biomonitor access grants EKG only. It never removes matrix access or grants HP. HP appears over the EKG. Hidden tokens remain hidden.</p>
+<footer class="sheet-footer flexrow"><button type="submit"><i class="fas fa-save"></i> Save</button></footer></form>

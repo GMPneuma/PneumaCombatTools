@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.28 - 2026-10-29
+
+- Add Bottom-Docked Combat Bar: Players popup, movement/settings, combatants and turn controls, followed by the right-aligned native macro bar. Turn controls stay beside the final combatant.
+- Always open docked Players in All mode, including offline users, through the native three-state integration.
+- Add optional full-screen width with automatic sidebar height adjustment, and an enabled-by-default option to resize macros with combat portraits.
+- Place position radios below their label with dock-only options alongside them, preserving window height when switching positions. Restore native widgets when leaving the dock.
+- Add GM-configurable hover EKG visibility and HP display, Biomonitor access rules, and compact combat portrait health strips.
+- Add an Ablate Armor toggle when blocked-hit ablation is enabled, allowing individual damage applications to preserve armor while retaining SP protection; retain native damage and Undo behavior.
+
+Validation: strict production build, automated tests and focused browser fixtures. Live Foundry/theme/multiplayer verification remains pending.
+
 ## 0.9.27 - 2026-10-28
 
 - Fix Self capture startup on Foundry v12: use CPR's roll-card renderer and the CombatTools card helper instead of attempting to wrap the non-configurable global renderTemplate function.

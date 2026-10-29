@@ -16,6 +16,74 @@ let hold: {timer: number; pointer: number; x: number; y: number} | undefined;
 let suppressClick = false;
 const report = (error: unknown) => ui.notifications!.error(error instanceof Error ? error.message : String(error));
 
+// Retain native application nodes and listeners, restoring their original slots on exit.
+let bottomDock: HTMLElement | undefined;
+let playersButton: HTMLButtonElement | undefined;
+const nativeSlots = new Map<HTMLElement, Comment>();
+function restoreBottomDock(): void {
+  document.body.classList.remove("pneuma-dock-full-width");
+  document.body.style.removeProperty("--pneuma-dock-space");
+  for (const [element, slot] of nativeSlots) {
+    const current = element.isConnected ? element : document.getElementById(element.id);
+    if (current && slot.parentNode) slot.replaceWith(current);
+    else slot.remove();
+  }
+  nativeSlots.clear();
+  if (root && bottomDock?.contains(root)) document.body.append(root);
+  bottomDock?.remove(); bottomDock = undefined; playersButton = undefined;
+}
+function syncBottomDock(enabled: boolean, size: number): void {
+  if (!enabled) {restoreBottomDock(); return;}
+  if (!root) return;
+  if (!bottomDock) {
+    bottomDock = document.createElement("div");
+    bottomDock.id = "pneuma-bottom-dock";
+    bottomDock.className = "app";
+    playersButton = button("", "Players", "players");
+    playersButton.setAttribute("aria-controls", "players");
+    playersButton.setAttribute("aria-expanded", "false");
+    const icon = document.createElement("i");
+    icon.className = document.querySelector("#players h3 i")?.className ?? "fas fa-users";
+    playersButton.append(icon);
+    playersButton.addEventListener("click", () => {
+      const open = bottomDock!.classList.toggle("players-open");
+      playersButton!.setAttribute("aria-expanded", String(open));
+      if (open) {
+        // players-control derives native filtering and the heading from this saved mode.
+        void game.settings!.set(MODULE, "playersMode", "all")
+          .then(() => {ui.players?.render(true);}).catch(report);
+      }
+    });
+    bottomDock.append(playersButton, root);
+    document.body.append(bottomDock);
+  }
+  bottomDock.style.setProperty("--portrait-size", `${size}px`);
+  bottomDock.classList.toggle("resize-macros", game.settings!.get(MODULE, "combatBarResizeMacros"));
+  for (const [element, slot] of nativeSlots) {
+    if (!element.isConnected) {
+      nativeSlots.delete(element);
+      const replacement = document.getElementById(element.id);
+      if (replacement) nativeSlots.set(replacement, slot);
+      else slot.remove();
+    }
+  }
+  for (const id of ["players", "hotbar"]) {
+    const element = document.getElementById(id);
+    if (!element || element.parentElement === bottomDock) continue;
+    if (!nativeSlots.has(element)) {
+      const slot = document.createComment(`pneuma-${id}-slot`);
+      element.before(slot); nativeSlots.set(element, slot);
+    }
+    bottomDock.append(element);
+  }
+  playersButton!.disabled = !document.getElementById("players");
+  observer?.observe(bottomDock);
+}
+function closeDockPlayers(): void {
+  bottomDock?.classList.remove("players-open");
+  playersButton?.setAttribute("aria-expanded", "false");
+}
+
 function cancelHold(): void {
   if (hold) window.clearTimeout(hold.timer);
   hold = undefined;
@@ -31,6 +99,16 @@ function position(): void {
     const z = Number.parseInt(getComputedStyle(node).zIndex); if (Number.isFinite(z) && z > 0) layers.push(z);
   }
   root.style.zIndex = String(layers.length ? Math.max(0, Math.min(...layers) - 1) : 19);
+  if (root.dataset.dock === "bottom-docked" && bottomDock) {
+    const fullWidth = game.settings!.get(MODULE, "combatBarFullWidth");
+    document.body.classList.toggle("pneuma-dock-full-width", fullWidth);
+    bottomDock.style.zIndex = root.style.zIndex;
+    bottomDock.style.right = (fullWidth ? 8 : Math.max(8, window.innerWidth - edge + 8)) + "px";
+    if (fullWidth) document.body.style.setProperty("--pneuma-dock-space", `${Math.ceil(bottomDock.getBoundingClientRect().height) + 16}px`);
+    else document.body.style.removeProperty("--pneuma-dock-space");
+    for (const property of ["left", "right", "top", "bottom", "max-height", "max-width"]) root.style.removeProperty(property);
+    positionEndTurn(); return;
+  }
   if (root.dataset.dock === "top-right") {
     root.style.left = "auto"; root.style.bottom = "auto"; root.style.top = "8px";
     root.style.right = Math.max(8, window.innerWidth - edge + 8) + "px";
@@ -94,6 +172,18 @@ function button(text: string, title: string, action: string): HTMLButtonElement 
   return control;
 }
 
+function barHealth(entry:BarEntry):{hp:number;max:number}|undefined {
+ const actor=entry.token?.actor??entry.combatant?.actor??entry.actor;
+ if(!actor||!game.user||(!game.user.isGM&&!actor.testUserPermission(game.user,"OWNER")))return;
+ const hp=Number(foundry.utils.getProperty(actor,"system.derivedStats.hp.value")),max=Number(foundry.utils.getProperty(actor,"system.derivedStats.hp.max"));
+ if(Number.isFinite(hp)&&Number.isFinite(max)&&max>0)return {hp,max};
+}
+function updateHealth(element:HTMLElement,entry:BarEntry):void {
+ const health=barHealth(entry);let strip=element.querySelector<HTMLElement>(".pneuma-bar-health");
+ if(!health){strip?.remove();return;}if(!strip){strip=document.createElement("div");strip.className="pneuma-bar-health";strip.append(document.createElement("span"));element.append(strip);}
+ const {hp,max}=health;strip.style.setProperty("--health-fill",Math.max(0,Math.min(100,hp/max*100))+"%");strip.dataset.state=hp<=0?"zero":hp<max/2?"serious":hp<max?"wounded":"normal";strip.title=hp+" / "+max+" HP";strip.setAttribute("role","meter");strip.setAttribute("aria-label","Hit points");strip.setAttribute("aria-valuemin","0");strip.setAttribute("aria-valuemax",String(max));strip.setAttribute("aria-valuenow",String(Math.max(0,Math.min(max,hp))));strip.setAttribute("aria-valuetext",strip.title);
+}
+
 function row(entry: BarEntry): HTMLElement {
   const element = document.createElement("li");
   element.className = "combatant";
@@ -115,6 +205,7 @@ function row(entry: BarEntry): HTMLElement {
   img.width = img.height = 40;
   portrait.append(img);
   element.append(portrait);
+  updateHealth(element,entry);
   if (entry.hidden) {
     const hidden = document.createElement("i");
     hidden.className = "fas fa-eye-slash";
@@ -246,12 +337,15 @@ function render(): void {
   const mode = movementMode();
   const endTurn = canEndTurn(combat);
   const size = Number(game.settings!.get(MODULE, "combatBarSize"));
-  const orientation = game.settings!.get(MODULE, "combatBarOrientation");
   const dock = game.settings!.get(MODULE, "combatBarDock");
-  const minimized = game.settings!.get(MODULE, "combatBarMinimized");
+  const docked = dock === "bottom-docked";
+  const orientation = docked ? "horizontal" : game.settings!.get(MODULE, "combatBarOrientation");
+  const minimized = !docked && game.settings!.get(MODULE, "combatBarMinimized");
+  syncBottomDock(docked, [32,40,48,64,80,96].includes(size) ? size : 40);
+  position();
   const key = JSON.stringify([size, orientation, dock, minimized, game.settings!.get(MODULE, "combatBarNameOnly"), combat?.id, combat?.round, combat?.turn, game.user?.isGM, mode, endTurn, turnPending, modePending,
     entries.map(entry => [entry.id, entry.name, entry.img, entry.active, entry.hidden, entry.defeated, !!entry.token])]);
-  if (key === renderKey) return;
+  if (key === renderKey) {const byId=new Map(entries.map(entry=>[entry.id,entry]));root.querySelectorAll<HTMLElement>("li[data-entry-id]").forEach(element=>{const entry=byId.get(element.dataset.entryId!);if(entry)updateHealth(element,entry);});return;}
   renderKey = key;
   cancelHold();
   closeBarFlyout();
@@ -266,12 +360,12 @@ function render(): void {
   root.classList.toggle("is-gm", !!game.user?.isGM);
   root.style.setProperty("--portrait-size", `${[32,40,48,64,80,96].includes(size) ? size : 40}px`);
   root.dataset.turnKey = turnKey;
-  root.hidden = !entries.length && !game.user?.isGM;
+  root.hidden = !docked && !entries.length && !game.user?.isGM;
   const toolbar = document.createElement("div");
   toolbar.className = "pneuma-bar-display";
   const collapse = button(minimized ? "+" : "−", minimized ? "Restore combat bar" : "Minimize combat bar", "minimize");
   collapse.setAttribute("aria-expanded", String(!minimized));
-  toolbar.append(collapse);
+  if (!docked) toolbar.append(collapse);
   const settings = button("", "Combat Bar settings", "settings");
   const gear = document.createElement("i");gear.className="fas fa-cog";gear.setAttribute("aria-hidden","true");
   settings.append(gear);toolbar.append(settings);
@@ -309,7 +403,7 @@ function render(): void {
     root.append(list);
     list.scrollTop = scroll;
     list.scrollLeft = scrollLeft;
-    root.hidden = !entries.length && !game.user?.isGM;
+    root.hidden = !docked && !entries.length && !game.user?.isGM;
     if (endTurn && entries.some(entry => entry.active)) {
       const end = button("End Turn", "End Turn", "end-turn");
       end.className = "pneuma-bar-end";
@@ -352,6 +446,7 @@ function remove(): void {
   closeBarFlyout();
   observer?.disconnect();
   observer = undefined;
+  restoreBottomDock();
   root?.remove();
   root = undefined;
   players = null;
@@ -367,11 +462,19 @@ export function registerCombatBar(): void {
   });
   game.settings!.register(MODULE, "combatBarDock", {
     name: "Combat bar position", hint: "Choose where the combat bar appears.",
-    scope: "client", config: true, type: String, default: "bottom-left", choices: {"bottom-left":"Bottom left", "top-right":"Top right"},
+    scope: "client", config: true, type: String, default: "bottom-left", choices: {"bottom-left":"Bottom left", "top-right":"Top right", "bottom-docked":"Bottom-Docked"},
     onChange: () => { refresh(); Hooks.callAll("pneumaCombatBarDockChanged"); },
   });
+  game.settings!.register(MODULE, "combatBarResizeMacros", {
+    name: "Resize Macro Bar to match Combat Bar", hint: "Bottom-Docked only: match native macro slots to the combat portraits. Disable to retain native macro sizing.",
+    scope: "client", config: true, type: Boolean, default: true, onChange: refresh,
+  });
+  game.settings!.register(MODULE, "combatBarFullWidth", {
+    name: "Use full screen width", hint: "Bottom-Docked only: extend beneath the sidebar and shorten it to leave room for the dock.",
+    scope: "client", config: true, type: Boolean, default: false, onChange: refresh,
+  });
   game.settings!.register(MODULE, "combatBarSize", {
-    name: "Combat bar portrait size", hint: "Square actor portrait size on this client.",
+    name: "Combat bar portrait size", hint: "Square actor portrait size on this client. Bottom-Docked also sizes the Players button and native macro slots.",
     scope: "client", config: true, type: String, default: "40",
     choices: {32: "Small (32 px)", 40: "Medium (40 px)", 48: "Large (48 px)", 64: "Extra large (64 px)", 80: "Huge (80 px)", 96: "Maximum (96 px)"}, onChange: refresh,
   });
@@ -411,7 +514,7 @@ export function registerCombatBar(): void {
   window.addEventListener("pointerup", cancelHold);
   window.addEventListener("pointercancel", cancelHold);
   window.addEventListener("blur", cancelHold);
-  window.addEventListener("pointerdown", event => {if(root&&!root.contains(event.target as Node)){closeBarFlyout();}});
-  window.addEventListener("keydown", event => {if(event.key==="Escape")closeBarFlyout();});
+  window.addEventListener("pointerdown", event => {if(root&&!root.contains(event.target as Node)){closeBarFlyout();}if(bottomDock&&!bottomDock.contains(event.target as Node))closeDockPlayers();});
+  window.addEventListener("keydown", event => {if(event.key==="Escape"){closeBarFlyout();closeDockPlayers();}});
   for(const hook of ["createActiveEffect","updateActiveEffect","deleteActiveEffect"])Hooks.on(hook,invalidateBarStatuses);
 }

@@ -135,7 +135,7 @@ Hooks.once("init", () => {
   game.settings!.register(MODULE_ID, "ablateBlockedHits", {
     name: "Ablate Armor even if hit doesn't penetrate.",
     hint: "Homebrew: positive damage stopped by armor still applies the attack's normal ablation amount. Armor bypass, zero-ablation attacks and shield-only hits remain excluded; Cover Up keeps its existing double ablation.",
-    scope: "world", config: true, type: Boolean, default: false,
+    scope: "world", config: true, type: Boolean, default: false, onChange: () => ui.chat?.render(false),
   });
   game.settings!.register(MODULE_ID, "targetedRightClick", {
     name: "PNEUMA_COMBAT_TOOLS.TargetedRightClickName",

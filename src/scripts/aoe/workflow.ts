@@ -7,7 +7,7 @@ import { PendingCardRefresh } from "../pending-card-refresh.js";
 import {tokenEncounter,encounterRef,resolveEncounter,type EncounterRef} from "../encounter.js";
 import {suppressionExpiry} from "../suppression.js";
 import {attackCrossesSmoke} from "./smoke-obscuration.js";
-import {halfArmorSelected, interactArmorSelected} from "../half-armor.js";
+import {ablateArmorSelected, halfArmorSelected, interactArmorSelected} from "../half-armor.js";
 import {automaticNPCEvasion} from "../evasion-settings.js";
 import {evasionBlocked} from "../injury-rules.js";
 import {ammoProfile,instantId} from "../instant-catalog.js";
@@ -713,7 +713,7 @@ export function registerAreaAttacks() {
           else if(action==="retryResponse"&&row)await respond(message,data,row);
           else if(action==="move"&&row)await moveOutside(message,data,row);
           else if(action==="damage")await rollDamage(message.id!,data.exchange,(a,extra)=>send(message.id!,"damage",{damageRequest:{...extra,action:a}}),event.shiftKey);
-          else if(action==="apply"&&row)await applyFromCard(rowExchange(data,row),(a,extra)=>send(message.id!,"damage",{target:row.uuid,damageRequest:{...extra,action:a}}),event.shiftKey,row.uuid,"recorded",halfArmorSelected(event),interactArmorSelected(event));
+          else if(action==="apply"&&row)await applyFromCard(rowExchange(data,row),(a,extra)=>send(message.id!,"damage",{target:row.uuid,damageRequest:{...extra,action:a}}),event.shiftKey,row.uuid,"recorded",halfArmorSelected(event),interactArmorSelected(event),ablateArmorSelected(event));
           else if(action==="damageReset"||action==="damageResolved")await send(message.id!,"damage",{target:row?.uuid,damageRequest:{action}});
           else await send(message.id!,action,{target:row?.uuid});
         }catch(e){errors(e);}finally{button.disabled=false;}
