@@ -9,7 +9,7 @@ export function halfArmorControl(original:number,interact=true):string {
   return '<div class="pneuma-armor-controls"><button type="button" class="pneuma-interact-armor" aria-pressed="'+interact+'" title="Apply armor SP and armor ablation">Interact With Armor</button>'
     +'<button type="button" class="pneuma-half-armor" aria-pressed="'+(original===50)+'" data-original-ignore="'+original+'"'+(!interact||original>=100?' disabled':'')+' title="Use half armor SP, rounded up, when applying damage">Half Armor SP</button>'+ablateArmorControl()+'</div>';
 }
-function ablateArmorControl():string {return game.settings?.get("pneuma-combattools","ablateBlockedHits")?'<button type="button" class="pneuma-ablate-armor" aria-pressed="true" title="Ablate armor for this damage application. Turn off to preserve armor while still applying SP protection.">Ablate Armor</button>':"";}
+function ablateArmorControl():string {return game.settings?.get("pneuma-combattools","ablateBlockedHits")?'<button type="button" class="pneuma-ablate-armor" aria-pressed="true" title="Ablate armor even when damage does not penetrate. Turn off to use normal ablation rules.">Always Ablate</button>':"";}
 function selected(event:Event,selector:string):boolean|undefined {
   const element=event.currentTarget as Element|null;
   const card=element?.closest(".pneuma-manual-card, .pneuma-aoe-card, .message");
@@ -40,7 +40,7 @@ export function bindHalfArmor(root:HTMLElement,show=true):void {
     const update=()=>{
       const enabled=interact?.getAttribute("aria-pressed")!=="false";
       if(half)half.disabled=!enabled||Number(half.dataset.originalIgnore)>=100;
-      for(const {link,ignore,ablation:amount} of original){link.dataset.ignoreArmorPercent=String(armorIgnorePercent(ignore,half?half.getAttribute("aria-pressed")==="true":undefined,enabled));link.dataset.ablation=enabled&&ablation?.getAttribute("aria-pressed")!=="false"?amount:"0";}
+      for(const {link,ignore,ablation:amount} of original){link.dataset.ignoreArmorPercent=String(armorIgnorePercent(ignore,half?half.getAttribute("aria-pressed")==="true":undefined,enabled));link.dataset.ablation=enabled?amount:"0";}
     };
     for(const button of [interact,half,ablation])button?.addEventListener("click",event=>{
       event.preventDefault();event.stopPropagation();if(button.disabled)return;

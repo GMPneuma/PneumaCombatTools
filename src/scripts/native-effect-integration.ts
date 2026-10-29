@@ -5,8 +5,9 @@ import {reportExposure} from "./effect-events.js";
 import {igniteTarget} from "./instant-lifetime.js";
 const MODULE="pneuma-combattools";
 // Per-dialog context survives awaits; the stack covers only synchronous Ctrl-skip calls.
-const contexts:string[]=[];
-const dialogContext=new WeakMap<object,string>();
+interface DamageContext {ammo:string;alwaysAblate?:boolean}
+const contexts:DamageContext[]=[];
+const dialogContext=new WeakMap<object,DamageContext>();
 interface NativeDamageApplication {
   actor:Actor;hpReduction:number;rawDamageDealt?:number;damage?:number;location?:string;
   ablation?:number;armorData?:{equipped:boolean;value:number};pneumaBlockedAblation?:boolean;
@@ -52,7 +53,8 @@ export function installNativeEffectIntegration(chat:object,dialog:object,actorPr
     const id=target?.closest<HTMLElement>("[data-message-id]")?.dataset.messageId;
     const message=id?game.messages?.get(id):undefined;
     const ammo=message?foundry.utils.getProperty(message,"flags."+MODULE+".ammoType"):undefined;
-    contexts.push(typeof ammo==="string"?ammo:"");
+    const toggle=target?.closest(".rollcard")?.querySelector(".pneuma-ablate-armor");
+    contexts.push({ammo:typeof ammo==="string"?ammo:"",alwaysAblate:toggle?toggle.getAttribute("aria-pressed")==="true":undefined});
     try{return wrapped(event);}finally{contexts.pop();}
   },"WRAPPER");
   registerNativeWrapper(dialog,"showDialog",async function(wrapped,data:object,...args:unknown[]){
@@ -63,13 +65,15 @@ export function installNativeEffectIntegration(chat:object,dialog:object,actorPr
   },"WRAPPER");
   registerNativeWrapper(actorPrototype,"_applyDamage",async function(this:Actor,wrapped,...args:unknown[]){
     const form=args[8];
-    const ammo=(form&&typeof form==="object"?dialogContext.get(form):undefined)??contexts.at(-1);
+    const context=(form&&typeof form==="object"?dialogContext.get(form):undefined)??contexts.at(-1);
+    const ammo=context?.ammo;
+    const override=(form as {pneumaAlwaysAblate?:boolean}|undefined)?.pneumaAlwaysAblate??context?.alwaysAblate;
     const actor=this;
     const run=async()=>{
       const amount=Number(args[3]);
       const application:{hpReduction:number;rawDamageDealt:number;blockedAblation:number;pending?:Promise<unknown>}={
         hpReduction:0,rawDamageDealt:0,
-        blockedAblation:game.settings?.get(MODULE,"ablateBlockedHits")&&Number.isFinite(amount)&&amount>0?amount:0
+        blockedAblation:(override??game.settings?.get(MODULE,"ablateBlockedHits"))&&Number.isFinite(amount)&&amount>0?amount:0
       };
       applications.set(actor,application);
       try {

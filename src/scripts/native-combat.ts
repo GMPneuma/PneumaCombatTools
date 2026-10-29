@@ -91,10 +91,9 @@ export async function nativeAPI(): Promise<NativeAPI> {
   api ??= (async () => {
     const path = nativeDiceHandlerURL();
     const Dice = (await import(path)).default as NativeAPI["Dice"];
-    const original = Dice.handle3dDice;
-    Dice.handle3dDice = function(roll, mode) {
-      return hiddenDice.has(roll) ? Promise.resolve() : original.call(this, roll, mode);
-    };
+    registerNativeWrapper(Dice, "handle3dDice", function(wrapped, roll: Roll, mode?: string) {
+      return hiddenDice.has(roll) ? Promise.resolve() : wrapped(roll, mode);
+    }, "MIXED");
     return { Dice };
   })();
   return api;

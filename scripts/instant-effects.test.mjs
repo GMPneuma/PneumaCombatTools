@@ -1,3 +1,5 @@
+import {installMockLibWrapper} from './lib-wrapper-fixture.mjs';
+installMockLibWrapper();
 globalThis.Hooks ??= {once(){},on(){}};
 import assert from "node:assert/strict";
 import {test} from "node:test";

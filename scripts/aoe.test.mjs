@@ -1,3 +1,5 @@
+import {installMockLibWrapper} from './lib-wrapper-fixture.mjs';
+installMockLibWrapper();
 import { overlaps } from "./aoe-geometry-fixture.mjs";
 import assert from "node:assert/strict";
 import {test} from "node:test";

@@ -1,6 +1,8 @@
 # Combat Tools feature inventory
 
-- Per-application armor ablation (local/unreleased): enabling blocked-hit armor ablation adds a default-on Ablate Armor toggle to native and managed damage cards. Turning it off preserves armor SP but suppresses armor ablation for that application, including Cover Up. Zero-ablation attacks remain zero. Live Foundry verification pending.
+- Hidden attack dice and Self Chat now share one libWrapper registration for the native dice handler, preventing the module self-conflict warning. Automated coverage checks both installation orders, hidden rolls, replay and Self audience; live Foundry verification pending.
+
+- Per-application armor ablation (local/unreleased): enabling blocked-hit armor ablation adds a default-on Always Ablate toggle to native and managed damage cards. Turning it off restores normal ablation rules: blocked hits do not receive extra ablation, while penetrating hits and Cover Up retain their normal behavior. Zero-ablation attacks remain zero. Live Foundry verification pending.
 
 - Hover EKG visibility (local/unreleased): GM-only 3 × 4 matrix controls no display, EKG, or EKG with current/max HP overlay. HP text inherits the waveform color. The compact settings matrix includes a single-line Biomonitor label with a fixed-width dropdown. Assigned-character Medtech rank determines the MedTech Player row. Optional installed-Biomonitor grants add EKG only. Combat-bar segmented health strips appear for GMs and owners, update in place and preserve portrait controls. Live Foundry verification pending.
 

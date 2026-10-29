@@ -1,3 +1,5 @@
+import {installMockLibWrapper} from './lib-wrapper-fixture.mjs';
+installMockLibWrapper();
 import {registerHooks} from 'node:module';
 registerHooks({resolve(s,c,next){if(s==='/systems/cyberpunk-red-core/modules/extern/cpr-dice-handler.js')return {shortCircuit:true,url:'data:text/javascript,export default {handle3dDice:async()=>{}}'};return next(s,c);}});
 import test from 'node:test';

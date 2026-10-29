@@ -90,4 +90,4 @@ The exact grouping code is [settings-layout.ts](../src/scripts/settings-layout.t
 
 The authoritative homebrew payload is saved by its subform; these compatibility defaults do not add extra visible controls.
 
-When blocked-hit ablation is enabled, every damage card shows a default-on **Ablate Armor** toggle, even when normal armor controls are hidden. Turn it off to suppress armor ablation for that application while retaining SP protection. Native, attack, manual and AoE damage paths honor the choice; Cover Up retains doubled SP but also honors the ablation opt-out.
+When blocked-hit ablation is enabled, every damage card shows a default-on **Always Ablate** toggle, even when normal armor controls are hidden. Turn it off to use normal ablation rules; penetrating hits still ablate armor. Native, attack, manual and AoE damage paths honor the choice; Cover Up retains its normal doubled SP and ablation.

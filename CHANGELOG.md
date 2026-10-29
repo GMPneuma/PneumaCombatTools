@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.29 - 2026-10-29
+
+- Rename the per-application armor toggle to Always Ablate. Checked adds ablation for blocked hits; unchecked restores normal ablation while preserving penetrating hits, Martial Arts exemptions and Cover Up.
+- Route hidden attack dice and Self Chat through one shared libWrapper handler, removing the direct replacement that caused a module self-conflict warning.
+
+Validation: production build, 671 automated tests passed (15 skipped), and the armor-control browser fixture passed. Live Foundry verification remains pending.
+
+
 ## 0.9.28 - 2026-10-29
 
 - Add Bottom-Docked Combat Bar: Players popup, movement/settings, combatants and turn controls, followed by the right-aligned native macro bar. Turn controls stay beside the final combatant.

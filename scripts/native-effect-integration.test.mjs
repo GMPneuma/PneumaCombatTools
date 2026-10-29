@@ -6,7 +6,7 @@ globalThis.foundry={utils:{getProperty:get,randomID:()=>String(++serial)}};
 globalThis.FormApplication=class{};
 let serial=0;
 globalThis.libWrapper={register(_m,path,fn){const keys=path.split('.');const method=keys.pop();let owner=globalThis;for(const key of keys)owner=owner[key];const original=owner[method];owner[method]=function(...args){return fn.call(this,original.bind(this),...args)};}};
-globalThis.Element=class {constructor(id){this.dataset={messageId:id}}closest(){return this}};
+globalThis.Element=class {constructor(id){this.dataset={messageId:id}}closest(){return this}querySelector(){return null}};
 const {installNativeEffectIntegration}=await import('../dist/scripts/native-effect-integration.js');
 const {masterStatuses}=await import('../dist/scripts/status-catalog.js');
 const events=[];globalThis.Hooks={callAll:(_name,actor,kind)=>events.push({actor,kind})};

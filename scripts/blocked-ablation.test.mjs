@@ -16,7 +16,10 @@ function fixture({on=true,receipt={},mode='blocked',delay,failAblation,failRende
   enabled=on;installMockLibWrapper();
   const cards=[],calls=[],events=[];
   const chat={
-    RenderRollCard(){},damageApplication(){},
+    RenderRollCard(){},async damageApplication(event){
+      const form=await dialog.showDialog({});
+      await actor._applyDamage(8,0,"body",2,"",0,0,true,form);
+    },
     RenderDamageApplicationCard(data){
       if(failRender)throw Error('receipt failure');
       cards.push({...data});events.push('receipt');
@@ -45,7 +48,8 @@ function fixture({on=true,receipt={},mode='blocked',delay,failAblation,failRende
       events.push('apply-end');
     }
   }
-  installNativeEffectIntegration(chat,{showDialog:async data=>data},Actor.prototype);
+  const dialog={showDialog:async data=>{await tick();return {...data}}};
+  installNativeEffectIntegration(chat,dialog,Actor.prototype);
   const actor=new Actor();
   return {actor,cards,calls,events,chat,Actor,apply:(damage=8,amount=1,location='body',bonus=0)=>actor._applyDamage(damage,bonus,location,amount,'',0,0,true,options)};
 }
@@ -211,4 +215,16 @@ test('native CPR shields stop normal hits; destroyed explosive shields still exp
     assert.equal(f.actor.system.derivedStats.hp.value,50);assert.equal(f.armors[0].system.bodyLocation.ablation,entry.expectedArmor);
     assert.equal(f.cards[0].ablation,entry.expectedArmor);assert.equal(f.cards[0].shieldAblation,Math.min(8,entry.shield));
   }
+});
+
+test('Always Ablate unchecked restores normal blocked and penetrating behavior',async()=>{
+ for(const mode of ['blocked','penetrated'])for(const always of [false,true]){
+ const f=fixture({mode});await f.actor._applyDamage(8,0,'body',2,'',0,0,true,{...options,pneumaAlwaysAblate:always});
+ assert.deepEqual(f.calls,mode==='penetrated'||always?[['body',2]]:[]);
+ }
+});
+
+test('native damage dialog retains the clicked Always Ablate choice across awaits',async()=>{
+ globalThis.Element=class {constructor(always){this.always=always;this.dataset={}}closest(){return this}querySelector(){return {getAttribute:()=>String(this.always)}}};
+ for(const always of [false,true]){const f=fixture();const target=new Element(always);const pending=f.chat.damageApplication({currentTarget:target});target.always=!always;await pending;assert.deepEqual(f.calls,always?[['body',2]]:[]);}
 });
