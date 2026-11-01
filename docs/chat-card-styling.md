@@ -365,4 +365,15 @@ Hazard activation ChatMessage UUID links within .pneuma-trap-card join .pneuma-c
 
 ### Per-application armor ablation control
 
+Completed `.pneuma-critical-row` rows replace the pending label with a `details > summary` containing the roll total and injury name. The GM-only `.pneuma-critical-reroll` button enables a replacement roll while retaining the current result until rolled. Controls retain tooltips and accessible labels.
+
+Critical injuries use a .pneuma-critical-row beneath the damage controls, or within .pneuma-aoe-target-effects for each hit AoE defender. The pending .pneuma-apply-critical button rolls and applies the injury. The completed row shows a native details/summary disclosure with the total, injury name and saved native roll/details. GM or target ownership controls injury requests. Applied results persist across rerenders. Example selector: .pneuma-critical-row > details. The previous injury placement beside the damage button is superseded.
+
 When ablateBlockedHits is enabled, damage cards include a `.pneuma-ablate-armor` toggle within `.pneuma-armor-controls`, including when the other armor controls are hidden. Label: Always Ablate. Its `aria-pressed="true"` default uses the shared chat toggle styling; `false` restores normal ablation rules without changing SP or suppressing penetrating-hit ablation. It applies to native CPR damage cards and managed attack/manual/AoE damage. Existing zero-ablation and armor-bypass behavior remains. Example: `.pneuma-armor-controls .pneuma-ablate-armor[aria-pressed="false"]`.
+
+
+Normal attacks append .pneuma-damage-injuries after .pneuma-resolution-damage-apply .pneuma-damage-applications. Its .pneuma-critical-row children contain the existing injury controls and saved results. Visibility and ownership checks remain in renderDamage. Native result markup and injury controls are retained. Example selector: .pneuma-resolution-damage-apply .pneuma-damage-injuries > .pneuma-critical-row.
+
+Normal-attack recipient rows now render the target label, damage action, and critical-injury action in that order, with aligned button columns. Saved injury results and GM reroll controls stay below damage outputs in .pneuma-damage-injuries. Completed injuries show a disabled injury action until reroll is allowed.
+
+Normal-attack saved injury results now nest directly beneath the matching token damage card. Damage cards expose data-damage-target, derived from application IDs and selected-target UUIDs. One injury result attaches to the latest matching application. An injury without matching damage retains an explicitly named fallback below the outputs. This supersedes the separate combined injury-results block.

@@ -89,6 +89,50 @@ try {
  assert.match(await page.locator('[data-pneuma-section="damage-roll"]').textContent(),/DAMAGE/);
  assert.equal(await page.locator('.pneuma-resolution-damage-apply .pneuma-aoe-applications .pneuma-damage-applied').count(),1);
  assert.equal(await page.locator('.pneuma-aoe-targets .pneuma-damage-applied').count(),0);
+ const injuryTargets = await page.evaluate(async () => {
+  const {areaContent} = await import('/scripts/aoe/workflow.js');
+  const rocket = structuredClone(data);
+  rocket.exchange.criticalMethod = 'Rocket';
+  rocket.rows[0].damage.recordedApplied = true;
+  rocket.rows.push({...rocket.rows[1], uuid:'evaded', state:'miss'});
+  const savedLookup = fromUuid, savedSetting = game.settings.get;
+  const results = [];
+  try {
+   fromUuid = async uuid => rocket.rows.some(row=>row.uuid===uuid)
+    ? {actor:{...targetActor, testUserPermission:()=>uuid==='owned'}} : null;
+   for (const [gm, sixes, enabled, completed] of [[true,2,true],[false,2,true],[true,1,true],[true,2,false],[true,2,true,true]]) {
+    game.user.isGM = gm;
+    game.settings.get = (module,key) => key==='criticalRocket'?enabled:savedSetting(module,key);
+    rocket.exchange.damage.result.sixes = sixes;
+    if (completed) rocket.rows[0].damage.injuries={owned:{name:'Foreign Object',total:7,html:'<p>Injury details</p>',applied:true}};
+    const host = document.createElement('div');
+    host.innerHTML = areaContent(rocket);
+    const html = {0:host,find:s=>({toArray:()=>[...host.querySelectorAll(s)]})};
+    for (const hook of hooks.renderChatMessage) await hook({...message,flags:{'pneuma-combattools':{aoe:rocket}}},html);
+    if (completed) {
+     const row=host.querySelector('.pneuma-aoe-resolution-target[data-aoe-row="owned"]');
+     if (!row.querySelector('.pneuma-critical-row summary')?.textContent.includes('Foreign Object')
+      || !row.querySelector('[data-aoe-action="injuryReroll"]')) throw Error('Saved injury must replace pending text and offer GM re-roll');
+    }
+    for (const injury of host.querySelectorAll('[data-aoe-action="injury"]')) {
+     if (injury.textContent.trim() || !injury.getAttribute('aria-label')) throw Error('Injury must be icon-only and accessible');
+     if (!injury.closest('.pneuma-critical-row')?.parentElement.matches('.pneuma-aoe-target-effects')) throw Error('Injury must have its own effect row');
+    }
+    results.push([...host.querySelectorAll('[data-aoe-action="injury"]')].map(button=>button.dataset.aoeTarget));
+   }
+  } finally {
+   fromUuid = savedLookup; game.settings.get = savedSetting; game.user.isGM = true;
+  }
+  return results;
+ });
+ assert.deepEqual(injuryTargets,[['owned','unowned'],['owned'],[],[],['unowned']]);
+ await page.evaluate(async()=>{
+  const {criticalInjuryRow}=await import('/scripts/critical-injury.js');
+  const host=document.createElement('div');
+  host.innerHTML=criticalInjuryRow({name:'Foreign Object',total:7,html:'<p>Native injury details</p>',applied:true},'Rage');
+  if(host.querySelector('.pneuma-apply-critical') || !host.querySelector('summary').textContent.includes('7 — Foreign Object')
+   || !host.querySelector('.pneuma-critical-details').textContent.includes('Native injury details')) throw Error('Completed injury must show a persistent expandable result');
+ });
  await page.evaluate(async()=>{
   const {standardizeAreaLayout,areaContent}=await import('/scripts/aoe/workflow.js');
   const legacy=document.createElement('div');legacy.innerHTML='<section class="pneuma-aoe-card"><div class="pneuma-aoe-targets"><div class="pneuma-aoe-target" data-aoe-row="owned"><span class="pneuma-aoe-name">Target</span><button data-aoe-action="decline">Decline</button><button data-aoe-action="apply">Apply</button></div><div class="pneuma-instant-effect">Effect</div></div><div class="pneuma-damage-result"><span data-native-die>6</span></div><div class="pneuma-aoe-applications"><div class="pneuma-damage-applied">Receipt</div></div></section>';

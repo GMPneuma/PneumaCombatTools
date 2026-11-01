@@ -6,7 +6,7 @@ import {instantId} from "./instant-catalog.js";
 import {createInstantCard} from "./instant-effects.js";
 import { thrownRollItem } from "./thrown-weapons.js";
 import { captureDamageApplication } from "./damage-application.js";
-import { applyCriticalInjury, damageSixes, hasCriticalInjury, criticalLocation } from "./critical-injury.js";
+import { rollCriticalInjury, criticalInjuryRow, injuryKey, injuryResult, damageSixes, hasCriticalInjury, type InlineInjury } from "./critical-injury.js";
 import { damageStatusChoices, validateDamageStatuses, canonicalDamageStatus, inherentDamageStatuses, renderDamageStatusPicker } from "./damage-status.js";
 import { resolutionSection } from "./card-structure.js";
 import { diceJSON, showSavedDice, messageDiceAudience, rollHidden, nativeCard, type DiceAudience, type NativeRoll, type RollItem } from "./native-combat.js";
@@ -18,6 +18,7 @@ export interface DamageValues {
 }
 export interface DamageResult { ammoType?:string; html: string; values: DamageValues; sixes?: number }
 export interface DamageState {
+  injuries?: Record<string,InlineInjury>;
   status: "rolling" | "rolled" | "applying" | "applied" | "review";
   effectsLocked?: boolean;
   selectedTargets?: {id:string; uuid:string; name:string}[];
@@ -26,7 +27,7 @@ export interface DamageState {
 export interface DamageOptions { useShield: boolean; damageReductionRole: boolean; damageReductionAE: boolean; brainDamageReduction: boolean }
 export interface DamageRequest {
   encounter?:EncounterRef;
-  action: "damageAllowMiss" | "damageClaim" | "damageRelease" | "damageCommit" | "damageApply" | "damageReset" | "damageResolved" | "damageStatuses";
+  action: "damageInjuryReroll" | "damageInjury" | "damageAllowMiss" | "damageClaim" | "damageRelease" | "damageCommit" | "damageApply" | "damageReset" | "damageResolved" | "damageStatuses";
   ablateArmor?: boolean; interactArmor?: boolean; halfArmor?: boolean; statusEffects?: string[]; nonce?: string; damage?: DamageResult; options?: DamageOptions; targetUuid?: string; application?: "recorded" | "selected"; applicationId?: string;
 }
 export async function damageActor(uuid: string): Promise<Actor> {
@@ -93,9 +94,19 @@ export function damageContent(data: Exchange, mode: "full" | "roll" = "full"): s
     : '<p class="pneuma-damage-status">' + labels[damage.status] + '</p>';
   const targets = (damage.selectedTargets ?? []).map(target=>'<li data-application-id="'+escape(target.id)+'">'+escape(target.name)+'</li>').join("");
   const history = targets ? '<div class="pneuma-damage-targets"><strong>Applied to</strong><ol class="pneuma-damage-target-history" aria-label="Applied to selected tokens">'+targets+'</ol></div>' : "";
+  const applications = (damage.applications ?? []).map(application => {
+    const doc = new DOMParser().parseFromString(application, "text/html");
+    for (const card of Array.from(doc.querySelectorAll<HTMLElement>(".pneuma-damage-applied[data-damage-instance]"))) {
+      const instance = card.dataset.damageInstance!;
+      const selected = damage.selectedTargets?.find(target =>
+        instance.startsWith(target.id + "-") && /^\d+$/.test(instance.slice(target.id.length + 1)));
+      card.dataset.damageTarget = selected?.uuid ?? data.defender;
+    }
+    return doc.body.innerHTML;
+  }).join("");
   const actions = mode === "full" && damage.result ? resolutionSection("damage-apply",
     '<div class="rollcard-bottom pneuma-damage-application"><div class="cpr-block pneuma-damage-application-box"></div></div>'
-      + history + '<div class="pneuma-damage-applications">' + (damage.applications ?? []).join("") + '</div>') : "";
+      + history + '<div class="pneuma-damage-applications">' + applications + '</div>') : "";
   return '<div class="pneuma-damage-result">' + resolutionSection("damage-roll", html + status + (damage.result ? (mode === "full" ? '<div class="pneuma-damage-effects-slot"></div>' : '<div class="pneuma-aoe-effects-picker"></div>') : ""))
     + actions + (mode === "full" ? resolutionSection("effects", '<div class="pneuma-damage-effect-results"></div>') : "") + (mode === "full" ? '<div class="pneuma-resolution-recovery-slot"></div>' : "") + "</div>";
 }
@@ -119,7 +130,7 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
     if (data.hit !== false) throw new Error("This attack is not a miss.");
     data.damageAllowedOnMiss = true; await save(); return;
   }
-  if (data.hit === false && !data.damageAllowedOnMiss && ["damageClaim", "damageCommit", "damageApply"].includes(request.action))
+  if (data.hit === false && !data.damageAllowedOnMiss && ["damageClaim", "damageCommit", "damageApply", "damageInjury"].includes(request.action))
     throw new Error("This attack missed. A GM must allow damage first.");
 
   if (request.action === "damageStatuses") {
@@ -132,6 +143,48 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
     if(damageEffectsLocked(data.damage))throw Error("Effect selection is locked because resolution has started.");
     data.damage.statusEffects = validateDamageStatuses(request.statusEffects);
     await save(); return;
+  }
+  if (request.action === "damageInjury" || request.action === "damageInjuryReroll") {
+    if (!sourceMessage || !hasCriticalInjury(data)) throw Error("This damage roll does not qualify for a critical injury.");
+    const target = request.targetUuid ?? data.defender;
+    const recipient = await damageActor(target);
+    if (!user.isGM && !recipient.testUserPermission(user,"OWNER")) throw Error("Only the recipient's owner or GM can apply an injury.");
+    const injuries = data.damage!.injuries ??= {};
+    let injury = injuryResult(injuries,target);
+    if (request.action === "damageInjuryReroll") {
+      if (!user.isGM) throw Error("Only a GM can allow an injury re-roll.");
+      if (!injury?.applied) throw Error("Finish the current injury application first.");
+      injuries[injuryKey(target)] = {...injury,target,allowReroll:true};
+      await save();
+      return;
+    }
+    if (injury?.applied && !injury.allowReroll) return;
+    if (!injury || injury.allowReroll) {
+      const replacesReceipt = injury ? injury.receipt ?? sourceMessage.uuid + ":" + target : undefined;
+      injury = {...await rollCriticalInjury(data,target,replacesReceipt),target,replacesReceipt,
+        receipt:sourceMessage.uuid + ":" + target + ":" + foundry.utils.randomID()};
+      injuries[injuryKey(target)] = injury;
+      await save();
+    }
+    // An interrupted message update can be retried without creating another injury.
+    const receipt = injury.receipt ?? sourceMessage.uuid + ":" + target;
+    if (!recipient.items.some(item => foundry.utils.getProperty(item,"flags.pneuma-combattools.injuryReceipt")===receipt)) {
+      const source = await fromUuid(injury.item) as Item|null;
+      if (!source || String(source.type)!=="criticalInjury") throw Error("The rolled injury item is unavailable.");
+      await recipient.createEmbeddedDocuments("Item", [{
+        name:source.name,type:source.type,img:source.img,system:foundry.utils.deepClone(source.system),
+        effects:source.effects.map(effect=>effect.toObject()),flags:{"pneuma-combattools":{injuryReceipt:receipt}},
+      }] as never);
+    }
+    if (injury.replacesReceipt) {
+      const previous = recipient.items.filter(item => foundry.utils.getProperty(item,"flags.pneuma-combattools.injuryReceipt")===injury.replacesReceipt).map(item=>item.id!);
+      if (previous.length) await recipient.deleteEmbeddedDocuments("Item",previous);
+    }
+    injury.applied = true;
+    injuries[injuryKey(target)] = injury;
+    await save();
+    await showSavedDice(injury.dice,data.rollMode,user.id!,messageDiceAudience(sourceMessage));
+    return;
   }
   const applying = request.action === "damageApply" || request.action === "damageResolved";
   const application = request.application ?? (request.targetUuid && request.targetUuid !== data.defender ? "selected" : "recorded");
@@ -306,27 +359,9 @@ export async function renderDamage(message: ChatMessage, data: Exchange, html: J
       const icon = document.createElement("i"); icon.className = "fas fa-bolt"; icon.setAttribute("aria-hidden", "true");
       node.append(icon);
       const row = document.createElement("div"); row.className = "pneuma-damage-recipient";
-      row.append(node); panel.append(row);
-      if (!manual && hasCriticalInjury(data)) {
-        const injury = document.createElement("a"); injury.className = "pneuma-apply-critical";
-        injury.dataset.pneumaDamageTarget = destination;
-        injury.title = "Roll/apply " + criticalLocation(data) + " critical injury to " + (destination === "recorded" ? data.defenderName : "the selected token");
-        injury.setAttribute("aria-label", injury.title); injury.setAttribute("role", "button"); injury.tabIndex = 0;
-        const die = document.createElement("i"); die.className = "fas fa-heart-crack"; die.setAttribute("aria-hidden", "true");
-        injury.append(die); row.append(injury);
-        let rolling = false;
-        injury.addEventListener("click", async event => {
-          event.preventDefault(); event.stopPropagation(); if (rolling) return;
-          rolling = true; injury.setAttribute("aria-disabled", "true");
-          try { await applyCriticalInjury(data, destination === "recorded" ? data.defender : selectedDamageTarget()); }
-          catch (error) { ui.notifications!.error((error as Error).message); }
-          finally { rolling = false; injury.removeAttribute("aria-disabled"); }
-        });
-        injury.addEventListener("keydown", event => {
-          if (event.key === "Enter" || event.key === " ") { event.preventDefault(); injury.click(); }
-        });
-      }
-      const recipientLabel=document.createElement("span"); recipientLabel.className="pneuma-damage-recipient-label"; recipientLabel.textContent=" " + label; row.append(recipientLabel);
+      row.dataset.damageRecipient=destination;
+      panel.append(row);
+      const recipientLabel=document.createElement("span"); recipientLabel.className="pneuma-damage-recipient-label"; recipientLabel.textContent=label; row.append(recipientLabel,node);
       node.addEventListener("keydown", event => {
         if ((event as KeyboardEvent).key === "Enter" || (event as KeyboardEvent).key === " ") { event.preventDefault(); node.dispatchEvent(new MouseEvent("click", { bubbles: true, shiftKey: (event as KeyboardEvent).shiftKey })); }
       });
@@ -376,7 +411,75 @@ export async function renderDamage(message: ChatMessage, data: Exchange, html: J
   if (!manual && game.user!.isGM && (status === "review" || status === "applying"))
     button("Mark resolved after GM review", () => send("damageResolved"), undefined, true);
   const actions = html.find(".pneuma-damage-application-box");
+  const injuryPanel = document.createElement("div");
+  injuryPanel.className = "pneuma-damage-injuries";
+  if (!manual && hasCriticalInjury(data) && (attacker.isOwner || defender.isOwner || game.user!.isGM)) {
+    const injuries = data.damage?.injuries ?? {};
+    const addInjury = (target:string|undefined, label:string) => {
+      const wrapper = document.createElement("div");
+      const result = target ? injuryResult(injuries,target) : undefined;
+      wrapper.innerHTML = criticalInjuryRow(result,label);
+      const control = wrapper.querySelector<HTMLButtonElement>(".pneuma-apply-critical");
+      control?.addEventListener("click",async event => {
+        event.preventDefault(); event.stopPropagation();
+        if (control.disabled) return;
+        control.disabled = true;
+        try { await send("damageInjury",{targetUuid:target ?? selectedDamageTarget()}); }
+        catch (error) { ui.notifications!.error((error as Error).message); }
+        finally { control.disabled = false; }
+      });
+      const reroll = wrapper.querySelector<HTMLButtonElement>(".pneuma-critical-reroll");
+      reroll?.addEventListener("click",async event=>{
+        event.preventDefault(); event.stopPropagation();
+        if (reroll.disabled) return;
+        reroll.disabled = true;
+        try { await send("damageInjuryReroll",{targetUuid:target}); }
+        catch (error) { ui.notifications!.error((error as Error).message); }
+        finally { reroll.disabled = false; }
+      });
+      const destination = target === data.defender ? "recorded" : target === undefined ? "selected" : undefined;
+      const recipient = destination ? panel.querySelector('[data-damage-recipient="'+destination+'"]') : null;
+      if (recipient) {
+        if (control) recipient.append(control);
+        else if (result?.applied) {
+          const applied = document.createElement("button");
+          applied.type = "button";
+          applied.className = "pneuma-apply-critical";
+          applied.disabled = true;
+          applied.title = "Critical injury applied";
+          applied.setAttribute("aria-label", applied.title);
+          applied.innerHTML = '<i class="fas fa-heart-crack" aria-hidden="true"></i>';
+          recipient.append(applied);
+        }
+      }
+      if (result || !recipient) {
+        const application = target
+          ? html.find('.pneuma-resolution-damage-apply .pneuma-damage-applied[data-damage-target="'+CSS.escape(target)+'"]').last()
+          : undefined;
+        if (result && application?.length) application.append(wrapper.firstElementChild!);
+        else {
+          if (result) {
+            const heading = document.createElement("strong");
+            heading.textContent = label;
+            wrapper.firstElementChild!.prepend(heading);
+          }
+          injuryPanel.append(wrapper.firstElementChild!);
+        }
+      }
+    };
+    if (defender.isOwner || game.user!.isGM || injuryResult(injuries,data.defender)?.applied) addInjury(data.defender,data.defenderName);
+    for (const [key,injury] of Object.entries(injuries)) {
+      const target = injury.target ?? decodeURIComponent(key);
+      if (target !== data.defender && injury.name) addInjury(target,injury.targetName);
+    }
+    addInjury(undefined,"Selected Token");
+  }
   if (panel.childElementCount) (actions.length ? actions : html.find(".message-content")).append(panel);
+  if (injuryPanel.childElementCount) {
+    const applications = html.find(".pneuma-resolution-damage-apply .pneuma-damage-applications");
+    if (applications.length) applications.after(injuryPanel);
+    else html.find(".message-content").append(injuryPanel);
+  }
   if (effectsPanel.childElementCount) {
     const effectSlot = html.find(".pneuma-damage-effects-slot");
     (effectSlot.length ? effectSlot : html.find(".message-content")).append(effectsPanel);

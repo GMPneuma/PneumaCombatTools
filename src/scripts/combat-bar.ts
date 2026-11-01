@@ -20,6 +20,7 @@ const report = (error: unknown) => ui.notifications!.error(error instanceof Erro
 let bottomDock: HTMLElement | undefined;
 let playersButton: HTMLButtonElement | undefined;
 const nativeSlots = new Map<HTMLElement, Comment>();
+let leftColumn: {element: HTMLElement; minWidth: string; priority: string} | undefined;
 function restoreBottomDock(): void {
   document.body.classList.remove("pneuma-dock-full-width");
   document.body.style.removeProperty("--pneuma-dock-space");
@@ -29,6 +30,12 @@ function restoreBottomDock(): void {
     else slot.remove();
   }
   nativeSlots.clear();
+  if (leftColumn) {
+    const {element, minWidth, priority} = leftColumn;
+    if (minWidth) element.style.setProperty("min-width", minWidth, priority);
+    else element.style.removeProperty("min-width");
+    leftColumn = undefined;
+  }
   if (root && bottomDock?.contains(root)) document.body.append(root);
   bottomDock?.remove(); bottomDock = undefined; playersButton = undefined;
 }
@@ -36,6 +43,14 @@ function syncBottomDock(enabled: boolean, size: number): void {
   if (!enabled) {restoreBottomDock(); return;}
   if (!root) return;
   if (!bottomDock) {
+    // Players contributes to the native left column width. Preserve it before
+    // relocating the panel so scene navigation cannot slide over left-side HUDs.
+    const column = document.getElementById("ui-left");
+    if (column) {
+      leftColumn = {element: column, minWidth: column.style.getPropertyValue("min-width"), priority: column.style.getPropertyPriority("min-width")};
+      const width = getComputedStyle(column).width;
+      if (Number.parseFloat(width) > 0) column.style.setProperty("min-width", width);
+    }
     bottomDock = document.createElement("div");
     bottomDock.id = "pneuma-bottom-dock";
     bottomDock.className = "app";

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.30 - 2026-11-01
+
+- Keep critical-injury rolls and results in normal attack and AoE cards, with retry and GM-controlled reroll actions.
+- Align normal-attack target names, damage actions, and critical-injury actions in shared rows.
+- Place each saved critical injury directly beneath the matching token damage output using application IDs and token UUIDs.
+- Preserve native left-column width when Players moves into the bottom dock.
+
+Validation: production build, 674 automated tests passed (15 skipped), and damage-flow and bottom-dock browser checks passed. The AoE browser suite passes the injury checks but stops on a resistance-popup assertion with VisualTools. Live Foundry multiplayer verification remains pending.
+
+
 ## 0.9.29 - 2026-10-29
 
 - Rename the per-application armor toggle to Always Ablate. Checked adds ablation for blocked hits; unchecked restores normal ablation while preserving penetrating hits, Martial Arts exemptions and Cover Up.

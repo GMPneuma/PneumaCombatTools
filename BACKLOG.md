@@ -660,3 +660,10 @@ Bottom-Docked Players popup: every opening resets the native list to show all us
 Bottom-Docked offers a client-only **Use full screen width** option (off by default), visible only for that position. It extends the dock beneath the native sidebar and reserves the measured dock height above it for all sidebar tabs, including chat. Resizing portraits updates that space; disabling the option, switching positions, or removing the bar restores native sidebar sizing. Live Foundry/theme verification remains pending.
 
 Bottom-Docked checkbox **Resize Macro Bar to match Combat Bar** is client-only and on by default. Turning it off retains native macro slot sizing while Players and combat portraits continue to use Combat Bar size.
+
+
+Implemented normal-attack injury placement beneath damage application outputs in a separate full-width block, matching the requested AoE ordering.
+
+Normal-attack recipient rows now render the target label, damage action, and critical-injury action in that order, with aligned button columns. Saved injury results and GM reroll controls stay below damage outputs in .pneuma-damage-injuries. Completed injuries show a disabled injury action until reroll is allowed.
+
+Normal-attack saved injury results now nest directly beneath the matching token damage card. Damage cards expose data-damage-target, derived from application IDs and selected-target UUIDs. One injury result attaches to the latest matching application. An injury without matching damage retains an explicitly named fallback below the outputs. This supersedes the separate combined injury-results block.

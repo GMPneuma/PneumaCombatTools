@@ -1,5 +1,11 @@
 # Combat Tools feature inventory
 
+- Critical injury results replace the pending row label with the total and injury name. A GM-only Allow re-roll control enables one replacement roll, replacing only the injury item created by that card. UUID-safe receipt keys preserve results through Foundry flag updates and read older dotted-path results.
+
+- Qualifying attack and AoE damage cards show a Critical Injury row per recipient. Rolling saves the total, injury name and expandable native roll/details on the original card and applies the native injury item and effects. Native duplicate settings apply. Serialized GM requests and item receipts prevent repeat application on retries. No separate injury chat message is created. Local implementation; live Foundry validation pending.
+
+- Bottom-Docked preserves the native left column width while relocating Players, preventing scene navigation from shifting over left-side HUDs. Original sizing is restored on exit. Live Foundry/theme verification pending.
+
 - Hidden attack dice and Self Chat now share one libWrapper registration for the native dice handler, preventing the module self-conflict warning. Automated coverage checks both installation orders, hidden rolls, replay and Self audience; live Foundry verification pending.
 
 - Per-application armor ablation (local/unreleased): enabling blocked-hit armor ablation adds a default-on Always Ablate toggle to native and managed damage cards. Turning it off restores normal ablation rules: blocked hits do not receive extra ablation, while penetrating hits and Cover Up retain their normal behavior. Zero-ablation attacks remain zero. Live Foundry verification pending.
@@ -679,3 +685,10 @@ Bottom-Docked checkbox **Resize Macro Bar to match Combat Bar** is client-only a
 Combat Bar position settings place radios below the position label, with Bottom-Docked options in a right-hand column. That column reserves its height when hidden, keeping the window height stable as positions change. Native input names and save behavior are preserved.
 
 Release 0.9.28 (2026-10-29): Bottom-Docked Combat Bar and its settings, health-display policy/portrait strips, and per-application armor-ablation controls are included. Prior local/unreleased labels describe implementation history. Live Foundry verification remains pending.
+
+
+Normal-attack critical-injury controls and saved results render in a dedicated full-width block below damage application outputs, outside the damage-recipient control grid.
+
+Normal-attack recipient rows now render the target label, damage action, and critical-injury action in that order, with aligned button columns. Saved injury results and GM reroll controls stay below damage outputs in .pneuma-damage-injuries. Completed injuries show a disabled injury action until reroll is allowed.
+
+Normal-attack saved injury results now nest directly beneath the matching token damage card. Damage cards expose data-damage-target, derived from application IDs and selected-target UUIDs. One injury result attaches to the latest matching application. An injury without matching damage retains an explicitly named fallback below the outputs. This supersedes the separate combined injury-results block.

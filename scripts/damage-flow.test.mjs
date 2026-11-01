@@ -14,7 +14,7 @@ try {
   window.game={settings:{get:()=>true},i18n:{localize:()=>"Damage",format:()=>"Apply damage"},user:{isGM:true},users:{get:()=>({active:true})}};
   window.hooks={};window.Hooks={on:(name,fn)=>{(window.hooks[name]??=[]).push(fn);}};
   window.wrap=nodes=>({length:nodes.length,find:s=>window.wrap(nodes.flatMap(n=>[...n.querySelectorAll(s)])),
-   prop:(key,value)=>{nodes.forEach(n=>n[key]=value);return window.wrap(nodes);},attr:(key,value)=>{nodes.forEach(n=>n.setAttribute(key,value));return window.wrap(nodes);},remove:()=>nodes.forEach(n=>n.remove()),first:()=>window.wrap(nodes.slice(0,1)),before:n=>nodes[0]?.before(n),after:n=>nodes[0]?.after(n),
+   prop:(key,value)=>{nodes.forEach(n=>n[key]=value);return window.wrap(nodes);},attr:(key,value)=>{nodes.forEach(n=>n.setAttribute(key,value));return window.wrap(nodes);},remove:()=>nodes.forEach(n=>n.remove()),first:()=>window.wrap(nodes.slice(0,1)),last:()=>window.wrap(nodes.slice(-1)),before:n=>nodes[0]?.before(n),after:n=>nodes[0]?.after(n),
    append:n=>nodes[0]?.append(n),on:(event,fn)=>nodes.forEach(n=>n.addEventListener(event,fn))});
  });
  const native=(await readFile('dist/scripts/self-chat-operation.js','utf8')).replace(/^import .*$/gm,'')+'\n'+(await readFile(new URL('../dist/scripts/native-combat.js',import.meta.url),'utf8')).replace(/^import .*$/gm,'');
@@ -45,8 +45,8 @@ try {
  const statusSource = await readFile(new URL('../dist/scripts/damage-status.js', import.meta.url), 'utf8');
  await page.addScriptTag({type:'module',content:statusSource.replace(/^import .*$/gm,'')+'\nObject.assign(window,{chooseDamageStatuses,damageStatusChoices,validateDamageStatuses,canonicalDamageStatus,inherentDamageStatuses,lockedDamageStatuses,renderDamageStatusPicker});'});
  await page.waitForFunction(()=>!!window.chooseDamageStatuses);
- const criticalSource = (await readFile('dist/scripts/native-lookup.js','utf8'))+'\n'+(await readFile(new URL('../dist/scripts/critical-injury.js', import.meta.url), 'utf8')).replace(/^import .*$/gm,'');
- await page.addScriptTag({type:'module',content:criticalSource.replace('import(utilsPath)', 'Promise.resolve({default:window.criticalUtils})')+'\nObject.assign(window,{hasCriticalInjury,criticalLocation,damageSixes,applyCriticalInjury});'});
+ const criticalSource = 'const esc=window.escapeHTML;'+(await readFile('dist/scripts/native-lookup.js','utf8'))+'\n'+(await readFile(new URL('../dist/scripts/critical-injury.js', import.meta.url), 'utf8')).replace(/^import .*$/gm,'');
+ await page.addScriptTag({type:'module',content:criticalSource.replace('import(utilsPath)', 'Promise.resolve({default:window.criticalUtils})')+'\nObject.assign(window,{hasCriticalInjury,criticalLocation,damageSixes,rollCriticalInjury,criticalInjuryRow,injuryKey,injuryResult});'});
  await page.waitForFunction(()=>!!window.hasCriticalInjury);
  const applicationSource = (await readFile('dist/scripts/actor-mutation.js','utf8'))+'\n'+(await readFile(new URL('../dist/scripts/native-wrappers.js', import.meta.url), 'utf8'))+'\n'+(await readFile(new URL('../dist/scripts/damage-application.js', import.meta.url), 'utf8')).replace(/^import .*$/gm,'');
  await page.addScriptTag({type:'module',content:applicationSource+'\nObject.assign(window,{compactDamageApplication,captureWithChat,captureDamageApplication,isDamageCaptureView,blockedArmorApplication,withActorMutation,registerNativeWrapper});'});
@@ -137,7 +137,7 @@ try {
  assert.match(result.pending,/pneumaRollDamage/);
  assert.equal(await page.locator(".pneuma-resolution-damage-roll .pneuma-damage-status-slot").count(),3);assert.equal(await page.locator("a.pneuma-apply-damage").count(),2);
  assert.equal(result.header,'DamageSmart');assert.equal(result.weaponRepeated,false);assert.equal(result.bolts,2);assert.deepEqual(result.destinations,['recorded','selected']);
- assert.deepEqual(result.applyButtons,[' Defender',' Selected Token']);
+ assert.deepEqual(result.applyButtons,['Defender','Selected Token']);
  assert.equal(result.nativeApply,0);assert.equal(result.detail,'22');assert.equal(result.requests.length,0);
  assert.match(result.unaware,/Defender unaware/);
  const missControls=await page.evaluate(async()=>{
@@ -326,30 +326,50 @@ try {
    window.game.settings.get=(module,key)=>key==="criticalInjuryRollTableCompendium"?"tables":true;
    window.criticalUtils={GetCompendiumDoc:async(pack,name)=>{calls.push([pack,name]);return table;},GetCompendiumIdByLabel:()=>"injuries"};
    window.fromUuid=async uuid=>({actor:{isOwner:true,sheet:{_drawCriticalInjuryTable:async(t,pack,iteration)=>calls.push([uuid,t.name,pack,iteration])}}});
-   await renderDamage({id:"critical"},data,wrap([document.body]),async()=>{});
+   await renderDamage({id:"critical"},data,wrap([document.body]),async(action,extra)=>calls.push([action,extra.targetUuid]));
    const icons=[...document.querySelectorAll(".pneuma-apply-critical")];
-   for(const row of document.querySelectorAll('.pneuma-damage-recipient')){
-     const [damage,injury,label]=row.children;
-     if(!damage.matches('.pneuma-apply-damage')||!injury.matches('.pneuma-apply-critical')||!label.matches('.pneuma-damage-recipient-label'))throw Error('Both buttons must precede recipient');
-     const a=damage.getBoundingClientRect(),b=injury.getBoundingClientRect(),c=label.getBoundingClientRect();
-     if(a.right>b.left+1||b.right>c.left+1||a.bottom<b.top||b.bottom<a.top)throw Error('Recipient buttons must stay together on the left');
-   }
    icons[0].click();
    await new Promise(resolve=>setTimeout(resolve,0));
    window.canvas={tokens:{controlled:[{actor:{isOwner:true},document:{uuid:"Token.selected"}}]}};
    icons[1].click();
    await new Promise(resolve=>setTimeout(resolve,0));
    const count=icons.length;
+   const checkPlacement=(expectedResults)=>{
+     const results=document.querySelector(".pneuma-resolution-damage-apply .pneuma-damage-applications");
+     const injuries=document.querySelector(".pneuma-damage-injuries");
+     return !injuries
+       && !document.querySelector(".pneuma-damage-controls .pneuma-critical-row")
+       && results.querySelectorAll(".pneuma-damage-applied > .pneuma-critical-row").length===expectedResults
+       && [...document.querySelectorAll(".pneuma-damage-recipient")].every(row=>row.children[0].matches(".pneuma-damage-recipient-label")&&row.children[1].matches(".pneuma-apply-damage")&&row.children[2].matches(".pneuma-apply-critical"));
+   };
+   const initialPlacement=checkPlacement(0);
+   data.damage.applications=['<div class="pneuma-damage-applied" data-damage-instance="recorded-0">Rage Body 48</div>',
+     '<div class="pneuma-damage-applied" data-damage-instance="selected-0">Pex Body 51</div>'];
+   data.damage.selectedTargets=[{id:"selected",uuid:"Token.selected",name:"Pex"}];
+   data.damage.injuries={[injuryKey(data.defender)]:{name:"Broken Leg",targetName:"Rage",total:8,html:"<p>Injury details</p>",applied:true}};
+   document.body.innerHTML='<div class="message-content">'+exchangeContent(data)+'</div>';
+   await renderDamage({id:"applied-critical"},data,wrap([document.body]),async(action,extra)=>calls.push([action,extra.targetUuid]));
+   const appliedPlacement=checkPlacement(1);
+   const recordedParent=document.querySelector(".pneuma-damage-applied summary")?.closest("[data-damage-instance]")?.dataset.damageInstance;
+   if(recordedParent!=="recorded-0")throw Error("Recorded injury attached to wrong damage result");
+   data.damage.injuries[injuryKey("Token.selected")]={name:"Foreign Object",targetName:"Pex",target:"Token.selected",total:7,html:"<p>Selected injury</p>",applied:true};
+   document.body.innerHTML='<div class="message-content">'+exchangeContent(data)+'</div>';
+   await renderDamage({id:"two-critical"},data,wrap([document.body]),async(action,extra)=>calls.push([action,extra.targetUuid]));
+   const paired=[...document.querySelectorAll(".pneuma-damage-applied")].map(card=>[card.dataset.damageTarget,card.querySelector("summary")?.textContent]);
+   if(paired[0][0]!==data.defender||!paired[0][1].includes("Broken Leg")||paired[1][0]!=="Token.selected"||!paired[1][1].includes("Foreign Object"))throw Error("Injury results are not paired by token");
+   const savedResult=document.querySelector(".pneuma-damage-applied summary")?.textContent;
+   document.querySelector(".pneuma-damage-applied .pneuma-critical-reroll").click();
+   await new Promise(resolve=>setTimeout(resolve,0));
    window.game.settings.get=()=>false;
    document.body.innerHTML='<div class="message-content">'+exchangeContent(data)+'</div>';
    await renderDamage({id:"disabled-critical"},data,wrap([document.body]),async()=>{});
    const disabledCount=document.querySelectorAll(".pneuma-apply-critical").length;
    window.game.settings.get=()=>true;
-   return {count,disabledCount,calls};
+   return {count,disabledCount,calls,initialPlacement,appliedPlacement,savedResult};
  });
  assert.equal(critical.count,2);assert.equal(critical.disabledCount,0);
- assert.deepEqual(critical.calls,[["tables","Critical Injuries (Head)"],["d","Critical Injuries (Head)","injuries",0],
-   ["tables","Critical Injuries (Head)"],["Token.selected","Critical Injuries (Head)","injuries",0]]);
+ assert.deepEqual(critical.calls,[["damageInjury","d"],["damageInjury","Token.selected"],["damageInjuryReroll","d"]]);
+ assert.equal(critical.initialPlacement,true);assert.equal(critical.appliedPlacement,true);assert.match(critical.savedResult,/8.*Broken Leg/);
 
 
  const coverLocations=await page.evaluate(async()=>{
@@ -358,7 +378,7 @@ try {
      const calls=[],chat={RenderDamageApplicationCard(){}},actor={getEquippedArmors:part=>worn.includes(part)?[{}]:[],_ablateArmor:async(part,n)=>calls.push([part,n])};
      window.renderTemplate=async()=>'<div><span data-action="toggleVisibility" data-visible-element="d6-data-details">0</span><div class="d6-data-details">Blocked</div></div>';
      const receipts=await captureWithChat(chat,actor,'Target','body','all-armor',async view=>{await chat.RenderDamageApplicationCard({actor:view,location:'body',hpReduction:0,rawDamageDealt:0});},{ablation,ignorePercent:0,ignoreBelow:0});
-     results.push({calls,note:receipts[0].includes('all worn head and body armor')});
+     results.push({calls,note:receipts[0].includes(ablation>0?'all worn head and body armor':'no armor ablation for this application')});
    }
    return results;
  });

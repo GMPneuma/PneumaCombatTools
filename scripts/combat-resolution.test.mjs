@@ -429,9 +429,79 @@ test("critical injury counts only active damage d6 sixes and chooses the attack 
  registerCriticalSettings();assert.equal(registered.length,8);assert.ok(registered.every(([key,value])=>value===(key!=="criticalQuickhack")));
 });
 test("critical injury verifies recipient ownership before native mutation",async()=>{
- const {applyCriticalInjury}=await import("../dist/scripts/critical-injury.js");
+ const {rollCriticalInjury}=await import("../dist/scripts/critical-injury.js");
  setup();game.settings.get=()=>true;globalThis.fromUuid=async()=>({actor:{isOwner:false}});
- await assert.rejects(applyCriticalInjury({ranged:true,damage:{result:{sixes:2}}},"Token.foreign"),/owner or GM/);
+ await assert.rejects(rollCriticalInjury({ranged:true,damage:{result:{sixes:2}}},"Token.foreign"),/owner or GM/);
+});
+
+test("inline injury resumes a saved roll and recovers a failed card save without duplicating the item",async()=>{
+ setup();
+ const {handleDamage}=await import("../dist/scripts/damage-flow.js");
+ const injury={name:"Foreign Object",targetName:"Defender",item:"Compendium.injury",total:7,html:"native details",dice:[]};
+ const data={state:"resolved",hit:true,ranged:true,defender:"Token.d",rollMode:"roll",
+  damage:{status:"applied",result:{sixes:2},injuries:{"Token.d":injury}}};
+ const source={name:injury.name,type:"criticalInjury",img:"injury.png",system:{description:"Details"},effects:[{toObject:()=>({name:"Native effect"})}]};
+ globalThis.fromUuid=async uuid=>uuid===injury.item?source:{actor};
+ let created=0;
+ actor.createEmbeddedDocuments=async(_type,items)=>{created++;actor.items.push(...items);return items;};
+ const request={action:"damageInjury",targetUuid:"Token.d"};
+ await assert.rejects(handleDamage(request,game.users.get("stranger"),data,async()=>{}, {uuid:"ChatMessage.crit"}),/owner or GM/);
+ await assert.rejects(handleDamage(request,game.users.get("owner"),data,async()=>{throw Error("write interrupted");},{uuid:"ChatMessage.crit"}),/write interrupted/);
+ assert.equal(created,1);
+ injury.applied=false; // Persisted state before the failed message update.
+ await handleDamage(request,game.users.get("owner"),data,async()=>{}, {uuid:"ChatMessage.crit"});
+ await handleDamage(request,game.users.get("owner"),data,async()=>{}, {uuid:"ChatMessage.crit"});
+ assert.equal(created,1);
+ assert.equal(injury.applied,true);
+ assert.deepEqual(actor.items[0].effects,[{name:"Native effect"}]);
+ assert.equal(injury.total,7);
+});
+
+test("injury results survive dotted-path flag expansion and only the GM can enable a re-roll",async()=>{
+ setup();
+ const {injuryKey,injuryResult,criticalInjuryRow}=await import("../dist/scripts/critical-injury.js");
+ const {handleDamage}=await import("../dist/scripts/damage-flow.js");
+ const target="Scene.scene.Token.token";
+ const injury={name:"Foreign Object",targetName:"Defender",item:"Compendium.injury",total:7,html:"details",dice:[],applied:true};
+ const nested={Scene:{scene:{Token:{token:injury}}}};
+ assert.equal(injuryResult(nested,target),injury,"Recover results written with raw UUID keys");
+ assert.ok(!injuryKey(target).includes("."));
+ const data={state:"resolved",hit:true,ranged:true,defender:target,damage:{result:{sixes:2},injuries:nested}};
+ const request={action:"damageInjuryReroll",targetUuid:target};
+ await assert.rejects(handleDamage(request,game.users.get("owner"),data,async()=>{}, {uuid:"ChatMessage.crit"}),/Only a GM/);
+ let saved;
+ await handleDamage(request,game.users.get("gm"),data,async()=>{saved=structuredClone(data);},{uuid:"ChatMessage.crit"});
+ assert.equal(injuryResult(saved.damage.injuries,target).allowReroll,true);
+ game.user=game.users.get("gm");
+ const result=criticalInjuryRow(injury,"Defender");
+ assert.match(result,/7 — Foreign Object/);
+ assert.doesNotMatch(result,/<strong>Critical Injury/);
+ assert.match(result,/Allow re-roll/);
+ game.user=game.users.get("owner");
+ assert.doesNotMatch(criticalInjuryRow(injury,""),/Allow re-roll/);
+});
+
+test("replacement injury removes only the previous card injury and survives a retry",async()=>{
+ setup();
+ const {injuryKey}=await import("../dist/scripts/critical-injury.js");
+ const {handleDamage}=await import("../dist/scripts/damage-flow.js");
+ const target="Token.d";
+ const injury={name:"Broken Arm",targetName:"Defender",item:"Compendium.new",total:8,html:"details",dice:[],
+  receipt:"new-roll",replacesReceipt:"old-roll"};
+ const data={state:"resolved",hit:true,ranged:true,defender:target,damage:{result:{sixes:2},injuries:{[injuryKey(target)]:injury}}};
+ actor.items=[{id:"old",flags:{"pneuma-combattools":{injuryReceipt:"old-roll"}}},{id:"unrelated",name:"Existing injury"}];
+ const source={name:"Broken Arm",type:"criticalInjury",system:{},effects:[]};
+ globalThis.fromUuid=async uuid=>uuid===injury.item?source:{actor};
+ let creations=0;
+ actor.createEmbeddedDocuments=async(_type,items)=>{creations++;actor.items.push(...items);};
+ actor.deleteEmbeddedDocuments=async(_type,ids)=>{assert.deepEqual(ids,["old"]);actor.items=actor.items.filter(item=>!ids.includes(item.id));};
+ const request={action:"damageInjury",targetUuid:target};
+ await handleDamage(request,game.users.get("gm"),data,async()=>{},{uuid:"ChatMessage.crit"});
+ await handleDamage(request,game.users.get("gm"),data,async()=>{},{uuid:"ChatMessage.crit"});
+ assert.equal(creations,1);
+ assert.ok(actor.items.some(item=>item.id==="unrelated"));
+ assert.ok(!actor.items.some(item=>item.id==="old"));
+ assert.equal(injury.applied,true);
 });
 
 test("native ammo rejection stops attack before dialog, confirmation, LUCK or chat",async()=>{

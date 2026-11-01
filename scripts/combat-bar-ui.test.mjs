@@ -370,6 +370,9 @@ try {
  });
  await page.addScriptTag({type:'module',content:(await readFile(output+'/scripts/players-control.js','utf8')).replace(/^import .*;\s*/gm,'')+'\nregisterPlayersControl();emit("setup");ui.players.render();'});
  await page.addStyleTag({content:':root{--macro-size:50px;--hotbar-height:52px}'});
+ // Content-sized native columns must not shrink when Players moves into the dock.
+ await page.addStyleTag({content:"#ui-left{width:max-content}#players{position:relative;left:0;bottom:0}#navigation{position:fixed;top:0}"});
+ await page.evaluate(()=>{const navigation=document.createElement("nav");navigation.id="navigation";document.body.append(navigation);window.leftColumnWidth=document.getElementById("ui-left").getBoundingClientRect().width;});
  // Native-node lifecycle and responsive Bottom-Docked geometry.
  await page.evaluate(()=>{
    game.user=gm;combat.started=true;canvas.tokens.placeables=tokens;
@@ -451,12 +454,14 @@ try {
    assert.ok(geometry.turns-geometry.last>=0&&geometry.turns-geometry.last<=8,'Turn controls immediately follow final combatant');
    assert.ok(Math.abs(geometry.dockRight-geometry.macroRight-5)<1,'Macro bar remains right aligned');
  }
+ assert.equal(await page.locator('#ui-left').evaluate(e=>e.getBoundingClientRect().width),await page.evaluate(()=>leftColumnWidth),'Docking preserves the column that offsets map navigation');
  await page.screenshot({path:process.env.TEMP+'/pct-bottom-docked.png'});
  await page.evaluate(()=>{
    const old=document.getElementById('hotbar'),replacement=old.cloneNode(true);old.replaceWith(replacement);emit('renderHotbar');
    const oldPlayers=document.getElementById('players');oldPlayers.replaceWith(oldPlayers.cloneNode(true));emit('renderPlayerList',ui.players,[document.getElementById('players')]);
  });
  await page.evaluate(()=>game.settings.set('','combatBarDock','bottom-left'));
+ assert.equal(await page.locator('#ui-left').evaluate(e=>e.style.minWidth),'');
  assert.equal(await page.locator('#pneuma-bottom-dock').count(),0);
  assert.equal(await page.evaluate(()=>document.body.classList.contains('pneuma-dock-full-width')),false);
  assert.equal(await page.evaluate(()=>document.getElementById('hotbar').parentElement===hotbarParent&&document.getElementById('players').parentElement===playersParent),true);

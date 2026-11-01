@@ -10,6 +10,7 @@ import {attackCrossesSmoke} from "./smoke-obscuration.js";
 import {ablateArmorSelected, halfArmorSelected, interactArmorSelected} from "../half-armor.js";
 import {automaticNPCEvasion} from "../evasion-settings.js";
 import {evasionBlocked} from "../injury-rules.js";
+import {criticalInjuryRow, injuryResult, hasCriticalInjury} from "../critical-injury.js";
 import {ammoProfile,instantId} from "../instant-catalog.js";
 import {inherentDamageStatuses,renderDamageStatusPicker} from "../damage-status.js";
 import {newInstant,instantContent,instantDone,handleInstant,bindInstantControls,arrangeAreaEffectControls,type InstantState,type InstantRequest} from "../instant-effects.js";
@@ -237,7 +238,7 @@ export async function handleAreaRequest(req:Request) {
   if(req.action==="damage"){
     if(!req.damageRequest||data.kind==="suppression"||data.special||data.phase==="scatter")throw Error("Damage is unavailable.");
     if(req.target) {
-      if(!row||row.state!=="hit"||!["damageApply","damageResolved"].includes(req.damageRequest.action))throw Error("Select an affected target.");
+      if(!row||row.state!=="hit"||!["damageApply","damageResolved","damageInjury","damageInjuryReroll"].includes(req.damageRequest.action))throw Error("Select an affected target.");
       if(req.damageRequest.targetUuid && req.damageRequest.targetUuid!==row.uuid)throw Error("Damage target changed.");
       const exchange=rowExchange(data,row);
       await handleDamage(req.damageRequest,user,exchange,async()=>{row.damage=exchange.damage;if(damageEffectsLocked(row.damage))data.effectsLocked=true;
@@ -647,6 +648,29 @@ export function registerAreaAttacks() {
   Hooks.on("renderChatMessage",async(message:ChatMessage,html:JQuery)=>{
     const data=flag(message);if(!data||!canRenderCombatCard(message))return;
     if(html[0])standardizeAreaLayout(html[0],data);
+    if (hasCriticalInjury(data.exchange)) {
+      for (const slot of html.find<HTMLElement>(".pneuma-aoe-resolution-target > .pneuma-aoe-target-effects").toArray()) {
+        const target = slot.parentElement?.dataset.aoeRow;
+        const row = data.rows.find(candidate => candidate.uuid === target);
+        if (row?.state !== "hit" || slot.querySelector(".pneuma-critical-row")) continue;
+        slot.insertAdjacentHTML("beforeend", criticalInjuryRow(injuryResult(row.damage?.injuries,row.uuid),""));
+        const button = slot.querySelector<HTMLButtonElement>(".pneuma-apply-critical");
+        if (button) { button.dataset.aoeAction="injury"; button.dataset.aoeTarget=row.uuid; }
+        const reroll = slot.querySelector<HTMLButtonElement>(".pneuma-critical-reroll");
+        if (reroll) { reroll.dataset.aoeAction="injuryReroll"; reroll.dataset.aoeTarget=row.uuid; }
+      }
+    }
+    for (const slot of html.find<HTMLElement>(".pneuma-aoe-resolution-target > .pneuma-aoe-target-damage").toArray()) {
+      const controls = Array.from(slot.querySelectorAll<HTMLButtonElement>('[data-aoe-action="apply"]'));
+      if (!controls.length) continue;
+      let actions = slot.querySelector<HTMLElement>(".pneuma-aoe-damage-actions, .pneuma-damage-applied-row");
+      if (!actions) {
+        actions = document.createElement("div");
+        actions.className = "pneuma-aoe-damage-actions";
+        slot.append(actions);
+      }
+      actions.append(...controls);
+    }
     const picker=html[0]?.querySelector<HTMLElement>('.pneuma-aoe-effects-picker');
     if(picker && data.exchange.damage?.result) {
       const attacker=await actorAt(data.exchange.attacker).catch(()=>null);
@@ -664,7 +688,7 @@ export function registerAreaAttacks() {
     html.find<HTMLElement>('.pneuma-aoe-attack [data-action="rollDamage"]').toArray().forEach(button=>button.remove());
     for(const button of html.find<HTMLButtonElement>("[data-aoe-action]").toArray()){
       const action=button.dataset.aoeAction!,row=data.rows.find(r=>r.uuid===button.dataset.aoeTarget);
-      if(action==="damage"||action==="apply")button.innerHTML='<i class="fas '+(action==="damage"?"fa-droplet":"fa-bolt")+'" aria-hidden="true"></i>'+(action==="apply"?' <span>'+(row?.damage?.recordedApplied?'Applied':'Apply Damage')+'</span>':'');
+      if(action==="damage"||action==="apply")button.innerHTML='<i class="fas '+(action==="damage"?"fa-droplet":"fa-bolt")+'" aria-hidden="true"></i>';
       if(action==="show") {
         if(!game.user!.isGM){button.remove();continue;}
         const label=data.areaHidden?"Show attack area":"Hide attack area";
@@ -713,6 +737,7 @@ export function registerAreaAttacks() {
           else if(action==="retryResponse"&&row)await respond(message,data,row);
           else if(action==="move"&&row)await moveOutside(message,data,row);
           else if(action==="damage")await rollDamage(message.id!,data.exchange,(a,extra)=>send(message.id!,"damage",{damageRequest:{...extra,action:a}}),event.shiftKey);
+          else if((action==="injury" || action==="injuryReroll") && row?.state==="hit")await send(message.id!,"damage",{target:row.uuid,damageRequest:{action:action==="injury"?"damageInjury":"damageInjuryReroll",targetUuid:row.uuid}});
           else if(action==="apply"&&row)await applyFromCard(rowExchange(data,row),(a,extra)=>send(message.id!,"damage",{target:row.uuid,damageRequest:{...extra,action:a}}),event.shiftKey,row.uuid,"recorded",halfArmorSelected(event),interactArmorSelected(event),ablateArmorSelected(event));
           else if(action==="damageReset"||action==="damageResolved")await send(message.id!,"damage",{target:row?.uuid,damageRequest:{action}});
           else await send(message.id!,action,{target:row?.uuid});

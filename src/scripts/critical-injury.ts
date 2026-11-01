@@ -1,6 +1,7 @@
 import {nativeCriticalTable} from "./native-lookup.js";
 import type { Exchange } from "./combat-resolution.js";
-import type { NativeRoll } from "./native-combat.js";
+import {nativeCard, diceJSON, type NativeRoll} from "./native-combat.js";
+import {escapeHTML as esc} from "./shared.js";
 
 export const criticalMethods = {
   Ranged: "Ranged attacks", Melee: "Melee attacks", Unarmed: "Unarmed attacks", Autofire: "Autofire",
@@ -25,20 +26,21 @@ export function hasCriticalInjury(data: Exchange): boolean {
   return (data.damage?.result?.sixes ?? 0) >= 2
     && game.settings!.get("pneuma-combattools", `critical${criticalMethod(data)}`) !== false;
 }
-/** Delegate injury items, effects, duplicate policy and chat to the native sheet workflow. */
-export async function applyCriticalInjury(data: Exchange, targetUuid: string): Promise<void> {
+export interface InlineInjury { name:string; targetName:string; target?:string; item:string; total:number; html:string; dice:string[]; applied?:boolean; allowReroll?:boolean; receipt?:string; replacesReceipt?:string }
+// Foundry expands dotted update keys. Token UUIDs must not be used as raw flag keys.
+export const injuryKey = (target:string):string => encodeURIComponent(target).replaceAll(".","%2E");
+export function injuryResult(injuries:Record<string,InlineInjury>|undefined,target:string):InlineInjury|undefined {
+  return injuries?.[injuryKey(target)] ?? injuries?.[target] ?? foundry.utils.getProperty(injuries ?? {},target) as InlineInjury|undefined;
+}
+/** Use the native table, duplicate policy, roll card and injury item without publishing a separate message. */
+export async function rollCriticalInjury(data: Exchange, targetUuid: string, replacesReceipt?:string): Promise<InlineInjury> {
   if (!hasCriticalInjury(data)) throw new Error("This damage roll does not qualify for a critical injury.");
   const token = await fromUuid(targetUuid) as TokenDocument | null;
   const actor = token?.actor;
   if (!actor?.isOwner) throw new Error("Only the recipient's owner or GM can apply an injury.");
-  const sheet = actor.sheet as ActorSheet & {
-    _drawCriticalInjuryTable?: (table: RollTable, compendium: string, iteration: number) => Promise<void>;
-  };
-  if (typeof sheet?._drawCriticalInjuryTable !== "function")
-    throw new Error("Native critical injury application is unavailable.");
   const utilsPath = "/systems/cyberpunk-red-core/modules/utils/cpr-systemUtils.js";
   const utils = (await import(utilsPath)).default as {
-    GetCompendiumDoc(pack: string, name: string): Promise<RollTable>;
+    GetCompendiumDoc(pack: string, name: string): Promise<RollTable | Item>;
     GetCompendiumIdByLabel(label: string): string | null;
   };
   const tableName = criticalLocation(data) === "head" ? "Critical Injuries (Head)" : "Critical Injuries (Body)";
@@ -48,9 +50,48 @@ export async function applyCriticalInjury(data: Exchange, targetUuid: string): P
   const native = await nativeCriticalTable(tablePack, criticalLocation(data));
   if (!native && !game.packs!.get(tablePack)!.index.find(entry => entry.name === tableName))
     throw new Error("The configured compendium has no " + tableName + " table.");
-  const table = native ?? await utils.GetCompendiumDoc(tablePack, tableName);
+  const table = native ?? await utils.GetCompendiumDoc(tablePack, tableName) as RollTable;
   const injuryPack = native ? "cyberpunk-red-core.core_critical-injuries-" + criticalLocation(data) : utils.GetCompendiumIdByLabel(tableName);
   if (!table || !injuryPack) throw new Error("The native " + tableName + " table or injury compendium is unavailable.");
   await game.packs!.get(injuryPack)?.getIndex();
-  await sheet._drawCriticalInjuryTable(table, injuryPack, 0);
+  const duplicate = game.settings!.get("cyberpunk-red-core", "preventDuplicateCriticalInjuries" as never);
+  const hasInjury = (name:string) => actor.items.some(item => String(item.type)==="criticalInjury" && item.name===name
+    && (!replacesReceipt || foundry.utils.getProperty(item,"flags.pneuma-combattools.injuryReceipt")!==replacesReceipt));
+  if (duplicate === "reroll" && table.results.contents.every(result => hasInjury(result.text ?? "")))
+    throw Error("This character already has every injury on this table.");
+  for (let attempt = 0; attempt < 1000; attempt++) {
+    const result = await table.draw({displayChat:false} as Parameters<RollTable["draw"]>[0]);
+    if (result.results.length !== 1) throw Error("The injury table must return one injury.");
+    const item = await utils.GetCompendiumDoc(injuryPack, result.results[0]!.text!) as Item;
+    if (!item || String(item.type)!=="criticalInjury") throw Error("The rolled injury item is unavailable.");
+    if (hasInjury(item.name!)) {
+      if (duplicate === "reroll") continue;
+      if (duplicate === "warn") ui.notifications!.warn(actor.name + " already has " + item.name + ".");
+    }
+    const path = "/systems/cyberpunk-red-core/modules/rolls/cpr-rolls.js";
+    const {CPRTableRoll} = await import(path) as {CPRTableRoll:new(name:string,roll:Roll,template:string)=>NativeRoll & {rollCardExtraArgs:Record<string,unknown>}};
+    const roll = new CPRTableRoll(item.name!,result.roll,"systems/cyberpunk-red-core/templates/chat/cpr-critical-injury-rollcard.hbs");
+    roll.resultTotal = result.roll.total!;
+    roll.rollCardExtraArgs = {tableName:table.name,itemName:item.name,itemImg:item.img};
+    const description = await TextEditor.enrichHTML(String(foundry.utils.getProperty(item,"system.description") ?? ""));
+    const card = new DOMParser().parseFromString(await nativeCard(roll),"text/html");
+    for (const link of Array.from(card.querySelectorAll<HTMLElement>('[data-action="itemEdit"]'))) {
+      link.removeAttribute("data-action");
+      link.className = "content-link";
+      link.dataset.uuid = item.uuid;
+    }
+    return {name:item.name!,targetName:actor.name!,item:item.uuid,total:result.roll.total!,html:card.body.innerHTML+description,dice:diceJSON(roll)};
+  }
+  throw Error("No unused injury found. Check the actor's existing injuries.");
+}
+
+export function criticalInjuryRow(result:InlineInjury|undefined, label:string):string {
+  const content = result
+    ? '<details><summary>'+esc(result.total)+' — '+esc(result.name)+(result.applied?'':' — application pending')+'</summary><div class="pneuma-critical-details">'+result.html+'</div></details>'
+    : '<strong>Critical Injury'+(label?' — '+esc(label):'')+'</strong>';
+  const roll = !result || !result.applied || result.allowReroll
+    ? '<button type="button" class="pneuma-apply-critical" title="'+(result?.allowReroll?'Re-roll critical injury':result?'Finish injury application':'Roll critical injury')+'" aria-label="Roll or finish critical injury"><i class="fas fa-heart-crack" aria-hidden="true"></i></button>' : '';
+  const reroll = result?.applied && !result.allowReroll && game.user?.isGM
+    ? '<button type="button" class="pneuma-critical-reroll" data-gm-only="true" title="Allow re-roll" aria-label="Allow re-roll"><i class="fas fa-rotate-left" aria-hidden="true"></i></button>' : '';
+  return '<div class="pneuma-critical-row">'+content+roll+reroll+'</div>';
 }

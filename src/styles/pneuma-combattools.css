@@ -261,7 +261,20 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 .pneuma-combat-message .pneuma-applied-location { white-space: nowrap; }
 .pneuma-combat-message .pneuma-applied-details { font-size: 12px; }
 
-.pneuma-combat-message .pneuma-damage-recipient { grid-column: 1; }
+.pneuma-combat-message .pneuma-damage-controls > .pneuma-damage-recipient {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px 34px;
+  align-items: center;
+}
+.pneuma-combat-message .pneuma-damage-controls > .pneuma-damage-recipient > :is(.pneuma-apply-damage, .pneuma-apply-critical) {
+  width: 34px;
+  min-width: 0;
+  margin: 0;
+  justify-self: center;
+}
+.pneuma-combat-message .pneuma-damage-controls > .pneuma-damage-recipient > .pneuma-apply-damage { grid-column: 2; text-align: center; }
+.pneuma-combat-message .pneuma-damage-controls > .pneuma-damage-recipient > .pneuma-apply-critical { grid-column: 3; }
 .pneuma-combat-message .pneuma-damage-status-effects {
   grid-column: 2; grid-row: 1 / span 2; justify-self: end;
   display: grid; grid-template-columns: repeat(3, var(--pneuma-effect-slot-size,24px)); gap: 3px;
@@ -1188,7 +1201,18 @@ i.pneuma-neural-plug::before { content: ""; display: inline-block; width: 1em; h
 .pneuma-aoe-target-damage .pneuma-damage-applications > :is(.pneuma-cover-up-damage,.pneuma-injury-damage) { grid-column:1 / -1; }
 .pneuma-aoe-target-damage .pneuma-damage-applied { margin:0; padding:0; border:0; }
 .pneuma-aoe-target-damage > button,
+.pneuma-aoe-target-damage > .pneuma-aoe-damage-actions,
 .pneuma-aoe-target-damage .pneuma-damage-applied-row { grid-column:3; grid-row:1; justify-self:end; }
+.pneuma-aoe-damage-actions { display:flex; align-items:center; gap:4px; }
+.pneuma-damage-injuries { display:block; width:100%; min-width:0; }
+.pneuma-damage-injuries > .pneuma-critical-row { min-width:0; }
+.pneuma-critical-row { display:flex; align-items:center; flex-wrap:wrap; gap:4px; width:100%; padding:3px 0; }
+.pneuma-critical-row > strong { flex:1; font-size:12px; }
+.pneuma-critical-row > button { width:auto; flex:0 0 auto; }
+.pneuma-critical-row > details { flex:1; min-width:0; }
+.pneuma-critical-row summary { cursor:pointer; }
+.pneuma-critical-details { padding:4px; }
+.pneuma-aoe-target-damage :is([data-aoe-action="apply"], [data-aoe-action="injury"]) { width:auto; flex:0 0 auto; padding:2px 4px; }
 .pneuma-aoe-target-damage .pneuma-applied-details { grid-column:1 / -1; grid-row:2; min-width:0; padding:6px; margin:0; background:var(--pvt-panel,transparent); }
 .pneuma-applied-details.hide { display:none; }
 .pneuma-aoe-target-damage .pneuma-damage-applied > :is(.pneuma-cover-up-damage,.pneuma-injury-damage,.pneuma-reversal-status) { grid-column:1 / -1; }

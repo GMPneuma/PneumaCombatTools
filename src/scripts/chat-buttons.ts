@@ -1,6 +1,6 @@
 /** Shared presentation for Combat Tools chat controls only. Native roll links stay untouched. */
 const controls=[
-  ".pneuma-defense-controls button", ".pneuma-evasion-override", ".pneuma-result-damage", ".pneuma-apply-damage", ".pneuma-apply-critical",
+  ".pneuma-defense-controls button", ".pneuma-evasion-override", ".pneuma-result-damage", ".pneuma-apply-damage", ".pneuma-apply-critical", ".pneuma-critical-reroll",
   ".pneuma-damage-status-slot", ".pneuma-damage-recovery-controls button", ".pneuma-quickhack-actions button",
   ".pneuma-grapple-controls button", "[data-aoe-action]", "[data-instant-action]", "[data-emp-select]", "[data-status-cleanup]", "[data-copy-combat-summary]",
   "[data-scene-effect-action]", "[data-trap-action]", "[data-ribs-apply]", ".pneuma-manual-controls button", ".pneuma-group-action button", ".pneuma-half-armor", ".pneuma-interact-armor", ".pneuma-ablate-armor"
