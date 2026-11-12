@@ -18,9 +18,9 @@ import {selfIce} from "./self-ice.js";
 export const actorQuickhacks = (actor: Actor) => {
   const items = [...actor.items] as unknown as QuickhackItem[];
   return availableQuickhacks(items, mode(), enabled()).map(hack => ({
-    ...hack, img: quickhackAssetPath(items.find(item => quickhackId(item) === hack.id && item.img)?.img)
+    ...hack, img: quickhackAssetPath(hack.img) ?? quickhackAssetPath(items.find(item => quickhackId(item) === hack.id && item.img)?.img)
       ?? quickhackAssetPath([...game.items ?? []].find(item => quickhackId(item as unknown as QuickhackItem) === hack.id && item.img)?.img)
-      ?? `modules/${MODULE}/styles/quickhacks/${hack.id}-gray.png`,
+      ?? (hack.tier==="Custom"?`modules/${MODULE}/styles/quickhack-gray.png`:`modules/${MODULE}/styles/quickhacks/${hack.id}-gray.png`),
   }));
 };
 export function validTokens(source: Token, target: Token) {
@@ -92,12 +92,12 @@ export async function executeQuickhack(source: Token, target: Token, id: string,
       const alreadyAware=!!connection?.awareness?.alerted;
       const alerted = alreadyAware||isQuickhackTargetAlerted({ success, silentOnSuccess: hack.silentOnSuccess, targetIsPlayer: scenario.targetIsPlayer });
       const route = resolveQuickhackRouting(routing(), scenario);
-      const data: QuickhackResult = { ...base, type: "quickhack", connectionId: connection?.id, quickhackId: hack.id, success, alerted, ...route };
+      const data: QuickhackResult = { ...base, type: "quickhack", connectionId: connection?.id, quickhackId: hack.id, ...(hack.tier==="Custom"?{customDescription:hack.description??"",effectResolved:true}:{}), success, alerted, ...route };
       const detail = (route.showInterfaceTotal ? `<p>${label("Quickhack.InterfaceSummary", { interface: roll.total })}</p>` : "")
         + `<p>${label(alerted ? "Quickhack.AwarenessShort" : "Quickhack.UnawareShort", { target: escapeHTML(target.name) })}</p>`;
       const message = await postResult(source, target, data, `${hack.name} · DV${hack.dv}`, label(success ? "Quickhack.SuccessShort" : "Quickhack.FailureShort"), detail, roll.content);
       if (message && combatUuid) await establishConnection(message);
-      if (message && success && valid()) await requestEffect(message);
+      if (message && success && hack.tier!=="Custom" && valid()) await requestEffect(message);
       if (message && actor.hasPlayerOwner && !message.blind) void showSavedDice(roll.dice,"roll",roll.roller,messageDiceAudience(message)).catch(error=>console.warn(MODULE,"QuickHack dice display failed",error));
     } else {
       const automatic = !!roleFor(target.actor!);

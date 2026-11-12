@@ -26,6 +26,8 @@ export function markHomebrew(label: HTMLElement): HTMLElement {
 }
 
 function decorateSettings(root: HTMLElement) {
+  const armorLabel=root.querySelector('button[data-key="pneuma-combattools.closeArmorMenu"]')?.closest(".form-group")?.querySelector("label");
+  if(armorLabel)markHomebrew(armorLabel);
   const ablationLabel = root.querySelector('[name="pneuma-combattools.ablateBlockedHits"]')?.closest(".form-group")?.querySelector("label");
   if (ablationLabel && !ablationLabel.querySelector(".pneuma-homebrew-rule-icon")) {
     const icon = document.createElement("i");

@@ -20,7 +20,7 @@ function decorate(node:HTMLElement):void {
   }
   const text=node.textContent?.trim()??"",action=node.dataset.chatAction??node.dataset.sceneEffectAction??node.dataset.trapAction??node.dataset.aoeAction??node.dataset.instantAction??node.dataset.quickhackAction??"";
   const gmOnly=!!node.dataset.trapAction || !!node.dataset.sceneEffectAction && action!=="avoid" || node.dataset.gmOnly==="true"
-    || !!node.dataset.aoeAction && ["show","removeSmoke","scatter","hit","miss","exclude","forcehit","add","reset","damageReset","damageResolved","effectsResolved"].includes(action)
+    || !!node.dataset.aoeAction && ["show","removeSmoke","scatter","scatterRandom","scatterAny","hit","miss","exclude","forcehit","add","reset","damageReset","damageResolved","effectsResolved"].includes(action)
     || !!node.dataset.instantAction && ["skip","reset","review"].includes(action);
   node.dataset.chatRole=gmOnly?"gm":"player";
   const iconOnly=!text || node.classList.contains("pneuma-damage-status-slot");

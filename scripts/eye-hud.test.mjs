@@ -233,7 +233,7 @@ try{
  assert.equal(await page.locator('.pneuma-eye-hp strong').innerText(),'12');
  assert.equal(await page.locator('.pneuma-eye-notification-owner').count(),0);
  assert.match(await page.locator('.pneuma-eye-notifications').getAttribute('aria-label'),/Smitty/);
- assert.equal(await page.locator('.pneuma-eye-notification').first().evaluate(n=>getComputedStyle(n).fontSize),'24px');
+ assert.equal(await page.locator('.pneuma-eye-notification').first().evaluate(n=>getComputedStyle(n).fontSize),'14px');
  assert.equal(await page.locator('.pneuma-eye-notification').first().evaluate(n=>getComputedStyle(n).color),'rgb(255, 180, 95)');
  assert.equal(await page.locator('.pneuma-eye-notification.is-attack').count(),1,'Own attack remains while viewing someone else');
  await page.evaluate(()=>hooks.hoverToken.forEach(f=>f(token,false)));

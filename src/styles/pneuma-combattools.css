@@ -560,7 +560,7 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 #pneuma-eye-hud .pneuma-eye-situation { pointer-events:auto; color:#ead56c; background:linear-gradient(135deg,#272717,#171b12); border:1px solid #887d38; border-right:2px solid #ead56c; border-radius:0 0 5px 1px; padding:3px 7px; text-transform:uppercase; overflow-wrap:anywhere; max-width:100%; }
 
 #pneuma-eye-attachments .pneuma-eye-notifications { margin-top:9px; text-align:right; text-shadow:0 1px 3px #000,0 0 4px #000; }
-#pneuma-eye-attachments .pneuma-eye-notification { display:flex; justify-content:flex-end; align-items:baseline; gap:8px; padding:2px 0; font-size:24px; color:#ffb45f; }
+#pneuma-eye-attachments .pneuma-eye-notification { display:flex; justify-content:flex-end; align-items:baseline; gap:8px; padding:2px 0; font-size:14px; color:#ffb45f; }
 #pneuma-eye-attachments .pneuma-eye-notification.is-attack { color:#ffb45f; }
 #pneuma-eye-attachments .pneuma-eye-notification button { pointer-events:auto; font:inherit; color:inherit; background:transparent; border:0; width:auto; padding:0 3px; margin:0; box-shadow:none; text-shadow:inherit; }
 #pneuma-eye-attachments .pneuma-eye-notification > span { overflow-wrap:anywhere; }
@@ -727,7 +727,7 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 
 /* Flash-only API alerts never occupy the dismissible HUD queue. */
 .pneuma-hud-flashes { position:fixed; z-index:100; left:50%; top:50%; transform:translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; gap:16px; pointer-events:none; }
-.pneuma-hud-flash { width:max-content; max-width:calc(100vw - 48px); color:#ffb45f; font:bold 28px/1.4 monospace; text-align:center; overflow-wrap:anywhere; text-shadow:0 0 8px #ff8a2477; pointer-events:none; }
+.pneuma-hud-flash { width:max-content; max-width:calc(100vw - 48px); color:#ffb45f; font:bold 18px/1.4 monospace; text-align:center; overflow-wrap:anywhere; text-shadow:0 0 8px #ff8a2477; pointer-events:none; }
 
 /* Integrated EKG stays at its selected dock; messages follow below, clear control first. */
 #pneuma-eye-attachments.is-integrated .pneuma-eye-notifications { text-align:left; }
@@ -865,6 +865,9 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 .pneuma-chat-button.pneuma-chat-complete { opacity:var(--pneuma-chat-button-complete-opacity) !important; }
 .pneuma-chat-complete::before { content:"✓"; }
 .pneuma-chat-complete.pneuma-chat-icon > * { display:none; }
+.pneuma-bonus-damage { display: inline-flex; align-items: center; gap: .3em; }
+.pneuma-bonus-damage input { width: 4em; }
+
 /* Busy feedback overlays the existing footprint; labels and layout remain intact. */
 .pneuma-chat-button.pneuma-chat-busy { color:transparent !important; opacity:var(--pneuma-chat-button-complete-opacity) !important; }
 .pneuma-chat-busy > * { visibility:hidden; }
@@ -1422,3 +1425,42 @@ body.pneuma-dock-full-width #sidebar {
 .pneuma-bar-dock-options > .form-group > .form-fields { justify-content: flex-end; }
 .pneuma-bar-dock-options > .form-group > .notes { grid-column: 1 / -1; margin: 0; font-size: 11px; line-height: 1.3; }
 .pneuma-bar-position-row > .form-fields[hidden] { display: none; }
+
+/* Rolled attack damage stays compact until the pencil is selected. */
+.pneuma-compact-damage .pneuma-damage-number { position:relative; display:flex; align-items:center; justify-content:center; }
+.pneuma-damage-result .pneuma-compact-damage .pneuma-damage-number > button.pneuma-modify-damage {
+  position:absolute; right:1px; bottom:1px; z-index:1; display:grid; place-items:center;
+  box-sizing:border-box; width:14px; min-width:0; height:14px; min-height:0;
+  margin:0; padding:0; line-height:1; font-size:9px; color:inherit;
+  background:transparent; border:0; box-shadow:none;
+}
+.pneuma-damage-number > .pneuma-modify-damage > i { font-size:9px; line-height:1; margin:0; }
+.pneuma-damage-editor { display:grid; gap:4px; margin-top:5px; }
+.pneuma-damage-editor[hidden] { display:none !important; }
+.pneuma-damage-editor-row { display:flex; align-items:center; gap:4px; }
+.pneuma-damage-editor-row > button { width:auto; }
+.pneuma-damage-editor-row:has(> .pneuma-armor-toggle) { flex-wrap:wrap; }
+.pneuma-damage-editor-row .pneuma-armor-toggle { display:inline-flex; align-items:center; justify-content:center; gap:.35em; }
+.pneuma-armor-toggle .pneuma-armor-toggle-state { padding:0 .3em; font: bold 10px/1.5 sans-serif; text-transform:uppercase; border:1px solid currentColor; border-radius:3px; }
+.pneuma-damage-editor-row .pneuma-armor-toggle[aria-pressed="true"] { background:#24483b; color:#fff; border-color:#19372c; }
+.pneuma-armor-toggle[aria-pressed="true"] .pneuma-armor-toggle-state { background:#fff; color:#24483b; }
+.pneuma-damage-editor-row input { width:4em; }
+.pneuma-damage-editor-row .pneuma-damage-effects-picker,.pneuma-damage-editor-row .pneuma-aoe-effects-picker { margin:0; }
+
+.pneuma-damage-editor-row[hidden], .pneuma-resolution-damage-roll:has(.pneuma-compact-damage) > .pneuma-resolution-label { display:none; }
+
+#pneuma-custom-quickhacks .pneuma-quickhack-manager { display:flex; flex-direction:column; height:100%; gap:8px; }
+#pneuma-custom-quickhacks .qh-workspace { display:grid; grid-template-columns:minmax(140px,35%) minmax(0,1fr); flex:1; min-height:0; border:1px solid var(--color-border-light-2,#aaa); }
+#pneuma-custom-quickhacks aside { display:flex; flex-direction:column; gap:5px; min-height:0; padding:8px; border-right:1px solid var(--color-border-light-2,#aaa); }
+#pneuma-custom-quickhacks [data-hack-list] { display:grid; align-content:start; gap:4px; overflow-y:auto; }
+#pneuma-custom-quickhacks [data-hack-list] button { margin:0; padding:7px 9px; text-align:left; font-weight:bold; white-space:normal; overflow-wrap:anywhere; }
+#pneuma-custom-quickhacks [data-hack-list] button[aria-pressed=true] { box-shadow:inset 0 0 0 2px currentColor; }
+#pneuma-custom-quickhacks [data-details] { padding:10px; overflow:auto; }
+#pneuma-custom-quickhacks fieldset { border:0; padding:0; margin:0; min-width:0; }
+#pneuma-custom-quickhacks legend { font-weight:bold; }
+#pneuma-custom-quickhacks label { display:grid; gap:3px; margin:8px 0; }
+#pneuma-custom-quickhacks textarea { min-height:6em; resize:vertical; }
+#pneuma-custom-quickhacks [hidden] { display:none; }
+
+#pneuma-custom-quickhacks .qh-icon-field { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end; gap:4px; margin:8px 0; }
+#pneuma-custom-quickhacks .qh-icon-field label, #pneuma-custom-quickhacks .qh-icon-field button { margin:0; }

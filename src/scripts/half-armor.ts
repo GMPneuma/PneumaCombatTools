@@ -1,4 +1,3 @@
-declare global { interface SettingConfig { "pneuma-combattools.showArmorControls": boolean } }
 /** Native CPR rounds remaining SP with Math.round; at 50%, odd integer SP rounds up. */
 export function armorIgnorePercent(original:number,half?:boolean,interact?:boolean):number {
   if(interact===false)return 100;
@@ -49,15 +48,22 @@ export function bindHalfArmor(root:HTMLElement,show=true):void {
   }
 }
 export function registerHalfArmor():void {
-  game.settings!.register("pneuma-combattools","showArmorControls",{name:"Show armor controls on normal damage cards",hint:"Show Interact With Armor and Half Armor SP on normal damage cards for everyone. Off by default. Damage rolls from the chat-roll menu always show them.",scope:"world",config:true,type:Boolean,default:false,onChange:()=>ui.chat?.render(false)});
   Hooks.on("renderChatMessage",(message:ChatMessage,html:JQuery)=>{
     const root=html[0];if(!root)return;
     const manual=foundry.utils.getProperty(message,"flags.pneuma-combattools.manualRoll.kind")==="damage";
-    const show=manual||game.settings!.get("pneuma-combattools","showArmorControls");
+    const nativeCards=Array.from(root.querySelectorAll<HTMLElement>('.rollcard')).filter(card=>card.querySelector('[data-action="applyDamage"]'));
+    const show=manual||nativeCards.length>0;
     const values=["exchange.damage","aoe.exchange.damage","manualRoll.damage"].map(path=>foundry.utils.getProperty(message,"flags.pneuma-combattools."+path+".result.values") as {ignorePercent:number;interactArmor?:boolean}|undefined).find(Boolean);
     if((show||game.settings!.get("pneuma-combattools","ablateBlockedHits"))&&values)for(const result of Array.from(root.querySelectorAll<HTMLElement>(".pneuma-damage-result"))) {
       if(!result.querySelector(".pneuma-half-armor"))result.insertAdjacentHTML("beforeend",halfArmorControl(values.ignorePercent,values.interactArmor!==false));
     }
     bindHalfArmor(root,show);
+    if(!manual)for(const card of nativeCards){
+      const controls=card.querySelector<HTMLElement>(":scope > .pneuma-armor-controls");
+      if(!controls)continue;
+      const disclosure=document.createElement("details");
+      const summary=document.createElement("summary");summary.textContent="Armor options";
+      controls.replaceWith(disclosure);disclosure.append(summary,controls);
+    }
   });
 }

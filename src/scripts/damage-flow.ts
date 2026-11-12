@@ -1,5 +1,7 @@
 import { escapeHTML as escape } from "./shared.js";
 import {requireParticipants,resolveEncounter,encounterRef,tokenEncounter,type EncounterRef} from "./encounter.js";
+import {renderDamageEditor} from "./damage-editor.js";
+import {weaponArmor} from "./close-armor.js";
 import {ablateArmorSelected, interactArmorSelected, halfArmorSelected, halfArmorControl, armorIgnorePercent} from "./half-armor.js";
 import {reportExposure} from "./effect-events.js";
 import {instantId} from "./instant-catalog.js";
@@ -16,7 +18,7 @@ export interface DamageValues {
   total: number; bonus: number; location: string; ablation: number; ammo: string;
   interactArmor?: boolean; ignorePercent: number; ignoreBelow: number; lethal: boolean;
 }
-export interface DamageResult { ammoType?:string; html: string; values: DamageValues; sixes?: number }
+export interface DamageResult { armorOptions?:Partial<Record<"interact"|"ablate"|"always",boolean>>; flatBonus?:number; ammoType?:string; html: string; values: DamageValues; sixes?: number }
 export interface DamageState {
   injuries?: Record<string,InlineInjury>;
   status: "rolling" | "rolled" | "applying" | "applied" | "review";
@@ -27,7 +29,8 @@ export interface DamageState {
 export interface DamageOptions { useShield: boolean; damageReductionRole: boolean; damageReductionAE: boolean; brainDamageReduction: boolean }
 export interface DamageRequest {
   encounter?:EncounterRef;
-  action: "damageInjuryReroll" | "damageInjury" | "damageAllowMiss" | "damageClaim" | "damageRelease" | "damageCommit" | "damageApply" | "damageReset" | "damageResolved" | "damageStatuses";
+  armorOption?: "interact"|"ablate"|"always"; enabled?:boolean; flatBonus?:number;
+  action: "damageArmor" | "damageBonus" | "damageInjuryReroll" | "damageInjury" | "damageAllowMiss" | "damageClaim" | "damageRelease" | "damageCommit" | "damageApply" | "damageReset" | "damageResolved" | "damageStatuses";
   ablateArmor?: boolean; interactArmor?: boolean; halfArmor?: boolean; statusEffects?: string[]; nonce?: string; damage?: DamageResult; options?: DamageOptions; targetUuid?: string; application?: "recorded" | "selected"; applicationId?: string;
 }
 export async function damageActor(uuid: string): Promise<Actor> {
@@ -88,7 +91,9 @@ export function damageContent(data: Exchange, mode: "full" | "roll" = "full"): s
       row.append(label, ammoLabel);
       header.replaceChildren(row);
     }
-    html = doc.body.innerHTML + halfArmorControl(damage.result.values.ignorePercent,damage.result.values.interactArmor!==false);
+    const bonus=damage.result.flatBonus??0;
+    const breakdown=bonus ? `<p class="pneuma-bonus-total">Rolled ${damage.result.values.total} + ${bonus} bonus = <strong>${damage.result.values.total+bonus} damage</strong></p>` : "";
+    html = doc.body.innerHTML + breakdown + halfArmorControl(damage.result.values.ignorePercent,damage.result.values.interactArmor!==false);
   }
   const status = ["rolled", "applied"].includes(damage.status) ? ""
     : '<p class="pneuma-damage-status">' + labels[damage.status] + '</p>';
@@ -202,8 +207,23 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
     data.damage = { status: "rolling", user: user.id!, nonce: request.nonce }; await save(); return;
   }
   if (!damage) throw new Error("No damage roll is pending.");
+  if (request.action === "damageBonus" || request.action==="damageArmor") {
+    if (damage.status!=="rolled" || !damage.result || damage.nonce!==request.nonce || !canResetDamage(damage))
+      throw Error("Damage options can only change on the current unapplied roll.");
+    if(request.action==="damageArmor"){
+      const key=request.armorOption;
+      if(!key || !["interact","ablate","always"].includes(key) || typeof request.enabled!=="boolean")throw Error("Invalid armor option.");
+      damage.result.armorOptions={...damage.result.armorOptions,[key]:request.enabled};
+      await save();return;
+    }
+    const bonus=request.flatBonus;
+    if (bonus===undefined || !Number.isSafeInteger(bonus) || bonus<0 || !Number.isSafeInteger(damage.result.values.total+bonus))
+      throw Error("Bonus damage must be a nonnegative whole number within the supported damage range.");
+    damage.result.flatBonus=bonus;
+    await save();return;
+  }
   if (request.action === "damageReset") {
-    if (!user.isGM || damage.status !== "rolling") throw new Error("Only a GM can release an unfinished damage roll.");
+    if (!user.isGM || !canResetDamage(damage) || (damage.status==="rolled" && request.nonce!==damage.nonce)) throw new Error("Only the GM can reset the current unapplied damage roll.");
     delete data.damage; await save(); return;
   }
   if (request.action === "damageRelease") {
@@ -219,6 +239,8 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
     if (!result || ![result.values.total, result.values.bonus, result.values.ablation, result.values.ignorePercent, result.values.ignoreBelow].every(Number.isFinite))
       throw new Error("Invalid damage result.");
     if (result.sixes !== undefined && (!Number.isInteger(result.sixes) || result.sixes < 0)) throw new Error("Invalid damage dice.");
+    const armor=weaponArmor(data.weaponType);
+    if(armor)result.values.ignorePercent=armorIgnorePercent(result.values.ignorePercent,armor.half);
     damage.result = result; damage.statusEffects ??= inherentDamageStatuses(result.ammoType); damage.status = "rolled"; await save(); return;
   }
   if (request.action === "damageResolved") {
@@ -239,7 +261,10 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
     throw new Error("Damage status effects changed. Review the updated card and apply again.");
   damage.statusEffects = effects;
   const v = damage.result.values;
-  const interact=request.interactArmor??v.interactArmor;
+  const armor=damage.result.armorOptions;
+  const interact=armor?.interact??request.interactArmor??v.interactArmor;
+  const ablates=armor?.ablate??(weaponArmor(data.weaponType)?.ablate!==false);
+  const always=armor?.always??request.ablateArmor;
   damage.recordedApplied = recordedDamageApplied(data);
   damage.application = application;
   damage.applicationId = request.applicationId ?? foundry.utils.randomID();
@@ -248,8 +273,8 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
   try {
     const token = await fromUuid(destination) as TokenDocument | null;
     const summaries = await captureDamageApplication(actor, token?.name ?? actor.name ?? "", v.location, damage.applicationId!,
-      view => target._applyDamage.call(view, v.total, v.bonus, v.location, (interact===false || data.coverUp || data.weaponType === "martialArts" && game.settings!.get("pneuma-combattools", "maNoAblation")) ? 0 : v.ablation, v.ammo, data.coverUp?2*armorIgnorePercent(v.ignorePercent,request.halfArmor,interact)-100:armorIgnorePercent(v.ignorePercent,request.halfArmor,interact), data.coverUp?v.ignoreBelow/2:v.ignoreBelow, v.lethal, request.ablateArmor===undefined?request.options:{...request.options,pneumaAlwaysAblate:request.ablateArmor}),
-      data.coverUp?{ablation:interact===false?0:2*v.ablation,ignorePercent:armorIgnorePercent(v.ignorePercent,request.halfArmor,interact),ignoreBelow:v.ignoreBelow}:undefined, native=>{damage.penetrated=Number(native.rawDamageDealt)>0&&native.hpReduction>0;},data.attackMode==="aimed"&&v.location==="head");
+      view => target._applyDamage.call(view, v.total+(damage.result!.flatBonus??0), v.bonus, v.location, (interact===false || data.coverUp || !ablates) ? 0 : v.ablation, v.ammo, data.coverUp?2*armorIgnorePercent(v.ignorePercent,request.halfArmor,interact)-100:armorIgnorePercent(v.ignorePercent,request.halfArmor,interact), data.coverUp?v.ignoreBelow/2:v.ignoreBelow, v.lethal, always===undefined?request.options:{...request.options,pneumaAlwaysAblate:always}),
+      data.coverUp?{ablation:interact===false||!ablates?0:2*v.ablation,ignorePercent:armorIgnorePercent(v.ignorePercent,request.halfArmor,interact),ignoreBelow:v.ignoreBelow}:undefined, native=>{damage.penetrated=Number(native.rawDamageDealt)>0&&native.hpReduction>0;},data.attackMode==="aimed"&&v.location==="head");
     if(damage.penetrated) {
       const ammo=damage.result.ammoType;
       if(ammo&&ammo!=="incendiary")await reportExposure(actor,ammo);
@@ -277,9 +302,18 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
 }
 const retry = new Map<string, { result: { nonce: string; damage: DamageResult }; dice: string[]; mode: string; roller: string; audience?: DiceAudience }>();
 type Send = (action: DamageRequest["action"], extra?: Partial<DamageRequest>) => Promise<unknown>;
+export function canResetDamage(damage?:DamageState):boolean {
+  return !!damage && (damage.status==="rolling" || damage.status==="rolled") && !damageEffectsLocked(damage)
+    && !damage.recordedApplied && !Object.keys(damage.injuries??{}).length;
+}
 export async function rollDamage(id: string, data: Exchange, send: Send, modifyDialog = false): Promise<void> {
   const previous = retry.get(id);
-  if (previous) {
+  if(previous){
+    const card=game.messages?.get(id);
+    const saved=card && (foundry.utils.getProperty(card,"flags.pneuma-combattools.exchange") ?? foundry.utils.getProperty(card,"flags.pneuma-combattools.aoe.exchange")) as Exchange|undefined;
+    if(saved && saved.damage?.nonce!==previous.result.nonce)retry.delete(id);
+  }
+  if (previous && retry.has(id)) {
     await send("damageCommit", previous.result); retry.delete(id);
     await showSavedDice(previous.dice,previous.mode,previous.roller,previous.audience); return;
   }
@@ -388,6 +422,7 @@ export async function renderDamage(message: ChatMessage, data: Exchange, html: J
 
   const missed = !manual && data.hit === false && !data.damageAllowedOnMiss;
   if (missed && game.user!.isGM) button("Allow damage on miss", () => send("damageAllowMiss"), undefined, true);
+
   if (!missed && attacker.isOwner && !data.damage && (!data.improvised || data.improvisedDice)) drop.on("click", event => {
     event.preventDefault(); event.stopPropagation();
     void rollDamage(message.id!, data, send, !!event.shiftKey).catch(error => { ui.notifications!.error(error.message); ui.chat?.updateMessage(message); });
@@ -407,6 +442,7 @@ export async function renderDamage(message: ChatMessage, data: Exchange, html: J
     if (!manual || manual.recordedOnly) button(data.defenderName, event => applyFromCard(data, send, event.shiftKey, data.defender, "recorded", halfArmorSelected(event), interactArmorSelected(event), ablateArmorSelected(event)), "recorded");
     if (!manual?.recordedOnly) button("Selected Token", event => applyFromCard(data, send, event.shiftKey, selectedDamageTarget(), "selected", halfArmorSelected(event), interactArmorSelected(event), ablateArmorSelected(event)), "selected");
   }
+  if (!manual && game.user!.isGM && status==="rolled" && canResetDamage(data.damage)) button("Reset damage roll", () => send("damageReset",{nonce:data.damage!.nonce}), undefined, true);
   if (!manual && game.user!.isGM && status === "rolling") button("Release unfinished damage roll", () => send("damageReset"), undefined, true);
   if (!manual && game.user!.isGM && (status === "review" || status === "applying"))
     button("Mark resolved after GM review", () => send("damageResolved"), undefined, true);
@@ -480,13 +516,16 @@ export async function renderDamage(message: ChatMessage, data: Exchange, html: J
     if (applications.length) applications.after(injuryPanel);
     else html.find(".message-content").append(injuryPanel);
   }
-  if (effectsPanel.childElementCount) {
+  if (!manual && data.damage?.result && html[0]) {
+    renderDamageEditor(html[0],message,data,effectsPanel,canResetDamage(data.damage)&&(attacker.isOwner||game.user!.isGM),send);
+  } else if (effectsPanel.childElementCount) {
     const effectSlot = html.find(".pneuma-damage-effects-slot");
     (effectSlot.length ? effectSlot : html.find(".message-content")).append(effectsPanel);
   }
   if (recoveryPanel.childElementCount) {
     const recovery = document.createElement("div");
     recovery.innerHTML = resolutionSection("recovery", "");
+    if(recoveryPanel.querySelector('button[data-gm-only="true"]'))recovery.querySelector(".pneuma-resolution-label")?.remove();
     recovery.querySelector(".pneuma-resolution-body")!.append(recoveryPanel);
     const slot = html.find(".pneuma-resolution-recovery-slot");
     (slot.length ? slot : html.find(".message-content")).append(recovery.firstElementChild!);

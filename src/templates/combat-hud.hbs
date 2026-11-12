@@ -102,7 +102,7 @@
     <ul>
       <li><button type="button" class="combat-weapon-name" data-quickhack-id="{{quickhackJackAction}}" {{#if quickhackJackInDisabled}}disabled{{/if}}><i class="fas fa-network-wired" aria-hidden="true"></i><span>Jack In/Out</span></button></li>
       {{#each quickhacks}}
-      <li><button type="button" class="combat-weapon-name" data-quickhack-id="{{id}}" {{#unless ../quickhackConnected}}disabled{{/unless}}><img src="{{img}}" alt="" width="24" height="24"><span>{{name}}</span><small>DV{{dv}}</small></button></li>
+      <li><button type="button" class="combat-weapon-name" data-quickhack-id="{{id}}" {{#if description}}title="{{description}}"{{/if}} {{#unless ../quickhackConnected}}disabled{{/unless}}><img src="{{img}}" alt="" width="24" height="24"><span>{{name}}</span><small>DV{{dv}}</small></button></li>
       {{else}}<li>No QuickHacks available under the current rules mode.</li>{{/each}}
     </ul>
     {{/if}}

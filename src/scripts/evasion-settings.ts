@@ -10,6 +10,7 @@ export interface EvasionHomebrew {
 
 declare global {
   interface SettingConfig {
+    "pneuma-combattools.skipIneligibleEvasion": boolean;
     "pneuma-combattools.npcAutoEvasion": boolean;
     "pneuma-combattools.evasionEligibility": "raw" | "none" | "custom";
     "pneuma-combattools.evasionHomebrew": EvasionHomebrew | null;
@@ -113,6 +114,7 @@ export function automaticNPCEvasion(actor:Actor):boolean {
   return !!game.settings!.get(MODULE,"npcAutoEvasion")&&game.settings!.get(MODULE,"evasionEligibility")==="raw"&&!actor.hasPlayerOwner;
 }
 export function registerEvasionSettings() {
+  game.settings!.register(MODULE,"skipIneligibleEvasion",{name:"Skip ineligible evasion",hint:"Resolve targets with no evasion or alternate area defense against the attack DV.",scope:"world",config:true,type:Boolean,default:true});
   game.settings!.register(MODULE,"npcAutoEvasion",{name:"Automatic NPC evasion (RAW only)",hint:"Eligible NPCs roll without a GM dialog. Inactive with homebrew evasion; AoE also requires RAW eligibility, no evasion penalties, movement costs or Cover Up.",scope:"world",config:true,type:Boolean,default:false});
   game.settings!.register(MODULE, "evasionEligibility", {
     scope: "world", config: true, name: "PNEUMA_COMBAT_TOOLS.EvasionEligibilityName",

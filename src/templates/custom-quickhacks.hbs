@@ -1,0 +1,30 @@
+{{#*inline "hackDetails"}}
+<fieldset data-entry="{{id}}" hidden>
+  <legend>Quickhack details</legend>
+  <label>Name<input type="text" data-name name="hackName-{{id}}" value="{{name}}" required></label>
+  <label>DV<input type="number" name="hackDV-{{id}}" value="{{dv}}" min="1" step="1" required></label>
+  <div class="qh-icon-field">
+    <label>Icon<input type="text" data-icon-path name="hackIcon-{{id}}" value="{{img}}" placeholder="Image path"></label>
+    <button type="button" data-browse-icon title="Browse images" aria-label="Browse quickhack icons"><i class="fas fa-folder-open"></i></button>
+  </div>
+  <label>Description<textarea name="hackDescription-{{id}}">{{description}}</textarea></label>
+</fieldset>
+{{/inline}}
+<form class="pneuma-quickhack-manager" autocomplete="off" novalidate>
+  <div class="qh-workspace">
+    <aside>
+      <input type="search" data-search aria-label="Search quickhacks" placeholder="Search quickhacks">
+      <button type="button" data-add-hack><i class="fas fa-plus"></i> Add</button>
+      <div data-hack-list aria-label="Custom quickhacks"></div>
+    </aside>
+    <section data-details>
+      <p data-empty-list>Select or add a quickhack to edit.</p>
+      {{#each hacks}}{{> hackDetails}}{{/each}}
+    </section>
+  </div>
+  <template>{{> hackDetails}}</template>
+  <footer class="sheet-footer flexrow">
+    <button type="button" data-delete-hack><i class="fas fa-trash"></i> Remove selected</button>
+    <button type="submit"><i class="fas fa-save"></i> Save Changes</button>
+  </footer>
+</form>

@@ -477,6 +477,8 @@ Effect selection locks when the first target starts damage application; effect-o
 Compact effects retain their native status glyph or specific effect glyph in `.pneuma-effect-apply`, labeled Apply; the pending-resistance button is disabled with an explanation. Completion replaces it with `.pneuma-effect-complete[data-effect-state]`, preserving the glyph and distinguishing applied, resisted and unaffected results. Applied effects show the glyph alone, without a checkmark; their title and accessible label retain the applied state. Resistance and unaffected indicators remain. Resistance stays in `.pneuma-effect-resistance`; application stays in `.pneuma-effect-application`. Each target uses `.pneuma-aoe-target-gm` on the damage line when damage overrides are available; empty GM groups occupy no space. Each effect retains its own `.pneuma-effect-gm-slot` and `.pneuma-effect-gm-controls` group with directly visible GM buttons. Existing GM buttons are moved intact, retaining permissions and handlers. No magic-wand substitution or Extinguish control is emitted on attack/effect cards; Treatment and self actions retain extinguishing. Legacy Extinguish buttons are removed during binding. Wake remains available on standalone Sleep cards.
 ## Grenade marker cleanup (unreleased, 2026-10-04)
 
+GMs can use **Token Controls → Hide grenade footprints** when a grenade blast or aim marker is visible on the viewed scene. One click hides the scene’s grenade markers. Each surviving grenade chat card can restore its own markers with **Show attack area**. Active smoke keeps its own visibility and timer.
+
 Ending/resetting or deleting an encounter removes that encounter's grenade blast and original-target MeasuredTemplates through the active GM. New grenade markers store `grenadeCombat`, allowing cleanup even after the source chat is deleted; older markers use the surviving source card's encounter reference. Smoke, native templates, out-of-combat attacks and other encounters remain untouched. Cleanup waits for queued area-template work. Source/type and targeted regression verification only; live Foundry verification pending.
 
 Target effect rows (unreleased, 2026-10-04) supersede the previous all-controls-on-one-line layout. The existing .pneuma-aoe-resolution-target groups a damage line and a full-width .pneuma-aoe-target-effects stack. Each .pneuma-aoe-inline-effect shows its name and effect-colored border; Resist is omitted for skill-less effects. Native roll disclosures, per-effect data-instant-scope, permissions, lock rules, receipt notes and undo remain. Completed effects retain named status rows. Single/manual attached effects group by actor or target token in .pneuma-attached-target, with one recipient heading and separate rows. No selectors or native dice nodes are removed. Extinguish remains in Treatment/self actions. Build and browser verification recorded separately; live Foundry verification pending.
@@ -692,3 +694,24 @@ Normal-attack critical-injury controls and saved results render in a dedicated f
 Normal-attack recipient rows now render the target label, damage action, and critical-injury action in that order, with aligned button columns. Saved injury results and GM reroll controls stay below damage outputs in .pneuma-damage-injuries. Completed injuries show a disabled injury action until reroll is allowed.
 
 Normal-attack saved injury results now nest directly beneath the matching token damage card. Damage cards expose data-damage-target, derived from application IDs and selected-target UUIDs. One injury result attaches to the latest matching application. An injury without matching damage retains an explicitly named fallback below the outputs. This supersedes the separate combined injury-results block.
+
+## Combat feedback changes (local, 2026-11-11)
+
+- **Grenade and rocket scatter**. Missed grenade and rocket cards wait for a GM to choose GM place new, True random (another on-scene square in the original footprint), or Near/far scatter. Near/far scatters one square for misses by 0–3 and two squares for larger misses. Gridless scenes or empty candidate sets use GM placement. This replaces the world placement setting.
+- **Skip ineligible evasion**. Enabled by default. Ordinary attacks use the undefended outcome. Area targets skip only when neither evasion nor Cover Up is available. Suppression retains its Concentration response.
+- **Custom quickhacks**. The separate Custom Quickhacks settings button opens a searchable list with Add on the left, selected quickhack details on the right, and Remove selected and Save Changes below. The optional Icon field accepts an image path or Foundry file selection and overrides Program artwork in the menu. RAW lists all saved custom quickhacks alongside the built-ins. Purchase and loaded modes use a case-insensitive Program name match, including renamed copies of built-in Programs. Loaded mode also requires installation in an equipped cyberdeck. Successful cards show the saved description for manual resolution.
+- **Flat bonus damage**. After seeing an ordinary or shared damage roll, the roller or GM can set a flat bonus on the result before application. The card shows the original roll, bonus and adjusted damage.
+- **Reset damage roll**. The GM can reset a rolled result only before damage application starts for any recipient.
+- **Close-combat armor rules**. Defaults for Half Armor / Ablate Armor are Melee Yes/Yes, Brawling No/Yes and Martial Arts Yes/Yes. Existing worlds retain their Martial Arts no-ablation choice until edited.
+
+Exchange result lines show Hits or Misses without repeating participant names. GM recovery controls appear without a visible heading.
+
+Ordinary attack and shared area damage results show the ammunition and rolled damage. The small pencil in the bottom-right corner of the final damage box opens four rows below the roll: armor interaction and ablation, always ablate, flat bonus damage, and three effect slots. Armor defaults follow the attack and world settings. Bonus damage updates the displayed total after the field is committed.
+
+Base HUD pop-up alerts use 18px text. Notification rows beneath the biomonitor use 14px text.
+
+Damage editor armor toggles show an explicit On/Off indicator. Active settings have a dark green fill in the base skin.
+
+Close Combat Armor Rules carries the Pneuma Homebrew badge in settings and identifies the homebrew in its window title.
+
+Retired the Show armor controls on normal damage cards setting. Rolled CombatTools attacks expose armor options through the pencil. Native damage cards with an Apply Damage action offer a collapsed Armor options disclosure.

@@ -125,5 +125,35 @@ try {
   if(scans||button.dataset.chatKind!=='recovery'||button.dataset.chatRole!=='gm')throw Error('Mutation triggered a root rescan or missed new controls');
   window.MutationObserver=NativeObserver;
  });
+ await page.evaluate(async()=>{
+  const {renderDamageEditor}=await import('/scripts/damage-editor.js');
+  const {renderDamageStatusPicker}=await import('/scripts/damage-status.js');
+  const host=document.querySelector('#host');
+  for(const slot of ['pneuma-damage-effects-picker','pneuma-aoe-effects-picker']){
+    host.innerHTML='<div class="pneuma-damage-result"><div class="pneuma-resolution-damage-roll-body"><span class="pneuma-damage-ammo">Basic</span><div class="d6-number-div"><span>12</span></div></div></div>';
+    host.style.width='260px';
+    const effects=document.createElement('div');effects.className=slot;
+    renderDamageStatusPicker(effects,[],false,false,async()=>{});
+    const message={},exchange={damage:{nonce:'roll',result:{flatBonus:2,values:{ablation:1,total:12}}}};
+    const calls=[];
+    renderDamageEditor(host,message,exchange,effects,true,async(action,data)=>calls.push([action,data]));
+    const button=host.querySelector('.pneuma-modify-damage'), editor=host.querySelector('.pneuma-damage-editor');
+    if(!editor.hidden || button.previousElementSibling.textContent!=='14')throw Error('Initial compact result');
+    button.click();
+    const rows=editor.children,rect=node=>node.getBoundingClientRect();
+    if(rows.length!==4 || editor.hidden || rect(rows[0]).top<rect(button).bottom-1)throw Error('Editor must expand below the roll');
+    const box=rect(button.parentElement),pen=rect(button);
+    if(Math.abs(box.right-pen.right-1)>1 || Math.abs(box.bottom-pen.bottom-1)>1 || pen.width>14 || pen.height>14)
+      throw Error('Pencil must stay small and anchored inside the bottom-right corner');
+    if(rows[0].querySelectorAll('button').length!==2 || !rows[1].textContent.startsWith('Always Ablate') || !rows[2].querySelector('input') || rows[3].querySelectorAll('button').length!==3)throw Error('Incorrect damage editor rows');
+    for(const toggle of editor.querySelectorAll('.pneuma-armor-toggle')){
+      if(toggle.querySelector('.pneuma-armor-toggle-state')?.textContent!==(toggle.getAttribute('aria-pressed')==='true'?'On':'Off'))throw Error('Missing visible armor toggle state');
+    }
+    rows[0].querySelector('button').click();
+    const input=rows[2].querySelector('input');input.value='4';input.dispatchEvent(new Event('change'));
+    if(calls[0][1].armorOption!=='interact' || calls[1][1].flatBonus!==4)throw Error('Editor did not submit the chosen options');
+    button.click();if(!editor.hidden)throw Error('Editor failed to collapse');
+  }
+ });
  console.log('Card controls passed: normal/manual/AoE decorated picker geometry; 260/300/400px effect state matrix; GM visibility/alignment; plain full-width disclosures; bounded actor lookups and targeted observers.');
 }finally{await browser.close();}

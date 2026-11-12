@@ -149,7 +149,7 @@ Main `.pneuma-combat-settings` retains contextual fieldsets and native switches/
 Hover DV uses `[data-hover-dv-mode]` as a presentation-only select while the original `hoverDV`/`hoverAutofire` fields remain hidden native submitted controls. Position conflicts use `p.notes[data-position-conflict]`, hidden unless both saved positions conflict. QuickHack adds a native `select[name="mode"]` above existing message sections; Save persists both mode and routing. No existing saved-setting keys were renamed. The settings section formerly titled Status HUD & Biomonitor is now Biomonitor; IDs remain compatible.
 # Cover and terrain wording
 
-Missed explosive attacks use `.pneuma-aoe-reposition` with “Missed” and one instruction: “GM: choose a new center inside the gray area.” The `[data-aoe-action="scatter"]` button retains its crosshair icon and now displays “Place New Target Center”; shared chat-button styling treats it as a text button, not an icon-only control. GM-only visibility and existing card selectors are preserved.
+Missed explosive attacks show three GM-only text buttons in the result section: GM place new (data-aoe-action="scatter"), True random (data-aoe-action="scatterAny") and Near/far scatter (data-aoe-action="scatterRandom").
 
 Explosive area cards show one paragraph: “GM resolves all aspects of cover and terrain.” This copy change preserves existing card markup and selectors.
 
@@ -377,3 +377,17 @@ Normal attacks append .pneuma-damage-injuries after .pneuma-resolution-damage-ap
 Normal-attack recipient rows now render the target label, damage action, and critical-injury action in that order, with aligned button columns. Saved injury results and GM reroll controls stay below damage outputs in .pneuma-damage-injuries. Completed injuries show a disabled injury action until reroll is allowed.
 
 Normal-attack saved injury results now nest directly beneath the matching token damage card. Damage cards expose data-damage-target, derived from application IDs and selected-target UUIDs. One injury result attaches to the latest matching application. An injury without matching damage retains an explicitly named fallback below the outputs. This supersedes the separate combined injury-results block.
+
+### Flat damage and GM reset (2026-11-11)
+
+Ordinary exchange cards (`.pneuma-combat-message`) and shared area cards (`.pneuma-aoe-card`) attach `.pneuma-bonus-damage input` with a Set bonus button beneath the rolled result, before application for the attacker's owner or GM. The GM reset button appears in ordinary recovery controls or the area action row when the roll is unapplied. Example area selector: `.pneuma-aoe-actions [data-aoe-action="damageReset"]`. Native rollcard classes and state attributes are retained. Successful custom quickhacks show the description in `.pneuma-quickhack-card .pneuma-quickhack-effect`.
+
+Exchange result summaries show Hits or Misses using the existing hit/miss spans. Participant names appear in the card header. A recovery section containing GM controls omits its visible heading and retains its accessible section label. Player-only retry sections retain their heading.
+
+### Compact attack damage editor
+
+On ordinary exchange and area damage cards, the native dice and final number stay in the damage roll section. A 9px pencil on a 14px button anchored inside the bottom-right corner of the number box expands a separate .pneuma-damage-editor below the native roll. Four .pneuma-damage-editor-row elements group the two armor switches, Always Ablate, the numeric bonus and the three native module effect slots. The button exposes aria-expanded. Hidden editor rows use the hidden attribute. An attacker owner or GM edits shared armor and bonus before application. The editor supersedes the inline .pneuma-bonus-damage input and legacy Half Armor SP button for these cards.
+
+The three damage editor armor buttons use .pneuma-armor-toggle with aria-pressed and a visible .pneuma-armor-toggle-state On/Off indicator.
+
+Native damage rollcards with an Apply Damage action group their .pneuma-armor-controls under a collapsed Armor options disclosure. Example selector: .rollcard > details > .pneuma-armor-controls. CombatTools exchange and area cards use the existing pencil editor.

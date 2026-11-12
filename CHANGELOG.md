@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.9.31 - 2026-11-11
+
+### Grenades and evasion
+
+- Missed grenades and rockets give the GM three placement choices: GM place new, True random within the original footprint, or Near/far scatter (one square on a miss by 3 or less, two on a larger miss).
+- Hide grenade footprints in Token Controls clears visible blast and aim markers on the current scene. Individual cards can show their markers again. Smoke retains its own timer.
+- Skip ineligible evasion is enabled by default. Cover Up and suppression responses remain available when applicable.
+
+### Damage and armor
+
+- Use the pencil on an ordinary or shared damage roll to change armor interaction, ablation, Always Ablate, flat bonus damage, or up to three effects. Armor toggles show ON or OFF.
+- Set flat bonus damage after seeing the roll. The GM can reset a damage roll before application starts for any recipient.
+- Close Combat Armor Rules offers separate Half Armor and Ablate Armor defaults for melee weapons, brawling, and martial arts. Existing Martial Arts no-ablation preferences carry forward.
+- Native damage cards expose armor settings under Armor options. Removed the redundant visibility setting.
+
+### Custom quickhacks
+
+- Manage custom quickhacks in a searchable settings window with name, DV, description, and optional icon. Successful cards show the description for manual resolution.
+- RAW lists all saved quickhacks. Purchase mode requires a matching Program, and loaded mode requires that Program in an equipped cyberdeck.
+
+### Chat and HUD
+
+- Hit and miss summaries omit repeated names. GM recovery controls omit the Recovery heading.
+- Base-skin pop-up alerts use 18px text, and notifications beneath the biomonitor use 14px text.
+
 ## 0.9.30 - 2026-11-01
 
 - Keep critical-injury rolls and results in normal attack and AoE cards, with retry and GM-controlled reroll actions.

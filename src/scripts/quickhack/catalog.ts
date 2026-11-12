@@ -1,4 +1,4 @@
-export interface Quickhack { id: string; name: string; tier: string; dv: number; automaticDamageFormula?: string; damageFormula?: string; silentOnSuccess?: boolean }
+export interface Quickhack { id: string; name: string; img?: string; tier: string; description?: string; dv: number; automaticDamageFormula?: string; damageFormula?: string; silentOnSuccess?: boolean }
 export const QUICKHACKS: readonly Quickhack[] = Object.freeze([
   { id: "impair-movement", name: "Impair Movement", tier: "Simple", dv: 6 },
   { id: "sonic-shock", name: "Sonic Shock", tier: "Simple", dv: 6 },
@@ -14,4 +14,10 @@ export const QUICKHACKS: readonly Quickhack[] = Object.freeze([
 ]);
 
 
-export const getQuickhack = (id: string) => QUICKHACKS.find(hack => hack.id === id);
+export interface CustomQuickhack {img?:string; id:string; name:string; dv:number; description:string}
+declare global {interface SettingConfig {"pneuma-combattools.customQuickhacks": CustomQuickhack[]}}
+export function customQuickhacks():Quickhack[] {
+  const saved=typeof game==="undefined"?undefined:game.settings?.get("pneuma-combattools","customQuickhacks");
+  return Array.isArray(saved)?saved.map(hack=>({...hack,tier:"Custom"})):[];
+}
+export const getQuickhack = (id: string) => QUICKHACKS.find(hack => hack.id === id) ?? customQuickhacks().find(hack=>hack.id===id);

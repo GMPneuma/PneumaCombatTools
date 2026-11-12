@@ -16,6 +16,8 @@ import {inherentDamageStatuses,renderDamageStatusPicker} from "../damage-status.
 import {newInstant,instantContent,instantDone,handleInstant,bindInstantControls,arrangeAreaEffectControls,type InstantState,type InstantRequest} from "../instant-effects.js";
 import {createSmoke,registerSmoke} from "./smoke.js";
 import {clearGrenadeMarkers} from "./marker-cleanup.js";
+import {scatterImpact} from "./scatter.js";
+import {registerFootprintControl} from "./footprint-control.js";
 import {isAccessPoint} from "./access-points.js";
 import {empDisabled} from "../emp-state.js";
 import {masterStatuses} from "../status-catalog.js";
@@ -31,7 +33,8 @@ import { thrownRollItem, improvisedSource } from "../thrown-weapons.js";
 import { getTable } from "../dv-hover.js";
 import { parseDV } from "../dv-data.js";
 import { bindCardAction, resolutionSection, rollOutcomeClass, canRenderCombatCard } from "../card-structure.js";
-import { rollDamage, damageContent, handleDamage, damageEffectsLocked, applyFromCard, type DamageState, type DamageRequest } from "../damage-flow.js";
+import {renderDamageEditor} from "../damage-editor.js";
+import { canResetDamage, rollDamage, damageContent, handleDamage, damageEffectsLocked, applyFromCard, type DamageState, type DamageRequest } from "../damage-flow.js";
 import type { Exchange } from "../combat-resolution.js";
 import { grappleWeaponBlocked } from "../grapple/state.js";
 import { checkedLuck } from "../evasion-rules.js";
@@ -82,6 +85,12 @@ export function makeArea(kind:AreaKind, source:Token, point:Point, s:AreaSetting
     width:(kind==="shell"?s.shellWidth:s.suppressionWidth)*Number(canvas.scene!.grid.size),
     angle:kind==="shell"?s.shellAngle:s.suppressionAngle};
 }
+function areaResponse(data:AreaAttack, actor:Actor):Pick<TargetRow,"eligible"|"state"> {
+  const eligible=!evasionBlocked(actor)&&evadeAllowed(Number(foundry.utils.getProperty(actor,"system.stats.ref.value")),data.settings.evade);
+  if(data.kind==="shell" && data.exchange.total<=13)return {eligible,state:"miss"};
+  const skip=data.kind!=="suppression" && !data.settings.coverUp && !eligible && game.settings?.get(MODULE,"skipIneligibleEvasion")===true;
+  return {eligible,state:skip?"hit":"waiting"};
+}
 function targets(data:AreaAttack):TargetRow[] {
   if(canvas.scene?.id!==data.scene)throw Error("Open the original scene to collect area targets.");
   if(data.ammoType==="smoke")return [];
@@ -92,12 +101,17 @@ function targets(data:AreaAttack):TargetRow[] {
     ).map(t=>({
       ...(instantId(data.ammoType)&&data.ammoType!=="incendiary"?{instant:newInstant(data.ammoType,t.actor!.uuid,t.name??"",rowEncounter(data,t.document.uuid))} : {}),
       uuid:t.document.uuid,actor:t.actor!.uuid,name:t.name??"",img:t.document.texture.src??"",
-      eligible:!evasionBlocked(t.actor!)&&evadeAllowed(Number(foundry.utils.getProperty(t.actor!,"system.stats.ref.value")),data.settings.evade),
-      state:data.kind==="shell" && data.exchange.total<=13?"miss":"waiting",
+      ...areaResponse(data,t.actor!),
     }));
 }
 function rowEncounter(data:AreaAttack,_uuid:string):EncounterRef {return encounterRef(resolveEncounter(data.exchange),data.scene,[data.exchange.attacker]);}
 const btn=(action:string,icon:string,title:string,target="",label="")=>`<button type="button" data-aoe-action="${action}" data-aoe-target="${esc(target)}" title="${esc(title)}" aria-label="${esc(title)}"><i class="fas ${icon}" aria-hidden="true"></i>${label?" "+esc(label):""}</button>`;
+function scatterControls():string {
+  return '<div class="pneuma-aoe-reposition"><strong>Missed</strong></div>'
+    +btn("scatter","fa-crosshairs","GM place new","","GM place new")
+    +btn("scatterAny","fa-dice","Random square in the original blast footprint","","True random")
+    +btn("scatterRandom","fa-dice","Scatter 1 square on a miss by 3 or less, otherwise 2 squares","","Near/far scatter");
+}
 const awaitingResponses=(data:AreaAttack)=>data.phase==="scatter"||data.rows.some(r=>["waiting","rolling"].includes(r.state));
 function canResetResponse(data:AreaAttack,row:TargetRow):boolean {
   return row.state!=="waiting" && !row.damage && !row.moved && !data.effectsResolved
@@ -137,7 +151,7 @@ export function areaContent(data:AreaAttack):string {
     ${r.instant?instantContent(r.instant,r.uuid,true):data.ammoType==="incendiary"?instantContent({...newInstant("incendiary",r.actor,r.name),state:"pending"},r.uuid,true):""}</div><div class="pneuma-aoe-target-gm"></div></div>`).join("");
   return `<section class="rollcard pneuma-aoe-card" data-state="${data.phase==="scatter"?"scatter":waiting?"waiting":"resolved"}"><div class="rollcard-top"><div class="cpr-block">${attackHeading(data.exchange.title)}</div></div>
     ${resolutionSection("attack",attack)}
-    ${resolutionSection("result",data.phase==="scatter"?"<div class='pneuma-aoe-reposition'><strong>Missed</strong><p>GM: choose a new center inside the gray area.</p></div>"+btn("scatter","fa-crosshairs","Place New Target Center","","Place New Target Center"): `<div role="list" class="pneuma-aoe-targets">${rows||"<p>No tokens in the area.</p>"}</div>`)}
+    ${resolutionSection("result",data.phase==="scatter"?scatterControls(): `<div role="list" class="pneuma-aoe-targets">${rows||"<p>No tokens in the area.</p>"}</div>`)}
     <div class="pneuma-aoe-actions">${btn("show",data.areaHidden?"fa-eye":"fa-eye-slash",data.areaHidden?"Show attack area":"Hide attack area")}${data.phase==="responses"?btn("add","fa-user-plus","GM: add selected token (manual coverage override)"):""}
     ${data.kind!=="suppression"&&data.phase!=="scatter"&&!data.special&&!data.exchange.damage?btn("damage","fa-droplet","Roll shared damage (click to roll immediately; Shift-click to modify)"):""}
     ${data.exchange.damage?.status==="rolling"?btn("damageReset","fa-unlock","GM: release unfinished damage roll"):""}</div>
@@ -226,13 +240,23 @@ export async function handleAreaRequest(req:Request) {
     if(isAccessPoint(token))throw Error("Access points cannot be area attack targets.");
     if(row)return;
     data.effectsResolved=false;
-    data.rows.push({...(instantId(data.ammoType)&&data.ammoType!=="incendiary"?{instant:newInstant(data.ammoType,token.actor.uuid,token.name??"",rowEncounter(data,token.uuid))} : {}),uuid:token.uuid,actor:token.actor.uuid,name:token.name??"",img:token.texture.src??"",eligible:!evasionBlocked(token.actor)&&evadeAllowed(Number(foundry.utils.getProperty(token.actor,"system.stats.ref.value")),data.settings.evade),state:"waiting"});
+    data.rows.push({...(instantId(data.ammoType)&&data.ammoType!=="incendiary"?{instant:newInstant(data.ammoType,token.actor.uuid,token.name??"",rowEncounter(data,token.uuid))} : {}),uuid:token.uuid,actor:token.actor.uuid,name:token.name??"",img:token.texture.src??"",...areaResponse(data,token.actor)});
     await save(message,data);return;
   }
-  if(req.action==="scatter"){
-    if(!user.isGM||data.phase!=="scatter"||!req.area||canvas.scene?.id!==data.scene)throw Error("Only the GM can place a missed blast in its original scene.");
-    const p=req.area.origin, half=data.settings.blastSize*pixelsPerUnit()/2;
-    if(Math.abs(p.x-data.intended.x)>half||Math.abs(p.y-data.intended.y)>half)throw Error("Landing point must be inside the intended blast square.");
+  if(req.action==="scatter" || req.action==="scatterRandom" || req.action==="scatterAny"){
+    if(!user.isGM || data.phase!=="scatter" || canvas.scene?.id!==data.scene)throw Error("Only the GM can place a missed blast in its original scene.");
+    let p:Point;
+    if(req.action!=="scatter"){
+      if(canvas.grid!.type===CONST.GRID_TYPES.GRIDLESS)throw Error("Use GM place new on a gridless scene.");
+      const impact=scatterImpact(data.area,req.action==="scatterAny"?"random":"margin",data.exchange.dv!-data.exchange.total);
+      if(!impact)throw Error("No eligible landing square. Use GM place new.");
+      p=impact;
+    }else{
+      if(!req.area)throw Error("Choose a new landing point.");
+      p=req.area.origin;
+      const half=data.settings.blastSize*pixelsPerUnit()/2;
+      if(Math.abs(p.x-data.intended.x)>half||Math.abs(p.y-data.intended.y)>half)throw Error("Landing point must be inside the intended blast square.");
+    }
     data.area={...data.area,origin:p,wallOrigin:p};data.phase="responses";data.rows=targets(data);await syncTemplate(message,data);await save(message,data);return;
   }
   if(req.action==="damage"){
@@ -248,7 +272,8 @@ export async function handleAreaRequest(req:Request) {
         }
         await save(message,data);},message);
     } else {
-      if(!["damageClaim","damageRelease","damageCommit","damageReset","damageStatuses"].includes(req.damageRequest.action))throw Error("Invalid shared damage action.");
+      if(!["damageClaim","damageRelease","damageCommit","damageArmor","damageBonus","damageReset","damageStatuses"].includes(req.damageRequest.action))throw Error("Invalid shared damage action.");
+      if(["damageReset","damageArmor","damageBonus"].includes(req.damageRequest.action) && areaEffectsLocked(data))throw Error("A target has already started damage or effect resolution.");
       if(req.damageRequest.action==="damageStatuses"&&areaEffectsLocked(data))throw Error("Effect selection is locked because target resolution has started.");
       await handleDamage(req.damageRequest,user,data.exchange,()=>save(message,data),message);
     }
@@ -580,6 +605,7 @@ export function standardizeAreaLayout(root: HTMLElement,data?:AreaAttack): void 
 }
 
 export function registerAreaAttacks() {
+  registerFootprintControl(id => send(id, "show", {hidden:true}), errors);
   Hooks.once('ready',()=>{
     const module=game.modules!.get(MODULE) as unknown as {api?:Record<string,unknown>};
     module.api={...module.api,getAreaEffectCells:(messageId:string)=>{
@@ -647,6 +673,14 @@ export function registerAreaAttacks() {
   }));
   Hooks.on("renderChatMessage",async(message:ChatMessage,html:JQuery)=>{
     const data=flag(message);if(!data||!canRenderCombatCard(message))return;
+    if(data.phase==="scatter"){
+      const placement=html[0]?.querySelector('.pneuma-resolution-result-body');
+      if(placement?.querySelector('[data-aoe-action="scatter"]') && !placement.querySelector('[data-aoe-action="scatterAny"]'))placement.innerHTML=scatterControls();
+    }
+    if(game.user?.isGM && data.exchange.damage?.status==="rolled" && canResetDamage(data.exchange.damage) && !areaEffectsLocked(data)) {
+      const actions=html[0]?.querySelector(".pneuma-aoe-actions");
+      if(actions && !actions.querySelector('[data-aoe-action="damageReset"]'))actions.insertAdjacentHTML("beforeend",btn("damageReset","fa-rotate-left","GM: reset unapplied damage roll"));
+    }
     if(html[0])standardizeAreaLayout(html[0],data);
     if (hasCriticalInjury(data.exchange)) {
       for (const slot of html.find<HTMLElement>(".pneuma-aoe-resolution-target > .pneuma-aoe-target-effects").toArray()) {
@@ -678,7 +712,10 @@ export function registerAreaAttacks() {
         const selected=(data.exchange.damage.statusEffects??inherentDamageStatuses(data.exchange.damage.result.ammoType)).slice(0,3);
         renderDamageStatusPicker(picker,selected,areaEffectsLocked(data),!["rolled","applied"].includes(data.exchange.damage.status),
           statusEffects=>send(message.id!,"damage",{damageRequest:{action:"damageStatuses",statusEffects}}));
+
       } else picker.replaceChildren();
+      renderDamageEditor(html[0]!,message,data.exchange,picker,!!attacker && owns(attacker) && canResetDamage(data.exchange.damage) && !areaEffectsLocked(data),
+        (action,extra)=>send(message.id!,"damage",{damageRequest:{...extra,action}}));
     }
     if(html[0])arrangeAreaEffectControls(html[0]);
     if(html[0])await bindInstantControls(html[0],scope=>data.rows.find(r=>r.uuid===scope)?.instant,(scope,instantRequest)=>send(message.id!,"instant",{target:scope,instantRequest}),data.exchange.rollMode,messageDiceAudience(message));
@@ -703,7 +740,7 @@ export function registerAreaAttacks() {
       }
       if(action==="other"&&!areaSettings().coverUp){button.remove();continue;}
       const actor=await actorAt(row?.uuid??data.exchange.attacker).catch(()=>null);
-      const gmOnly=["removeSmoke","scatter","hit","miss","exclude","forcehit","add","reset","damageReset","damageResolved","effectsResolved"].includes(action);
+      const gmOnly=["removeSmoke","scatter","scatterRandom","scatterAny","hit","miss","exclude","forcehit","add","reset","damageReset","damageResolved","effectsResolved"].includes(action);
       if(action!=="show"&&(!actor||!owns(actor)||gmOnly&&!game.user!.isGM)){button.remove();continue;}
       if(action==="retryResponse"&&row&&!responseRetries.has(game.user!.id+":"+message.id+":"+row.uuid)) {
         if(row.state!=="rolling"){button.remove();continue;}
@@ -728,6 +765,7 @@ export function registerAreaAttacks() {
             if(!template)throw Error("Smoke has expired or was deleted.");
             await send(message.id!,"removeSmoke",{hidden:!template.hidden});
           }
+          else if(action==="scatterRandom" || action==="scatterAny")await send(message.id!,action);
           else if(action==="scatter"){
             if(canvas.scene?.id!==data.scene)throw Error("Open the attack scene first.");
             const area=await placeArea(p=>({...data.area,origin:canvas.grid!.getCenterPoint(p),wallOrigin:canvas.grid!.getCenterPoint(p)}),data.intended,"Choose a new center inside the gray area.",ammoProfile(data.ammoType)?.color);
@@ -739,7 +777,7 @@ export function registerAreaAttacks() {
           else if(action==="damage")await rollDamage(message.id!,data.exchange,(a,extra)=>send(message.id!,"damage",{damageRequest:{...extra,action:a}}),event.shiftKey);
           else if((action==="injury" || action==="injuryReroll") && row?.state==="hit")await send(message.id!,"damage",{target:row.uuid,damageRequest:{action:action==="injury"?"damageInjury":"damageInjuryReroll",targetUuid:row.uuid}});
           else if(action==="apply"&&row)await applyFromCard(rowExchange(data,row),(a,extra)=>send(message.id!,"damage",{target:row.uuid,damageRequest:{...extra,action:a}}),event.shiftKey,row.uuid,"recorded",halfArmorSelected(event),interactArmorSelected(event),ablateArmorSelected(event));
-          else if(action==="damageReset"||action==="damageResolved")await send(message.id!,"damage",{target:row?.uuid,damageRequest:{action}});
+          else if(action==="damageReset"||action==="damageResolved")await send(message.id!,"damage",{target:row?.uuid,damageRequest:{action,nonce:data.exchange.damage?.nonce}});
           else await send(message.id!,action,{target:row?.uuid});
         }catch(e){errors(e);}finally{button.disabled=false;}
       });

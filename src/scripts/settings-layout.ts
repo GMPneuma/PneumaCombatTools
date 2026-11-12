@@ -2,12 +2,12 @@ const MODULE = "pneuma-combattools";
 export const COMBAT_BAR_SETTING_KEYS = ["combatBar", "combatBarDock", "combatBarFullWidth","combatBarResizeMacros", "combatBarSize", "combatBarOrientation", "combatBarNameOnly", "combatBarDefaultMovement"] as const;
 /** Order existing native rows; settings remain registered under their original keys/scopes. */
 const groups = [
-  { id: "combat", title: "Attack & Damage Cards", keys: ["routeSheetAttacks", "hideAttackWeapon", "chatResultDelay", "showArmorControls", "maNoAblation", "ablateBlockedHits", "reportWeaponReloads"] },
-  { id: "evasion", title: "Evasion & Area Attacks", keys: ["evasionEligibility", "configureEvasion", "npcAutoEvasion", "areaSettingsMenu"] },
+  { id: "combat", title: "Attack & Damage Cards", keys: ["routeSheetAttacks", "hideAttackWeapon", "chatResultDelay", "closeArmorMenu", "ablateBlockedHits", "reportWeaponReloads"] },
+  { id: "evasion", title: "Evasion & Area Attacks", keys: ["evasionEligibility", "configureEvasion", "skipIneligibleEvasion", "npcAutoEvasion", "areaSettingsMenu"] },
   { id: "movement", title: "Movement & Initiative", keys: ["movementTracking", "pneumaHomebrew"] },
   { id: "turn-marker", title: "Turn Indicator", keys: ["turnMarkerEnabled", "turnMarkerSettings", "turnMarkerForceDefault", "turnMarkerStyle", "turnMarkerColor", "turnMarkerThickness", "turnMarkerDistance", "turnMarkerOpacity", "turnMarkerSpeed", "turnMarkerDisplay", "nextTurnMarker", "turnPopups", "notificationSounds"] },
   { id: "injuries", title: "Injuries & Effects", keys: ["enableStabilization", "criticalInjuries", "injuryTurnEndReminder", "empBehaviorMenu", "customStatusesMenu", "statusCleanup"] },
-  { id: "quickhack", title: "QuickHack", keys: ["quickhackEnabled", "quickhackMode", "quickhackMessages"] },
+  { id: "quickhack", title: "QuickHack", keys: ["quickhackEnabled", "quickhackMode", "quickhackMessages", "customQuickhackMenu"] },
   { id: "combat-bar", title: "Combat Bar", keys: [...COMBAT_BAR_SETTING_KEYS,"combatBarSettings"] },
   { id: "token-hud", title: "Token HUD & Targeting", keys: ["tokenHUDSettings", "hoverDV", "hoverAutofire", "hoverDVEncounterOnly", "ekgVisibilitySettings"] },
   { id: "status-hud", title: "Biomonitor", keys: ["eyeHUD", "biomonitorSettings", "eyeHUDDock", "crewHUDIntegration", "biomonitorShowHP", "forcePlayerHUDAnimations", "eyeHUDAnimateMessages", "biomonitorFlashSeconds"] },

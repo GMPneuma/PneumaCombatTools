@@ -30,6 +30,55 @@ User-requested fifth position: Players icon button opening the native player lis
 
 ## Open items
 
+### BL-029 - Automatic grenade and rocket scatter
+
+**Status:** Implemented locally (2026-11-11). Live verification pending.
+
+Offer two optional scatter modes for missed grenade and rocket attacks. True random selects a random impact square from the eligible area. Margin-based scatter selects a random square exactly one square from the intended target for a near miss, or exactly two squares away for a bad miss.
+
+Missed grenade and rocket cards wait for a GM to choose GM place new, True random (another on-scene square in the original footprint), or Near/far scatter. Near/far scatters one square for misses by 0–3 and two squares for larger misses. Gridless scenes or empty candidate sets use GM placement. This replaces the world placement setting.
+
+### BL-030 - Skip ineligible evasion rolls
+
+**Status:** Implemented locally (2026-11-11). Live verification pending.
+
+Add an option to skip the evasion roll automatically when the target has no eligible evasion response.
+
+Enabled by default. Ordinary attacks use the undefended outcome. Area targets skip only when neither evasion nor Cover Up is available. Suppression retains its Concentration response.
+
+### BL-031 - Custom quickhacks
+
+**Status:** Implemented locally (2026-11-11). Live verification pending.
+
+Add a settings editor with Name, DV and Description. Make custom quickhacks available through the existing Quickhack homebrew when a Program item matches the custom quickhack’s name.
+
+The separate Custom Quickhacks settings button opens a searchable list with Add on the left, selected quickhack details on the right, and Remove selected and Save Changes below. The optional Icon field accepts an image path or Foundry file selection and overrides Program artwork in the menu. RAW lists all saved custom quickhacks alongside the built-ins. Purchase and loaded modes use a case-insensitive Program name match, including renamed copies of built-in Programs. Loaded mode also requires installation in an equipped cyberdeck. Successful cards show the saved description for manual resolution.
+
+### BL-032 - Bonus damage on a damage roll
+
+**Status:** Implemented locally (2026-11-11). Live verification pending.
+
+Let the roller enter bonus damage for an individual damage roll.
+
+After seeing an ordinary or shared damage roll, the roller or GM can set a flat bonus on the result before application. The card shows the original roll, bonus and adjusted damage.
+
+### BL-033 - GM reset for a player damage reroll
+
+**Status:** Implemented locally (2026-11-11). Live verification pending.
+
+Give the GM a button that resets a damage roll so the player can roll again from the attack card.
+
+The GM can reset a rolled result only before damage application starts for any recipient.
+
+### BL-034 - Configurable close-combat armor rules
+
+**Status:** Implemented locally (2026-11-11). Live verification pending.
+
+Expand the existing Martial Arts no-ablation homebrew into a submenu. Give Melee, Brawling and Martial Arts independent Half Armor and Ablate Armor settings. The supplied example uses Melee Yes/Yes, Brawling No/Yes and Martial Arts Yes/No, respectively.
+
+Defaults for Half Armor / Ablate Armor are Melee Yes/Yes, Brawling No/Yes and Martial Arts Yes/Yes. Existing worlds retain their Martial Arts no-ablation choice until edited.
+
+
 ### BL-028 — Refactor native CPR damage integration
 
 **Priority:** High\
@@ -667,3 +716,4 @@ Implemented normal-attack injury placement beneath damage application outputs in
 Normal-attack recipient rows now render the target label, damage action, and critical-injury action in that order, with aligned button columns. Saved injury results and GM reroll controls stay below damage outputs in .pneuma-damage-injuries. Completed injuries show a disabled injury action until reroll is allowed.
 
 Normal-attack saved injury results now nest directly beneath the matching token damage card. Damage cards expose data-damage-target, derived from application IDs and selected-target UUIDs. One injury result attaches to the latest matching application. An injury without matching damage retains an explicitly named fallback below the outputs. This supersedes the separate combined injury-results block.
+- Grenade footprints (2026-11-11): implemented a GM-only Token Controls button for hiding visible grenade markers on the current scene. Individual chat cards retain their Show action. Live Foundry verification pending.

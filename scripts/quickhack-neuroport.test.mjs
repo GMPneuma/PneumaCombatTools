@@ -20,7 +20,7 @@ test("Neuroport option defaults off, persists both states and refreshes the HUD"
   let Settings, refreshed = 0;
   globalThis.game = {user:{isGM:true},settings:{
     register(_scope,key,definition){definitions.set(key,definition);values.set(key,definition.default);},
-    registerMenu(_scope,_key,definition){Settings=definition.type;},
+    registerMenu(_scope,key,definition){if(key==="quickhackMessages")Settings=definition.type;},
     get(_scope,key){return values.get(key);},
     async set(_scope,key,value){values.set(key,value);definitions.get(key)?.onChange?.();}
   }};

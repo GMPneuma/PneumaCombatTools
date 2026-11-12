@@ -16,11 +16,13 @@ export const enabled = () => game.system?.id === "cyberpunk-red-core"
 export const mode = () => game.settings!.get(MODULE, "quickhackMode");
 export const routing = () => normalizeRoutingConfig(game.settings!.get(MODULE, "quickhackRouting"));
 
+import {CustomQuickhackSettings} from "./custom-settings.js";
+
 class QuickhackSettings extends FormApplication {
   constructor() { super({}); }
   static override get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
-      id: "pneuma-quickhack-settings", title: "QuickHack settings", width: 610,
+      id: "pneuma-quickhack-settings", title: "QuickHack settings", width: 610, resizable: true,
       template: `modules/${MODULE}/templates/quickhack-settings.hbs`, closeOnSubmit: true,
     });
   }
@@ -55,6 +57,7 @@ class QuickhackSettings extends FormApplication {
   }
 }
 export function registerQuickhackSettings(refresh: () => void) {
+  game.settings!.register(MODULE,"customQuickhacks",{scope:"world",config:false,type:Array,default:[],onChange:refresh});
   game.settings!.register(MODULE, "quickhackRequireNeuroport", { name: "Hide QuickHack menu without installed Neuroport",
     scope: "world", config: false, type: Boolean, default: false, onChange: refresh });
   game.settings!.register(MODULE, "quickhackEnabled", { name: "Enable QuickHack", hint: "Enable QuickHack controls, rolls, effects and macros. Disable the standalone Pneuma Quickhack module before using this integration.",
@@ -65,4 +68,5 @@ export function registerQuickhackSettings(refresh: () => void) {
     // @ts-expect-error Foundry v12 supports ObjectField settings; pinned typings omit this overload.
     type: new foundry.data.fields.ObjectField(), default: DEFAULT_ROUTING_CONFIG });
   game.settings!.registerMenu(MODULE, "quickhackMessages", { name: "QuickHack settings", label: "Configure", hint: "Rules mode, message visibility, totals and attacker identity.", icon: "fas fa-comments", type: QuickhackSettings, restricted: true });
+  game.settings!.registerMenu(MODULE,"customQuickhackMenu",{name:"Custom Quickhacks",label:"Manage Custom Quickhacks",hint:"Add, edit or delete custom quickhacks for this world.",icon:"fas fa-list",type:CustomQuickhackSettings,restricted:true});
 }

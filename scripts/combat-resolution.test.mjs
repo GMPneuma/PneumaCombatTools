@@ -702,3 +702,60 @@ test('autofire result bar displays capped damage multiplier against DV or evasio
 test("Always Ablate choice retains native ablation, SP and original roll",async()=>{
  for(const ablateArmor of [false,true,undefined]){setup();const msg=await rolled();let args;actor._applyDamage=async(...values)=>{args=values;};await request("damage","damageApply",{options:damageOptions,ablateArmor});assert.equal(args[3],2);assert.equal(args[8].pneumaAlwaysAblate,ablateArmor);assert.equal(args[5],0.5);assert.equal(msg.flags["pneuma-combattools"].exchange.damage.result.values.ablation,2);}
 });
+
+test("GM resets only current unapplied damage and reopens the player roll",async()=>{
+  setup();await rolled();
+  await assert.rejects(request("damage","damageReset",{nonce:"n"}),/Only the GM/);
+  await assert.rejects(request("damage","damageReset",{user:"gm",nonce:"old"}),/Only the GM/);
+  await request("damage","damageReset",{user:"gm",nonce:"n"});
+  await request("damage","damageClaim",{nonce:"next"});
+  await request("damage","damageCommit",{nonce:"next",damage:damageResult()});
+  actor._applyDamage=async()=>{};
+  await request("damage","damageApply",{options:damageOptions});
+  await assert.rejects(request("damage","damageReset",{user:"gm",nonce:"next"}),/Only the GM/);
+});
+test("close-combat armor settings apply at damage roll and application",async()=>{
+  for(const [type,half,ablate] of [["martialArts",false,true],["mediumMelee",false,false],["unarmed",true,false]]){
+    setup();const msg=hit(),data=get(msg,"flags.pneuma-combattools.exchange");
+    data.weaponType=type;
+    const settings=game.settings.get;
+    game.settings.get=(module,key)=>key==="closeArmor"?{martialArts:{half,ablate},melee:{half,ablate},brawling:{half,ablate}}:settings(module,key);
+    await request("damage","damageClaim",{nonce:"n"});
+    const result=damageResult();result.values.ignorePercent=type==="unarmed"?0:50;
+    await request("damage","damageCommit",{nonce:"n",damage:result});
+    let args;actor._applyDamage=async(...values)=>{args=values;};
+    await request("damage","damageApply",{options:damageOptions});
+    assert.equal(args[5],half?50:0);assert.equal(args[3],ablate?2:0);
+  }
+});
+test("ineligible ranged target can wait for a manual response with skipping disabled",async()=>{
+  setup();actor.system.stats.ref.value=5;game.settings.get=(_module,key)=>key==="skipIneligibleEvasion"?false:"raw";
+  const data=message("skip-off").flags["pneuma-combattools"].exchange;
+  const {skipUnavailableEvasion}=await import("../dist/scripts/combat-resolution.js");
+  skipUnavailableEvasion(data,actor,game.combat);assert.equal(data.state,"waiting");
+});
+
+test("post-roll bonus edits replace the previous amount and lock at application",async()=>{
+  setup();const msg=await rolled();
+  const bonus=flatBonus=>request("damage","damageBonus",{nonce:"n",flatBonus});
+  await assert.rejects(bonus(-1),/whole number/);
+  await bonus(3);await bonus(4);
+  const result=get(msg,"flags.pneuma-combattools.exchange.damage.result");
+  assert.equal(result.values.total,22);assert.equal(result.flatBonus,4);
+  let args;actor._applyDamage=async(...values)=>{args=values;};
+  await request("damage","damageApply",{options:damageOptions});
+  assert.deepEqual(args.slice(0,2),[26,5]);
+  await assert.rejects(bonus(2),/unapplied roll/);
+});
+
+test("post-roll armor options control SP, ablation and blocked-hit ablation at application",async()=>{
+ for(const [interact,ablate,always,expected] of [[true,false,true,0],[false,true,false,0],[true,true,true,2]]){
+  setup();await rolled();let args;actor._applyDamage=async(...v)=>{args=v;};
+  for(const [armorOption,enabled] of Object.entries({interact,ablate,always}))
+    await request("damage","damageArmor",{nonce:"n",armorOption,enabled});
+  await request("damage","damageApply",{options:damageOptions});
+  assert.equal(args[3],expected);assert.equal(args[5],interact?0.5:100);
+  assert.equal(args.at(-1).pneumaAlwaysAblate,always);
+  await assert.rejects(request("damage","damageArmor",{nonce:"n",armorOption:"always",enabled:false}),/unapplied/);
+ }
+});

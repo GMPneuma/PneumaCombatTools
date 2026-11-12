@@ -117,12 +117,12 @@ function exchangeOffer(actor: Actor, data: Exchange, combat?: Combat): EvasionOf
     ? { allowed: true, penalty: 0, cost: 0, free: 0, reason: "GM override" } : choice;
 }
 export function skipUnavailableEvasion(data: Exchange, actor: Actor, combat?: Combat): void {
-  if (!data.ranged || data.unaware) return;
-  const choice = offer(actor, true, combat);
+  if (data.unaware || game.settings?.get(MODULE,"skipIneligibleEvasion")===false) return;
+  const choice = offer(actor, data.ranged, combat);
   if (choice.allowed) return;
   data.cannotEvade = choice.reason;
   data.state = "resolved";
-  data.hit = data.total > data.dv!;
+  data.hit = !data.ranged || data.total > data.dv!;
 }
 function canOverrideEvasion(message: ChatMessage, data: Exchange): boolean {
   return !!data.cannotEvade && !data.evasionOverride && data.state === "resolved" && !data.damage
@@ -180,8 +180,8 @@ export function exchangeContent(data: Exchange): string {
   return '<div class="pneuma-resolution-card">'
     + resolutionSection("attack", doc.body.innerHTML, "pneuma-attack-result " + rollOutcomeClass(!!data.hit))
     + defense + resolutionSection("result", '<p class="pneuma-combat-outcome" title="' + escape(opposed) + '">' + damageControl + '<strong class="pneuma-result-summary">'
-    + escape(data.attackerName) + ' <span class="' + (data.hit ? "pneuma-hit" : "pneuma-miss") + '">'
-    + (data.hit ? "hits" : "misses") + '</span> ' + escape(data.defenderName)
+    + '<span class="' + (data.hit ? "pneuma-hit" : "pneuma-miss") + '">'
+    + (data.hit ? "Hits" : "Misses") + '</span>'
     + (multiplier!==undefined?' <span class="pneuma-autofire-multiplier">Autofire ×'+multiplier+'</span>':'')
     + '</strong></p>' + (data.cannotEvade ? '<small class="pneuma-cannot-evade" title="' + escape(data.cannotEvade) + '">'
       + (data.evasionOverride ? 'GM allowed evasion' : 'Target cannot evade') + '</small>' : '')) + damageContent(data) + '</div>';
@@ -541,6 +541,13 @@ export function registerCombatResolution(): void {
     if (data.state === "cancelled") return;
     html.find(".message-sender").text(data.attackerName + " → " + data.defenderName);
     if (data.state === "resolved") {
+      // Older saved cards include the two names as text nodes around the outcome.
+      const outcome=html[0]?.querySelector(".pneuma-result-summary > .pneuma-hit, .pneuma-result-summary > .pneuma-miss");
+      if(outcome && (outcome.textContent==="hits" || outcome.textContent==="misses")) {
+        if(outcome.previousSibling?.nodeType===Node.TEXT_NODE)outcome.previousSibling.remove();
+        if(outcome.nextSibling?.nodeType===Node.TEXT_NODE)outcome.nextSibling.remove();
+        outcome.textContent=data.hit?"Hits":"Misses";
+      }
       if (game.user!.isGM && canOverrideEvasion(message, data)) {
         const button = html[0]?.querySelector<HTMLButtonElement>(".pneuma-evasion-override") ?? document.createElement("button");
         button.type = "button"; button.className = "pneuma-evasion-override";

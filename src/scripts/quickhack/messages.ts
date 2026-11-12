@@ -10,7 +10,7 @@ export interface QuickhackResult extends Partial<EncounterRef> {
   breachCleared?: number;
   combatUuid?: string;
   sourceActorUuid: string; targetActorUuid: string; sourceTokenUuid: string; targetTokenUuid: string;
-  quickhackId?: string; success: boolean; alerted: boolean; audience: string; revealAttacker: boolean;
+  customDescription?:string; quickhackId?: string; success: boolean; alerted: boolean; audience: string; revealAttacker: boolean;
   effectResolved?: boolean; effectFailed?: boolean;
   connectionId?: string;
 }
@@ -40,7 +40,7 @@ export async function postResult(source: Token, target: Token, result: Quickhack
   const controls = result.alerted ? `<button type="button" data-quickhack-action="force-out">${label("ForceOut.Button")}</button>` : "";
   const damage = result.success && result.quickhackId === "synapse-burnout"
     ? `<button type="button" data-quickhack-action="damage">${label("Damage.Roll")}</button>` : "";
-  const effects = result.type === "quickhack" && result.success ? `<p class="pneuma-quickhack-effect">${label("Effect.Resolving")}</p>` : "";
+  const effects = result.type === "quickhack" && result.success ? `<p class="pneuma-quickhack-effect">${result.customDescription!==undefined?escapeHTML(result.customDescription):label("Effect.Resolving")}</p>` : "";
   const header = `<div class="rollcard-top"><div class="cpr-block pneuma-quickhack-heading"><h3>${escapeHTML(title)}</h3>${participants}</div></div>`;
   const dice = rollContent ? `<div class="pneuma-quickhack-roll ${rollOutcomeClass(result.success)}" data-quickhack-section="roll">${rollContent}</div>` : "";
   const content = `<div class="rollcard pneuma-quickhack-card" data-state="${result.success ? "success" : "failure"}">`

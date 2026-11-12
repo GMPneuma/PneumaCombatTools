@@ -176,7 +176,9 @@ try {
   document.querySelector('#card').innerHTML=areaContent({...data,phase:'scatter',rows:[],exchange:{...data.exchange,damage:undefined}});
   const {styleChatButtons}=await import('/scripts/chat-buttons.js');styleChatButtons(document.querySelector('#card'));
  });
- assert.equal(await page.locator('[data-aoe-action="scatter"]').innerText(),'Place New Target Center');
+ assert.equal(await page.locator('[data-aoe-action="scatter"]').innerText(),'GM place new');
+ assert.equal(await page.locator('[data-aoe-action="scatterRandom"]').innerText(),'Near/far scatter');
+ assert.equal(await page.locator('[data-aoe-action="scatterAny"]').innerText(),'True random');
  assert.equal(await page.locator('[data-aoe-action="scatter"]').evaluate(el=>el.classList.contains('pneuma-chat-icon')),false);
  await page.screenshot({path:process.env.TEMP+'/pct-aoe-scatter.png'});
  await page.evaluate(async()=>{

@@ -174,12 +174,12 @@ try {
   const interact=native.querySelector('.pneuma-interact-armor');check(interact.getAttribute('aria-pressed')==='true','armor default checked');
   interact.click();check(native.querySelector('a').dataset.ignoreArmorPercent==='100'&&native.querySelector('a').dataset.ablation==='0'&&native.querySelector('.pneuma-half-armor').disabled,'native armor bypass and no ablation');
   interact.click();check(native.querySelector('a').dataset.ignoreArmorPercent==='0'&&!native.querySelector('.pneuma-half-armor').disabled,'restore armor interaction');
-  game.settings.register=(_m,_k,options)=>{window.armorSetting=options};registerHalfArmor();check(armorSetting.scope==='world'&&armorSetting.default===false&&armorSetting.name==='Show armor controls on normal damage cards','GM world setting');
+  registerHalfArmor();
   const armorHook=hooks.renderChatMessage.at(-1);game.settings.get=()=>false;
   cards.innerHTML=manualContent(damage);armorHook(dm,[cards]);check(cards.querySelector('.pneuma-interact-armor'),'manual keeps controls');
   const normal={flags:{'pneuma-combattools':{exchange:{damage:damage.damage}}}};
   armorHook(normal,[cards]);check(!cards.querySelector('.pneuma-half-armor')&&!cards.querySelector('.pneuma-interact-armor'),'normal hides both controls');
-  game.settings.get=()=>true;armorHook(normal,[cards]);check(cards.querySelector('.pneuma-interact-armor'),'normal setting restores controls');
+  cards.innerHTML='<div class="rollcard"><a data-action="applyDamage"></a></div>';armorHook(normal,[cards]);check(cards.querySelector('details:not([open]) .pneuma-interact-armor'),'native controls available in collapsed disclosure');
   game.settings.get=(_m,key)=>key==='ablateBlockedHits';
   cards.innerHTML=manualContent(damage);armorHook(dm,[cards]);bindManualCard(dm,cards);await new Promise(requestAnimationFrame);
   const ablate=cards.querySelector('.pneuma-ablate-armor');check(ablate?.textContent==='Always Ablate','toggle label');check(ablate?.getAttribute('aria-pressed')==='true','ablation defaults checked');ablate.click();cards.querySelector('.pneuma-apply-damage').click();await new Promise(resolve=>setTimeout(resolve,20));check(applied.ablateArmor===false,'per-application opt out is sent');

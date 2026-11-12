@@ -95,11 +95,28 @@ test("suppression uses native suppressive mode and requires ten bullets",async()
 test("missed blast waits for GM placement and rejects scatter outside the intended square",async()=>{
  const f=fixture("explosive",13);await startAreaAttack(f.source,f.target,"w","attack");
  assert.equal(f.data().phase,"scatter");assert.equal(f.data().rows.length,0);
- assert.match(f.messages[0].content,/GM: choose a new center inside the gray area/);
+ assert.match(f.messages[0].content,/GM place new/);assert.match(f.messages[0].content,/True random/);assert.match(f.messages[0].content,/Near\/far scatter/);
  await assert.rejects(f.request("scatter",{area:f.data().area}),/Only the GM/);
  await assert.rejects(f.request("scatter",{user:"gm",area:{...f.data().area,origin:{x:1000,y:1000}}}),/inside/);
  await f.request("scatter",{user:"gm",area:{...f.data().area,origin:{x:550,y:50}}});
  assert.equal(f.data().phase,"responses");assert.equal(f.scene.templates.length,2);assert.notEqual(f.scene.templates[0].fillColor,"#737980");assert.ok(f.data().rows.length>0);
+});
+test("random placement waits for the GM and resolves a missed blast only once",async()=>{
+ const f=fixture("explosive",13);
+ await startAreaAttack(f.source,f.target,"w","attack");
+ const aim=f.data().intended;
+ await assert.rejects(f.request("scatterRandom"),/Only the GM/);
+ await assert.rejects(f.request("scatterAny"),/Only the GM/);
+ globalThis.CONST={...globalThis.CONST,GRID_TYPES:{GRIDLESS:0}};
+ canvas.grid.type=1;
+ canvas.grid.getOffset=({x,y})=>({i:Math.floor(y/100),j:Math.floor(x/100)});
+ canvas.grid.getAdjacentOffsets=({i,j})=>[{i,j:j+1},{i,j:j-1}];
+ canvas.grid.getCenterPoint=({i,j})=>({x:100*j+50,y:100*i+50});
+ canvas.dimensions.sceneRect={contains:()=>true};
+ await f.request("scatterRandom",{user:"gm"});
+ assert.equal(f.data().phase,"responses");
+ assert.equal(Math.abs(f.data().area.origin.x-aim.x),100);
+ await assert.rejects(f.request("scatterRandom",{user:"gm"}),/Only the GM/);
 });
 test("target response reservations reject competing users and explosive ties hit",async()=>{
  const f=fixture();await startAreaAttack(f.source,f.target,"w","attack");

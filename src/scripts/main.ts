@@ -19,6 +19,7 @@ import {canWake,wakeUsingAction,registerWake} from "./wake.js";
 import {registerDisplaySettings} from "./display-settings.js";
 import {registerCombatBarSettings} from "./combat-bar-settings.js";
 import {registerChatButtons} from "./chat-buttons.js";
+import {registerCloseArmor} from "./close-armor-settings.js";
 import {registerHalfArmor} from "./half-armor.js";
 import {registerManualRolls} from "./manual-rolls.js";
 import {registerInjuryNotices} from "./injury-notices.js";
@@ -92,6 +93,7 @@ Hooks.once("init", () => {
   registerSceneEffects();
   registerManualRolls();
   registerHalfArmor();
+  registerCloseArmor();
   registerChatButtons();
   registerDamageReversal();
   registerCombatSummary();
@@ -130,7 +132,7 @@ Hooks.once("init", () => {
   registerSettingsLayout();
   game.settings!.register(MODULE_ID, "maNoAblation", {
     name: "MA does not ablate armor", hint: "Martial Arts retains half SP, but does not ablate armor when applying damage from a resolution card.",
-    scope: "world", config: true, type: Boolean, default: false,
+    scope: "world", config: false, type: Boolean, default: false,
   });
   game.settings!.register(MODULE_ID, "ablateBlockedHits", {
     name: "Ablate Armor even if hit doesn't penetrate.",
