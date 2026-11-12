@@ -388,6 +388,8 @@ Exchange result summaries show Hits or Misses using the existing hit/miss spans.
 
 On ordinary exchange and area damage cards, the native dice and final number stay in the damage roll section. A 9px pencil on a 14px button anchored inside the bottom-right corner of the number box expands a separate .pneuma-damage-editor below the native roll. Four .pneuma-damage-editor-row elements group the two armor switches, Always Ablate, the numeric bonus and the three native module effect slots. The button exposes aria-expanded. Hidden editor rows use the hidden attribute. An attacker owner or GM edits shared armor and bonus before application. The editor supersedes the inline .pneuma-bonus-damage input and legacy Half Armor SP button for these cards.
 
-The three damage editor armor buttons use .pneuma-armor-toggle with aria-pressed and a visible .pneuma-armor-toggle-state On/Off indicator.
+The four damage editor armor buttons use .pneuma-armor-toggle with aria-pressed and a visible .pneuma-armor-toggle-state indicator.
 
 Native damage rollcards with an Apply Damage action group their .pneuma-armor-controls under a collapsed Armor options disclosure. Example selector: .rollcard > details > .pneuma-armor-controls. CombatTools exchange and area cards use the existing pencil editor.
+
+The ordinary and shared area damage editors include Halve Armor beside Always Ablate. It starts from the rolled half-SP value and can be changed before damage application. Full armor bypass is preserved.

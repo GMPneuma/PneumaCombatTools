@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.33 - 2026-11-12
+
+- Added Halve Armor to Damage Modification on ordinary and shared area damage cards. It starts from the roll’s armor setting and can be toggled before applying damage.
+
 ## 0.9.32 - 2026-11-12
 
 - Shortened the armor control label to Interact w/armor. Damage-editor armor toggles now show a small checkmark when enabled and an empty box when disabled.

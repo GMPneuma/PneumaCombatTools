@@ -18,7 +18,7 @@ export interface DamageValues {
   total: number; bonus: number; location: string; ablation: number; ammo: string;
   interactArmor?: boolean; ignorePercent: number; ignoreBelow: number; lethal: boolean;
 }
-export interface DamageResult { armorOptions?:Partial<Record<"interact"|"ablate"|"always",boolean>>; flatBonus?:number; ammoType?:string; html: string; values: DamageValues; sixes?: number }
+export interface DamageResult { armorOptions?:Partial<Record<"interact"|"ablate"|"always"|"half",boolean>>; flatBonus?:number; ammoType?:string; html: string; values: DamageValues; sixes?: number }
 export interface DamageState {
   injuries?: Record<string,InlineInjury>;
   status: "rolling" | "rolled" | "applying" | "applied" | "review";
@@ -29,7 +29,7 @@ export interface DamageState {
 export interface DamageOptions { useShield: boolean; damageReductionRole: boolean; damageReductionAE: boolean; brainDamageReduction: boolean }
 export interface DamageRequest {
   encounter?:EncounterRef;
-  armorOption?: "interact"|"ablate"|"always"; enabled?:boolean; flatBonus?:number;
+  armorOption?: "interact"|"ablate"|"always"|"half"; enabled?:boolean; flatBonus?:number;
   action: "damageArmor" | "damageBonus" | "damageInjuryReroll" | "damageInjury" | "damageAllowMiss" | "damageClaim" | "damageRelease" | "damageCommit" | "damageApply" | "damageReset" | "damageResolved" | "damageStatuses";
   ablateArmor?: boolean; interactArmor?: boolean; halfArmor?: boolean; statusEffects?: string[]; nonce?: string; damage?: DamageResult; options?: DamageOptions; targetUuid?: string; application?: "recorded" | "selected"; applicationId?: string;
 }
@@ -212,7 +212,7 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
       throw Error("Damage options can only change on the current unapplied roll.");
     if(request.action==="damageArmor"){
       const key=request.armorOption;
-      if(!key || !["interact","ablate","always"].includes(key) || typeof request.enabled!=="boolean")throw Error("Invalid armor option.");
+      if(!key || !["interact","ablate","always","half"].includes(key) || typeof request.enabled!=="boolean")throw Error("Invalid armor option.");
       damage.result.armorOptions={...damage.result.armorOptions,[key]:request.enabled};
       await save();return;
     }
@@ -263,6 +263,7 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
   const v = damage.result.values;
   const armor=damage.result.armorOptions;
   const interact=armor?.interact??request.interactArmor??v.interactArmor;
+  const ignorePercent=armorIgnorePercent(v.ignorePercent,armor?.half??request.halfArmor,interact);
   const ablates=armor?.ablate??(weaponArmor(data.weaponType)?.ablate!==false);
   const always=armor?.always??request.ablateArmor;
   damage.recordedApplied = recordedDamageApplied(data);
@@ -273,8 +274,8 @@ export async function handleDamage(request: DamageRequest, user: User, data: Exc
   try {
     const token = await fromUuid(destination) as TokenDocument | null;
     const summaries = await captureDamageApplication(actor, token?.name ?? actor.name ?? "", v.location, damage.applicationId!,
-      view => target._applyDamage.call(view, v.total+(damage.result!.flatBonus??0), v.bonus, v.location, (interact===false || data.coverUp || !ablates) ? 0 : v.ablation, v.ammo, data.coverUp?2*armorIgnorePercent(v.ignorePercent,request.halfArmor,interact)-100:armorIgnorePercent(v.ignorePercent,request.halfArmor,interact), data.coverUp?v.ignoreBelow/2:v.ignoreBelow, v.lethal, always===undefined?request.options:{...request.options,pneumaAlwaysAblate:always}),
-      data.coverUp?{ablation:interact===false||!ablates?0:2*v.ablation,ignorePercent:armorIgnorePercent(v.ignorePercent,request.halfArmor,interact),ignoreBelow:v.ignoreBelow}:undefined, native=>{damage.penetrated=Number(native.rawDamageDealt)>0&&native.hpReduction>0;},data.attackMode==="aimed"&&v.location==="head");
+      view => target._applyDamage.call(view, v.total+(damage.result!.flatBonus??0), v.bonus, v.location, (interact===false || data.coverUp || !ablates) ? 0 : v.ablation, v.ammo, data.coverUp?2*ignorePercent-100:ignorePercent, data.coverUp?v.ignoreBelow/2:v.ignoreBelow, v.lethal, always===undefined?request.options:{...request.options,pneumaAlwaysAblate:always}),
+      data.coverUp?{ablation:interact===false||!ablates?0:2*v.ablation,ignorePercent:ignorePercent,ignoreBelow:v.ignoreBelow}:undefined, native=>{damage.penetrated=Number(native.rawDamageDealt)>0&&native.hpReduction>0;},data.attackMode==="aimed"&&v.location==="head");
     if(damage.penetrated) {
       const ammo=damage.result.ammoType;
       if(ammo&&ammo!=="incendiary")await reportExposure(actor,ammo);

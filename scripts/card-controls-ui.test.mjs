@@ -145,7 +145,7 @@ try {
     const box=rect(button.parentElement),pen=rect(button);
     if(Math.abs(box.right-pen.right-1)>1 || Math.abs(box.bottom-pen.bottom-1)>1 || pen.width>14 || pen.height>14)
       throw Error('Pencil must stay small and anchored inside the bottom-right corner');
-    if(rows[0].querySelectorAll('button').length!==2 || !rows[1].textContent.startsWith('Always Ablate') || !rows[2].querySelector('input') || rows[3].querySelectorAll('button').length!==3)throw Error('Incorrect damage editor rows');
+    if(rows[0].querySelectorAll('button').length!==2 || !rows[1].textContent.includes('Halve Armor') || !rows[1].textContent.includes('Always Ablate') || !rows[2].querySelector('input') || rows[3].querySelectorAll('button').length!==3)throw Error('Incorrect damage editor rows');
     for(const toggle of editor.querySelectorAll('.pneuma-armor-toggle')){
       if(toggle.querySelector('.pneuma-armor-toggle-state')?.textContent!==(toggle.getAttribute('aria-pressed')==='true'?'✓':''))throw Error('Missing visible armor toggle state');
     }

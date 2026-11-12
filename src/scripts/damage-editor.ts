@@ -41,7 +41,7 @@ export function renderDamageEditor(root:HTMLElement,message:ChatMessage,data:Exc
   const armor=result.armorOptions;
   const interact=armor?.interact??(result.values.interactArmor!==false);
   const ablate=armor?.ablate??(weaponArmor(data.weaponType)?.ablate!==false && result.values.ablation>0);
-  function armorButton(line:HTMLElement,key:"interact"|"ablate"|"always",label:string,active:boolean,available:boolean){
+  function armorButton(line:HTMLElement,key:"interact"|"ablate"|"always"|"half",label:string,active:boolean,available:boolean){
     const button=document.createElement("button");button.type="button";button.textContent=label;
     const on=active && available;
     button.className="pneuma-armor-toggle";
@@ -63,7 +63,9 @@ export function renderDamageEditor(root:HTMLElement,message:ChatMessage,data:Exc
   const first=row();
   armorButton(first,"interact","Interact w/armor",interact,true);
   armorButton(first,"ablate","Ablate Armor",ablate,interact && result.values.ablation>0);
-  armorButton(row(),"always","Always Ablate",armor?.always??!!game.settings!.get("pneuma-combattools","ablateBlockedHits"),interact && ablate);
+  const second=row();
+  armorButton(second,"half","Halve Armor",armor?.half??(result.values.ignorePercent===50),interact && result.values.ignorePercent<100);
+  armorButton(second,"always","Always Ablate",armor?.always??!!game.settings!.get("pneuma-combattools","ablateBlockedHits"),interact && ablate);
   const label=document.createElement("label");label.textContent="Bonus Damage ";
   const bonus=document.createElement("input");bonus.type="number";bonus.step="1";bonus.min="0";
   bonus.value=String(result.flatBonus??0);bonus.disabled=!editable;

@@ -715,3 +715,5 @@ Damage editor armor toggles show a small checked or empty box. Active settings h
 Close Combat Armor Rules carries the Pneuma Homebrew badge in settings and identifies the homebrew in its window title.
 
 Retired the Show armor controls on normal damage cards setting. Rolled CombatTools attacks expose armor options through the pencil. Native damage cards with an Apply Damage action offer a collapsed Armor options disclosure.
+
+The ordinary and shared area damage editors include Halve Armor beside Always Ablate. It starts from the rolled half-SP value and can be changed before damage application. Full armor bypass is preserved.

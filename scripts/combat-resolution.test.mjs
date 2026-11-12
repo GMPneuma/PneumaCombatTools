@@ -759,3 +759,15 @@ test("post-roll armor options control SP, ablation and blocked-hit ablation at a
   await assert.rejects(request("damage","damageArmor",{nonce:"n",armorOption:"always",enabled:false}),/unapplied/);
  }
 });
+
+test("Halve Armor overrides the rolled default and preserves full bypass",async()=>{
+ for(const [original,half,expected] of [[0,true,50],[50,false,0],[100,true,100]]){
+  setup();hit();await request("damage","damageClaim",{nonce:"n"});
+  const result=damageResult();result.values.ignorePercent=original;
+  await request("damage","damageCommit",{nonce:"n",damage:result});
+  await request("damage","damageArmor",{nonce:"n",armorOption:"half",enabled:half});
+  let args;actor._applyDamage=async(...v)=>{args=v;};
+  await request("damage","damageApply",{options:damageOptions});
+  assert.equal(args[5],expected);
+ }
+});
