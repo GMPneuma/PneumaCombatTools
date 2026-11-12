@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.32 - 2026-11-12
+
+- Shortened the armor control label to Interact w/armor. Damage-editor armor toggles now show a small checkmark when enabled and an empty box when disabled.
+
 ## 0.9.31 - 2026-11-11
 
 ### Grenades and evasion

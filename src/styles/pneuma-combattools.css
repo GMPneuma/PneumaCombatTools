@@ -1441,7 +1441,7 @@ body.pneuma-dock-full-width #sidebar {
 .pneuma-damage-editor-row > button { width:auto; }
 .pneuma-damage-editor-row:has(> .pneuma-armor-toggle) { flex-wrap:wrap; }
 .pneuma-damage-editor-row .pneuma-armor-toggle { display:inline-flex; align-items:center; justify-content:center; gap:.35em; }
-.pneuma-armor-toggle .pneuma-armor-toggle-state { padding:0 .3em; font: bold 10px/1.5 sans-serif; text-transform:uppercase; border:1px solid currentColor; border-radius:3px; }
+.pneuma-armor-toggle .pneuma-armor-toggle-state { display:inline-grid; place-items:center; box-sizing:border-box; width:1.15em; height:1.15em; flex:none; font:bold 12px/1 sans-serif; border:1px solid currentColor; border-radius:3px; }
 .pneuma-damage-editor-row .pneuma-armor-toggle[aria-pressed="true"] { background:#24483b; color:#fff; border-color:#19372c; }
 .pneuma-armor-toggle[aria-pressed="true"] .pneuma-armor-toggle-state { background:#fff; color:#24483b; }
 .pneuma-damage-editor-row input { width:4em; }

@@ -49,7 +49,7 @@ export function renderDamageEditor(root:HTMLElement,message:ChatMessage,data:Exc
     const indicator=document.createElement("span");
     indicator.className="pneuma-armor-toggle-state";
     indicator.setAttribute("aria-hidden","true");
-    indicator.textContent=on?"On":"Off";
+    indicator.textContent=on?"✓":"";
     button.append(indicator);
     button.disabled=!editable||!available;
     button.addEventListener("click",async()=>{
@@ -61,7 +61,7 @@ export function renderDamageEditor(root:HTMLElement,message:ChatMessage,data:Exc
     line.append(button);
   }
   const first=row();
-  armorButton(first,"interact","Interact With Armor",interact,true);
+  armorButton(first,"interact","Interact w/armor",interact,true);
   armorButton(first,"ablate","Ablate Armor",ablate,interact && result.values.ablation>0);
   armorButton(row(),"always","Always Ablate",armor?.always??!!game.settings!.get("pneuma-combattools","ablateBlockedHits"),interact && ablate);
   const label=document.createElement("label");label.textContent="Bonus Damage ";

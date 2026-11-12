@@ -710,7 +710,7 @@ Ordinary attack and shared area damage results show the ammunition and rolled da
 
 Base HUD pop-up alerts use 18px text. Notification rows beneath the biomonitor use 14px text.
 
-Damage editor armor toggles show an explicit On/Off indicator. Active settings have a dark green fill in the base skin.
+Damage editor armor toggles show a small checked or empty box. Active settings have a dark green fill in the base skin.
 
 Close Combat Armor Rules carries the Pneuma Homebrew badge in settings and identifies the homebrew in its window title.
 

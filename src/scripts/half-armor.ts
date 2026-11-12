@@ -5,7 +5,7 @@ export function armorIgnorePercent(original:number,half?:boolean,interact?:boole
   return half?Math.max(50,original):original===50?0:original;
 }
 export function halfArmorControl(original:number,interact=true):string {
-  return '<div class="pneuma-armor-controls"><button type="button" class="pneuma-interact-armor" aria-pressed="'+interact+'" title="Apply armor SP and armor ablation">Interact With Armor</button>'
+  return '<div class="pneuma-armor-controls"><button type="button" class="pneuma-interact-armor" aria-pressed="'+interact+'" title="Apply armor SP and armor ablation">Interact w/armor</button>'
     +'<button type="button" class="pneuma-half-armor" aria-pressed="'+(original===50)+'" data-original-ignore="'+original+'"'+(!interact||original>=100?' disabled':'')+' title="Use half armor SP, rounded up, when applying damage">Half Armor SP</button>'+ablateArmorControl()+'</div>';
 }
 function ablateArmorControl():string {return game.settings?.get("pneuma-combattools","ablateBlockedHits")?'<button type="button" class="pneuma-ablate-armor" aria-pressed="true" title="Ablate armor even when damage does not penetrate. Turn off to use normal ablation rules.">Always Ablate</button>':"";}

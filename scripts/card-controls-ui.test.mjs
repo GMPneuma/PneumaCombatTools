@@ -147,7 +147,7 @@ try {
       throw Error('Pencil must stay small and anchored inside the bottom-right corner');
     if(rows[0].querySelectorAll('button').length!==2 || !rows[1].textContent.startsWith('Always Ablate') || !rows[2].querySelector('input') || rows[3].querySelectorAll('button').length!==3)throw Error('Incorrect damage editor rows');
     for(const toggle of editor.querySelectorAll('.pneuma-armor-toggle')){
-      if(toggle.querySelector('.pneuma-armor-toggle-state')?.textContent!==(toggle.getAttribute('aria-pressed')==='true'?'On':'Off'))throw Error('Missing visible armor toggle state');
+      if(toggle.querySelector('.pneuma-armor-toggle-state')?.textContent!==(toggle.getAttribute('aria-pressed')==='true'?'✓':''))throw Error('Missing visible armor toggle state');
     }
     rows[0].querySelector('button').click();
     const input=rows[2].querySelector('input');input.value='4';input.dispatchEvent(new Event('change'));
