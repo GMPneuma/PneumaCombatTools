@@ -82,10 +82,6 @@ async function changeSource(actor: Actor, status: Bound, active: boolean): Promi
   }
 }
 async function refreshMarkers(actor: Actor): Promise<void> {
-  // CPR shows its standard sheet actions when an actor-created effect names the actor as its origin.
-  const missingOrigins = Array.from(actor.effects).filter(effect=>effect.parent===actor && !effect.origin);
-  if (missingOrigins.length) await actor.updateEmbeddedDocuments("ActiveEffect",
-    missingOrigins.map(effect=>({_id:effect.id!,origin:actor.uuid})),options);
   for (const effect of actor.allApplicableEffects?.() ?? []) {
     const id=generalByName.get(effect.name ?? "");
     if (!id || !(effect.parent instanceof Item)) continue;
@@ -109,7 +105,7 @@ async function refreshMarkers(actor: Actor): Promise<void> {
     if (needsMarker && !existing.length) {
       await actor.createEmbeddedDocuments("ActiveEffect", [{
         name:status.name, img:status.img, statuses:[status.id], changes:[],
-        description:"Created by Pneuma Combat Tools.", origin:actor.uuid, flags:{[String(MODULE)]:{syncMarker:true}}
+        description:"Created by Pneuma Combat Tools.", flags:{[String(MODULE)]:{syncMarker:true}}
       }],options);
     } else if (!needsMarker && mirrors.length) {
       await actor.deleteEmbeddedDocuments("ActiveEffect",mirrors.map(e=>e.id!),options);

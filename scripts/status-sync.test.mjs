@@ -30,7 +30,7 @@ class Actor {
 globalThis.Actor=Actor;globalThis.Item=Item;
 const leg=masterStatuses.find(s=>s.name==="Broken Leg");
 const stim=masterStatuses.find(s=>s.name==="Stim");
-test("standalone active and inactive effects receive the actor origin for CPR's native sheet actions",async()=>{
+test("status sync preserves effect origins so GM-only sheet controls do not change native player actions",async()=>{
  const actor=setup();
  const [item]=await actor.createEmbeddedDocuments("Item",[{name:"Synthcoke",type:"drug",effects:[{name:"Synthcoke Primary"}]}]);
  const [active,inactive,manual,fromItem,unknown]=await actor.createEmbeddedDocuments("ActiveEffect",[
@@ -38,7 +38,7 @@ test("standalone active and inactive effects receive the actor origin for CPR's 
   {name:"Derived from gear",origin:actor.uuid+".Item."+item.id},{name:"Missing source",origin:"Item.missing"}
  ]);
  await syncActorStatuses(actor);
- assert.deepEqual([active.origin,inactive.origin,manual.origin],[actor.uuid,actor.uuid,actor.uuid]);
+ assert.deepEqual([active.origin,inactive.origin,manual.origin],[undefined,undefined,actor.uuid]);
  assert.equal(fromItem.origin,actor.uuid+".Item."+item.id);
  assert.equal(unknown.origin,"Item.missing");
  assert.equal([...item.effects][0].origin,undefined);
@@ -75,7 +75,7 @@ test("effectless injury marker can be deleted without deleting or recreating the
  await syncActorStatuses(actor);
  const [marker]=actor.effects;
  assert.equal(marker.description,"Created by Pneuma Combat Tools.");
- assert.equal(marker.origin,actor.uuid);
+ assert.equal(marker.origin,undefined);
  actor.effects.delete(marker.id);hooks.deleteActiveEffect(marker,{},"gm");
  await syncActorStatuses(actor,[],true);assert.equal(actor.effects.size,0);assert.equal(actor.items.get(item.id),item);
  await syncActorStatuses(actor,[leg.id],false,true);assert.equal(actor.effects.size,1);

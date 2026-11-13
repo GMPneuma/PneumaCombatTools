@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.35 - 2026-11-12
+
+- Restricted the extra actor-sheet trash icon supplied by Combat Tools to GMs. Players retain CPR's native controls on manual effects.
+
 ## 0.9.34 - 2026-11-12
 
 - Added a top-center Combat Bar layout, top-aligned controls, labeled status lists, top-aligned portrait cropping, and a confirmed End Combat action.

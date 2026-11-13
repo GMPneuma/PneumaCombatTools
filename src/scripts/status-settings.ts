@@ -14,7 +14,10 @@ export function labelCombatEffects(actor:Actor,root:HTMLElement,manageEffect?:(e
   for (const row of Array.from(root.querySelectorAll<HTMLElement>(".effect[data-effect-id]"))) {
     const effect=actorEffects.get(row.dataset.effectId ?? "");
     const actions=row.querySelector(".effect-actions");
-    if (manageEffect && actor.isOwner && effect?.parent===actor && (!effect.origin || effect.origin===actor.uuid)
+    // Earlier versions assigned the actor origin to module markers, exposing CPR's trash icon.
+    if (!game.user?.isGM && effect?.parent===actor && effect.origin===actor.uuid && owned.has(effect.uuid))
+      actions?.querySelector('[data-action="delete"]')?.remove();
+    if (manageEffect && game.user?.isGM && actor.isOwner && effect?.parent===actor && (!effect.origin || effect.origin===actor.uuid)
       && actions && !actions.querySelector('[data-action="delete"]')) {
       const link=document.createElement("a");
       link.className="effect-control";
@@ -23,7 +26,7 @@ export function labelCombatEffects(actor:Actor,root:HTMLElement,manageEffect?:(e
       link.setAttribute("aria-label",link.dataset.tooltip);
       link.innerHTML='<i class="fas fa-trash-can"></i>';
       link.addEventListener("click",event=>{
-        if (actor.isOwner && effect.parent===actor && (!effect.origin || effect.origin===actor.uuid)) manageEffect(event);
+        if (game.user?.isGM && actor.isOwner && effect.parent===actor && (!effect.origin || effect.origin===actor.uuid)) manageEffect(event);
       });
       actions.append(link);
     }
@@ -144,8 +147,6 @@ export function registerCyberpunkStatuses(): void {
   Hooks.on("preCreateActiveEffect",(effect:ActiveEffect)=>{
     if (effect.parent instanceof Actor && effect.description?.includes(creationNote))
       effect.updateSource({["flags."+MODULE+".createdByCombatTools"]:true});
-    if (effect.parent instanceof Actor && !effect.origin)
-      effect.updateSource({origin:effect.parent.uuid});
     const statuses = new Set(effect.statuses);
     for (const [legacy,native] of nativeIds) if (statuses.has(native)) statuses.add(legacy);
     if (statuses.size!==effect.statuses.size) effect.updateSource({statuses:[...statuses]});
