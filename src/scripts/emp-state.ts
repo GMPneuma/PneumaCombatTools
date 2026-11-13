@@ -147,7 +147,7 @@ export async function syncDisabledLimbs(actor:Actor) {
   if(!amount){if(old)await actor.deleteEmbeddedDocuments("ActiveEffect",[old.id!]);return;}
   const data={disabled:false,name:"Disabled Cyberleg — MOVE penalty",img:"systems/cyberpunk-red-core/icons/compendium/status/broken_leg.svg",changes:[{key:"system.stats.move.value",mode:2,value:String(-amount),priority:20},{key:"system.stats.move.value",mode:4,value:"1",priority:21}],flags:{[MODULE]:{disabledLegPenalty:true}}};
   Object.assign(data.flags,{"cyberpunk-red-core":penaltyFlags(data.changes)});
-  if(old){if(old.disabled||old.changes?.[0]?.value!==String(-amount)||missingPenaltyFlags(old))await old.update(data as never);}else await actor.createEmbeddedDocuments("ActiveEffect",[data] as never);
+  if(old){if(old.disabled||old.changes?.[0]?.value!==String(-amount)||missingPenaltyFlags(old))await old.update(data as never);}else await actor.createEmbeddedDocuments("ActiveEffect",[{...data, description:"Created by Pneuma Combat Tools."}] as never);
 }
 export async function expireDisablements(actor:Actor, endedCombat?:string) {
   for(const item of actor.items){
@@ -186,7 +186,7 @@ async function syncDisabledFrames(actor:Actor) {
   if(!changes.length){if(old)await actor.deleteEmbeddedDocuments("ActiveEffect",[old.id!]);return;}
   const data={disabled:false,name:"Disabled Internal Frame",img:"icons/svg/lightning.svg",changes,flags:{[MODULE]:{frameConsequences:true}}};
   Object.assign(data.flags,{"cyberpunk-red-core":penaltyFlags(changes)});
-  if(old){if(old.disabled||JSON.stringify(old.changes)!==JSON.stringify(changes)||missingPenaltyFlags(old))await old.update(data as never);}else await actor.createEmbeddedDocuments("ActiveEffect",[data] as never);
+  if(old){if(old.disabled||JSON.stringify(old.changes)!==JSON.stringify(changes)||missingPenaltyFlags(old))await old.update(data as never);}else await actor.createEmbeddedDocuments("ActiveEffect",[{...data, description:"Created by Pneuma Combat Tools."}] as never);
 }
 export function frameMovementBlocked(actor:Actor| null|undefined,changes:Record<string,unknown>,isGM:boolean):boolean {
   return !isGM&&!!actor&&["x","y","elevation"].some(k=>k in changes)&&disabledFrameConsequences(actor).noMove;
@@ -197,12 +197,14 @@ export async function syncEmpStatus(actor:Actor):Promise<void> {
   const status=masterStatuses.find(status=>status.name==="EMP");if(!status)return;
   const managed=actor.effects.filter(effect=>!!foundry.utils.getProperty(effect,path+".empStatus"));
   const active=hasActorEMP(actor)||actor.items.some(item=>activeDisables(item).some(disable=>disable.source==="microwaver"));
-  if(!active){if(managed.length)await actor.deleteEmbeddedDocuments("ActiveEffect",managed.map(effect=>effect.id!));return;}
+  const dismissed=foundry.utils.getProperty(actor,path+".hideEmpStatus");
+  const internal={pneumaStatusSync:true} as never;
+  if(!active){if(dismissed)await actor.update({[path+".-=hideEmpStatus"]:null} as never);if(managed.length)await actor.deleteEmbeddedDocuments("ActiveEffect",managed.map(effect=>effect.id!),internal);return;}
   const manual=actor.effects.some(effect=>!foundry.utils.getProperty(effect,path+".empStatus")&&!effect.disabled&&effect.statuses?.has(status.id));
-  if(manual){if(managed.length)await actor.deleteEmbeddedDocuments("ActiveEffect",managed.map(effect=>effect.id!));return;}
+  if(manual||dismissed){if(managed.length)await actor.deleteEmbeddedDocuments("ActiveEffect",managed.map(effect=>effect.id!),internal);return;}
   const data={name:status.name,img:status.img,disabled:false,statuses:[status.id],changes:[],flags:{[MODULE]:{empStatus:true}}};
   if(managed.length){
-    const first=managed[0]!;if(first.disabled||!first.statuses.has(status.id))await first.update(data as never);
-    if(managed.length>1)await actor.deleteEmbeddedDocuments("ActiveEffect",managed.slice(1).map(effect=>effect.id!));
-  }else await actor.createEmbeddedDocuments("ActiveEffect",[data] as never);
+    const first=managed[0]!;if(!first.statuses.has(status.id))await first.update({statuses:[...first.statuses,status.id]} as never);
+    if(managed.length>1)await actor.deleteEmbeddedDocuments("ActiveEffect",managed.slice(1).map(effect=>effect.id!),internal);
+  }else await actor.createEmbeddedDocuments("ActiveEffect",[{...data, description:"Created by Pneuma Combat Tools."}] as never);
 }

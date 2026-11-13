@@ -100,8 +100,8 @@ async function save(scene: Scene, g: Grapple) {
 async function status(actor: Actor, name: string) {
   const definition = masterStatuses.find(s => s.name === name);
   if (!definition) throw new Error(`Missing ${name} status.`);
-  if (!Array.from(actor.effects).some(e => !e.disabled && e.statuses.has(definition.id)))
-    await actor.createEmbeddedDocuments("ActiveEffect", [{name, img:definition.img, statuses:[definition.id], changes:[]}]);
+  if (!Array.from(actor.allApplicableEffects?.() ?? actor.effects).some(e => !e.disabled && !e.isSuppressed && (e.statuses.has(definition.id) || e.name===name)))
+    await actor.createEmbeddedDocuments("ActiveEffect", [{description:"Created by Pneuma Combat Tools.", name, img:definition.img, statuses:[definition.id], changes:[]}]);
 }
 async function grappleEffect(actor: Actor, id: string) {
   const own = Array.from(actor.effects).find(e => property<string>(e, "grappleId") === id);
@@ -110,8 +110,9 @@ async function grappleEffect(actor: Actor, id: string) {
   const existingPenalty = Array.from(actor.allApplicableEffects()).some(e => !e.disabled && !e.isSuppressed
     && !foundry.utils.getProperty(e,"system.isSuppressed") && (e.statuses.has(definition.id) || e.name === "Grappled")
     && e.changes.some(c => c.key === "bonuses.allActions" && Number(c.value) === -2));
-  await actor.createEmbeddedDocuments("ActiveEffect", [{name:"Grappled",img:definition.img,statuses:[definition.id],
-    changes:existingPenalty ? [] : [{key:"bonuses.allActions",mode:CONST.ACTIVE_EFFECT_MODES.ADD,value:"-2",priority:20}],
+  if (existingPenalty) return;
+  await actor.createEmbeddedDocuments("ActiveEffect", [{description:"Created by Pneuma Combat Tools.", name:"Grappled",img:definition.img,statuses:[definition.id],
+    changes:[{key:"bonuses.allActions",mode:CONST.ACTIVE_EFFECT_MODES.ADD,value:"-2",priority:20}],
     flags:{[String(MODULE)]:{grappleId:id},[String("cyberpunk-red-core")]:{changes:{cats:{0:"misc"},situational:{0:{isSituational:false,onByDefault:true}}}}}}]);
 }
 async function chokingEffect(actor: Actor, id: string, count: number) {
@@ -119,7 +120,7 @@ async function chokingEffect(actor: Actor, id: string, count: number) {
   const own = Array.from(actor.effects).filter(e => property<string>(e,"grappleId") === id && property<boolean>(e,"choking"));
   if (definition && own.some(e => !e.disabled && e.statuses.has(definition.id))) return;
   if (own.length) await actor.deleteEmbeddedDocuments("ActiveEffect",own.map(e => e.id!));
-  if (definition) await actor.createEmbeddedDocuments("ActiveEffect",[{name:definition.name,img:definition.img,statuses:[definition.id],changes:[],flags:{[String(MODULE)]:{grappleId:id,choking:true}}}]);
+  if (definition) await actor.createEmbeddedDocuments("ActiveEffect",[{description:"Created by Pneuma Combat Tools.", name:definition.name,img:definition.img,statuses:[definition.id],changes:[],flags:{[String(MODULE)]:{grappleId:id,choking:true}}}]);
 }
 async function removeGrappleEffects(scene: Scene, g: Grapple) {
   const target = scene.tokens.find(t => t.uuid === g.target.token);

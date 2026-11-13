@@ -53,12 +53,13 @@ export function combatBarPositionControls(root: HTMLElement): void {
     ["top-right", "horizontal", "Top right horizontal"],
     ["top-right", "vertical", "Top right vertical"],
     ["bottom-docked", "horizontal", "Bottom-Docked"],
+    ["top-center", "horizontal", "Top center"],
   ] as const) {
     const label = document.createElement("label");
     const radio = document.createElement("input");
     radio.type = "radio";
     // Unnamed presentation controls never enter Foundry's settings submission.
-    radio.checked = dock.value === position && (position === "bottom-docked" || orientation.value === direction);
+    radio.checked = dock.value === position && (position === "bottom-docked" || position === "top-center" || orientation.value === direction);
     radio.tabIndex = radio.checked ? 0 : -1;
     radio.addEventListener("change", () => {
       for (const sibling of radios) { sibling.checked = sibling === radio; sibling.tabIndex = sibling === radio ? 0 : -1; }

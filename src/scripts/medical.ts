@@ -71,7 +71,9 @@ export async function markMedicalDamage(actor:Actor,before:number):Promise<void>
   const key=actor.uuid;
   const next=(damageWork.get(key)??Promise.resolve()).catch(()=>{}).then(async()=>{
     if(!medicalEnabled()||!inActiveCombat(actor))return;
-    if(!needsStabilization(actor))await actor.createEmbeddedDocuments("ActiveEffect",[{name:"Needs Stabilization",img:"icons/svg/regen.svg",statuses:[STATUS],changes:[]}]);
+    const inactive=actor.effects.find(e=>e.disabled && e.statuses.has(STATUS));
+    if(!needsStabilization(actor) && inactive) await inactive.update({disabled:false});
+    else if(!needsStabilization(actor))await actor.createEmbeddedDocuments("ActiveEffect",[{description:"Created by Pneuma Combat Tools.", name:"Needs Stabilization",img:"icons/svg/regen.svg",statuses:[STATUS],changes:[]}]);
   });
   damageWork.set(key,next);
   try{await next;}finally{if(damageWork.get(key)===next)damageWork.delete(key);}
@@ -121,7 +123,7 @@ async function applyPatient(req:Request,healer:Actor,patient:Actor,target:TokenD
     const encounter=sceneEncounter(target.parent?.id);
     const combat=encounter?.combatants.some(row=>row.token?.uuid===target.uuid)?encounter:undefined;
     if(!patient.effects.some(effect=>get(effect,`flags.${M}.speedhealOperation`)===operationId))
-      await patient.createEmbeddedDocuments("ActiveEffect",[{name:status.name,img:status.img,statuses:[status.id],changes:[],flags:{[M]:{speedhealOperation:operationId,...(combat?{endWithCombat:combat.id}:{})}}}] as never);
+      await patient.createEmbeddedDocuments("ActiveEffect",[{description:"Created by Pneuma Combat Tools.", name:status.name,img:status.img,statuses:[status.id],changes:[],flags:{[M]:{speedhealOperation:operationId,...(combat?{endWithCombat:combat.id}:{})}}}] as never);
     const receipt=`flags.${M}.speedhealDoses.${operationId}`;
     if(!get(stock,receipt)) {
       const remaining=Number(get(stock,"system.amount"));
@@ -138,7 +140,7 @@ async function applyPatient(req:Request,healer:Actor,patient:Actor,target:TokenD
     if(medicalHP(patient)<1) {
       await patient.update({"system.derivedStats.hp.value":1} as never);
       const status=masterStatuses.find(s=>s.name==="Unconscious")!;
-      if(!patient.effects.some(e=>!e.disabled&&e.statuses.has(status.id)))await patient.createEmbeddedDocuments("ActiveEffect",[{name:"Unconscious",img:status.img,statuses:[status.id],changes:[],duration:{seconds:60,startTime:game.time!.worldTime}}] as never);
+      if(!patient.effects.some(e=>!e.disabled&&e.statuses.has(status.id)))await patient.createEmbeddedDocuments("ActiveEffect",[{description:"Created by Pneuma Combat Tools.", name:"Unconscious",img:status.img,statuses:[status.id],changes:[],duration:{seconds:60,startTime:game.time!.worldTime}}] as never);
     }
     await patient.deleteEmbeddedDocuments("ActiveEffect",patient.effects.filter(e=>e.statuses.has(STATUS)).map(e=>e.id!));
   }else if(req.action==="quickFix") {
@@ -154,7 +156,7 @@ async function applyPatient(req:Request,healer:Actor,patient:Actor,target:TokenD
       await injury.update({[`flags.${M}.quickFix`]:saved,"system.deathSaveIncrease":false} as never);
       if(saved.effects.length)await injury.updateEmbeddedDocuments("ActiveEffect",saved.effects.map(_id=>({_id,disabled:true})));
       const status=masterStatuses.find(s=>s.name==="Quick Fix")!;
-      await patient.createEmbeddedDocuments("ActiveEffect",[{name:"Quick Fix — "+injury.name,img:status.img,statuses:[status.id],changes:[],origin:injury.uuid}] as never);
+      await patient.createEmbeddedDocuments("ActiveEffect",[{description:"Created by Pneuma Combat Tools.", name:"Quick Fix — "+injury.name,img:status.img,statuses:[status.id],changes:[],origin:injury.uuid}] as never);
     }
     await syncActorStatuses(patient);
   }

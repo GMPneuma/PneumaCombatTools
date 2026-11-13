@@ -13,8 +13,9 @@ class Effect {
  constructor(data,parent){Object.assign(this,data);this.id=data._id??"e"+(++serial);this.parent=parent;this.name=data.name;this.disabled=!!data.disabled;this.statuses=new Set(data.statuses??[]);this.system={isSuppressed:false};}
 }
 class Item {
+ async update(changes){for(const [key,value] of Object.entries(changes))set(this,key,value);}
  constructor(data,parent){Object.assign(this,data);this.id=data._id??"i"+(++serial);this.parent=parent;this.effects=new Collection((data.effects??[]).map(e=>{const doc=new Effect(e,this);return [doc.id,doc];}));}
- async updateEmbeddedDocuments(_type,rows){for(const row of rows)Object.assign(this.effects.get(row._id),row);}
+ async updateEmbeddedDocuments(_type,rows){for(const row of rows)Object.assign(this.effects.get(row._id),row,row.statuses?{statuses:new Set(row.statuses)}:{});}
 }
 class Actor {
  constructor(){this.uuid="Actor."+ (++serial);this.type="character";this.items=new Collection();this.effects=new Collection();this.failCreate=false;this.failDelete=false;}
@@ -29,6 +30,20 @@ class Actor {
 globalThis.Actor=Actor;globalThis.Item=Item;
 const leg=masterStatuses.find(s=>s.name==="Broken Leg");
 const stim=masterStatuses.find(s=>s.name==="Stim");
+test("standalone active and inactive effects receive the actor origin for CPR's native sheet actions",async()=>{
+ const actor=setup();
+ const [item]=await actor.createEmbeddedDocuments("Item",[{name:"Synthcoke",type:"drug",effects:[{name:"Synthcoke Primary"}]}]);
+ const [active,inactive,manual,fromItem,unknown]=await actor.createEmbeddedDocuments("ActiveEffect",[
+  {name:"Old marker"},{name:"Old inactive marker",disabled:true},{name:"Manual",origin:actor.uuid},
+  {name:"Derived from gear",origin:actor.uuid+".Item."+item.id},{name:"Missing source",origin:"Item.missing"}
+ ]);
+ await syncActorStatuses(actor);
+ assert.deepEqual([active.origin,inactive.origin,manual.origin],[actor.uuid,actor.uuid,actor.uuid]);
+ assert.equal(fromItem.origin,actor.uuid+".Item."+item.id);
+ assert.equal(unknown.origin,"Item.missing");
+ assert.equal([...item.effects][0].origin,undefined);
+ assert.equal(inactive.disabled,true);
+});
 const marker=(actor,status,disabled=false)=>actor.createEmbeddedDocuments("ActiveEffect",[{name:status.name,statuses:[status.id],disabled,changes:[]}]);
 function setup(){
  globalThis.game={user:{id:"gm",isGM:true},users:{filter:fn=>[{id:"gm",isGM:true,active:true},{id:"owner",active:true}].filter(fn)},settings:{get:()=>null,storage:{get:()=>new Map()}},
@@ -45,64 +60,49 @@ test("catalog includes six pharmacy additions and retains 22 native injury bindi
  assert.equal(new Set(masterStatuses.map(s=>s.id)).size,74);
  setup();assert.equal(configuredStatuses().filter(s=>s.name==="In Jail").length,1);
 });
-test("existing native injury produces a marker with no duplicate modifier",async()=>{
- const actor=setup();await actor.createEmbeddedDocuments("Item",[{name:"Broken Leg",type:"criticalInjury",effects:[{name:"native",changes:[{value:-4}]}]}]);
+test("native injury carries its token status and toggles without deleting the item",async()=>{
+ const actor=setup();const [item]=await actor.createEmbeddedDocuments("Item",[{name:"Broken Leg",type:"criticalInjury",effects:[{name:"native",statuses:["other"],changes:[{value:-4}]}]}]);
  await syncActorStatuses(actor);await syncActorStatuses(actor);
- assert.equal(actor.items.size,1);assert.equal(actor.effects.size,1);
- assert.deepEqual([...actor.effects][0].changes,[]);
+ const [effect]=item.effects;
+ assert.deepEqual([...effect.statuses],["other",leg.id]);assert.equal(actor.effects.size,0);
+ await syncActorStatuses(actor,[leg.id],false,false);assert.ok(effect.disabled);assert.equal(actor.items.get(item.id),item);
+ await syncActorStatuses(actor,[leg.id],false,true);assert.equal(effect.disabled,false);assert.deepEqual(effect.changes,[{value:-4}]);
 });
-test("status adds native injury once, even with concurrent sync requests",async()=>{
- const actor=setup();await marker(actor,leg);
- await Promise.all([syncActorStatuses(actor,[leg.id]),syncActorStatuses(actor,[leg.id])]);
- assert.equal(actor.items.size,1);assert.equal([...actor.items][0].name,"Broken Leg");
- assert.equal([...actor.items][0].effects.size,1);
+test("effectless injury marker can be deleted without deleting or recreating the source",async()=>{
+ const actor=setup(),hooks={};globalThis.Hooks={on:(k,f)=>hooks[k]=f,once(){}};
+ registerStatusSync();
+ const [item]=await actor.createEmbeddedDocuments("Item",[{name:"Broken Leg",type:"criticalInjury"}]);
+ await syncActorStatuses(actor);
+ const [marker]=actor.effects;
+ assert.equal(marker.description,"Created by Pneuma Combat Tools.");
+ assert.equal(marker.origin,actor.uuid);
+ actor.effects.delete(marker.id);hooks.deleteActiveEffect(marker,{},"gm");
+ await syncActorStatuses(actor,[],true);assert.equal(actor.effects.size,0);assert.equal(actor.items.get(item.id),item);
+ await syncActorStatuses(actor,[leg.id],false,true);assert.equal(actor.effects.size,1);
 });
-test("removing or disabling injury status removes its native injury",async()=>{
- for(const disable of [false,true]){
-  const actor=setup();await marker(actor,leg);await syncActorStatuses(actor,[leg.id]);
-  if(disable)[...actor.effects][0].disabled=true;else actor.effects.clear();
-  await syncActorStatuses(actor,[leg.id]);assert.equal(actor.items.size,0);assert.equal(actor.effects.size,0);
- }
+test("failed native import leaves no new markers and a retry succeeds",async()=>{
+ const actor=setup();actor.failCreate=true;await assert.rejects(syncActorStatuses(actor,[leg.id],false,true),/import failed/);
+ assert.equal(actor.effects.size,0);actor.failCreate=false;await syncActorStatuses(actor,[leg.id],false,true);assert.equal(actor.items.size,1);
 });
-test("deleting native injury removes only its corresponding status",async()=>{
- const actor=setup();await marker(actor,leg);await syncActorStatuses(actor,[leg.id]);await marker(actor,{id:"custom",name:"Custom"});
- actor.items.clear();await syncActorStatuses(actor);
- assert.deepEqual([...actor.effects][0].statuses,new Set(["custom"]));assert.equal(actor.effects.size,1);
-});
-test("failed native import rolls back orphan injury icon and retry succeeds",async()=>{
- const actor=setup();actor.failCreate=true;await marker(actor,leg);
- await assert.rejects(syncActorStatuses(actor,[leg.id]),/import failed/);assert.equal(actor.effects.size,0);
- actor.failCreate=false;await marker(actor,leg);await syncActorStatuses(actor,[leg.id]);assert.equal(actor.items.size,1);
-});
-test("failed injury removal restores the icon instead of hiding active mechanics",async()=>{
- const actor=setup();await marker(actor,leg);await syncActorStatuses(actor,[leg.id]);actor.effects.clear();actor.failDelete=true;
- await assert.rejects(syncActorStatuses(actor,[leg.id]),/delete failed/);assert.equal(actor.effects.size,1);assert.equal(actor.items.size,1);
-});
-test("drug status reuses disabled native effect and removal disables instead of deleting stock",async()=>{
- const actor=setup();await actor.createEmbeddedDocuments("Item",[{name:"Stim",type:"drug",effects:[{name:"Stim",disabled:true}]}]);
- await marker(actor,stim);await syncActorStatuses(actor,[stim.id]);
- assert.equal(actor.items.size,1);assert.equal([...([...actor.items][0].effects)][0].disabled,false);
- actor.effects.clear();await syncActorStatuses(actor,[stim.id]);
- assert.equal(actor.items.size,1);assert.equal([...([...actor.items][0].effects)][0].disabled,true);
-});
-test("sheet drug toggles reflect on token; source-less general statuses remain untouched",async()=>{
- const actor=setup();const [item]=await actor.createEmbeddedDocuments("Item",[{name:"Stim",type:"drug",effects:[{name:"Stim",disabled:false}]}]);
- await syncActorStatuses(actor);assert.equal(actor.effects.size,1);
- [...item.effects][0].disabled=true;await syncActorStatuses(actor);assert.equal(actor.effects.size,0);
+test("drug toggles use the native effect and preserve stock and unrelated statuses",async()=>{
+ const actor=setup();const [item]=await actor.createEmbeddedDocuments("Item",[{name:"Stim",type:"drug",effects:[{name:"Stim",disabled:true}]}]);
+ const [effect]=item.effects;await syncActorStatuses(actor,[stim.id],false,true);assert.equal(effect.disabled,false);
+ assert.ok(effect.statuses.has(stim.id));assert.equal(actor.effects.size,0);
+ await syncActorStatuses(actor,[stim.id],false,false);assert.equal(effect.disabled,true);assert.equal(actor.items.size,1);
  await marker(actor,{id:"prone",name:"Prone"});await syncActorStatuses(actor);assert.equal(actor.effects.size,1);
 });
 test("native Blue Glass has no effects: primary and addiction remain independent status markers",async()=>{
  const actor=setup(),primary=masterStatuses.find(s=>s.name==='Blue Glass'),addiction=masterStatuses.find(s=>s.name==='Blue Glass Addiction');
  const [item]=await actor.createEmbeddedDocuments('Item',[{name:'Blue Glass',type:'drug',system:{amount:3,usage:'toggled',consumed:'None'},effects:[]}]);
  game.packs.get=()=>{throw Error('Marker must not import a native effect');};
- for(const status of [primary,addiction]){assert.equal(status.binding,undefined);await marker(actor,status);await syncActorStatuses(actor,[status.id]);}
+ for(const status of [primary,addiction]){assert.equal(status.binding,undefined);await marker(actor,status);await syncActorStatuses(actor);}
  await syncActorStatuses(actor,[],true);assert.equal(actor.effects.size,2);assert.equal(actor.items.size,1);assert.equal(item.system.amount,3);
  actor.effects.delete([...actor.effects].find(e=>e.statuses.has(primary.id)).id);await syncActorStatuses(actor,[primary.id]);assert.deepEqual([...actor.effects].map(e=>e.name),['Blue Glass Addiction']);
 });
 
-test("startup adopts legacy injury statuses without duplicating existing injury",async()=>{
+test("startup leaves legacy standalone markers intact without importing an injury",async()=>{
  const actor=setup();await marker(actor,leg);await syncActorStatuses(actor,[],true);await syncActorStatuses(actor,[],true);
- assert.equal(actor.items.size,1);assert.equal(actor.effects.size,1);
+ assert.equal(actor.items.size,0);assert.equal(actor.effects.size,1);
 });
 test("custom names and IDs remain unique, and custom In Jail is retained",()=>{
  setup();assert.throws(()=>validateCustomStatuses([{id:"a",name:"Broken Leg",img:"icon.svg"}]),/unique status/);
@@ -123,24 +123,14 @@ test("item hook ignores own writes and routes ordinary source edits",async()=>{
  hooks.createItem(item,{},"gm");await syncActorStatuses(actor);assert.equal(actor.effects.size,1);
 });
 
-test("damage-card injury application awaits native source and preserves failure",async()=>{
- const {applyCombatStatus}=await import("../dist/scripts/status-sync.js");
- const actor=setup();actor.failCreate=true;
- await assert.rejects(applyCombatStatus(actor,leg.id),/import failed/);
- assert.equal(actor.effects.size,0);
- actor.failCreate=false;await applyCombatStatus(actor,leg.id);
- assert.equal(actor.items.size,1);assert.equal(actor.effects.size,1);
+test("damage card imports a native source once and uses its own effect",async()=>{
+ const actor=setup();const {applyCombatStatus}=await import("../dist/scripts/status-sync.js");
+ await Promise.all([applyCombatStatus(actor,leg.id),applyCombatStatus(actor,leg.id)]);
+ assert.equal(actor.items.size,1);assert.equal(actor.effects.size,0);
 });
-test("startup respects an existing disabled drug effect rather than a stale marker",async()=>{
- const actor=setup();await actor.createEmbeddedDocuments("Item",[{name:"Stim",type:"drug",effects:[{name:"Stim",disabled:true}]}]);
- await marker(actor,stim);await syncActorStatuses(actor,[],true);assert.equal(actor.effects.size,0);
-});
-test("editing a status ID removes the old injury binding",async()=>{
- const actor=setup();const hooks={};globalThis.Hooks={on:(name,fn)=>hooks[name]=fn,once:()=>{}};
- registerStatusSync();await marker(actor,leg);await syncActorStatuses(actor,[leg.id]);
- const effect=[...actor.effects][0];hooks.preUpdateActiveEffect(effect);
- effect.statuses=new Set(["custom"]);hooks.updateActiveEffect(effect,{statuses:["custom"]},{},"gm");
- await syncActorStatuses(actor);assert.equal(actor.items.size,0);assert.equal(actor.effects.size,1);
+test("passive sync preserves a disabled drug and a legacy standalone marker without changing either",async()=>{
+ const actor=setup();const [item]=await actor.createEmbeddedDocuments("Item",[{name:"Stim",type:"drug",effects:[{name:"Stim",disabled:true}]}]);
+ await marker(actor,stim);await syncActorStatuses(actor,[],true);assert.equal(actor.effects.size,1);assert.ok([...item.effects][0].disabled);
 });
 
 test('passive sync coalesces but explicit remove/add operations retain order',async()=>{
@@ -160,10 +150,10 @@ test('unrelated effects and cosmetic item updates skip reconciliation',async()=>
 test('pharmacy menu statuses enable native primary effects and retain stock on removal',async()=>{
  for(const name of ['Prime Time','Sixgun','Timewarp','Veritas']) {
   const actor=setup(),status=masterStatuses.find(s=>s.name===name);
-  await marker(actor,status);await syncActorStatuses(actor,[status.id]);
+  await syncActorStatuses(actor,[status.id],false,true);
   assert.equal(actor.items.size,1);const item=[...actor.items][0];
   assert.equal([...item.effects].filter(e=>!e.disabled).length,1);
-  actor.effects.clear();await syncActorStatuses(actor,[status.id]);
+  await syncActorStatuses(actor,[status.id],false,false);
   assert.equal(actor.items.size,1);assert.ok([...item.effects].every(e=>e.disabled));
  }
  for(const name of ['Berserker','Sedative']) {
@@ -177,9 +167,9 @@ test('each new street-drug addiction toggles its native effect and retains drug 
  for(const name of ['Berserker','Prime Time','Sixgun','Timewarp']) {
   const actor=setup(),status=masterStatuses.find(s=>s.name===name+' Addiction');
   const [item]=await actor.createEmbeddedDocuments('Item',[{name,type:'drug',effects:[{name:name+' Addiction',disabled:true}]}]);
-  await marker(actor,status);await syncActorStatuses(actor,[status.id]);
+  await syncActorStatuses(actor,[status.id],false,true);
   assert.equal(actor.items.size,1);assert.equal([...item.effects][0].disabled,false);
-  actor.effects.clear();await syncActorStatuses(actor,[status.id]);
+  await syncActorStatuses(actor,[status.id],false,false);
   assert.equal(actor.items.size,1);assert.equal([...item.effects][0].disabled,true);
  }
 });
@@ -190,4 +180,21 @@ test('street-drug primaries and addictions are separate without adding excluded 
  assert.deepEqual(masterStatuses.filter(s=>s.group==='addiction').map(s=>s.name).sort(),names.map(name=>name+' Addiction').sort());
  for(const name of ['Emerald City','Mortalis','Red Lace','Piranha Smash'])assert.ok(!masterStatuses.some(s=>s.name===name));
  for(const status of masterStatuses.filter(s=>s.group==='addiction'&&s.name!=='Blue Glass Addiction'))assert.equal(status.binding?.kind,'effect');
+});
+
+test("Synthcoke sheet and token toggles use the same native primary and preserve its duration and stock",async()=>{
+ const actor=setup(),id=masterStatuses.find(s=>s.name==="Synthcoke").id;
+ const duration={seconds:14400,startTime:123},changes=[{key:"system.stats.ref.value",value:"1"}];
+ const [item]=await actor.createEmbeddedDocuments("Item",[{name:"Synthcoke",type:"drug",system:{amount:3,consumed:"Synthcoke Addicted Primary"},effects:[
+  {name:"Synthcoke Primary",disabled:true},{name:"Synthcoke Addicted Primary",disabled:false,duration,changes},{name:"Synthcoke Addiction",disabled:true}
+ ]}]);
+ const [regular,primary,addiction]=item.effects;
+ const {boundStatusActive}=await import("../dist/scripts/status-sync.js");
+ await syncActorStatuses(actor);assert.ok(primary.statuses.has(id));assert.equal(boundStatusActive(actor,id),true);
+ await item.updateEmbeddedDocuments("ActiveEffect",[{_id:primary.id,disabled:true}]);await syncActorStatuses(actor);
+ assert.equal(boundStatusActive(actor,id),false);
+ await syncActorStatuses(actor,[id],false,true);assert.equal(primary.disabled,false);
+ await syncActorStatuses(actor,[id],false,false);assert.equal(primary.disabled,true);
+ assert.deepEqual(primary.duration,duration);assert.deepEqual(primary.changes,changes);assert.equal(item.system.amount,3);
+ assert.ok(regular.disabled && addiction.disabled);assert.equal(actor.effects.size,0);
 });

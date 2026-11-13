@@ -167,7 +167,7 @@ test('Failed second effect creation is recoverable and never duplicates the firs
 });
 test('A manually supplied native grapple penalty is reused and retained on release',async()=>{
  const f=setup();f.actors[0].effects.push({id:'manual',name:'Grappled',flags:{},statuses:new Set(),changes:[{key:'bonuses.allActions',value:'-2'}]});
- await f.hold();assert.equal(f.actors[0].effects.filter(e=>e.changes.length).length,1);
+ await f.hold();assert.deepEqual(f.actors[0].effects.map(e=>e.id),['manual']);
  await f.request('release');assert.deepEqual(f.actors[0].effects.map(e=>e.id),['manual']);
 });
 test('Socket authority serializes simultaneous Chokes and non-GM defender movement is blocked',async()=>{

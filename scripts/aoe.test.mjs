@@ -380,7 +380,7 @@ test("suppression adds its status on failure, preserves other effects on GM corr
  await f.request('exclude',{user:'gm'});assert.deepEqual(f.b.effects.map(e=>e.id),['manual']);
  await f.request('reset',{user:'gm'});await f.request('claim',{nonce:'two'});await f.request('commit',{nonce:'two',total:20,html:'tie'});
  assert.equal(f.data().rows[0].state,'miss');assert.deepEqual(f.b.effects.map(e=>e.id),['manual']);
- await f.request('forcehit',{user:'gm'});assert.equal(f.b.effects.length,2);
+ await f.request('forcehit',{user:'gm'});assert.deepEqual(f.b.effects.map(e=>e.id),['manual']);
 });
 
 test('original explosive target marker stays put after GM scatter and follows area visibility',async()=>{

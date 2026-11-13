@@ -8,7 +8,7 @@ function set(o,p,v){const keys=p.split('.');for(const key of keys.slice(0,-1))o=
 class Collection extends Map {[Symbol.iterator](){return this.values();}filter(fn){return [...this].filter(fn);}some(fn){return [...this].some(fn);}find(fn){return [...this].find(fn);}}
 class Doc {
  constructor(data,parent){Object.assign(this,data);this.id=data._id??String(++serial);this.parent=parent;this.uuid=(parent?.uuid??'Actor')+'.'+this.id;this.effects=new Collection();this.items=new Collection();this.statuses=new Set(data.statuses??[]);}
- async update(changes){for(const [k,v]of Object.entries(changes))set(this,k,v);}
+ async update(changes){for(const [k,v]of Object.entries(changes))set(this,k,k==="statuses"?new Set(v):v);}
  async createEmbeddedDocuments(type,rows){return rows.map(data=>{const doc=new Doc(data,this);(type==='Item'?this.items:this.effects).set(doc.id,doc);return doc;});}
  async deleteEmbeddedDocuments(type,ids){for(const id of ids)(type==='Item'?this.items:this.effects).delete(id);}
  async updateEmbeddedDocuments(type,rows){for(const row of rows)await (type==='Item'?this.items:this.effects).get(row._id).update(row);}

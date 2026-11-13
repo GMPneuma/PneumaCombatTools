@@ -27,7 +27,7 @@ function createPanel(root: HTMLElement, row: HTMLElement, entry?: BarEntry): HTM
     panel.style.top="auto";
     panel.style.bottom=entry?.active&&root.querySelector(".pneuma-bar-end:not([hidden])")?"calc(100% + 32px)":"calc(100% + 4px)";
   }
-  if(root.dataset.dock==="top-right") {
+  if(root.dataset.dock==="top-right" || root.dataset.dock==="top-center") {
     if(root.dataset.orientation==="horizontal") {
       panel.style.top=entry?.active&&root.querySelector(".pneuma-bar-end:not([hidden])")?"calc(100% + 32px)":"calc(100% + 4px)";
       panel.style.bottom="auto";
@@ -48,8 +48,19 @@ export function showBarStatuses(root: HTMLElement, row: HTMLElement): void {
   const flyout=createPanel(root,row,entry);flyout.classList.add("pneuma-bar-statuses");
   flyout.setAttribute("role","tooltip");flyout.setAttribute("aria-label",`${entry.name}: status effects`);
   for(const effect of effects){
-    const icon=document.createElement("img");icon.src=effect.img!;icon.alt=effect.name??"Status";icon.title=game.i18n!.localize(effect.name??"Status");
-    flyout.append(icon);
+    const item = document.createElement("div");
+    item.className = "pneuma-bar-status";
+    const icon = document.createElement("img");
+    icon.src = effect.img!;
+    icon.alt = "";
+    const label = document.createElement("span");
+    label.textContent = game.i18n!.localize(effect.name ?? "Status");
+    item.append(icon, label);
+    flyout.append(item);
+  }
+  if (root.dataset.orientation === "vertical") {
+    const overflow = flyout.getBoundingClientRect().bottom - window.innerHeight + 4;
+    if (overflow > 0) flyout.style.top = Math.max(4 - root.getBoundingClientRect().top, flyout.offsetTop - overflow) + "px";
   }
 }
 
@@ -130,7 +141,7 @@ export async function showBarInitiative(root: HTMLElement, round: HTMLElement): 
   if(!game.user?.isGM||!combat||!ui.combat||panel?.classList.contains("pneuma-bar-initiative"))return;
   const flyout=createPanel(root,round);controlsOpen=true;
   flyout.classList.add("pneuma-bar-initiative");
-  flyout.setAttribute("aria-label","Initiative controls");
+  flyout.setAttribute("aria-label","Encounter controls");
   const tracker=Object.assign(Object.create(ui.combat),{viewed:combat}) as NativeTracker;
   const current=revision;
   const html=await renderTemplate(tracker.template,await tracker.getData());
@@ -151,6 +162,22 @@ export async function showBarInitiative(root: HTMLElement, round: HTMLElement): 
     });
     flyout.append(control);
   }
-  if(!flyout.children.length){closeBarFlyout();return;}
+  const end = document.createElement("button");
+  end.type = "button";
+  end.title = "End Combat";
+  end.setAttribute("aria-label", end.title);
+  const icon = document.createElement("i");
+  icon.className = "fas fa-flag-checkered";
+  icon.setAttribute("aria-hidden", "true");
+  end.append(icon);
+  end.addEventListener("click", event => {
+    event.preventDefault();
+    event.stopPropagation();
+    closeBarFlyout();
+    if (game.user?.isGM && barCombat()?.id === combat.id) {
+      void combat.endCombat().catch(error => ui.notifications!.error(String(error)));
+    }
+  });
+  flyout.append(end);
   flyout.addEventListener("pointerleave",()=>closeBarFlyout());
 }

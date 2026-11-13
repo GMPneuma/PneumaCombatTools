@@ -26,6 +26,8 @@ This remains the master feature roadmap. The [complete previous backlog](docs/hi
 
 ## Bottom-Docked Combat Bar (implemented locally, 2026-10-29)
 
+The requested carousel-style top-center position was implemented locally as a horizontal Combat Bar layout.
+
 User-requested fifth position: Players icon button opening the native player list; movement and gear controls without minimize; participants; previous/next turn controls; native macro bar. Portrait size also sizes Players and macro buttons. Native controls and listeners are retained, with restoration on exit and rerender handling. Build, 20 Combat Bar tests, and Combat Bar/settings browser fixtures pass. Live Foundry/theme/multiplayer validation remains pending; not released.
 
 ## Open items

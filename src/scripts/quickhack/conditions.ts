@@ -14,7 +14,7 @@ export async function applyQuickhackCondition(actor:Actor,id:string,rollMode="ro
     const deaf=status("Deafened");
     const existing=actor.effects.find(e=>!e.disabled&&e.statuses.has(deaf));
     if(existing){if(foundry.utils.getProperty(existing,"flags."+M+".quickhackEffect")==="sonic-shock")await existing.update({duration:effectDuration(60,combat)} as never);}
-    else await actor.createEmbeddedDocuments("ActiveEffect",[{name:"Deafened",img:"icons/svg/deaf.svg",statuses:[deaf],duration:effectDuration(60,combat),flags:{[M]:{quickhackEffect:id}}}] as never);
+    else await actor.createEmbeddedDocuments("ActiveEffect",[{description:"Created by Pneuma Combat Tools.", name:"Deafened",img:"icons/svg/deaf.svg",statuses:[deaf],duration:effectDuration(60,combat),flags:{[M]:{quickhackEffect:id}}}] as never);
     return;
   }
   if(id==="system-reset") {await sleepTarget(actor,combat);return;}
@@ -29,7 +29,7 @@ export async function applyQuickhackCondition(actor:Actor,id:string,rollMode="ro
     changes:[{key:"system.stats.move.value",mode:CONST.ACTIVE_EFFECT_MODES.ADD,value:String(-penalty),priority:20}],
     flags:{[M]:{quickhackEffect:id,quickhackAmount:penalty}}};
   Object.assign(data.flags,{"cyberpunk-red-core":penaltyFlags(data.changes)});
-  if(old)await old.update(data as never);else await actor.createEmbeddedDocuments("ActiveEffect",[data] as never);
+  if(old)await old.update(data as never);else await actor.createEmbeddedDocuments("ActiveEffect",[{...data, description:"Created by Pneuma Combat Tools."}] as never);
   // The saved penalty is authoritative; optional dice playback cannot block application.
   if(roll)void showDiceAs(roll,rollMode,game.user!.id,audience).catch(error=>console.warn(M,"Slow dice display failed",error));
   return penalty;

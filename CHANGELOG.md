@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.34 - 2026-11-12
+
+- Added a top-center Combat Bar layout, top-aligned controls, labeled status lists, top-aligned portrait cropping, and a confirmed End Combat action.
+- Integrated the biomonitor with the Crew Tools HUD. Updated token and actor status synchronization to use native effects and identify removable Combat Tools markers on the actor sheet.
+
 ## 0.9.33 - 2026-11-12
 
 - Added Halve Armor to Damage Modification on ordinary and shared area damage cards. It starts from the roll’s armor setting and can be toggled before applying damage.

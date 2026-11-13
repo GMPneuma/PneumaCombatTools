@@ -23,7 +23,7 @@ export function groupStatusHUD(root: HTMLElement, statuses: StatusDefinition[]):
   for (const icon of icons) {
     const id = icon.dataset.statusId;
     const status = statuses.find(status => status.id === id);
-    if (["Lightly Wounded", "Seriously Wounded", "Mortally Wounded", "Quick Fix"].includes(status?.name ?? "")) { icon.remove(); continue; }
-    (groups.get(status?.group ?? "general") ?? general).append(icon);
+    if (!status || ["Lightly Wounded", "Seriously Wounded", "Mortally Wounded", "Quick Fix"].includes(status.name)) { icon.remove(); continue; }
+    (groups.get(status.group) ?? general).append(icon);
   }
 }

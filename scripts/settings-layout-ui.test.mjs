@@ -17,7 +17,7 @@ try {
  await page.addScriptTag({content:(await readFile('dist/scripts/homebrew-badge.js','utf8')).replaceAll('export ','')});
  const result=await page.evaluate(()=>{
   const form=document.querySelector('form');
-  const defs={combatBarDock:['bottom-left','top-right','bottom-docked'],combatBarOrientation:['vertical','horizontal']};
+  const defs={combatBarDock:['bottom-left','top-right','bottom-docked','top-center'],combatBarOrientation:['vertical','horizontal']};
   const keys=['routeSheetAttacks','injuryTurnEndReminder','movementTracking','ablateBlockedHits','maNoAblation','npcAutoEvasion','combatBar','turnMarkerEnabled','turnMarkerDisplay','quickhackEnabled','quickhackMode',...Object.keys(defs),'combatBarSize','combatBarFullWidth','combatBarResizeMacros','criticalInjuries','eyeHUD','eyeHUDDock','biomonitorShowHP','hoverDV','hoverAutofire'];
   for(const key of keys){const row=document.createElement('div');row.className='form-group';row.innerHTML='<label for="setting-'+key+'">'+key+'</label>'+(defs[key]?'<select id="setting-'+key+'" name="pneuma-combattools.'+key+'">'+defs[key].map(v=>'<option>'+v+'</option>').join('')+'</select>':'<input id="setting-'+key+'" name="pneuma-combattools.'+key+'" type="checkbox">');form.append(row);}
   const menu=document.createElement("div");menu.className="form-group submenu";menu.innerHTML='<label>Turn Indicator</label><button type="button" data-key="pneuma-combattools.turnMarkerSettings">Configure</button>';form.append(menu);menu.querySelector("button").addEventListener("click",()=>window.indicatorMenuOpened=true);
@@ -36,7 +36,9 @@ try {
  assert.ok(positionLayout.radiosTop>=positionLayout.labelBottom,'Radios are beneath the position label');
  assert.equal(await page.locator('[name$=combatBarFullWidth]').isVisible(),false);
  assert.equal(await page.locator('[name$=combatBarResizeMacros]').isVisible(),false);
- assert.equal(result.count,5);assert.deepEqual(result.initial,[false,true,false,false,false]);assert.deepEqual(result.checked,[false,false,true,false,false]);
+ assert.equal(result.count,6);assert.deepEqual(result.initial,[false,true,false,false,false,false]);assert.deepEqual(result.checked,[false,false,true,false,false,false]);
+ await page.getByRole('radio',{name:'Top center',exact:true}).click();
+ assert.equal(await page.locator('select[name$="combatBarDock"]').inputValue(),'top-center');
  assert.equal(result.values['pneuma-combattools.combatBarDock'],'top-right');assert.equal(result.values['pneuma-combattools.combatBarOrientation'],'horizontal');assert.equal(result.hidden,true);
  assert.deepEqual(result.groups,['Attack & Damage Cards','Evasion & Area Attacks','Movement & Initiative','Turn Indicator','Injuries & Effects','QuickHack','Combat Bar','Token HUD & Targeting','Biomonitor']);
  assert.equal(await page.locator('[name="pneuma-combattools.routeSheetAttacks"]').isChecked(),false);

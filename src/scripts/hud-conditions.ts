@@ -49,7 +49,11 @@ export function collectHUDConditions(actor: Actor) {
       || /^(Blinded|Deafened|Drowning|Lightly Wounded|Seriously Wounded|Mortally Wounded|Dead)$/.test(title);
     (isMedical ? medical : situational).set(key, row);
   };
-  for (const item of actor.items) if (String(item.type) === "criticalInjury") add(item.name ?? "Injury", item.img, true);
+  for (const item of actor.items) {
+    if (String(item.type)!=="criticalInjury" || foundry.utils.getProperty(item,"flags.pneuma-combattools.quickFix")) continue;
+    const effects=Array.from(item.effects??[]);
+    if (!effects.length || effects.some(e=>!e.disabled&&!e.isSuppressed&&!foundry.utils.getProperty(e,"system.isSuppressed"))) add(item.name ?? "Injury",item.img,true);
+  }
   for (const effect of actor.allApplicableEffects()) {
     if (effect.disabled || effect.isSuppressed || foundry.utils.getProperty(effect, "system.isSuppressed")) continue;
     if (foundry.utils.getProperty(effect, "flags.pneuma-combattools.grappleId") || foundry.utils.getProperty(effect, "flags.pneuma-combattools.empItem")) continue;

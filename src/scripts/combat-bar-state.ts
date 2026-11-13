@@ -12,7 +12,7 @@ declare global {
     "pneuma-combattools.combatBarSize": string;
     "pneuma-combattools.combatBarFullWidth": boolean;
     "pneuma-combattools.combatBarResizeMacros": boolean;
-    "pneuma-combattools.combatBarDock": "bottom-left" | "top-right" | "bottom-docked";
+    "pneuma-combattools.combatBarDock": "bottom-left" | "top-right" | "top-center" | "bottom-docked";
     "pneuma-combattools.combatBarOrientation": "vertical" | "horizontal";
     "pneuma-combattools.combatBarMinimized": boolean;
     "pneuma-combattools.combatBarMovement": MovementMode;

@@ -334,8 +334,8 @@ export async function handleAreaRequest(req:Request) {
     if(row.state!=="waiting"||req.action==="other"&&(data.kind==="suppression"||!data.settings.coverUp||!areaSettings().coverUp)||req.action==="decline"&&data.kind==="suppression")throw Error("This response is unavailable.");
     if(req.action==="other") {
       const actor=await actorAt(row.uuid),prone=masterStatuses.find(s=>s.name==="Prone")!;
-      if(!Array.from(actor.effects).some(e=>!e.disabled&&e.statuses.has(prone.id))) {
-        const created=await actor.createEmbeddedDocuments("ActiveEffect",[{name:prone.name,img:prone.img,statuses:[prone.id],changes:[],flags:{[String(MODULE)]:{coverSource:message.id+":"+row.uuid}}}]);
+      if(!Array.from(actor.allApplicableEffects?.()??actor.effects).some(e=>!e.disabled&&!e.isSuppressed&&(e.statuses.has(prone.id)||e.name===prone.name))) {
+        const created=await actor.createEmbeddedDocuments("ActiveEffect",[{description:"Created by Pneuma Combat Tools.", name:prone.name,img:prone.img,statuses:[prone.id],changes:[],flags:{[String(MODULE)]:{coverSource:message.id+":"+row.uuid}}}]);
         row.coverProneId=created?.[0]?.id??undefined;
       }
       row.coverUp=true;
@@ -347,8 +347,10 @@ export async function handleAreaRequest(req:Request) {
     const actor=await actorAt(row.uuid),definition=masterStatuses.find(s=>s.name==="Suppressed")!;
     const source=message.id+":"+row.uuid;
     const own=Array.from(actor.effects).filter(e=>foundry.utils.getProperty(e,`flags.${MODULE}.suppressionSource`)===source);
-    if(row.state==="hit"&&!own.some(e=>!e.disabled))
-      await actor.createEmbeddedDocuments("ActiveEffect",[{name:definition.name,img:definition.img,statuses:[definition.id],changes:[],flags:{[String(MODULE)]:{suppressionSource:source,suppressionExpiry:suppressionExpiry(resolveEncounter(data.exchange),row.uuid)}}}]);
+    const external=Array.from(actor.allApplicableEffects?.()??actor.effects).some(e=>!e.disabled&&!e.isSuppressed &&
+      !foundry.utils.getProperty(e,`flags.${MODULE}.suppressionSource`) && (e.statuses.has(definition.id)||e.name===definition.name));
+    if(row.state==="hit"&&!external&&!own.some(e=>!e.disabled))
+      await actor.createEmbeddedDocuments("ActiveEffect",[{description:"Created by Pneuma Combat Tools.", name:definition.name,img:definition.img,statuses:[definition.id],changes:[],flags:{[String(MODULE)]:{suppressionSource:source,suppressionExpiry:suppressionExpiry(resolveEncounter(data.exchange),row.uuid)}}}]);
     else if(row.state!=="hit"&&own.length)await actor.deleteEmbeddedDocuments("ActiveEffect",own.map(e=>e.id!));
   }
   await save(message,data);

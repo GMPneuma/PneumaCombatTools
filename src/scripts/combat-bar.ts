@@ -124,6 +124,19 @@ function position(): void {
     for (const property of ["left", "right", "top", "bottom", "max-height", "max-width"]) root.style.removeProperty(property);
     positionEndTurn(); return;
   }
+  if (root.dataset.dock === "top-center") {
+    const crew = document.getElementById("pneuma-crewtools-calendar")?.getBoundingClientRect();
+    const start = crew?.width ? crew.right : 0;
+    root.style.right = root.style.bottom = "auto";
+    root.style.maxWidth = Math.max(0, edge - start - 16) + "px";
+    const left = Math.max(start + 8, (start + edge - root.offsetWidth) / 2);
+    root.style.left = left + "px";
+    const nav = document.getElementById("navigation")?.getBoundingClientRect();
+    const top = nav?.height && nav.top < 8 + root.offsetHeight && nav.right > left && nav.left < left + root.offsetWidth ? Math.max(8, nav.bottom + 8) : 8;
+    root.style.top = top + "px";
+    root.style.maxHeight = Math.max(0, window.innerHeight - top - 8) + "px";
+    positionEndTurn(); return;
+  }
   if (root.dataset.dock === "top-right") {
     root.style.left = "auto"; root.style.bottom = "auto"; root.style.top = "8px";
     root.style.right = Math.max(8, window.innerWidth - edge + 8) + "px";
@@ -169,7 +182,8 @@ function positionEndTurn(): void {
   const bar = root.getBoundingClientRect();
   const topRight = root.dataset.dock === "top-right";
   const x = horizontal ? row.left + (row.width - 56) / 2 : topRight ? bar.left - 60 : bar.right + 4;
-  const y = horizontal ? topRight ? bar.bottom + 4 : bar.top - 28 : row.top + (row.height - 24) / 2;
+  const topDock = topRight || root.dataset.dock === "top-center";
+  const y = horizontal ? topDock ? bar.bottom + 4 : bar.top - 28 : row.top + (row.height - 24) / 2;
   // Viewport coordinates keep the control out of app/scroll clipping in themed HUDs.
   end.style.position = "fixed";
   end.style.left = Math.max(4, Math.min(window.innerWidth - 60, x)) + "px";
@@ -342,7 +356,7 @@ function render(): void {
     const left = document.getElementById("ui-left");
     if (left) observer!.observe(left);
   }
-  for (const id of ["sidebar", "hotbar", "controls"]) {
+  for (const id of ["sidebar", "hotbar", "controls", "navigation", "pneuma-crewtools-calendar"]) {
     const element = document.getElementById(id);
     if (element) observer!.observe(element);
   }
@@ -354,7 +368,7 @@ function render(): void {
   const size = Number(game.settings!.get(MODULE, "combatBarSize"));
   const dock = game.settings!.get(MODULE, "combatBarDock");
   const docked = dock === "bottom-docked";
-  const orientation = docked ? "horizontal" : game.settings!.get(MODULE, "combatBarOrientation");
+  const orientation = docked || dock === "top-center" ? "horizontal" : game.settings!.get(MODULE, "combatBarOrientation");
   const minimized = !docked && game.settings!.get(MODULE, "combatBarMinimized");
   syncBottomDock(docked, [32,40,48,64,80,96].includes(size) ? size : 40);
   position();
@@ -477,7 +491,7 @@ export function registerCombatBar(): void {
   });
   game.settings!.register(MODULE, "combatBarDock", {
     name: "Combat bar position", hint: "Choose where the combat bar appears.",
-    scope: "client", config: true, type: String, default: "bottom-left", choices: {"bottom-left":"Bottom left", "top-right":"Top right", "bottom-docked":"Bottom-Docked"},
+    scope: "client", config: true, type: String, default: "bottom-left", choices: {"bottom-left":"Bottom left", "top-right":"Top right", "bottom-docked":"Bottom-Docked", "top-center":"Top center"},
     onChange: () => { refresh(); Hooks.callAll("pneumaCombatBarDockChanged"); },
   });
   game.settings!.register(MODULE, "combatBarResizeMacros", {

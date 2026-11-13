@@ -1,11 +1,11 @@
-import {actorEncounter} from "./encounter.js";
 import {updateTouchesPath} from "./update-path.js";
-import {effectDuration} from "./effect-duration.js";
 import { masterStatuses, type StatusDefinition } from "./status-catalog.js";
 const MODULE = "pneuma-combattools";
 const options = { pneumaStatusSync: true, render: true };
 type Bound = StatusDefinition & { binding: NonNullable<StatusDefinition["binding"]> };
 const bound = masterStatuses.filter((s): s is Bound => !!s.binding);
+export const nativeStatusIds = new Map<string,string>();
+const generalByName = new Map(masterStatuses.filter(s=>!s.binding).map(s=>[s.name,s.id]));
 const queues = new Map<string, Promise<void>>();
 const sources = new Map<string, Promise<Item>>();
 const flag = (doc: object, key: string) => foundry.utils.getProperty(doc, "flags." + MODULE + "." + key);
@@ -19,10 +19,10 @@ function matchingItems(actor: Actor, status: Bound): Item[] {
   });
 }
 function sourceEffects(item: Item, status: Bound): ActiveEffect[] {
-  return Array.from(item.effects).filter(effect => status.binding.effectNames?.includes(effect.name ?? ""));
+  return Array.from(item.effects).filter(effect => status.binding.kind === "injury" || status.binding.effectNames?.includes(effect.name ?? ""));
 }
 function live(effect: ActiveEffect): boolean {
-  return !effect.disabled && !(effect as ActiveEffect & { system?: { isSuppressed?: boolean } }).system?.isSuppressed;
+  return !effect.disabled && !effect.isSuppressed && !(effect as ActiveEffect & { system?: { isSuppressed?: boolean } }).system?.isSuppressed;
 }
 function markers(actor: Actor, id: string): ActiveEffect[] {
   return Array.from(actor.effects).filter(effect => effect.statuses.has(id));
@@ -44,16 +44,13 @@ async function sourceItem(status: Bound): Promise<Item> {
   }
   return promise;
 }
-async function changeSource(actor: Actor, status: Bound, active: boolean,combat?:Combat|null): Promise<void> {
+async function changeSource(actor: Actor, status: Bound, active: boolean): Promise<void> {
   let items = matchingItems(actor, status);
   if (!active) {
-    if (status.binding.kind === "injury") {
-      if (items.length) await actor.deleteEmbeddedDocuments("Item", items.map(item => item.id!), options);
-    } else {
-      for (const item of items) {
-        const effects = sourceEffects(item, status).filter(live);
-        if (effects.length) await item.updateEmbeddedDocuments("ActiveEffect", effects.map(e => ({ _id: e.id!, disabled: true })), options);
-      }
+    for (const item of items) {
+      const effects = sourceEffects(item, status).filter(live);
+      if (effects.length) await item.updateEmbeddedDocuments("ActiveEffect", effects.map(e => ({_id:e.id!, disabled:true})), options);
+      if (status.binding.kind === "injury" && !item.effects.size) await item.update({["flags."+MODULE+".hideStatusMarker"]:true} as never,options);
     }
     return;
   }
@@ -64,30 +61,59 @@ async function changeSource(actor: Actor, status: Bound, active: boolean,combat?
     items = await actor.createEmbeddedDocuments("Item", [source] as Parameters<Actor["createEmbeddedDocuments"]>[1], options) as Item[];
     if (!items.length) throw new Error("Could not add native " + status.name + ".");
   }
-  if (status.binding.kind === "effect") {
+  if (status.binding.kind === "injury") {
+    const disabledMarkers = markers(actor,status.id).filter(effect=>effect.disabled && flag(effect,"syncMarker"));
+    if (disabledMarkers.length) await actor.updateEmbeddedDocuments("ActiveEffect",disabledMarkers.map(effect=>({_id:effect.id!,disabled:false})),options);
+    for (const item of items) {
+      if (flag(item,"hideStatusMarker")) await item.update({["flags."+MODULE+".hideStatusMarker"]:false} as never,options);
+      if (flag(item,"quickFix")) continue;
+      const effects = sourceEffects(item,status);
+      if (effects.length && !effects.some(live)) await item.updateEmbeddedDocuments("ActiveEffect",effects.map(e=>({_id:e.id!,disabled:false})),options);
+    }
+  } else {
     // Reuse an already active variant, especially Synthcoke's addiction-aware primary.
     if (items.some(item => sourceEffects(item, status).some(live))) return;
-    const item = items[0]!;
-    const effect = sourceEffects(item, status)[0];
+    const item = items.find(candidate=>sourceEffects(candidate,status).length) ?? items[0]!;
+    const effects = sourceEffects(item,status);
+    const consumed = foundry.utils.getProperty(item,"system.consumed");
+    const effect = effects.find(candidate=>candidate.name===consumed) ?? effects[0];
     if (!effect) throw new Error("Native " + status.name + " effect is unavailable.");
-    const seconds=effect.duration?.seconds??(effect.duration?.rounds?effect.duration.rounds*3:undefined);
-    await item.updateEmbeddedDocuments("ActiveEffect", [{ _id: effect.id!, disabled: false, ...(typeof seconds==="number"&&seconds>0?{duration:effectDuration(seconds,combat===undefined?actorEncounter(actor):combat)}:{}) }] as never, options);
+    await item.updateEmbeddedDocuments("ActiveEffect", [{ _id: effect.id!, disabled: false }], options);
   }
 }
 async function refreshMarkers(actor: Actor): Promise<void> {
+  // CPR shows its standard sheet actions when an actor-created effect names the actor as its origin.
+  const missingOrigins = Array.from(actor.effects).filter(effect=>effect.parent===actor && !effect.origin);
+  if (missingOrigins.length) await actor.updateEmbeddedDocuments("ActiveEffect",
+    missingOrigins.map(effect=>({_id:effect.id!,origin:actor.uuid})),options);
+  for (const effect of actor.allApplicableEffects?.() ?? []) {
+    const id=generalByName.get(effect.name ?? "");
+    if (!id || !(effect.parent instanceof Item)) continue;
+    const tokenId=nativeStatusIds.get(id) ?? id;
+    if (!effect.statuses.has(tokenId)) await effect.update({statuses:[...new Set([...effect.statuses,id,tokenId])]},options);
+  }
   for (const status of bound) {
     const items = matchingItems(actor, status);
-    const active = status.binding.kind === "injury" ? items.some(item=>!foundry.utils.getProperty(item,"flags."+MODULE+".quickFix")) : items.some(item => sourceEffects(item, status).some(live));
-    const existing = markers(actor, status.id);
-    if (active) {
-      if (!existing.length) await actor.createEmbeddedDocuments("ActiveEffect", [{
-        name: status.name, img: status.img, statuses: [status.id], changes: [], disabled: false,
-      }], options);
-      else {
-        const disabled = existing.filter(effect => effect.disabled);
-        if (disabled.length) await actor.updateEmbeddedDocuments("ActiveEffect", disabled.map(effect => ({ _id: effect.id!, disabled: false })), options);
-      }
-    } else if (existing.length) await actor.deleteEmbeddedDocuments("ActiveEffect", existing.map(effect => effect.id!), options);
+    // The native effect carries the token status itself. Keep its changes, duration and identity.
+    for (const item of items) {
+      const tokenId=nativeStatusIds.get(status.id) ?? status.id;
+      const missing = sourceEffects(item,status).filter(effect => !effect.statuses.has(status.id) || !effect.statuses.has(tokenId));
+      if (missing.length) await item.updateEmbeddedDocuments("ActiveEffect", missing.map(effect => ({
+        _id:effect.id!, statuses:[...new Set([...effect.statuses,status.id,tokenId])]
+      })),options);
+    }
+    const needsMarker = status.binding.kind === "injury" && items.some(item =>
+      !item.effects.size && !flag(item,"quickFix") && !flag(item,"hideStatusMarker"));
+    const existing = markers(actor,status.id);
+    const mirrors = existing.filter(effect => flag(effect,"syncMarker") === true);
+    if (needsMarker && !existing.length) {
+      await actor.createEmbeddedDocuments("ActiveEffect", [{
+        name:status.name, img:status.img, statuses:[status.id], changes:[],
+        description:"Created by Pneuma Combat Tools.", origin:actor.uuid, flags:{[String(MODULE)]:{syncMarker:true}}
+      }],options);
+    } else if (!needsMarker && mirrors.length) {
+      await actor.deleteEmbeddedDocuments("ActiveEffect",mirrors.map(e=>e.id!),options);
+    }
   }
 }
 export function statusAuthority(actor: Actor): boolean {
@@ -96,24 +122,24 @@ export function statusAuthority(actor: Actor): boolean {
   return users[0]?.id === game.user?.id;
 }
 const refreshRequests = new Map<string, Promise<void>>();
-export function syncActorStatuses(actor: Actor, changedIds: string[] = [], initialize = false, requestedActive?: boolean,combat?:Combat|null): Promise<void> {
+export function syncActorStatuses(actor: Actor, changedIds: string[] = [], initialize = false, requestedActive?: boolean): Promise<void> {
   // Only passive refreshes are merged. Explicit status toggles retain their order.
-  if (changedIds.length || requestedActive !== undefined) return syncStatuses(actor, changedIds, initialize, requestedActive,combat);
+  if (changedIds.length || requestedActive !== undefined) return syncStatuses(actor, changedIds, initialize, requestedActive);
   const key = actor.uuid + ":" + initialize;
   const existing = refreshRequests.get(key); if (existing) return existing;
   const next = Promise.resolve().then(() => { refreshRequests.delete(key); return syncStatuses(actor, [], initialize); });
   refreshRequests.set(key, next); return next;
 }
-function syncStatuses(actor: Actor, changedIds: string[], initialize: boolean, requestedActive?: boolean,combat?:Combat|null): Promise<void> {
+function syncStatuses(actor: Actor, changedIds: string[], initialize: boolean, requestedActive?: boolean): Promise<void> {
   if (!["character", "mook"].includes(String(actor.type))) return Promise.resolve();
   const previous = queues.get(actor.uuid) ?? Promise.resolve();
   const next = previous.catch(() => {}).then(async () => {
-    const requested = initialize ? bound.filter(status => markers(actor, status.id).some(live) && !matchingItems(actor, status).length).map(status => status.id) : changedIds;
+    const requested = changedIds;
     for (const id of new Set(requested)) {
       const status = bound.find(status => status.id === id);
       if (!status) continue;
-      const active = requestedActive ?? markers(actor, id).some(live);
-      try { await changeSource(actor, status, active,combat); }
+      const active = requestedActive ?? !boundStatusActive(actor,id);
+      try { await changeSource(actor, status, active); }
       catch (error) {
         // Restore icons from the actual item state if importing/removing the source failed.
         await refreshMarkers(actor);
@@ -130,7 +156,7 @@ function syncStatuses(actor: Actor, changedIds: string[], initialize: boolean, r
 export async function applyCombatStatus(actor: Actor, id: string,combat?:Combat|null, endWithCombat=false): Promise<void> {
   const effects=()=>Array.from(actor.allApplicableEffects?.()??actor.effects??[]);
   const existing=new Set(effects().filter(live));
-  if (bound.some(status => status.id === id)) await syncActorStatuses(actor, [id], false, true,combat);
+  if (bound.some(status => status.id === id)) await syncActorStatuses(actor, [id], false, true);
   else await actor.toggleStatusEffect(id, { active: true });
   const definition=masterStatuses.find(s=>s.id===id);
   if(endWithCombat&&combat&&definition?.binding?.kind!=="injury"&&definition?.name!=="Dead"&&definition?.name!=="Needs Stabilization") {
@@ -152,17 +178,21 @@ export function registerStatusSync(): void {
       const context = hook === "updateItem" ? optionsOrUser : changesOrOptions;
       if (typeof context === "object" && "pneumaStatusSync" in context) return;
       if (hook === "updateItem" && !["name","type","effects","system","flags."+MODULE+".statusId","flags.core.sourceId","_stats.compendiumSource"].some(path=>updateTouchesPath(changesOrOptions,path))) return;
-      if (item.parent instanceof Actor && ["criticalInjury", "drug"].includes(String(item.type))) notify(item.parent);
+      if (item.parent instanceof Actor && (["criticalInjury", "drug"].includes(String(item.type)) || Array.from(item.effects??[]).some(e=>generalByName.has(e.name??"")))) notify(item.parent);
     });
   }
   for (const hook of ["createActiveEffect", "updateActiveEffect", "deleteActiveEffect"]) {
     Hooks.on(hook, (effect: ActiveEffect, changesOrOptions: object, optionsOrUser: object | string) => {
       const context = hook === "updateActiveEffect" ? optionsOrUser : changesOrOptions;
       if (typeof context === "object" && "pneumaStatusSync" in context) return;
+      if (hook==="deleteActiveEffect" && effect.parent instanceof Actor && flag(effect,"empStatus") && statusAuthority(effect.parent))
+        void effect.parent.update({["flags."+MODULE+".hideEmpStatus"]:true} as never).catch(error=>ui.notifications!.error(String(error)));
       const ids = [...effect.statuses, ...(previousStatuses.get(effect) ?? [])].filter(id=>bound.some(status=>status.id===id));
       if (hook === "updateActiveEffect" && !["statuses","disabled","name","system.isSuppressed"].some(path=>updateTouchesPath(changesOrOptions,path))) {previousStatuses.delete(effect);return;}
-      if (effect.parent instanceof Actor && ids.length) notify(effect.parent, ids);
-      else if (effect.parent instanceof Item && effect.parent.parent instanceof Actor && ["criticalInjury","drug"].includes(String(effect.parent.type))) notify(effect.parent.parent);
+      if (effect.parent instanceof Actor && hook === "deleteActiveEffect" && flag(effect,"syncMarker") && ids.length && statusAuthority(effect.parent)) {
+        void dismissInjuryMarker(effect.parent,ids).catch(error=>ui.notifications!.error(String(error)));
+      }
+      if (effect.parent instanceof Item && effect.parent.parent instanceof Actor && (["criticalInjury","drug"].includes(String(effect.parent.type)) || generalByName.has(effect.name??""))) notify(effect.parent.parent);
       previousStatuses.delete(effect);
     });
   }
@@ -175,4 +205,21 @@ export function registerStatusSync(): void {
     for (const actor of game.actors ?? []) notify(actor, [], true);
     canvasActors();
   });
+}
+
+/** Remember dismissal on the injury instance so passive refreshes and reloads respect it. */
+export async function dismissInjuryMarker(actor:Actor, ids:string[]):Promise<void> {
+  for (const status of bound.filter(s=>s.binding.kind==="injury" && ids.includes(s.id))) {
+    for (const item of matchingItems(actor,status)) {
+      if (!item.effects.size && !flag(item,"hideStatusMarker")) await item.update({["flags."+MODULE+".hideStatusMarker"]:true} as never,options);
+    }
+  }
+}
+export function boundStatusActive(actor:Actor,id:string):boolean | undefined {
+  const status=bound.find(s=>s.id===id);
+  if (!status || !["character","mook"].includes(String(actor.type))) return undefined;
+  return matchingItems(actor,status).some(item => !flag(item,"quickFix") && (
+    sourceEffects(item,status).some(live) || status.binding.kind==="injury" && !item.effects.size &&
+    !flag(item,"hideStatusMarker") && !markers(actor,id).some(effect=>effect.disabled)
+  ));
 }

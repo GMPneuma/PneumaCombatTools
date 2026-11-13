@@ -1,5 +1,9 @@
 # Combat Tools feature inventory
 
+- Status synchronization (v0.9.34) uses native item effects for bound conditions. Actor-owned fallback markers identify Combat Tools in their description and can be deleted from the Effects tab. Removing a sync marker preserves the injury item.
+
+- Newly created Combat Tools actor effects include “Created by Pneuma Combat Tools.” in their description, including statuses supplied through the token HUD.
+
 - Critical injury results replace the pending row label with the total and injury name. A GM-only Allow re-roll control enables one replacement roll, replacing only the injury item created by that card. UUID-safe receipt keys preserve results through Foundry flag updates and read older dotted-path results.
 
 - Qualifying attack and AoE damage cards show a Critical Injury row per recipient. Rolling saves the total, injury name and expandable native roll/details on the original card and applies the native injury item and effects. Native duplicate settings apply. Serialized GM requests and item receipts prevent repeat application on retries. No separate injury chat message is created. Local implementation; live Foundry validation pending.
@@ -196,7 +200,8 @@ Current source: release 0.8.3, reviewed 2026-09-24. “Implemented” means pres
 - Biomonitor vitals/EKG, medical guidance, active drugs/pharma, cyberware and situational states; private incoming-attack and API messages. Incoming Attack uses the shared session queue, created only when a new waiting attack arrives for an owned actor. Entries retain actor scope and a chat-card navigation link. Dismissal removes the queue entry; card updates and reconnecting never recreate it. Resolved/deleted cards retire remaining entries. No pending-card scan or separate attack alert store remains.
 - Player focus follows an owned selected token, assigned character's unique scene token, or a single owned token when no character is assigned. GM focus remains selection-based.
 - Left/right HUD docking; top-right combat bar temporarily forces HUD left without overwriting the preference.
-- Optional Crew Tools integration uses its shortcut API and retains status colors. Standalone and integrated HUD placement agree.
+- Optional Crew Tools integration widens the Crew HUD to show a clickable EKG with the token name beneath the trace. Activate the trace to open or minimize the full Biomonitor below the Crew HUD and to the right of Foundry’s scene controls. The standalone Biomonitor retains its own dock setting.
+- Opening the Crew HUD map list minimizes the integrated Biomonitor. Expanding the integrated Biomonitor closes the Crew HUD map list on that client.
 - Minimized EKG/name and notifications, hidden HP reveal on hover/focus, per-client animations and optional GM animation enforcement; reduced motion respected.
 - Six-second queued message arrival with fast reveal; separate four-second flash messages.
 - Hover EKG gated by Medtech, target Biomonitor or GM Always show EKG option; no numeric HP.
@@ -669,6 +674,14 @@ QuickHack HUD wording: "Quickhacking only works with an active combat". Connecti
 Attack HUD failures display the specific error message instead of replacing it with a generic console instruction. Missing combat participants are described as tokens missing from the current combat, with instructions to ask the GM to add them to the Combat Tracker and retry. Encounter membership requirements are unchanged.
 
 ### Bottom-Docked Combat Bar (local/unreleased)
+
+Combat Bar portraits align artwork to the top center of each square, keeping the top of tall images visible in every dock position.
+
+Hovering a combatant portrait as GM shows its status effects in a vertical list, with each effect’s icon and localized name on the same row.
+
+The GM’s round-counter menu includes End Combat for the encounter shown on the bar. It opens Foundry’s native end-encounter confirmation.
+
+The **Top center** position displays a horizontal combat bar centered in the available space beside the Crew HUD and sidebar. The movement buttons and the minimize/configure group align to the top edge. End Turn and portrait flyouts open below the bar.
 
 Fifth position: Players icon popup, movement and gear controls, participants, turn controls, then the native macro bar. Omits minimize; portrait sizing also scales Players and macro slots. Native player-list and hotbar nodes retain their listeners and are restored on mode exit, disable, or canvas teardown. Native rerenders are reattached. Overflow lists scroll horizontally. Live Foundry/theme/multiplayer verification remains pending.
 

@@ -75,8 +75,6 @@ export async function applyCleanup(scope:CleanupScope,ids:string[],includeInjuri
         await syncActorStatuses(row.actor);
       }else{
         const effect=row.document as ActiveEffect;
-        const bindings=Array.from(effect.statuses).filter(id=>masterStatuses.some(s=>s.id===id&&s.binding));
-        if(bindings.length)await syncActorStatuses(row.actor,bindings,false,false);
         if(effect.parent===row.actor){if(row.actor.effects.get(effect.id!))await row.actor.deleteEmbeddedDocuments("ActiveEffect",[effect.id!],{pneumaStatusSync:true} as never);}
         else await effect.update({disabled:true} as never);
         await syncActorStatuses(row.actor);

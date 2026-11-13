@@ -30,6 +30,7 @@ try {
   window.tokens=[makeToken('t1','Violet','#784462'),makeToken('t2','Solo','#365b74'),makeToken('t3','Hidden Guard','#744d36')];
   player.character=tokens[0].actor;
   window.combat={id:'fight',active:true,started:true,scene,round:1,turn:0,flags:{},canUserModify:()=>true,
+   async endCombat(){calls.endPrompt=this.id;},
    nextTurn:async()=>{calls.next++;if(window.deferTurn)await new Promise(resolve=>window.resolveTurn=resolve);combat.turn=(combat.turn+1)%combat.turns.length;emit('updateCombat');},
    previousTurn:async()=>{calls.previous++;combat.turn=Math.max(0,combat.turn-1);emit('updateCombat');},
    update:async data=>{const mode=data['flags.pneuma-combattools.combatBarMovement'];calls.mode.push(mode);if(window.rejectMode)throw Error('Mode update failed');combat.flags={'pneuma-combattools':{combatBarMovement:mode}};emit('updateCombat');}
@@ -98,13 +99,17 @@ try {
   for(const [action,label] of [['rollAll','Roll Initiative All'],['rollNPC','Roll Initiative NPC'],['resetAll','Reset Initiative']]){
    await bar.locator('header span').hover();
    await bar.locator('.pneuma-bar-initiative button').first().waitFor();
-   assert.equal(await bar.locator('.pneuma-bar-initiative button').count(),3);
+   assert.equal(await bar.locator('.pneuma-bar-initiative button').count(),4);
    assert.equal(await bar.getByRole('button',{name:label,exact:true}).locator('i').getAttribute('class'),{rollAll:'fas fa-users',rollNPC:'fas fa-users-cog',resetAll:'fas fa-undo'}[action]);
    await click(bar.getByRole('button',{name:label,exact:true}));
    assert.deepEqual(await page.evaluate(()=>calls.initiative),{action,combat:'fight'});
    assert.equal(await page.evaluate(()=>ui.combat.viewed.id),'sidebar-preview');
    assert.equal(await bar.locator('.pneuma-bar-initiative').count(),0);
   }
+  await page.evaluate(()=>{calls.endPrompt=null;});
+  await bar.locator('header span').hover();
+  await click(bar.getByRole('button',{name:'End Combat',exact:true}));
+  assert.equal(await page.evaluate(()=>calls.endPrompt),'fight','Opens the native confirmation for the bar encounter');
  }
  await page.evaluate(()=>game.settings.set('pneuma-combattools','combatBarOrientation','vertical'));
  assert.equal(await bar.locator('.active').count(),1);
@@ -113,13 +118,17 @@ try {
  assert.equal(await portrait.locator('img').getAttribute('src'),await page.evaluate(()=>tokens[0].actor.img));
  const size=await portrait.locator('img').boundingBox();assert.equal(size.width,size.height);assert.equal(size.width,40);
  assert.equal(await portrait.locator('img').evaluate(img=>getComputedStyle(img).borderRadius),'0px');
+ assert.equal(await portrait.locator('img').evaluate(img=>getComputedStyle(img).objectPosition),'50% 0%','Tall portraits crop from the bottom');
  const box=await bar.boundingBox(),players=await page.locator('#players').boundingBox();assert.equal(box.x,players.x);assert(box.y+box.height<=players.y-5);
  assert.equal(box.width,60);assert(box.x<50);assert.equal(await bar.locator('.pneuma-bar-name').count(),0);
  assert.equal(await bar.evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(0, 0, 0, 0.5)');
  const endBox=await bar.getByRole('button',{name:'End Turn',exact:true}).boundingBox();assert(endBox.x>=box.x+box.width);
  assert.equal(await bar.getByRole('button',{name:'No Movement',exact:true}).locator('i').getAttribute('class'),'fas fa-hand');
  await portrait.hover();assert.equal(await bar.locator('.pneuma-bar-statuses img').count(),2);
- assert.equal(await bar.locator('.pneuma-bar-statuses img').last().getAttribute('title'),'Dead');
+ const statusRows=bar.locator('.pneuma-bar-status');
+ assert.deepEqual(await statusRows.allInnerTexts(),['Prone','Dead']);
+ const firstStatus=await statusRows.first().boundingBox(), lastStatus=await statusRows.last().boundingBox();
+ assert.ok(lastStatus.y>=firstStatus.y+firstStatus.height && lastStatus.x===firstStatus.x,'Status effects stack vertically');
  await page.evaluate(()=>{window.statusFlyout=document.querySelector('.pneuma-bar-statuses');emit('updateActiveEffect',{parent:tokens[1].actor});});
  assert.equal(await page.evaluate(()=>document.querySelector('.pneuma-bar-statuses')===statusFlyout),true,'Unrelated effect preserves status tooltip');
  await page.evaluate(()=>emit('updateActiveEffect',{parent:{parent:tokens[0].actor}}));
@@ -314,6 +323,18 @@ try {
  });
  await page.waitForFunction(()=>document.getElementById('pneuma-combat-bar').getBoundingClientRect().top>=418);
  assert.ok(await bar.evaluate(e=>Number(getComputedStyle(e).zIndex)<40),'Canvas tools stack above bar');
+ await page.evaluate(()=>game.settings.set('','combatBarDock','top-center'));
+ await page.waitForFunction(()=>document.getElementById('pneuma-combat-bar').dataset.dock==='top-center');
+ assert.equal(await bar.getAttribute('data-orientation'),'horizontal');
+ const centered=await bar.boundingBox();
+ const movementTop=await bar.locator('footer').evaluate(footer=>footer.getBoundingClientRect().top);
+ assert.ok(Math.abs(movementTop-centered.y)<10,'Top-center movement controls align with the top edge');
+ const displayTop=await bar.locator('.pneuma-bar-display').evaluate(toolbar=>toolbar.getBoundingClientRect().top);
+ assert.equal(displayTop,movementTop,'Minimize and configure group aligns with the movement controls');
+ const sidebarEdge=await page.evaluate(()=>document.getElementById('sidebar')?.getBoundingClientRect().left || innerWidth);
+ assert.ok(Math.abs(centered.x+centered.width/2-sidebarEdge/2)<1,'Top bar centered in the available canvas');
+ const centeredEnd=await bar.locator('.pneuma-bar-end').boundingBox();
+ assert.ok(centeredEnd.y>=centered.y+centered.height,'End Turn opens below top-center bar');
  await page.evaluate(()=>game.settings.set('','combatBarDock','top-right'));
  await page.waitForFunction(()=>document.getElementById('pneuma-combat-bar').dataset.dock==='top-right');
  let geometry=await bar.evaluate(e=>({bar:e.getBoundingClientRect().toJSON(),footer:e.querySelector('footer').getBoundingClientRect().toJSON(),header:e.querySelector('header').getBoundingClientRect().toJSON(),list:e.querySelector('ol').getBoundingClientRect().toJSON()}));
