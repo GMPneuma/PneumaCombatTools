@@ -52,7 +52,7 @@ test('GM toolbar hides paired markers once per card, includes orphans, and follo
   const cards = [];
   registerFootprintControl(async id => {
     cards.push(id);
-    for (const row of rows.filter(row => row.flags[M].areaMessage === id)) row.hidden = true;
+    for (const row of rows.filter(row => row.flags[M].areaMessage === id)) {row.hidden = true;hooks.updateMeasuredTemplate({...row,parent:scene});}
   }, assert.fail);
   game.user.isGM = false;
   hooks.getSceneControlButtons(controls);
@@ -65,10 +65,10 @@ test('GM toolbar hides paired markers once per card, includes orphans, and follo
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(cards, ['old-card']);
   assert.deepEqual(hidden, ['other','outside']);
-  hooks.updateMeasuredTemplate({parent:scene});
+  for(const row of rows)hooks.updateMeasuredTemplate({...row,parent:scene});
   assert.equal(tool.visible, false);
   rows[0].hidden = false;
-  hooks.updateMeasuredTemplate({parent:scene});
+  hooks.updateMeasuredTemplate({...rows[0],parent:scene});
   assert.equal(tool.visible, true);
   canvas.scene = {templates:[]};
   hooks.canvasReady();

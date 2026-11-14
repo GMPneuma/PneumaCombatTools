@@ -32,6 +32,30 @@ export const injuryKey = (target:string):string => encodeURIComponent(target).re
 export function injuryResult(injuries:Record<string,InlineInjury>|undefined,target:string):InlineInjury|undefined {
   return injuries?.[injuryKey(target)] ?? injuries?.[target] ?? foundry.utils.getProperty(injuries ?? {},target) as InlineInjury|undefined;
 }
+/** Keep native table probabilities, but fetch each injury once and yield during long rerolls. */
+export async function drawCriticalInjury(table: RollTable, lookup: (name: string) => Promise<Item>, hasInjury: (name: string) => boolean, duplicate: unknown) {
+  const items = new Map<string, Item>();
+  for (let attempt = 0; attempt < 1000; attempt++) {
+    if (attempt && attempt % 16 === 0) await new Promise<void>(resolve => setTimeout(resolve, 0));
+    const result = await table.draw({displayChat:false} as Parameters<RollTable["draw"]>[0]);
+    if (result.results.length !== 1) throw Error("The injury table must return one injury.");
+    const name = result.results[0]!.text!;
+    let item = items.get(name);
+    if (!item) {
+      item = await lookup(name);
+      if (!item || String(item.type) !== "criticalInjury") throw Error("The rolled injury item is unavailable.");
+      items.set(name, item);
+    }
+    if (duplicate === "reroll" && hasInjury(item.name!)) {
+      if (table.results.contents.every(row => {
+        const known = items.get(row.text ?? ""); return known && hasInjury(known.name!);
+      })) throw Error("This character already has every injury on this table.");
+      continue;
+    }
+    return {result, item};
+  }
+  throw Error("No unused injury found. Check the actor's existing injuries.");
+}
 /** Use the native table, duplicate policy, roll card and injury item without publishing a separate message. */
 export async function rollCriticalInjury(data: Exchange, targetUuid: string, replacesReceipt?:string): Promise<InlineInjury> {
   if (!hasCriticalInjury(data)) throw new Error("This damage roll does not qualify for a critical injury.");
@@ -59,30 +83,23 @@ export async function rollCriticalInjury(data: Exchange, targetUuid: string, rep
     && (!replacesReceipt || foundry.utils.getProperty(item,"flags.pneuma-combattools.injuryReceipt")!==replacesReceipt));
   if (duplicate === "reroll" && table.results.contents.every(result => hasInjury(result.text ?? "")))
     throw Error("This character already has every injury on this table.");
-  for (let attempt = 0; attempt < 1000; attempt++) {
-    const result = await table.draw({displayChat:false} as Parameters<RollTable["draw"]>[0]);
-    if (result.results.length !== 1) throw Error("The injury table must return one injury.");
-    const item = await utils.GetCompendiumDoc(injuryPack, result.results[0]!.text!) as Item;
-    if (!item || String(item.type)!=="criticalInjury") throw Error("The rolled injury item is unavailable.");
-    if (hasInjury(item.name!)) {
-      if (duplicate === "reroll") continue;
-      if (duplicate === "warn") ui.notifications!.warn(actor.name + " already has " + item.name + ".");
-    }
-    const path = "/systems/cyberpunk-red-core/modules/rolls/cpr-rolls.js";
-    const {CPRTableRoll} = await import(path) as {CPRTableRoll:new(name:string,roll:Roll,template:string)=>NativeRoll & {rollCardExtraArgs:Record<string,unknown>}};
-    const roll = new CPRTableRoll(item.name!,result.roll,"systems/cyberpunk-red-core/templates/chat/cpr-critical-injury-rollcard.hbs");
-    roll.resultTotal = result.roll.total!;
-    roll.rollCardExtraArgs = {tableName:table.name,itemName:item.name,itemImg:item.img};
-    const description = await TextEditor.enrichHTML(String(foundry.utils.getProperty(item,"system.description") ?? ""));
-    const card = new DOMParser().parseFromString(await nativeCard(roll),"text/html");
-    for (const link of Array.from(card.querySelectorAll<HTMLElement>('[data-action="itemEdit"]'))) {
-      link.removeAttribute("data-action");
-      link.className = "content-link";
-      link.dataset.uuid = item.uuid;
-    }
-    return {name:item.name!,targetName:actor.name!,item:item.uuid,total:result.roll.total!,html:card.body.innerHTML+description,dice:diceJSON(roll)};
+  const {result, item} = await drawCriticalInjury(table, name => utils.GetCompendiumDoc(injuryPack, name) as Promise<Item>, hasInjury, duplicate);
+  if (hasInjury(item.name!)) {
+    if (duplicate === "warn") ui.notifications!.warn(actor.name + " already has " + item.name + ".");
   }
-  throw Error("No unused injury found. Check the actor's existing injuries.");
+  const path = "/systems/cyberpunk-red-core/modules/rolls/cpr-rolls.js";
+  const {CPRTableRoll} = await import(path) as {CPRTableRoll:new(name:string,roll:Roll,template:string)=>NativeRoll & {rollCardExtraArgs:Record<string,unknown>}};
+  const roll = new CPRTableRoll(item.name!,result.roll,"systems/cyberpunk-red-core/templates/chat/cpr-critical-injury-rollcard.hbs");
+  roll.resultTotal = result.roll.total!;
+  roll.rollCardExtraArgs = {tableName:table.name,itemName:item.name,itemImg:item.img};
+  const description = await TextEditor.enrichHTML(String(foundry.utils.getProperty(item,"system.description") ?? ""));
+  const card = new DOMParser().parseFromString(await nativeCard(roll),"text/html");
+  for (const link of Array.from(card.querySelectorAll<HTMLElement>('[data-action="itemEdit"]'))) {
+    link.removeAttribute("data-action");
+    link.className = "content-link";
+    link.dataset.uuid = item.uuid;
+  }
+  return {name:item.name!,targetName:actor.name!,item:item.uuid,total:result.roll.total!,html:card.body.innerHTML+description,dice:diceJSON(roll)};
 }
 
 export function criticalInjuryRow(result:InlineInjury|undefined, label:string):string {

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.36 - 2026-11-14
+
+- Index pending chat cards by actor and combat, batch repeated invalidations, and prevent overlapping renders. Reuse indexes for unfinished defense payments and turn-end injury reminders.
+- Cache damage-receipt formatting and construct armor/bonus controls when the damage editor opens. Keep recipient labels readable in narrow cards with older markup.
+- Combine passive status/injury refreshes, avoid scanning unrelated item effects, and share quickhack catalog/inventory lookups per operation.
+- Reuse injury documents during duplicate rerolls and yield during long retries while preserving native table draws.
+- Track individual grenade-template changes for Hide Grenade Footprints and batch combat-bar/biomonitor positioning.
+
+Validation: build, automated tests, and focused browser regressions. Live Foundry verification remains pending.
+
 ## 0.9.35 - 2026-11-12
 
 - Restricted the extra actor-sheet trash icon supplied by Combat Tools to GMs. Players retain CPR's native controls on manual effects.

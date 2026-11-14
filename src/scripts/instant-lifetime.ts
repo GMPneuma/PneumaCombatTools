@@ -52,10 +52,11 @@ export async function temporaryInjury(actor:Actor,name:string,combat:Combat|null
 }
 /** Adopt previously saved instant effects without duplicating native conditions. */
 async function migrateInstantActor(actor:Actor) {
+  let synchronized = false;
   for(const item of actor.items) {
     const old=life(item);
-    if(old?.kind!=="injury"||old.expires===undefined)continue;
-    await syncActorStatuses(actor);
+    if(old?.kind!=="injury"||old.expires===undefined||timedMarker(actor,item))continue;
+    if (!synchronized) { await syncActorStatuses(actor); synchronized = true; }
     const id=foundry.utils.getProperty(item,"flags."+M+".statusId");
     const marker=actor.effects.find(e=>typeof id==="string"&&e.statuses.has(id));
     if(!marker||timedMarker(actor,item))continue;

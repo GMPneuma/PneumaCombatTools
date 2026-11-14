@@ -245,8 +245,12 @@ function position(panel: HTMLElement, x: number, y: number) {
   positionAttachments();
 }
 let observedSidebar: HTMLElement | null = null;
-const sidebarResizeObserver = new ResizeObserver(() => { if (root) dockHUD(root); });
-const dockResizeObserver = new ResizeObserver(() => { if (root) dockHUD(root); });
+let dockFrame = 0;
+function scheduleDock(): void {
+  if (!dockFrame) dockFrame = requestAnimationFrame(() => { dockFrame = 0; if (root) dockHUD(root); });
+}
+const sidebarResizeObserver = new ResizeObserver(scheduleDock);
+const dockResizeObserver = new ResizeObserver(scheduleDock);
 let observedCrew: HTMLElement | null = null;
 function dockHUD(panel: HTMLElement) {
   const host = integratedHUD() ? crewButton?.closest<HTMLElement>("#pneuma-crewtools-calendar") ?? null : null;
@@ -263,10 +267,10 @@ function dockHUD(panel: HTMLElement) {
       .map(button => button.getBoundingClientRect()).filter(bounds => bounds.width && bounds.height);
     const right = buttons.length ? Math.max(...buttons.map(bounds => bounds.right)) : controls?.getBoundingClientRect().right;
     const left = Math.max(anchor.left, right ? right + 8 : 0);
-    panel.style.maxWidth = Math.max(0, window.innerWidth - left - 8) + "px";
-    panel.style.maxHeight = Math.max(0, window.innerHeight - top - 8) + "px";
-    panel.style.left = left + "px";
-    panel.style.top = top + "px";
+    for (const [name, value] of Object.entries({"max-width":Math.max(0, window.innerWidth - left - 8) + "px",
+      "max-height":Math.max(0, window.innerHeight - top - 8) + "px",left:left + "px",top:top + "px"})) {
+      if (panel.style.getPropertyValue(name) !== value) panel.style.setProperty(name, value);
+    }
     positionAttachments();
     return;
   }
@@ -777,6 +781,6 @@ export function registerEyeHUD() {
   Hooks.on("createChatMessage", (message:ChatMessage)=>{void queueIncomingAttack(message).catch(error=>console.error(MODULE,"Incoming attack notice failed",error));if(foundry.utils.getProperty(message,"flags.pneuma-combattools.quickhack"))schedule();});
   Hooks.on("updateChatMessage", refreshChatNotice);
   Hooks.on("deleteChatMessage", (message: ChatMessage) => { dismissHUDMessage(ATTACK_NOTICE_SOURCE,message.id!);if(foundry.utils.getProperty(message,"flags.pneuma-combattools.quickhack")) schedule(); });
-  for (const hook of ["renderSidebar", "collapseSidebar"]) Hooks.on(hook, () => { if (root) dockHUD(root); });
-  window.addEventListener("resize", () => { if (root) dockHUD(root); });
+  for (const hook of ["renderSidebar", "collapseSidebar"]) Hooks.on(hook, scheduleDock);
+  window.addEventListener("resize", scheduleDock);
 }

@@ -625,13 +625,13 @@ export function registerAreaAttacks() {
   Hooks.on("deleteCombat",finishMarkers);
   Hooks.on("updateChatMessage",(message:ChatMessage)=>{void automateArea(message).catch(errors);});
   registerAreaSettings();registerAreaMovement();registerSmoke();
-  const pendingCards = new PendingCardRefresh(message => { void ui.chat?.updateMessage(message); }, message => {
+  const pendingCards = new PendingCardRefresh(message => ui.chat?.updateMessage(message), message => {
     const data = flag(message);
     if (data?.phase !== "responses") return;
     const actors = data.rows.filter(row => ["waiting", "rolling"].includes(row.state)).map(row => row.actor);
     return actors.length ? { actors, combat: data.exchange.combatId } : undefined;
   });
-  Hooks.once("ready", () => { for (const message of game.messages ?? []) pendingCards.remember(message); });
+  Hooks.once("ready", () => pendingCards.seed(game.messages));
   for (const hook of ["createChatMessage", "updateChatMessage"]) Hooks.on(hook, (message: ChatMessage) => pendingCards.remember(message));
   Hooks.on("deleteChatMessage", (message: ChatMessage) => pendingCards.forget(message.id!));
   for(const hook of ["createItem","updateItem","deleteItem","createActiveEffect","updateActiveEffect","deleteActiveEffect"])Hooks.on(hook,(doc:Item|ActiveEffect)=>{

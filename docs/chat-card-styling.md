@@ -376,6 +376,8 @@ Normal attacks append .pneuma-damage-injuries after .pneuma-resolution-damage-ap
 
 Normal-attack recipient rows now render the target label, damage action, and critical-injury action in that order, with aligned button columns. Saved injury results and GM reroll controls stay below damage outputs in .pneuma-damage-injuries. Completed injuries show a disabled injury action until reroll is allowed.
 
+Within `.pneuma-combat-message .pneuma-damage-controls > .pneuma-damage-recipient`, the label occupies column 1 and the damage/critical actions occupy columns 2/3 of the same row. Explicit placement also supports older saved markup with the damage action before the label. Example selector: `.pneuma-damage-recipient > .pneuma-damage-recipient-label`. Selectors, native controls, and permission/disabled states are unchanged.
+
 Normal-attack saved injury results now nest directly beneath the matching token damage card. Damage cards expose data-damage-target, derived from application IDs and selected-target UUIDs. One injury result attaches to the latest matching application. An injury without matching damage retains an explicitly named fallback below the outputs. This supersedes the separate combined injury-results block.
 
 ### Flat damage and GM reset (2026-11-11)
@@ -387,6 +389,8 @@ Exchange result summaries show Hits or Misses using the existing hit/miss spans.
 ### Compact attack damage editor
 
 On ordinary exchange and area damage cards, the native dice and final number stay in the damage roll section. A 9px pencil on a 14px button anchored inside the bottom-right corner of the number box expands a separate .pneuma-damage-editor below the native roll. Four .pneuma-damage-editor-row elements group the two armor switches, Always Ablate, the numeric bonus and the three native module effect slots. The button exposes aria-expanded. Hidden editor rows use the hidden attribute. An attacker owner or GM edits shared armor and bonus before application. The editor supersedes the inline .pneuma-bonus-damage input and legacy Half Armor SP button for these cards.
+
+Armor/bonus rows are constructed on first expansion, or immediately when restoring an already-expanded editor for the same damage roll. The collapsed `.pneuma-damage-editor` still contains its existing effect-picker slot. Controls and selectors are unchanged, but consumers must allow these controls to appear after the chat-render hook; for example, `.pneuma-damage-editor .pneuma-armor-toggle`. No selector is removed or renamed. Native dice and totals, owner/GM edit restrictions, and the separate saved effect results remain unchanged.
 
 The four damage editor armor buttons use .pneuma-armor-toggle with aria-pressed and a visible .pneuma-armor-toggle-state indicator.
 

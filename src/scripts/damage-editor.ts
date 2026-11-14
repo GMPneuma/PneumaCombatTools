@@ -27,59 +27,68 @@ export function renderDamageEditor(root:HTMLElement,message:ChatMessage,data:Exc
   toggle.innerHTML='<i class="fas fa-pen" aria-hidden="true"></i>';
   anchor.append(toggle);
   const editor=document.createElement("div");editor.className="pneuma-damage-editor";
+  // Keep controls out of every historical card until the editor is opened.
+  let populated = false;
+  editor.append(effects);
   const reveal=(open:boolean)=>{editor.hidden=!open;toggle.setAttribute("aria-expanded",String(open));};
   reveal(expanded.get(message)===damage.nonce);
   toggle.addEventListener("click",event=>{
     event.preventDefault();event.stopPropagation();
     const open=editor.hidden;
     if(open)expanded.set(message,damage.nonce);else expanded.delete(message);
+    if (open) populate();
     reveal(open);
   });
   function row(){
     const line=document.createElement("div");line.className="pneuma-damage-editor-row";editor.append(line);return line;
   }
-  const armor=result.armorOptions;
-  const interact=armor?.interact??(result.values.interactArmor!==false);
-  const ablate=armor?.ablate??(weaponArmor(data.weaponType)?.ablate!==false && result.values.ablation>0);
-  function armorButton(line:HTMLElement,key:"interact"|"ablate"|"always"|"half",label:string,active:boolean,available:boolean){
-    const button=document.createElement("button");button.type="button";button.textContent=label;
-    const on=active && available;
-    button.className="pneuma-armor-toggle";
-    button.setAttribute("aria-pressed",String(on));
-    const indicator=document.createElement("span");
-    indicator.className="pneuma-armor-toggle-state";
-    indicator.setAttribute("aria-hidden","true");
-    indicator.textContent=on?"✓":"";
-    button.append(indicator);
-    button.disabled=!editable||!available;
-    button.addEventListener("click",async()=>{
-      button.disabled=true;
-      try{await send("damageArmor",{nonce:damage!.nonce,armorOption:key,enabled:!active});}
-      catch(error){ui.notifications!.error((error as Error).message);}
-      finally{button.disabled=!editable||!available;}
+  const populate = (): void => {
+    if (populated) return;
+    populated = true;
+    const armor=result.armorOptions;
+    const interact=armor?.interact??(result.values.interactArmor!==false);
+    const ablate=armor?.ablate??(weaponArmor(data.weaponType)?.ablate!==false && result.values.ablation>0);
+    function armorButton(line:HTMLElement,key:"interact"|"ablate"|"always"|"half",label:string,active:boolean,available:boolean){
+      const button=document.createElement("button");button.type="button";button.textContent=label;
+      const on=active && available;
+      button.className="pneuma-armor-toggle";
+      button.setAttribute("aria-pressed",String(on));
+      const indicator=document.createElement("span");
+      indicator.className="pneuma-armor-toggle-state";
+      indicator.setAttribute("aria-hidden","true");
+      indicator.textContent=on?"✓":"";
+      button.append(indicator);
+      button.disabled=!editable||!available;
+      button.addEventListener("click",async()=>{
+        button.disabled=true;
+        try{await send("damageArmor",{nonce:damage!.nonce,armorOption:key,enabled:!active});}
+        catch(error){ui.notifications!.error((error as Error).message);}
+        finally{button.disabled=!editable||!available;}
+      });
+      line.append(button);
+    }
+    const first=row();
+    armorButton(first,"interact","Interact w/armor",interact,true);
+    armorButton(first,"ablate","Ablate Armor",ablate,interact && result.values.ablation>0);
+    const second=row();
+    armorButton(second,"half","Halve Armor",armor?.half??(result.values.ignorePercent===50),interact && result.values.ignorePercent<100);
+    armorButton(second,"always","Always Ablate",armor?.always??!!game.settings!.get("pneuma-combattools","ablateBlockedHits"),interact && ablate);
+    const label=document.createElement("label");label.textContent="Bonus Damage ";
+    const bonus=document.createElement("input");bonus.type="number";bonus.step="1";bonus.min="0";
+    bonus.value=String(result.flatBonus??0);bonus.disabled=!editable;
+    bonus.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();bonus.blur();}});
+    bonus.addEventListener("change",async()=>{
+      if(!bonus.reportValidity())return;
+      bonus.disabled=true;
+      try{await send("damageBonus",{nonce:damage.nonce,flatBonus:Number(bonus.value)});}
+      catch(error){bonus.value=String(result.flatBonus??0);ui.notifications!.error((error as Error).message);}
+      finally{bonus.disabled=!editable;}
     });
-    line.append(button);
-  }
-  const first=row();
-  armorButton(first,"interact","Interact w/armor",interact,true);
-  armorButton(first,"ablate","Ablate Armor",ablate,interact && result.values.ablation>0);
-  const second=row();
-  armorButton(second,"half","Halve Armor",armor?.half??(result.values.ignorePercent===50),interact && result.values.ignorePercent<100);
-  armorButton(second,"always","Always Ablate",armor?.always??!!game.settings!.get("pneuma-combattools","ablateBlockedHits"),interact && ablate);
-  const label=document.createElement("label");label.textContent="Bonus Damage ";
-  const bonus=document.createElement("input");bonus.type="number";bonus.step="1";bonus.min="0";
-  bonus.value=String(result.flatBonus??0);bonus.disabled=!editable;
-  bonus.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();bonus.blur();}});
-  bonus.addEventListener("change",async()=>{
-    if(!bonus.reportValidity())return;
-    bonus.disabled=true;
-    try{await send("damageBonus",{nonce:damage.nonce,flatBonus:Number(bonus.value)});}
-    catch(error){bonus.value=String(result.flatBonus??0);ui.notifications!.error((error as Error).message);}
-    finally{bonus.disabled=!editable;}
-  });
-  label.append(bonus);row().append(label);
-  const last=row();
-  if(effects.childElementCount)last.append("Add Effects",effects);
-  else last.hidden=true;
+    label.append(bonus);row().append(label);
+    const last=row();
+    if(effects.childElementCount)last.append("Add Effects",effects);
+    else last.hidden=true;
+  };
+  if (!editor.hidden) populate();
   body.append(editor);
 }

@@ -72,6 +72,26 @@ export function damageValues(html: string): DamageValues {
     ablation: number("ablation"), ammo: get("ammo-variety"), ignorePercent: number("ignore-armor-percent", false),
     ignoreBelow: number("ignore-below-sp"), lethal: /true/i.test(get("damage-lethal")) };
 }
+// Bounded presentation cache: legacy receipts need parsing once, not on every card save.
+const applicationHTML = new Map<string, {targets: string; html: string}>();
+function damageApplications(data: Exchange): string {
+  const damage = data.damage!;
+  const targets = new Map(damage.selectedTargets?.map(target => [target.id, target.uuid]));
+  const signature = JSON.stringify([data.defender, [...targets]]);
+  return (damage.applications ?? []).map(application => {
+    const cached = applicationHTML.get(application);
+    if (cached?.targets === signature) return cached.html;
+    const doc = new DOMParser().parseFromString(application, "text/html");
+    for (const card of Array.from(doc.querySelectorAll<HTMLElement>(".pneuma-damage-applied[data-damage-instance]"))) {
+      const match = /^(.*)-\d+$/.exec(card.dataset.damageInstance!);
+      card.dataset.damageTarget = (match && targets.get(match[1]!)) || data.defender;
+    }
+    const html = doc.body.innerHTML;
+    applicationHTML.set(application, {targets: signature, html});
+    if (applicationHTML.size > 256) applicationHTML.delete(applicationHTML.keys().next().value!);
+    return html;
+  }).join("");
+}
 export function damageContent(data: Exchange, mode: "full" | "roll" = "full"): string {
   const damage = data.damage;
   if (!damage) return "";
@@ -99,19 +119,9 @@ export function damageContent(data: Exchange, mode: "full" | "roll" = "full"): s
     : '<p class="pneuma-damage-status">' + labels[damage.status] + '</p>';
   const targets = (damage.selectedTargets ?? []).map(target=>'<li data-application-id="'+escape(target.id)+'">'+escape(target.name)+'</li>').join("");
   const history = targets ? '<div class="pneuma-damage-targets"><strong>Applied to</strong><ol class="pneuma-damage-target-history" aria-label="Applied to selected tokens">'+targets+'</ol></div>' : "";
-  const applications = (damage.applications ?? []).map(application => {
-    const doc = new DOMParser().parseFromString(application, "text/html");
-    for (const card of Array.from(doc.querySelectorAll<HTMLElement>(".pneuma-damage-applied[data-damage-instance]"))) {
-      const instance = card.dataset.damageInstance!;
-      const selected = damage.selectedTargets?.find(target =>
-        instance.startsWith(target.id + "-") && /^\d+$/.test(instance.slice(target.id.length + 1)));
-      card.dataset.damageTarget = selected?.uuid ?? data.defender;
-    }
-    return doc.body.innerHTML;
-  }).join("");
   const actions = mode === "full" && damage.result ? resolutionSection("damage-apply",
     '<div class="rollcard-bottom pneuma-damage-application"><div class="cpr-block pneuma-damage-application-box"></div></div>'
-      + history + '<div class="pneuma-damage-applications">' + applications + '</div>') : "";
+      + history + '<div class="pneuma-damage-applications">' + damageApplications(data) + '</div>') : "";
   return '<div class="pneuma-damage-result">' + resolutionSection("damage-roll", html + status + (damage.result ? (mode === "full" ? '<div class="pneuma-damage-effects-slot"></div>' : '<div class="pneuma-aoe-effects-picker"></div>') : ""))
     + actions + (mode === "full" ? resolutionSection("effects", '<div class="pneuma-damage-effect-results"></div>') : "") + (mode === "full" ? '<div class="pneuma-resolution-recovery-slot"></div>' : "") + "</div>";
 }

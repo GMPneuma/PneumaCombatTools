@@ -79,7 +79,7 @@ function setup() {
       for(const [path,value] of Object.entries(changes))set(this,path,value);}});
   globalThis.game={users:{get:id=>users.find(u=>u.id===id)},combat:combats.get("combat"),combats:{values:()=>combats.values(),get:id=>combats.get(id),filter:fn=>[...combats.values()].filter(fn)},
     settings:{get:(_module,key)=>key==="evasionEligibility"?"custom":key==="evasionHomebrew"?config:undefined},
-    i18n:{localize:k=>k},messages:{get:id=>messages.get(id),find:fn=>[...messages.values()].find(fn)}};
+    i18n:{localize:k=>k},messages:{get:id=>messages.get(id),find:fn=>[...messages.values()].find(fn),[Symbol.iterator]:()=>messages.values()}};
   globalThis.fromUuid=async()=>({actor});
 }
 function message(id,combatId="combat") {

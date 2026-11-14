@@ -33,6 +33,16 @@ try {
   const host=document.querySelector('#host');
   const damage={status:'rolled',result:{html:'<div class="rollcard"><strong>17</strong></div>',values:{ignorePercent:0,interactArmor:true}}};
   const exchange={title:'Attack',damage};
+  const NativeParser=window.DOMParser;let receiptParses=0;
+  window.DOMParser=class extends NativeParser {parseFromString(...args){if(args[0].includes('data-damage-instance="cache-probe-0"'))receiptParses++;return super.parseFromString(...args);}};
+  try {
+    const probe={...exchange,defender:'Token.recorded',damage:{...damage,applications:['<div class="pneuma-damage-applied" data-damage-instance="cache-probe-0">Receipt</div>'],selectedTargets:[{id:'cache-probe',uuid:'Token.first',name:'First'}]}};
+    damageContent(probe,'roll');if(receiptParses)throw Error('Roll-only rendering parsed unused receipts');
+    const first=damageContent(probe);damageContent(probe);
+    if(receiptParses!==1||!first.includes('data-damage-target="Token.first"'))throw Error('Unchanged receipts were not cached or mapped');
+    probe.damage.selectedTargets[0].uuid='Token.changed';
+    if(!damageContent(probe).includes('data-damage-target="Token.changed"')||receiptParses!==2)throw Error('Receipt target changes failed to invalidate cached markup');
+  } finally {window.DOMParser=NativeParser;}
   const area={scene:'s',kind:'explosive',phase:'responses',area:{shape:'square',origin:{x:50,y:50},direction:0,length:500,width:500},settings:{coverUp:true,evade:'raw'},exchange,rows:[{uuid:'owned',actor:'Actor.target',name:'Target',img:'/icons/target.svg',eligible:true,state:'hit'}]};
   for(const width of [260,300,400])for(const family of ['normal','manual','aoe'])for(const locked of [false,true]){
    host.style.width=width+'px';
@@ -139,6 +149,7 @@ try {
     renderDamageEditor(host,message,exchange,effects,true,async(action,data)=>calls.push([action,data]));
     const button=host.querySelector('.pneuma-modify-damage'), editor=host.querySelector('.pneuma-damage-editor');
     if(!editor.hidden || button.previousElementSibling.textContent!=='14')throw Error('Initial compact result');
+    if(editor.querySelector('.pneuma-armor-toggle,input'))throw Error('Closed historical editors must not construct armor/bonus controls');
     button.click();
     const rows=editor.children,rect=node=>node.getBoundingClientRect();
     if(rows.length!==4 || editor.hidden || rect(rows[0]).top<rect(button).bottom-1)throw Error('Editor must expand below the roll');

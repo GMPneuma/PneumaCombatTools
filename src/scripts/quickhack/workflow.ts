@@ -2,7 +2,7 @@ import {quickhackAssetPath} from "./asset-paths.js";
 import {tokenEncounter,encounterRef,resolveEncounter} from "../encounter.js";
 import { requireCombatSocket } from "../socket-health.js";
 import { showSavedDice, messageDiceAudience } from "../native-combat.js";
-import { availableQuickhacks, quickhackId, MODULE, type QuickhackItem } from "./availability.js";
+import { availableQuickhacks, quickhackId, quickhackLookup, MODULE, type QuickhackItem } from "./availability.js";
 import { getQuickhack } from "./catalog.js";
 import { enabled, label, mode, routing } from "./settings.js";
 import { roleFor, canOperate, criticalD10, gmAudience, nativeQuickhackRoll, publicAudience } from "./rolls.js";
@@ -16,10 +16,25 @@ import { hasQuickhackSight } from "./sight.js";
 import {selfIce} from "./self-ice.js";
 
 export const actorQuickhacks = (actor: Actor) => {
+  if (!enabled()) return [];
+  const lookup = quickhackLookup();
   const items = [...actor.items] as unknown as QuickhackItem[];
-  return availableQuickhacks(items, mode(), enabled()).map(hack => ({
-    ...hack, img: quickhackAssetPath(hack.img) ?? quickhackAssetPath(items.find(item => quickhackId(item) === hack.id && item.img)?.img)
-      ?? quickhackAssetPath([...game.items ?? []].find(item => quickhackId(item as unknown as QuickhackItem) === hack.id && item.img)?.img)
+  const hacks = availableQuickhacks(items, mode(), true, lookup);
+  const icons = (source: Iterable<QuickhackItem>) => {
+    const result = new Map<string, string>();
+    for (const item of source) {
+      if (!item.img) continue;
+      const id = quickhackId(item, lookup);
+      if (id && !result.has(id)) result.set(id, item.img);
+    }
+    return result;
+  };
+  const owned = icons(items);
+  const world = hacks.some(hack => !quickhackAssetPath(hack.img) && !quickhackAssetPath(owned.get(hack.id)))
+    ? icons([...game.items ?? []] as unknown as QuickhackItem[]) : new Map<string, string>();
+  return hacks.map(hack => ({
+    ...hack, img: quickhackAssetPath(hack.img) ?? quickhackAssetPath(owned.get(hack.id))
+      ?? quickhackAssetPath(world.get(hack.id))
       ?? (hack.tier==="Custom"?`modules/${MODULE}/styles/quickhack-gray.png`:`modules/${MODULE}/styles/quickhacks/${hack.id}-gray.png`),
   }));
 };

@@ -51,6 +51,7 @@ interface Claim { user: string; message: string; nonce: string; offer: EvasionOf
 const claims = new Map<string, Claim>();
 const pending = new Map<string, { resolve(value: Claim | undefined): void; reject(error: Error): void }>();
 const retry = new Map<string, { nonce: string; defense: Defense }>();
+const pendingCards = new PendingCardRefresh(message => ui.chat?.updateMessage(message));
 let queue: Promise<unknown> = Promise.resolve();
 let trackingReady = true;
 const flag = <T>(doc: object, name: string): T | undefined =>
@@ -282,7 +283,8 @@ export async function handleCombatRequest(request: Request): Promise<Claim | und
   }
   if (data.state !== "waiting") throw new Error("Finish the pending payment before continuing.");
   const combat = currentCombat(data);
-  const unfinished = game.messages?.find(other => {
+  pendingCards.seed(game.messages);
+  const unfinished = pendingCards.find(actor.uuid, other => {
     const exchange = flag<Exchange>(other, "exchange");
     return other.id !== message.id! && exchange?.defenderActor === actor.uuid && exchange.state === "applying";
   });
@@ -471,7 +473,6 @@ export function registerCombatResolution(): void {
   ] as const) game.settings!.register(MODULE, key, { name, hint, scope: "world", config: true, type: Boolean, default: value });
   registerEvasionDialog();
   registerAttackDialog();
-  const pendingCards = new PendingCardRefresh(message => { ui.chat?.updateMessage(message); });
   const refreshPending = () => pendingCards.refresh();
   Hooks.on("createChatMessage", (message: ChatMessage) => {
     pendingCards.remember(message);
@@ -509,7 +510,7 @@ export function registerCombatResolution(): void {
     if (setting.key?.startsWith(MODULE + ".evasion")) refreshPending();
   });
   Hooks.once("ready", () => {
-    for (const message of game.messages ?? []) pendingCards.remember(message);
+    pendingCards.seed(game.messages);
     if (authority()?.id === game.user!.id) {
       trackingReady = false;
       void (async () => {

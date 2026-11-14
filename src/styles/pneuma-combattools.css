@@ -268,11 +268,13 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
   align-items: center;
 }
 .pneuma-combat-message .pneuma-damage-controls > .pneuma-damage-recipient > :is(.pneuma-apply-damage, .pneuma-apply-critical) {
+  grid-row: 1;
   width: 34px;
   min-width: 0;
   margin: 0;
   justify-self: center;
 }
+.pneuma-combat-message .pneuma-damage-controls > .pneuma-damage-recipient > .pneuma-damage-recipient-label { grid-column: 1; grid-row: 1; }
 .pneuma-combat-message .pneuma-damage-controls > .pneuma-damage-recipient > .pneuma-apply-damage { grid-column: 2; text-align: center; }
 .pneuma-combat-message .pneuma-damage-controls > .pneuma-damage-recipient > .pneuma-apply-critical { grid-column: 3; }
 .pneuma-combat-message .pneuma-damage-status-effects {

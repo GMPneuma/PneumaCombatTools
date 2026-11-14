@@ -67,12 +67,17 @@ try {
  const armor=await readFile(new URL('../dist/scripts/half-armor.js',import.meta.url),'utf8');
  await page.addScriptTag({type:'module',content:armor+'\nObject.assign(window,{ablateArmorSelected,halfArmorSelected,interactArmorSelected,halfArmorControl,armorIgnorePercent});'});
  await page.waitForFunction(()=>!!window.halfArmorControl);
+ await page.addScriptTag({type:'module',content:(await readFile('dist/scripts/close-armor.js','utf8'))+'\nwindow.weaponArmor=weaponArmor;'});
+ await page.addScriptTag({type:'module',content:(await readFile('dist/scripts/damage-editor.js','utf8')).replace(/^import .*$/gm,'')+'\nwindow.renderDamageEditor=renderDamageEditor;'});
+ await page.waitForFunction(()=>!!window.renderDamageEditor && !!window.weaponArmor);
  await page.addScriptTag({type:'module',content:(await readFile('dist/scripts/encounter.js','utf8'))+'\nObject.assign(window,{resolveEncounter,encounterRef,tokenEncounter});'});
  const damage=(await readFile(new URL('../dist/scripts/damage-flow.js',import.meta.url),'utf8')).replace(/^import .*$/gm,'');
  await page.addScriptTag({type:'module',content:damage.replace('import(path)', 'Promise.resolve({default:window.nativeDamageDialog})')+'\nObject.assign(window,{damageValues,damageContent,renderDamage,rollDamage});'});
  await page.addScriptTag({type:'module',content:(await readFile('dist/scripts/attack-title.js','utf8')).replace(/^import .*$/gm,'')+'\nObject.assign(window,{attackHeading});'});
  await page.waitForFunction(()=>!!window.attackHeading);
  const combat=(await readFile(new URL('../dist/scripts/combat-resolution.js',import.meta.url),'utf8')).replace(/^import .*$/gm,'');
+ await page.addScriptTag({type:'module',content:(await readFile('dist/scripts/pending-card-refresh.js','utf8'))+'\nwindow.PendingCardRefresh=PendingCardRefresh;'});
+ await page.waitForFunction(()=>!!window.PendingCardRefresh);
  await page.addScriptTag({type:'module',content:combat+'\nwindow.exchangeContent=exchangeContent;window.decorateCombatMessage=decorateCombatMessage;'});
  await page.waitForFunction(()=>!!window.exchangeContent);
  const states=await page.evaluate(()=>{
@@ -183,7 +188,8 @@ try {
    await renderDamage({id:"sections"}, fixture, wrap([document.body]), async()=>{});
    const kinds = [...document.querySelectorAll("[data-pneuma-section]")].map(n=>n.dataset.pneumaSection);
    const structure = [...document.querySelectorAll(".pneuma-resolution-section")].every(n =>
-     n.querySelector(":scope > .pneuma-resolution-label") && n.querySelector(":scope > .pneuma-resolution-body"));
+     n.querySelector(":scope > .pneuma-resolution-body") && (n.querySelector(":scope > .pneuma-resolution-label")
+       || n.dataset.pneumaSection === "recovery" && n.getAttribute("aria-label") === "Recovery" && n.querySelector('[data-gm-only="true"]')));
    const applicationInside = !!document.querySelector(".pneuma-resolution-damage-apply-body .pneuma-apply-damage");
    const dropInside = !!document.querySelector(".pneuma-resolution-result-body [data-action=pneumaRollDamage]");
    const recovering = {...fixture, damage:{status:"rolling", user:"gm", nonce:"n"}};
@@ -197,7 +203,7 @@ try {
  for (const snapshot of sections.snapshots) {
    assert.deepEqual(snapshot.kinds,["pending"]); assert.equal(snapshot.hasRoll,false); assert.equal(snapshot.slot,true);
  }
- assert.deepEqual(sections.kinds,["attack","result","damage-roll","damage-apply","effects"]);
+ assert.deepEqual(sections.kinds,["attack","result","damage-roll","damage-apply","effects","recovery"]);
  assert.equal(sections.structure,true); assert.equal(sections.applicationInside,true); assert.equal(sections.dropInside,true);
  assert.equal(sections.recovery,true); assert.equal(sections.prematureApply,false);
  assert.match(sections.cancelled,/Exchange cancelled by GM/);

@@ -7,10 +7,10 @@ export function hasInjury(actor:Actor,name:string):boolean {
   if(Array.from(actor.effects??[]).some(e=>!e.disabled&&!foundry.utils.getProperty(e,"system.isSuppressed")&&e.statuses.has(status.id)))return true;
   return Array.from(actor.items??[]).some(item=>{
     if(String(item.type)!=="criticalInjury"||foundry.utils.getProperty(item,"flags.pneuma-combattools.quickFix"))return false;
-    const effects=Array.from(item.effects??[]);
-    if(effects.length && !effects.some(e=>!e.disabled&&!e.isSuppressed&&!foundry.utils.getProperty(e,"system.isSuppressed")))return false;
     const source=String(foundry.utils.getProperty(item,"_stats.compendiumSource")??foundry.utils.getProperty(item,"flags.core.sourceId")??"");
-    return foundry.utils.getProperty(item,"flags.pneuma-combattools.statusId")===status.id||source.endsWith("."+status.binding!.itemId)||item.name===status.binding!.itemName;
+    if (!(foundry.utils.getProperty(item,"flags.pneuma-combattools.statusId")===status.id||source.endsWith("."+status.binding!.itemId)||item.name===status.binding!.itemName)) return false;
+    const effects=Array.from(item.effects??[]);
+    return !effects.length || effects.some(e=>!e.disabled&&!e.isSuppressed&&!foundry.utils.getProperty(e,"system.isSuppressed"));
   });
 }
 export function evasionBlocked(actor:Actor):string|undefined {

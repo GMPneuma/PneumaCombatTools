@@ -26,7 +26,7 @@ function indexInjuryCard(message:ChatMessage) {
  const key=cardKey(data.actor,data.combat,data.turn,data.epoch),group=injuryCards.get(key)??new Map<string,ChatMessage>();
  group.set(message.id!,message);injuryCards.set(key,group);injuryKeys.set(message.id!,key);
 }
-function existingInjuryCards(actor:string,record:MoveRecord,epoch:string): Iterable<ChatMessage> {
+export function existingInjuryCards(actor:string,record:Pick<MoveRecord,"combat"|"turn">,epoch:string): Iterable<ChatMessage> {
  if(indexedMessages!==game.messages){
   indexedMessages=game.messages;injuryCards.clear();injuryKeys.clear();
   for(const message of game.messages??[])indexInjuryCard(message);

@@ -9,6 +9,10 @@ let root: HTMLElement | undefined;
 let observer: ResizeObserver | undefined;
 let players: HTMLElement | null = null;
 let frame = 0;
+let positionFrame = 0;
+function schedulePosition(): void {
+  if (!positionFrame) positionFrame = requestAnimationFrame(() => { positionFrame = 0; position(); });
+}
 let renderKey = "";
 let turnPending = false;
 let modePending = false;
@@ -119,8 +123,11 @@ function position(): void {
     document.body.classList.toggle("pneuma-dock-full-width", fullWidth);
     bottomDock.style.zIndex = root.style.zIndex;
     bottomDock.style.right = (fullWidth ? 8 : Math.max(8, window.innerWidth - edge + 8)) + "px";
-    if (fullWidth) document.body.style.setProperty("--pneuma-dock-space", `${Math.ceil(bottomDock.getBoundingClientRect().height) + 16}px`);
-    else document.body.style.removeProperty("--pneuma-dock-space");
+    const space = fullWidth ? `${Math.ceil(bottomDock.getBoundingClientRect().height) + 16}px` : "";
+    if (document.body.style.getPropertyValue("--pneuma-dock-space") !== space) {
+      if (space) document.body.style.setProperty("--pneuma-dock-space", space);
+      else document.body.style.removeProperty("--pneuma-dock-space");
+    }
     for (const property of ["left", "right", "top", "bottom", "max-height", "max-width"]) root.style.removeProperty(property);
     positionEndTurn(); return;
   }
@@ -344,7 +351,7 @@ function render(): void {
     root.setAttribute("aria-label", "Combat bar");
     bind(root);
     document.body.append(root);
-    observer = new ResizeObserver(position);
+    observer = new ResizeObserver(schedulePosition);
     observer.observe(root);
   }
   const anchor = document.getElementById("players");
@@ -475,6 +482,7 @@ function remove(): void {
   closeBarFlyout();
   observer?.disconnect();
   observer = undefined;
+  cancelAnimationFrame(positionFrame); positionFrame = 0;
   restoreBottomDock();
   root?.remove();
   root = undefined;
@@ -539,7 +547,7 @@ export function registerCombatBar(): void {
   });
   Hooks.on("canvasTearDown", () => {cancelAnimationFrame(frame); frame = 0; remove();});
   Hooks.on("renderHotbar", refresh);
-  window.addEventListener("resize", position);
+  window.addEventListener("resize", schedulePosition);
   window.addEventListener("pointerup", cancelHold);
   window.addEventListener("pointercancel", cancelHold);
   window.addEventListener("blur", cancelHold);

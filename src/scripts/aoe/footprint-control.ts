@@ -2,19 +2,29 @@ import { MODULE } from "./settings.js";
 
 const toolName = "pneuma-hide-grenade-footprints";
 
-function visibleGrenades(scene: Scene) {
-  return scene.templates.filter(template => {
+function visibleGrenade(template: MeasuredTemplateDocument) {
     if (template.hidden) return false;
     const flags = foundry.utils.getProperty(template, `flags.${MODULE}`) as
       { grenadeCombat?: string | null; areaMessage?: string } | undefined;
     if (flags?.grenadeCombat !== undefined) return true;
     const source = flags?.areaMessage && game.messages?.get(flags.areaMessage);
     return !!source && foundry.utils.getProperty(source, `flags.${MODULE}.aoe.kind`) === "explosive";
-  });
+}
+function visibleGrenades(scene: Scene) {
+  return scene.templates.filter(visibleGrenade);
 }
 
 export function registerFootprintControl(hideCard: (message: string) => Promise<unknown>, report: (error: unknown) => void) {
-  const available = () => !!canvas.scene && visibleGrenades(canvas.scene).length > 0;
+  let indexedScene: Scene | undefined;
+  const visible = new Set<string>();
+  const available = () => {
+    if (indexedScene !== canvas.scene) {
+      indexedScene = canvas.scene ?? undefined;
+      visible.clear();
+      if (indexedScene) for (const template of visibleGrenades(indexedScene)) visible.add(template.id!);
+    }
+    return visible.size > 0;
+  };
   async function hide() {
     const scene = canvas.scene;
     if (!game.user?.isGM || !scene) return;
@@ -45,10 +55,15 @@ export function registerFootprintControl(hideCard: (message: string) => Promise<
     tool.visible = visible;
     ui.controls?.render();
   }
-  Hooks.on("canvasReady", refresh);
+  Hooks.on("canvasReady", () => { indexedScene = undefined; refresh(); });
   for (const hook of ["createMeasuredTemplate", "updateMeasuredTemplate", "deleteMeasuredTemplate"]) {
     Hooks.on(hook, (template: MeasuredTemplateDocument) => {
-      if (template.parent === canvas.scene) refresh();
+      if (template.parent !== canvas.scene) return;
+      if (indexedScene === canvas.scene) {
+        if (hook === "deleteMeasuredTemplate" || !visibleGrenade(template)) visible.delete(template.id!);
+        else visible.add(template.id!);
+      }
+      refresh();
     });
   }
 }

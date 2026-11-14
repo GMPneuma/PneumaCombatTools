@@ -2,6 +2,7 @@ import { primaryGM as electedGM } from "./shared.js";
 import {hasInjury} from "./injury-rules.js";
 import {postHUDMessage} from "./hud-messages.js";
 import {registerNativeWrapper} from "./native-wrappers.js";
+import {existingInjuryCards} from "./injury-mechanics.js";
 declare global {interface SettingConfig {"pneuma-combattools.injuryTurnEndReminder":boolean}}
 const M="pneuma-combattools",path="flags."+M+".injuryReminders";
 export const injuryGuidance:Record<string,string>={
@@ -54,6 +55,7 @@ export function applyInjuryMoveFloor(actor:Actor){
 export function registerInjuryNotices(){
  game.settings!.register(M,"injuryTurnEndReminder",{name:"Injury damage: turn-end HUD reminder",hint:"Remind owners and GM about unpaid Broken Ribs / Foreign Object movement-damage cards. Does not apply damage or spend actions.",scope:"world",config:true,type:Boolean,default:true});
  const known=new Map<string,Set<string>>();
+ const queuedChecks=new Set<string>();
  const snapshot=(actor:Actor)=>new Set(Object.keys(injuryGuidance).filter(n=>hasInjury(actor,n)));
  const check=async(actor:Actor)=>{
   const before=known.get(actor.uuid)??new Set<string>(),after=snapshot(actor);known.set(actor.uuid,after);
@@ -71,7 +73,10 @@ export function registerInjuryNotices(){
  });
  for(const hook of ["createItem","updateItem","deleteItem","createActiveEffect","updateActiveEffect","deleteActiveEffect"])Hooks.on(hook,(doc:Item|ActiveEffect)=>{
   const actor=doc.parent instanceof Actor?doc.parent:doc.parent instanceof Item?doc.parent.parent:null;
-  if(actor instanceof Actor)enqueue(()=>check(actor));
+  if(actor instanceof Actor && primary() && !queuedChecks.has(actor.uuid)) {
+   queuedChecks.add(actor.uuid);
+   enqueue(async()=>{queuedChecks.delete(actor.uuid);await check(actor);});
+  }
  });
  Hooks.on("updateToken",(token:TokenDocument,changes:Record<string,unknown>)=>{
   const partial=foundry.utils.getProperty(changes,"flags."+M+".movement")??changes["flags."+M+".movement"];
@@ -99,13 +104,14 @@ export function registerInjuryNotices(){
    const advanced=old&&(Number(combat.round)>old.round||Number(combat.round)===old.round&&Number(combat.turn)>old.turn);
    if(!advanced)return;
    if(old.actor&&game.settings!.get(M,"injuryTurnEndReminder")){
-    const pending=game.messages?.filter(m=>{
+    const index=combat.turns.findIndex(c=>c.actor?.uuid===old.actor!.uuid);
+    const participant=combat.turns[index];
+    const turn=participant?.id+":"+String(old.round-(old.turn<index?1:0));
+    const epoch=foundry.utils.getProperty(combat,"flags."+M+".evasionEpoch") as string|undefined??"";
+    const pending=Array.from(existingInjuryCards(old.actor.uuid,{combat:combat.id!,turn},epoch)).filter(m=>{
      const r=foundry.utils.getProperty(m,"flags."+M+".brokenRibs") as {actor:string;combat:string;applied?:boolean;distance:number;turn:string}|undefined;
-     const index=combat.turns.findIndex(c=>c.actor?.uuid===old.actor!.uuid);
-     const participant=combat.turns[index];
-     const turn=participant?.id+":"+String(old.round-(old.turn<index?1:0));
      return r?.actor===old.actor!.uuid&&r.combat===combat.id&&r.turn===turn&&!r.applied&&r.distance>4;
-    })??[];
+    });
     if(pending.length)alert(old.actor,"TURN END — "+pending.length+" movement-injury damage card(s) pending. Apply 5 HP per injury from chat.");
    }
    await deliverInjuryReminders(combat);

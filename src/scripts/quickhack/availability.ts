@@ -1,4 +1,4 @@
-import { QUICKHACKS, customQuickhacks, getQuickhack } from "./catalog.js";
+import { QUICKHACKS, customQuickhacks } from "./catalog.js";
 
 export const MODULE = "pneuma-combattools";
 export const LEGACY_MODULE = "pneuma-quickhack";
@@ -24,27 +24,35 @@ export interface QuickhackItem {
   flags?: Record<string, unknown>;
   system: { equipped?: string; installedItems?: { list?: string[] }; amount?: number };
 }
-export function quickhackId(item: QuickhackItem): string | undefined {
+/** One fresh settings snapshot per operation; no persistent cache can go stale. */
+export function quickhackLookup() {
+  const custom = customQuickhacks();
+  const catalog = [...QUICKHACKS, ...custom];
+  const names = new Map<string, string>();
+  for (const hack of custom) if (!names.has(hack.name.toLowerCase())) names.set(hack.name.toLowerCase(), hack.id);
+  return { catalog, names, ids: new Set(catalog.map(hack => hack.id)) };
+}
+export function quickhackId(item: QuickhackItem, lookup = quickhackLookup()): string | undefined {
   if (item.type === "program") {
     const name = item.name?.trim().toLowerCase();
-    const custom = name && customQuickhacks().find(hack => hack.name.toLowerCase() === name);
-    if (custom) return custom.id;
+    const custom = name && lookup.names.get(name);
+    if (custom) return custom;
   }
   for (const scope of [MODULE, LEGACY_MODULE]) {
     const id = (item.flags?.[scope] as { quickhackId?: unknown } | undefined)?.quickhackId;
-    if (typeof id === "string" && getQuickhack(id)) return id;
+    if (typeof id === "string" && lookup.ids.has(id)) return id;
   }
   return undefined;
 }
 /** The deck's native installation list is authoritative. REZ is not loading. */
-export function availableQuickhacks(items: QuickhackItem[], mode: QuickhackMode, enabled = true) {
+export function availableQuickhacks(items: QuickhackItem[], mode: QuickhackMode, enabled = true, lookup = quickhackLookup()) {
   if (!enabled) return [];
-  const catalog = [...QUICKHACKS, ...customQuickhacks()];
+  const {catalog} = lookup;
   if (mode === "raw") return catalog;
   if (mode !== "owned" && mode !== "loaded") return [];
   const installed = new Set(items.filter(item => item.type === "cyberdeck" && item.system.equipped === "equipped")
     .flatMap(deck => deck.system.installedItems?.list ?? []));
   const ids = new Set(items.filter(item => ["gear", "program"].includes(item.type) && (item.system.amount === undefined || item.system.amount > 0)
-    && (mode === "owned" || item.type === "program" && !!item.id && installed.has(item.id))).map(quickhackId));
+    && (mode === "owned" || item.type === "program" && !!item.id && installed.has(item.id))).map(item => quickhackId(item, lookup)));
   return catalog.filter(hack => ids.has(hack.id));
 }

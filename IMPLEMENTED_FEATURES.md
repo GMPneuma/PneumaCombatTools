@@ -1,5 +1,13 @@
 # Combat Tools feature inventory
 
+- Damage-recipient labels and action buttons occupy explicit grid cells, preserving readable names on narrow cards with either current label-first markup or older action-first markup. Browser checks cover both orders at 260/300/400px; live Foundry verification pending.
+
+- Local performance fixes: pending-card refreshes use actor/combat indexes, batch invalidations before selecting cards, and prevent overlapping asynchronous renders. Unfinished defense-payment lookup and turn-end injury reminders reuse indexes instead of repeatedly traversing chat history. Initial index hydration still reads existing messages once per index. Live Foundry verification pending.
+
+- Damage receipts reuse a bounded HTML cache; collapsed damage editors build armor and bonus controls when opened. Injury duplicate rerolls reuse loaded documents and yield during long retries while retaining native table draws and saved application receipts. Passive status synchronization and injury checks coalesce document-event bursts; injury matching skips unrelated item effects. Quickhack menus share one catalog snapshot and inventory lookup per opening.
+
+- Hide Grenade Footprints tracks individual template changes instead of rescanning every scene template on each hook. Explicit hide clicks still inspect current templates. Combat bar and biomonitor resize notifications coalesce per frame; unchanged shared-dock positioning styles are not rewritten.
+
 - Status synchronization (v0.9.34) uses native item effects for bound conditions. Actor-owned fallback markers identify Combat Tools in their description and can be deleted from the Effects tab. Removing a sync marker preserves the injury item.
 
 - Newly created Combat Tools actor effects include “Created by Pneuma Combat Tools.” in their description, including statuses supplied through the token HUD.

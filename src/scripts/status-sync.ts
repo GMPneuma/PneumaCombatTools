@@ -117,14 +117,20 @@ export function statusAuthority(actor: Actor): boolean {
   users.sort((a, b) => Number(b.isGM) - Number(a.isGM) || a.id!.localeCompare(b.id!));
   return users[0]?.id === game.user?.id;
 }
-const refreshRequests = new Map<string, Promise<void>>();
+const refreshRequests = new Map<string, {promise: Promise<void>; dirty: boolean}>();
 export function syncActorStatuses(actor: Actor, changedIds: string[] = [], initialize = false, requestedActive?: boolean): Promise<void> {
   // Only passive refreshes are merged. Explicit status toggles retain their order.
   if (changedIds.length || requestedActive !== undefined) return syncStatuses(actor, changedIds, initialize, requestedActive);
   const key = actor.uuid + ":" + initialize;
-  const existing = refreshRequests.get(key); if (existing) return existing;
-  const next = Promise.resolve().then(() => { refreshRequests.delete(key); return syncStatuses(actor, [], initialize); });
-  refreshRequests.set(key, next); return next;
+  const existing = refreshRequests.get(key);
+  if (existing) { existing.dirty = true; return existing.promise; }
+  const entry = {promise: Promise.resolve(), dirty: true};
+  entry.promise = Promise.resolve().then(async () => {
+    try {
+      do { entry.dirty = false; await syncStatuses(actor, [], initialize); } while (entry.dirty);
+    } finally { refreshRequests.delete(key); }
+  });
+  refreshRequests.set(key, entry); return entry.promise;
 }
 function syncStatuses(actor: Actor, changedIds: string[], initialize: boolean, requestedActive?: boolean): Promise<void> {
   if (!["character", "mook"].includes(String(actor.type))) return Promise.resolve();
