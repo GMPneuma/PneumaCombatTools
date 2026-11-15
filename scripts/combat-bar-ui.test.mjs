@@ -88,9 +88,22 @@ try {
  assert.equal(await bar.locator('.pneuma-bar-health').count(),3,'GM sees every health strip');
  await page.evaluate(()=>{game.user=player;emit('updateUser',player);});
  assert.equal(await bar.locator('.pneuma-bar-health').count(),1,'Players see only owned health');
- await page.evaluate(()=>{window.healthPortrait=document.querySelector('[data-entry-id="c0"] button');tokens[0].actor.system.derivedStats.hp.value=12;emit('updateActor',tokens[0].actor);});
+ await page.evaluate(()=>{window.healthPortrait=document.querySelector('[data-entry-id="c0"] button');tokens[0].actor.system.derivedStats.hp.value=12;emit('updateActor',tokens[0].actor,{'system.derivedStats.hp.value':12});});
  assert.equal(await bar.locator('.pneuma-bar-health').getAttribute('aria-valuenow'),'12');
  assert(await page.evaluate(()=>healthPortrait===document.querySelector('[data-entry-id="c0"] button')),'HP updates retain portrait nodes');
+ await page.evaluate(()=>{
+   window.layoutReads=0;window.nativeBounds=HTMLElement.prototype.getBoundingClientRect;
+   HTMLElement.prototype.getBoundingClientRect=function(){layoutReads++;return nativeBounds.call(this);};
+   for(let i=0;i<100;i++){
+     emit('updateActor',tokens[0].actor,{flags:{unrelated:{value:i}}});
+     emit('updateActor',{uuid:'Actor.unrelated'},{name:'Other'});
+   }
+ });
+ assert.equal(await page.evaluate(()=>layoutReads),0,'unrelated actor changes do not measure layout');
+ await page.evaluate(()=>{tokens[0].actor.system.derivedStats.hp.value=13;emit('updateActor',tokens[0].actor,{system:{derivedStats:{hp:{value:13}}}});});
+ assert.equal(await page.evaluate(()=>layoutReads),0,'HP changes bypass dock measurements');
+ assert.equal(await bar.locator('.pneuma-bar-health').getAttribute('aria-valuenow'),'13');
+ await page.evaluate(()=>{HTMLElement.prototype.getBoundingClientRect=nativeBounds;});
  await page.evaluate(()=>{game.user=gm;emit('updateUser',gm);});
  await page.screenshot({path:'../.ekg-validation/health-preview.png'});
 
@@ -193,7 +206,7 @@ try {
  const ownPortrait=bar.locator('[data-entry-id=c0] [data-action=token]');
  await ownPortrait.dblclick({delay:80});assert.deepEqual(await page.evaluate(()=>calls.sheets),[{id:'t1',force:true}]);
  await bar.locator('[data-entry-id=c1] [data-action=token]').dblclick({delay:80});assert.equal(await page.evaluate(()=>calls.sheets.length),1,'Denied viewers cannot open sheets');
- await page.evaluate(()=>{combat.turns[1].actor.testUserPermission=(_u,level)=>level==='OBSERVER';tokens[1].isVisible=false;emit('updateActor');});
+ await page.evaluate(()=>{combat.turns[1].actor.testUserPermission=(_u,level)=>level==='OBSERVER';tokens[1].isVisible=false;emit('updateActor',combat.turns[1].actor,{ownership:{default:2}});});
  await bar.locator('[data-entry-id=c1] [data-action=token]').dblclick({delay:80});assert.equal(await page.evaluate(()=>calls.sheets.length),2,'Observer access opens an unseen actor sheet without pan or ping');
  await page.evaluate(()=>{combat.turns[1].token=null;emit('updateCombatant');});
  await bar.locator('[data-entry-id=c1] [data-action=token]').dblclick({delay:80});assert.equal(await page.evaluate(()=>calls.sheets.length),3,'Actor-only combatants can open their sheet');

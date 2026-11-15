@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.37 - 2026-11-15
+
+- Ignore unrelated actor changes when refreshing the combat bar. Batch HP-strip updates without rebuilding portraits or measuring dock layout.
+
+Validation: builds and relevant automated regression checks passed. Live Foundry verification remains pending.
+
 ## 0.9.36 - 2026-11-14
 
 - Index pending chat cards by actor and combat, batch repeated invalidations, and prevent overlapping renders. Reuse indexes for unfinished defense payments and turn-end injury reminders.

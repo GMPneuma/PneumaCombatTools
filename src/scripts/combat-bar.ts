@@ -1,4 +1,4 @@
-import {tokenPositionOnly} from "./update-path.js";
+import {tokenPositionOnly,updateTouchesPath} from "./update-path.js";
 import {openCombatBarSettings} from "./combat-bar-settings.js";
 import {barCombat, barEntries, canEndTurn, movementMode, MOVEMENT_MODES, registerBarMovement, validMode, type BarEntry} from "./combat-bar-state.js";
 import {requestEndTurn,registerBarTurns} from "./combat-bar-turn.js";
@@ -9,6 +9,30 @@ let root: HTMLElement | undefined;
 let observer: ResizeObserver | undefined;
 let players: HTMLElement | null = null;
 let frame = 0;
+let healthFrame = 0;
+let displayedEntries:BarEntry[]=[];
+const healthActors=new Set<string>();
+function refreshActor(actor:Actor,changes:Record<string,unknown>):void {
+  const structural=["name","img","ownership","type"].some(path=>updateTouchesPath(changes,path));
+  if(!structural&&!updateTouchesPath(changes,"system"))return;
+  const matches=(candidate:Actor|null|undefined)=>candidate?.uuid===actor.uuid;
+  const combat=barCombat();
+  const relevant=combat
+    ? combat.turns.some(c=>matches(c.actor)||matches(c.token?.actor))
+    : Array.from(game.users?.values()??[]).some(u=>(game.user?.isGM?u.active&&!u.isGM:u.id===game.user?.id)&&matches(u.character));
+  if(!relevant)return;
+  if(structural){refresh();return;}
+  if(!root)return;
+  healthActors.add(actor.uuid);
+  if(!healthFrame)healthFrame=requestAnimationFrame(()=>{
+    healthFrame=0;
+    if(!frame&&root){
+      const entries=new Map(displayedEntries.filter(entry=>healthActors.has((entry.token?.actor??entry.combatant?.actor??entry.actor)?.uuid??"")).map(entry=>[entry.id,entry]));
+      root.querySelectorAll<HTMLElement>("li[data-entry-id]").forEach(row=>{const entry=entries.get(row.dataset.entryId!);if(entry)updateHealth(row,entry);});
+    }
+    healthActors.clear();
+  });
+}
 let positionFrame = 0;
 function schedulePosition(): void {
   if (!positionFrame) positionFrame = requestAnimationFrame(() => { positionFrame = 0; position(); });
@@ -370,6 +394,7 @@ function render(): void {
   position();
   const combat = barCombat();
   const entries = barEntries(combat);
+  displayedEntries=entries;
   const mode = movementMode();
   const endTurn = canEndTurn(combat);
   const size = Number(game.settings!.get(MODULE, "combatBarSize"));
@@ -478,6 +503,7 @@ function render(): void {
 
 function refresh(): void {if (!frame) frame = requestAnimationFrame(render);}
 function remove(): void {
+  cancelAnimationFrame(healthFrame);healthFrame=0;healthActors.clear();displayedEntries=[];
   cancelHold();
   closeBarFlyout();
   observer?.disconnect();
@@ -535,8 +561,9 @@ export function registerCombatBar(): void {
     });
   });
   for (const hook of ["ready", "canvasReady", "renderPlayerList", "renderSceneNavigation", "renderSceneControls", "collapseSidebar", "renderSidebar", "renderCombatTracker", "createToken", "deleteToken",
-    "updateActor", "updateUser", "userConnected", "createCombat", "updateCombat", "deleteCombat", "createCombatant", "updateCombatant", "deleteCombatant"])
+    "updateUser", "userConnected", "createCombat", "updateCombat", "deleteCombat", "createCombatant", "updateCombatant", "deleteCombatant"])
     Hooks.on(hook, refresh);
+  Hooks.on("updateActor",refreshActor);
   const visibility = new WeakMap<Token, boolean>();
   Hooks.on("refreshToken", (token: Token) => {
     const before = visibility.get(token); visibility.set(token, token.isVisible);

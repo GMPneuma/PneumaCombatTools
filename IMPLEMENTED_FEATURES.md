@@ -1,5 +1,7 @@
 # Combat Tools feature inventory
 
+- Combat bar actor updates ignore unrelated actors and fields; relevant system changes batch HP-strip updates without rebuilding entries or measuring dock layout. Name, portrait, type and ownership changes retain full refreshes. Live Foundry verification pending.
+
 - Damage-recipient labels and action buttons occupy explicit grid cells, preserving readable names on narrow cards with either current label-first markup or older action-first markup. Browser checks cover both orders at 260/300/400px; live Foundry verification pending.
 
 - Local performance fixes: pending-card refreshes use actor/combat indexes, batch invalidations before selecting cards, and prevent overlapping asynchronous renders. Unfinished defense-payment lookup and turn-end injury reminders reuse indexes instead of repeatedly traversing chat history. Initial index hydration still reads existing messages once per index. Live Foundry verification pending.
