@@ -424,7 +424,7 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 #token-hud.pneuma-readable-hud .status-effects.pneuma-status-tray { display: block; max-height: 70vh; overflow-y: auto; }
 #token-hud .pneuma-status-grid { display: grid; grid-template-columns: repeat(4, calc(var(--pneuma-status-icon-size, 36px) + 2px)); }
 #token-hud .pneuma-status-group > summary { color: var(--pneuma-status-heading-color, var(--color-text-light-highlight, #f0f0e0)); cursor: pointer; font-size: 13px; line-height: 1.5; text-align: left; padding: 4px; }
-#pneuma-custom-statuses .pneuma-custom-status-row { display:grid; margin-bottom:6px; grid-template-columns:minmax(0,1fr) minmax(0,1.5fr) 32px 32px; align-items:end; gap:8px; padding:10px 0; border-bottom:1px solid #8885; }
+#pneuma-custom-statuses .pneuma-custom-status-row { display:grid; margin-bottom:6px; grid-template-columns:70px 115px minmax(100px,1fr) 95px 100px 70px; align-items:center; gap:8px; padding:10px 8px; border-bottom:1px solid #8885; }
 
 /* The native status picker temporarily takes precedence over combat controls. */
 #token-hud:has(.status-effects.active:not(.pneuma-combat-menu)) .pneuma-combat-column { display: none; }
@@ -980,6 +980,54 @@ button[data-key="pneuma-combattools.configureEvasion"]:disabled {
 #pneuma-custom-statuses .pneuma-custom-status-row input { width: 100%; min-width: 0; }
 #pneuma-custom-statuses .pneuma-custom-status-row button { height: 28px; margin: 0; }
 #pneuma-custom-statuses .pneuma-custom-status-rows { max-height: 55vh; overflow-y: auto; margin-bottom: 10px; }
+#pneuma-custom-statuses > .window-content { min-height:0; overflow:hidden; }
+#pneuma-custom-statuses .pneuma-status-manager { display:flex; flex-direction:column; flex:1; min-height:0; height:auto; overflow:hidden; }
+#pneuma-custom-statuses .pneuma-status-manager > .notes,
+#pneuma-custom-statuses .pneuma-status-manager > .sheet-footer { flex:0 0 auto; }
+#pneuma-custom-statuses .status-tabs { display:flex; flex:0 0 auto; align-items:stretch; gap:0; padding:0; margin:6px 0 0; border:0; }
+#pneuma-custom-statuses .status-tabs .item { flex:1; min-width:0; padding:10px 8px; text-align:center; border:1px solid #8888; border-radius:5px 5px 0 0; background:#8882; text-shadow:none; line-height:1.3; box-shadow:none; }
+#pneuma-custom-statuses .status-tabs .item > span { display:inline-block; font-size:11px; font-weight:normal; opacity:.75; margin-left:3px; }
+#pneuma-custom-statuses .status-tabs .item:hover { background:#8881; text-shadow:none; }
+#pneuma-custom-statuses .status-tabs .item:focus-visible { outline:2px solid currentColor; outline-offset:-3px; }
+#pneuma-custom-statuses .status-tabs .item.active { font-weight:bold; text-decoration:none; border-color:#8888; border-bottom-color:transparent; background:transparent; box-shadow:inset 0 3px 0 currentColor; text-shadow:none; }
+#pneuma-custom-statuses .status-panels { flex:1; overflow-y:auto; min-height:0; padding:10px; border:1px solid #8888; border-top:0; border-radius:0 0 5px 5px; background:transparent; }
+#pneuma-custom-statuses .status-panels > .tab { display:none; }
+#pneuma-custom-statuses .status-panels > .tab.active { display:block; }
+#pneuma-custom-statuses .pneuma-status-list { border:1px solid #8888; border-radius:4px; overflow:hidden; }
+#pneuma-custom-statuses .pneuma-status-config-row,
+#pneuma-custom-statuses .status-table-header { display:grid; grid-template-columns:minmax(140px,1fr) minmax(150px,1.5fr) 105px 130px; align-items:stretch; }
+#pneuma-custom-statuses .status-table-header { font-weight:bold; background:#8883; border-bottom:2px solid #8888; font-size:12px; }
+#pneuma-custom-statuses .status-table-header > span,
+#pneuma-custom-statuses .pneuma-status-config-row > div { padding:10px 8px; min-width:0; border-right:1px solid #8885; }
+#pneuma-custom-statuses .status-table-header > span:last-child,
+#pneuma-custom-statuses .pneuma-status-config-row > div:last-child { border-right:0; }
+#pneuma-custom-statuses .pneuma-status-config-row { border-bottom:1px solid #8886; }
+#pneuma-custom-statuses .pneuma-status-config-row:last-child { border-bottom:0; }
+#pneuma-custom-statuses .pneuma-status-config-row:nth-child(odd) { background:#8881; }
+#pneuma-custom-statuses .pneuma-status-config-row:hover { background:#8882; }
+#pneuma-custom-statuses .status-name-cell { display:flex; gap:8px; align-items:center; overflow-wrap:anywhere; }
+#pneuma-custom-statuses .status-name-cell img { flex:0 0 28px; }
+#pneuma-custom-statuses .status-actions { display:flex; flex-direction:row; align-items:center; justify-content:center; gap:5px; }
+#pneuma-custom-statuses .status-actions > span:empty { display:none; }
+#pneuma-custom-statuses .status-effect-summary { align-content:center; }
+#pneuma-custom-statuses .status-automation-cell { align-content:center; }
+#pneuma-custom-statuses .pneuma-status-config-row small { display:block; font-size:11px; }
+#pneuma-custom-statuses .status-effect-badge { display:inline-block; width:fit-content; padding:2px 6px; border:1px solid currentColor; border-radius:3px; font-size:12px; font-weight:bold; }
+#pneuma-custom-statuses .status-effect-badge[data-effect-state="native"],
+#pneuma-custom-statuses .status-effect-badge[data-effect-state="custom"] { border-left-width:5px; }
+#pneuma-custom-statuses .status-effect-badge[data-effect-state="none"] { border-style:dashed; }
+#pneuma-custom-statuses .status-effect-badge[data-effect-state="missing"],
+#pneuma-custom-statuses .status-effect-badge[data-effect-state="unknown"] { border-style:double; border-width:3px; }
+#pneuma-custom-statuses .status-effect-summary { display:grid; gap:4px; min-width:0; }
+#pneuma-custom-statuses .status-section-colors { display:flex; align-items:center; gap:12px; margin:10px 0; padding-bottom:8px; border-bottom:1px solid #8885; }
+#pneuma-custom-statuses .status-section-colors label { display:flex; align-items:center; gap:8px; white-space:nowrap; }
+#pneuma-custom-statuses .status-section-colors span { font-size:11px; }
+#pneuma-custom-statuses input[type=color] { width:42px; height:28px; padding:2px; }
+#pneuma-custom-statuses .status-user-color input[type=checkbox] { width:auto; height:auto; margin:0 3px 0 0; }
+#pneuma-custom-statuses .status-user-color > span:last-child { font-size:11px; }
+#pneuma-custom-statuses img[data-status-preview] { background:var(--pneuma-icon-well,#242424); border-radius:3px; padding:2px; box-sizing:border-box; object-fit:contain; }
+#pneuma-custom-statuses .pneuma-status-config-row select { min-width:0; width:100%; }
+#pneuma-custom-statuses .pneuma-status-config-row button { margin:0; font-size:12px; }
 #pneuma-custom-statuses footer { display: flex; gap: 8px; margin-top: 12px; }
 #pneuma-quickhack-settings fieldset { margin: 0 0 12px; padding: 10px; }
 #pneuma-quickhack-settings legend { font-weight: bold; }
@@ -1490,3 +1538,36 @@ body.pneuma-dock-full-width #sidebar {
 
 #pneuma-custom-quickhacks .qh-icon-field { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end; gap:4px; margin:8px 0; }
 #pneuma-custom-quickhacks .qh-icon-field label, #pneuma-custom-quickhacks .qh-icon-field button { margin:0; }
+
+#pneuma-custom-statuses .status-color-controls { display:flex; align-items:center; gap:4px; }
+#pneuma-custom-statuses [data-reset-section-color], #pneuma-custom-statuses [data-reset-user-color] { flex:0 0 auto; width:auto; margin:0; padding:0 6px; font-size:12px; }
+
+.pneuma-status-effect-dialog .pneuma-status-effect-view table { width:100%; table-layout:fixed; }
+.pneuma-status-effect-dialog .pneuma-status-effect-view th, .pneuma-status-effect-dialog .pneuma-status-effect-view td { overflow-wrap:anywhere; padding:4px 6px; }
+.pneuma-status-effect-dialog .pneuma-status-effect-view th:first-child { width:60%; }
+
+#pneuma-custom-statuses .status-automation { display:grid; gap:3px; margin-top:4px; }
+#pneuma-custom-statuses .status-automation-badge { width:fit-content; border:1px solid currentColor; border-radius:3px; padding:1px 5px; font-size:11px; font-weight:bold; }
+#pneuma-custom-statuses .status-automation small { line-height:1.3; overflow-wrap:anywhere; }
+#pneuma-custom-statuses .status-actions > * { flex:0 0 auto; }
+
+#pneuma-custom-statuses .pneuma-custom-status-rows { border:1px solid #8888; border-radius:4px; }
+#pneuma-custom-statuses .pneuma-custom-status-row:nth-child(even) { background:#8881; }
+#pneuma-custom-statuses .status-user-icon { display:grid; justify-items:center; gap:4px; }
+#pneuma-custom-statuses .status-user-icon img { width:48px; height:48px; }
+#pneuma-custom-statuses .status-user-icon .status-edit-icon { border:0; background:none; box-shadow:none; text-decoration:underline; font-size:12px; padding:0; width:auto; height:auto; color:inherit; }
+#pneuma-custom-statuses .status-user-effect, #pneuma-custom-statuses .status-user-color { display:grid; gap:4px; }
+#pneuma-custom-statuses .status-field-title { font-size:12px; }
+#pneuma-custom-statuses .status-user-color > label { display:flex; align-items:center; font-size:11px; }
+
+#pneuma-custom-statuses .status-actions button { width:auto; white-space:nowrap; padding:0 6px; }
+#pneuma-custom-statuses .status-actions [data-reset-status] { width:32px; padding:0; }
+#pneuma-custom-statuses .status-actions [data-reset-status] i { margin:0; }
+
+#pneuma-custom-statuses .pneuma-custom-status-row > button,
+#pneuma-custom-statuses .status-actions > button { height:32px; min-height:32px; font-size:13px; display:inline-flex; align-items:center; justify-content:center; gap:4px; line-height:1; white-space:nowrap; padding:0 4px; }
+#pneuma-custom-statuses .pneuma-custom-status-row > button > i,
+#pneuma-custom-statuses .status-actions > button > i { display:inline-block; flex:0 0 auto; width:auto; height:auto; margin:0; padding:0; line-height:1; }
+
+#pneuma-custom-statuses .status-tabs .item + .item { margin-left:-1px; }
+

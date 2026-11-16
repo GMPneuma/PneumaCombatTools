@@ -51,6 +51,7 @@ import { actorQuickhacks, executeQuickhack } from "./quickhack/workflow.js";
 import { connectionFor, trackingCombat, jackOut } from "./quickhack/connections.js";
 import { hasQuickhackSight } from "./quickhack/sight.js";
 import { registerCyberpunkStatuses } from "./status-settings.js";
+import { correctStatusChoices } from "./status-hud.js";
 import { registerEyeHUD } from "./eye-hud.js";
 import { registerItemMarkers, decorateItemList } from "./item-markers.js";
 import { registerCriticalSettings } from "./critical-settings.js";
@@ -212,6 +213,9 @@ Hooks.once("init", () => {
   };
   // Extend the configured HUD: retain native positioning, lifecycle, and renderTokenHUD hooks.
   CONFIG.Token.hudClass = class CombatTokenHUD extends CONFIG.Token.hudClass {
+    protected override _getStatusEffectChoices() {
+      return correctStatusChoices(super._getStatusEffectChoices(),this.object?.actor);
+    }
     override bind(object: Token) {
       if (!object.actor) { selection = undefined; this.clear(); return; }
       super.bind(object);

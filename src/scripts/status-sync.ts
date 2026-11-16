@@ -1,5 +1,7 @@
 import {updateTouchesPath} from "./update-path.js";
 import { masterStatuses, type StatusDefinition } from "./status-catalog.js";
+import {freshStatusDuration,markCombatToolsEffect,matchingStatusEffects,toggleExistingEffects} from "./custom-effects.js";
+import {nativeStatusItem,nativeEffectsForStatus,statusTemplates} from "./status-sources.js";
 const MODULE = "pneuma-combattools";
 const options = { pneumaStatusSync: true, render: true };
 type Bound = StatusDefinition & { binding: NonNullable<StatusDefinition["binding"]> };
@@ -7,7 +9,6 @@ const bound = masterStatuses.filter((s): s is Bound => !!s.binding);
 export const nativeStatusIds = new Map<string,string>();
 const generalByName = new Map(masterStatuses.filter(s=>!s.binding).map(s=>[s.name,s.id]));
 const queues = new Map<string, Promise<void>>();
-const sources = new Map<string, Promise<Item>>();
 const flag = (doc: object, key: string) => foundry.utils.getProperty(doc, "flags." + MODULE + "." + key);
 function matchingItems(actor: Actor, status: Bound): Item[] {
   const b = status.binding;
@@ -19,7 +20,7 @@ function matchingItems(actor: Actor, status: Bound): Item[] {
   });
 }
 function sourceEffects(item: Item, status: Bound): ActiveEffect[] {
-  return Array.from(item.effects).filter(effect => status.binding.kind === "injury" || status.binding.effectNames?.includes(effect.name ?? ""));
+  return nativeEffectsForStatus(item,status);
 }
 function live(effect: ActiveEffect): boolean {
   return !effect.disabled && !effect.isSuppressed && !(effect as ActiveEffect & { system?: { isSuppressed?: boolean } }).system?.isSuppressed;
@@ -28,28 +29,28 @@ function markers(actor: Actor, id: string): ActiveEffect[] {
   return Array.from(actor.effects).filter(effect => effect.statuses.has(id));
 }
 async function sourceItem(status: Bound): Promise<Item> {
-  const key = status.binding.pack + "." + (status.binding.itemId||status.binding.itemName);
-  let promise = sources.get(key);
-  if (!promise) {
-    promise = (async () => {
-      const pack = game.packs!.get(status.binding.pack);
-      // Resolve name-bound drugs from the installed system instead of inventing IDs.
-      const id=status.binding.itemId||(await pack?.getIndex())?.find(row=>row.name===status.binding.itemName)?._id;
-      const item = id?await pack?.getDocument(id):undefined;
+      const item = await nativeStatusItem(status);
       if (!item || String((item as Item).type) !== (status.binding.kind === "injury" ? "criticalInjury" : "drug"))
         throw new Error("Native " + status.name + " item is unavailable.");
       return item as Item;
-    })();
-    sources.set(key, promise); promise.catch(() => sources.delete(key));
-  }
-  return promise;
 }
 async function changeSource(actor: Actor, status: Bound, active: boolean): Promise<void> {
+  const existing=matchingStatusEffects(actor,[status.id,nativeStatusIds.get(status.id)??status.id],status.name)
+    .filter(effect=>!flag(effect,"syncMarker") && (effect.parent===actor || effect.parent instanceof Item && !["criticalInjury","drug"].includes(String(effect.parent.type))));
   let items = matchingItems(actor, status);
+  if(existing.length) {
+    if(!active)await toggleExistingEffects(existing,[status.id,nativeStatusIds.get(status.id)??status.id],false);
+    else {
+      // Preserve the active native variant instead of enabling a duplicate penalty.
+      if(!items.some(item=>sourceEffects(item,status).some(live)))
+        await toggleExistingEffects(existing,[status.id,nativeStatusIds.get(status.id)??status.id],true);
+      return;
+    }
+  }
   if (!active) {
     for (const item of items) {
       const effects = sourceEffects(item, status).filter(live);
-      if (effects.length) await item.updateEmbeddedDocuments("ActiveEffect", effects.map(e => ({_id:e.id!, disabled:true})), options);
+      if (effects.length) await toggleExistingEffects(effects,[status.id,nativeStatusIds.get(status.id)??status.id],false);
       if (status.binding.kind === "injury" && !item.effects.size) await item.update({["flags."+MODULE+".hideStatusMarker"]:true} as never,options);
     }
     return;
@@ -60,6 +61,20 @@ async function changeSource(actor: Actor, status: Bound, active: boolean): Promi
     if (status.binding.kind === "effect") foundry.utils.setProperty(source, "system.amount", 0);
     items = await actor.createEmbeddedDocuments("Item", [source] as Parameters<Actor["createEmbeddedDocuments"]>[1], options) as Item[];
     if (!items.length) throw new Error("Could not add native " + status.name + ".");
+  }
+  // Add configured mechanics to effectless native items without overwriting existing effects.
+  const supplementalUuid=statusTemplates()[status.id]?.effectUuid;
+  if(supplementalUuid) {
+    const missing=items.filter(item=>!sourceEffects(item,status).length);
+    if(missing.length&&!sourceEffects(await sourceItem(status),status).length) {
+      const template=await fromUuid(supplementalUuid as Parameters<typeof fromUuid>[0]);
+      if(!(template instanceof ActiveEffect))throw Error("Supplemental effect is missing. Reset or edit "+status.name+" in Status effects.");
+      for(const item of missing) {
+        const {_id,...data}=template.toObject();
+        const rows=[markCombatToolsEffect({...data,duration:freshStatusDuration(actor,data.duration),origin:item.uuid,transfer:true,disabled:false,statuses:[...new Set([...template.statuses,status.id])]})];
+        await item.createEmbeddedDocuments("ActiveEffect",rows as Parameters<Item["createEmbeddedDocuments"]>[1],options);
+      }
+    }
   }
   if (status.binding.kind === "injury") {
     const disabledMarkers = markers(actor,status.id).filter(effect=>effect.disabled && flag(effect,"syncMarker"));
@@ -140,7 +155,7 @@ function syncStatuses(actor: Actor, changedIds: string[], initialize: boolean, r
     for (const id of new Set(requested)) {
       const status = bound.find(status => status.id === id);
       if (!status) continue;
-      const active = requestedActive ?? !boundStatusActive(actor,id);
+      const active = requestedActive ?? !(boundStatusActive(actor,id)||matchingStatusEffects(actor,[id,nativeStatusIds.get(id)??id],status.name).some(live));
       try { await changeSource(actor, status, active); }
       catch (error) {
         // Restore icons from the actual item state if importing/removing the source failed.

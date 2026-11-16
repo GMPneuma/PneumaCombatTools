@@ -1,13 +1,41 @@
-<form>
-  <p class="notes">Custom statuses appear alongside the Cyberpunk master list. They are actor effects and token icons; adding a name does not add mechanics.</p>
-  <div class="pneuma-custom-status-rows">
-    {{#each rows}}<div class="pneuma-custom-status-row" data-status-id="{{id}}">
-      <label>Status name<input class="status-name" aria-label="Status name" value="{{name}}" required></label>
-      <label>Icon path<input class="status-img" aria-label="Icon path" value="{{img}}" required></label>
-      <button type="button" data-pick-icon title="Choose icon"><i class="fas fa-image"></i></button>
-      <button type="button" data-remove-status title="Remove"><i class="fas fa-trash"></i></button>
-    </div>{{/each}}
-  </div>
-  <footer class="sheet-footer flexrow"><button type="button" data-add-status><i class="fas fa-plus"></i> Add status</button>
-  <button type="submit"><i class="fas fa-save"></i> Save statuses</button></footer>
+<form class="pneuma-status-manager">
+  <p class="notes">Has effect refers to a modifier effect. Combat Tools automation is listed separately and may work without one.</p>
+  <nav class="status-tabs tabs" data-group="primary" aria-label="Status categories">
+    {{#each tabs}}<a class="item" data-tab="{{id}}" data-group="primary">{{label}} <span>({{rows.length}})</span></a>{{/each}}
+  </nav>
+  <section class="status-panels">
+    {{#each tabs}}
+    <div class="tab" data-tab="{{id}}" data-group="primary">
+      <p class="notes">{{description}}</p>
+      <div class="status-section-colors"><label>Default icon color <input type="color" class="status-section-color" data-section="{{id}}" aria-label="{{label}} default icon color" value="{{color}}"></label><button type="button" data-reset-section-color aria-label="Reset section icon color" title="Reset to grey">Reset</button><span>Applies to the token menu and token icons. Red addiction icons stay unchanged.</span></div>
+      {{#if isCustom}}
+      <div class="pneuma-custom-status-rows">
+        {{#each rows}}<div class="pneuma-custom-status-row" data-status-id="{{id}}" data-effect-uuid="{{effectUuid}}">
+          <div class="status-user-icon"><img src="{{img}}" data-status-preview alt="Status icon" width="48" height="48"><input type="hidden" class="status-img" value="{{img}}"><button type="button" class="status-edit-icon" data-pick-icon aria-label="Edit icon">Edit icon</button></div>
+          <div class="status-user-color"><span class="status-field-title">Icon color</span><span class="status-color-controls"><input type="color" class="status-color" aria-label="Status icon color" value="{{colorValue}}"><button type="button" data-reset-user-color aria-label="Reset status icon color" title="Use section default">Reset</button></span><label><input type="checkbox" class="status-inherit-color" {{#if inheritColor}}checked{{/if}}> Use section default</label></div>
+          <label>Name<input class="status-name" aria-label="Status name" value="{{name}}" required></label>
+          <div class="status-user-effect"><span class="status-field-title">Effect</span><span class="status-effect-badge" data-effect-state="{{effectState}}" title="{{effectDetail}}">{{effectLabel}}</span></div>
+          <button type="button" data-edit-custom aria-label="Edit effect"><i class="fas fa-pen-to-square"></i> Edit Effect</button>
+          <button type="button" data-remove-status title="Delete status" aria-label="Delete status"><i class="fas fa-trash"></i> Delete</button>
+        </div>{{else}}<p class="notes">No user effects yet.</p>{{/each}}
+      </div>
+      <button type="button" data-add-status><i class="fas fa-plus"></i> Add user effect</button>
+      {{else}}
+      <div class="pneuma-status-list" role="table" aria-label="{{label}}">
+        <div class="status-table-header" role="row"><span role="columnheader">Status</span><span role="columnheader">Combat Tools Automation</span><span role="columnheader">Effect</span><span role="columnheader">Effect buttons</span></div>
+        {{#each rows}}<div role="row" class="pneuma-status-config-row" data-status-id="{{id}}" data-protected-color="{{protectedColor}}">
+          <div class="status-name-cell" role="cell"><img src="{{img}}" data-status-preview alt="" width="28" height="28"><strong>{{name}}</strong></div>
+          <div class="status-automation-cell" role="cell">{{#if automation}}<div class="status-automation"><span class="status-automation-badge">{{automationLabel}}</span><small>{{automation}}</small></div>{{else}}<span aria-label="No Combat Tools automation">—</span>{{/if}}</div><div class="status-effect-summary" role="cell">{{#if showEffectState}}<span class="status-effect-badge" data-effect-state="{{effectState}}" title="{{effectDetail}}">{{effectLabel}}</span>{{else}}<span aria-label="Managed by Combat Tools">—</span>{{/if}}</div>
+          <div class="status-actions" role="cell">
+          {{#if readOnly}}<button type="button" data-view-status><i class="fas fa-eye"></i> View effect</button>
+          {{else}}{{#if canEditEffect}}<button type="button" data-edit-status title="Configure a supplemental effect for a status without a system effect." {{#if unavailable}}disabled{{/if}}><i class="fas fa-pen-to-square"></i> {{#if customized}}Edit{{else}}Add effect{{/if}}</button>{{else}}<span></span>{{/if}}
+          {{#if customized}}<button type="button" data-reset-status title="Remove the added effect from this status" aria-label="Remove effect"><i class="fas fa-trash" aria-hidden="true"></i></button>{{else}}<span></span>{{/if}}{{/if}}</div>
+        </div>{{else}}<p class="notes">No statuses in this category.</p>{{/each}}
+      </div>
+      {{/if}}
+    </div>
+    {{/each}}
+  </section>
+  <p class="notes">System effects are view-only. Added effects remain editable. Remove disconnects an added effect without deleting its template or existing Actor effects. Editing saves pending user rows; viewing does not save anything.</p>
+  <footer class="sheet-footer flexrow"><button type="submit"><i class="fas fa-save"></i> Save settings</button></footer>
 </form>

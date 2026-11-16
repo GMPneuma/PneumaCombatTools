@@ -1,5 +1,17 @@
 # Combat Tools feature inventory
 
+Status icon colors (2026-11-15, local/unreleased): In Jail is a prepopulated, editable/removable example in User effects. Each of the four tabs has a saved default icon color; user entries can override it or use the section default. Red addiction icons retain their original artwork. Configuration previews use contrasting wells for light/dark visibility; token-menu icons retain native backgrounds. Saved colors redraw token effects and overlays without modifying effect documents or modifiers. Automated verification is separate from live Foundry validation.
+
+- Status configuration displays each status name once, without the redundant source-name subtitle. Effect-presence labels and modifier counts remain visible.
+
+- Status configuration rows explicitly identify **No effect**, **Has effect — system/custom**, or an unavailable/missing source, with modifier counts. Existing system effects offer **View effect** only, in a display-only dialog with no saves or document creation. User-added supplemental effects remain editable. The earlier native Item replacement path is removed; legacy Item overrides are ignored without deleting world Items or changing existing Actor effects.
+
+- Status editor layout fix: overrides Foundry v12's full-basis form notes inside the vertical form and confines scrolling to the status panels. Browser regression includes the confirmed native CSS rule and 29 rows, checking visible tabs, nonzero content height, footer placement, scrolling and narrower widths. Updated build still requires copying to the live server.
+
+- Local/unreleased: **Configure status effects** replaces the custom-only editor with four tabs: System effects, System statuses without effects, Combat Tools, and User effects. Categories inspect registered statuses and installed source Items each time the window opens. Native effect variants are view-only. Effectless native injuries may receive supplemental modifiers on their existing Item, and Reset disconnects added templates without deleting copies or changing Actor effects. Build/unit and browser-fixture checks pass; live Foundry verification pending.
+
+- Local/unreleased: status toggles inspect current Actor and owned-item effects by status ID, then localized name, preserving existing modifiers and disabling effects instead of deleting them. Custom statuses can create reusable world-Item templates through CPR's `createEffect` method and open the registered native effect editor. Applying a template copies its current modifiers and flags; existing Actor instances are not overwritten. Intoxicated uses Font Awesome's face-dizzy icon, with no assumed penalty. Live Foundry verification pending.
+
 - Combat bar actor updates ignore unrelated actors and fields; relevant system changes batch HP-strip updates without rebuilding entries or measuring dock layout. Name, portrait, type and ownership changes retain full refreshes. Live Foundry verification pending.
 
 - Damage-recipient labels and action buttons occupy explicit grid cells, preserving readable names on narrow cards with either current label-first markup or older action-first markup. Browser checks cover both orders at 260/300/400px; live Foundry verification pending.
@@ -741,6 +753,53 @@ Retired the Show armor controls on normal damage cards setting. Rolled CombatToo
 
 The ordinary and shared area damage editors include Halve Armor beside Always Ablate. It starts from the rolled half-SP value and can be changed before damage application. Full armor bypass is preserved.
 
+Status summary simplification (2026-11-15, local/unreleased): removed effect dropdowns and modifier-count sublines from status rows. Rows show Has effect or No effect; diagnostic details remain in the badge tooltip. View effect displays all native variants in one read-only dialog.
+
+Status tab labels (2026-11-15, local/unreleased): renamed Combat Tools to Combat Tools Statuses and User effects to Custom User Statuses.
+
+Status color resets (2026-11-15, local/unreleased): Reset beside each section color restores white. Reset beside a user color restores inheritance from its section. Previews update immediately; Save settings applies the changes.
+
+Effect view and removal labels (2026-11-15, local/unreleased): the read-only view shows modifier tables and any nonzero duration directly, without expandable raw flags or empty duration fields. Dialog height fits content and long values wrap. Supplemental-effect Reset is now labeled Remove; color Reset buttons retain their names and behavior. Removing disconnects the template without deleting world Items or existing Actor effects.
+
+CT automation labels (2026-11-15, local/unreleased): status settings show a Combat Tools automation badge and a short source-reviewed description separately from modifier-effect availability. Descriptions distinguish direct status behavior, reminders, and workflow-only behavior; custom user entries do not inherit automation claims by name. On Fire applies 2/4/6 HP directly at turn end, highest level only, with an active GM and combat progression. Injury damage cards still require Apply. This change documents existing behavior; it does not add automation.
+
+Managed status controls (2026-11-15, local/unreleased): automation/reminder descriptions occupy the effect-summary column instead of No effect. Automatic and workflow-managed statuses cannot receive new supplemental effects from this editor. Reminder-only statuses retain Add effect. Native effects retain View effect. Existing supplemental templates remain visible, editable and removable; removal disconnects them without deleting documents. User-created statuses remain independently configurable.
+
+Status table layout (2026-11-15, local/unreleased): built-in status sections now have separate Status, Modifier effect, Combat Tools automation, and Actions columns, with headers, column dividers, alternating row shading, and an outer border. Managed statuses without a modifier show a dash in that column; their automation remains in its own column. Existing control behavior is unchanged.
+
+Custom user status layout (2026-11-15, local/unreleased): larger 48px icon at the far right with Edit icon beneath it. Moving left: icon color, name, effect state, Edit Effect, Delete. Icon paths are managed through the native FilePicker; existing save/color behavior remains.
+
+Status column order (2026-11-15, local/unreleased): Status → CT Automation → Effect → Effect buttons, placing effect actions directly beside effect availability.
+
+Status tab styling (2026-11-15, local/unreleased): bordered tabs connect to a shared framed content panel; the selected tab has a strong top edge and opens into the panel. Foundry tab selectors, data attributes, and controller remain unchanged.
+
+Custom user row order corrected (2026-11-15, local/unreleased): left to right is Icon, Icon color, Name, Effect, Edit Effect, Delete. Supersedes the earlier reversed layout.
+
+Status table header (2026-11-15, local/unreleased): expanded CT Automation to Combat Tools Automation.
+
+Effect action layout (2026-11-15, local/unreleased): existing supplemental effects use an icon + Edit button beside an accessible trash button. Removed redundant View only text beneath native View effect buttons.
+
+Status button alignment (2026-11-15, local/unreleased): explicit flex centering keeps action icons and labels vertically aligned and prevents the custom Delete label wrapping below its button.
+
+Status wording (2026-11-15, local/unreleased): expanded all remaining CT abbreviations in runtime user-facing text to Combat Tools.
+
+Status tab contrast (2026-11-15, local/unreleased): selected tab and content panel share darker translucent shading; inactive tabs use medium shading. Text colors remain inherited from the active theme.
+
+Status tab refinement (2026-11-15, local/unreleased): supersedes framed/dark tab styling. Restored the native content background; tabs now have spacing, subtle hover/selection shading, smaller counts, and a bottom selection indicator. Existing table styling and Foundry tab behavior remain.
+
+Status review fixes (2026-11-15, local/unreleased): per-Actor status toggle serialization prevents overlapping local activations from duplicating custom effects. Bound-status deactivation disables both reused Actor effects and native Item effects, while activation preserves an already-active native variant. New Actor and supplemental Item copies reset template start times; round/turn durations use the actor encounter and current round/turn. Outside combat, round durations use three seconds per round and turn-based templates require an active encounter. New copies receive the Combat Tools attribution flag without changing source templates or existing native flags. Regression tests cover concurrency, failure recovery, native/custom coexistence, and duration boundaries; live Foundry validation pending.
+
+Existing custom status attribution (2026-11-15, local/unreleased): Actor-sheet rendering recognizes configured custom status effects, including old In Jail copies without creation flags, and displays (Combat Tools). Uses the same dynamic ID/name matching as status reuse. No effect data, modifiers, or deletion permissions are changed.
+
+Uniform grey status defaults (2026-11-15, local/unreleased): all section defaults and Reset now use #888888. Existing white section defaults migrate to grey once; other section colors and per-user overrides remain. Addiction artwork stays red. Users can select white explicitly after migration.
+
+Containing tabs and button sizing (2026-11-15, local/unreleased): restored adjoining tabs connected to a bordered content panel with the native content background. Effect actions have explicit 32px height; Edit and trash remain side by side. Supersedes the separated-tab design.
+
+
+- Token status-menu selection now uses enabled, unsuppressed applicable Actor/Item effects. Disabled effects retained on the sheet no longer brighten HUD icons; active aliases and overlays remain supported. Verified with automated state-transition tests; live Foundry validation pending.
+
+- Turning off an effect attributed to Combat Tools now removes the instance, including custom supplemental Item effects; native effects are retained and disabled. Sheet disable updates use the same ownership predicate as the attribution label. All module-created effect paths carry attribution, including supplemental Item copies. No startup purge of existing disabled effects is performed. Automated checks passed; live Foundry validation remains pending.
+
 ### AoE evasion settings (v0.9.38)
 
 - Grouped Evasion / Movement & Cover Up controls with a full-width eligibility selector and contextual help.
@@ -750,3 +809,5 @@ The ordinary and shared area damage editors include Halve Armor beside Always Ab
 - Automated functional checks and browser form checks passed; live Foundry/theme verification pending.
 
 AoE layout correction (v0.9.39): rule panels use grid layout so native form-note flex sizing cannot push Cover Up outside its panel. Browser regression covers expanded Rule details at three widths; live Foundry verification pending.
+
+Status-menu release completion (v0.9.40, 2026-11-16): the status-manager, custom-effect, icon-color, attribution/removal and HUD-state changes described above are included in this release. They were not included in v0.9.38 or v0.9.39. Earlier local/unreleased labels record their implementation history. Live Foundry validation remains pending.

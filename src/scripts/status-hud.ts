@@ -1,4 +1,23 @@
 import type { StatusDefinition } from "./status-catalog.js";
+/** Foundry v12 counts disabled Actor effects as selected in its native HUD choices. */
+export function correctStatusChoices<T extends Record<string, {isActive:boolean;isOverlay:boolean;cssClass:string}>>(choices:T,actor:Actor|null|undefined):T {
+  const active=new Set<string>(), overlays=new Set<string>();
+  for(const effect of actor?.allApplicableEffects()??[]) {
+    if(effect.disabled||effect.isSuppressed||(effect as ActiveEffect & {system?:{isSuppressed?:boolean}}).system?.isSuppressed)continue;
+    for(const id of effect.statuses) {
+      active.add(id);
+      if(foundry.utils.getProperty(effect,"flags.core.overlay"))overlays.add(id);
+    }
+  }
+  for(const [id,choice] of Object.entries(choices)) {
+    choice.isActive=active.has(id);choice.isOverlay=overlays.has(id);
+    const classes=choice.cssClass.split(/\s+/).filter(value=>value&&value!=="active"&&value!=="overlay");
+    if(choice.isActive)classes.push("active");
+    if(choice.isOverlay)classes.push("overlay");
+    choice.cssClass=classes.join(" ");
+  }
+  return choices;
+}
 /** Move native nodes rather than replace them: Foundry keeps its click/right-click handlers. */
 export function groupStatusHUD(root: HTMLElement, statuses: StatusDefinition[]): void {
   const tray = root.querySelector<HTMLElement>(".status-effects:not(.pneuma-combat-menu)");

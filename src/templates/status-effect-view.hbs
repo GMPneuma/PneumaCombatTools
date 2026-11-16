@@ -1,0 +1,8 @@
+<section class="pneuma-status-effect-view">
+  <p><strong>{{name}}</strong> — View only</p>
+  <table><thead><tr><th>Modifier</th><th>Operation</th><th>Value</th></tr></thead><tbody>
+    {{#each changes}}<tr><td>{{key}}</td><td>{{mode}}</td><td>{{value}}</td></tr>
+    {{else}}<tr><td colspan="3">No modifier changes stored on this effect.</td></tr>{{/each}}
+  </tbody></table>
+  {{#if duration}}<p>Duration: {{duration}}</p>{{/if}}
+</section>

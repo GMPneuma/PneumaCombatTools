@@ -10,9 +10,13 @@ const {validateCustomStatuses,configuredStatuses}=await import("../dist/scripts/
 class Collection extends Map { [Symbol.iterator](){return this.values();} }
 let serial=0;
 class Effect {
+ async delete(){this.parent.effects.delete(this.id);}
+ async update(data){Object.assign(this,data);if(data.statuses)this.statuses=new Set(data.statuses);return this;}
  constructor(data,parent){Object.assign(this,data);this.id=data._id??"e"+(++serial);this.parent=parent;this.name=data.name;this.disabled=!!data.disabled;this.statuses=new Set(data.statuses??[]);this.system={isSuppressed:false};}
+ toObject(){const {parent,statuses,...data}=this;return {...data,statuses:[...statuses]};}
 }
 class Item {
+ async createEmbeddedDocuments(_type,rows){return rows.map(row=>{const effect=new Effect(row,this);this.effects.set(effect.id,effect);return effect;});}
  async update(changes){for(const [key,value] of Object.entries(changes))set(this,key,value);}
  constructor(data,parent){Object.assign(this,data);this.id=data._id??"i"+(++serial);this.parent=parent;this.effects=new Collection((data.effects??[]).map(e=>{const doc=new Effect(e,this);return [doc.id,doc];}));}
  async updateEmbeddedDocuments(_type,rows){for(const row of rows)Object.assign(this.effects.get(row._id),row,row.statuses?{statuses:new Set(row.statuses)}:{});}
@@ -27,9 +31,29 @@ class Actor {
  async deleteEmbeddedDocuments(type,ids){if(type==="Item"&&this.failDelete)throw Error("delete failed");for(const id of ids)(type==="Item"?this.items:this.effects).delete(id);}
  async updateEmbeddedDocuments(_type,rows){for(const row of rows)Object.assign(this.effects.get(row._id),row);}
 }
-globalThis.Actor=Actor;globalThis.Item=Item;
+globalThis.Actor=Actor;globalThis.Item=Item;globalThis.ActiveEffect=Effect;
 const leg=masterStatuses.find(s=>s.name==="Broken Leg");
 const stim=masterStatuses.find(s=>s.name==="Stim");
+test("legacy world Item overrides cannot replace the native source during application",async()=>{
+ const actor=setup();
+ game.settings.get=(_module,key)=>key==='statusTemplates'?{[stim.id]:{itemUuid:'Item.old',effectUuid:'Item.old.ActiveEffect.old'}}:null;
+ globalThis.fromUuid=async()=>{throw Error('Legacy replacement must not be read');};
+ await syncActorStatuses(actor,[stim.id],false,true);
+ const [item]=actor.items;const [effect]=item.effects;
+ assert.equal(item.name,'Stim');assert.deepEqual(effect.changes,[{key:'native',value:1}]);
+});
+test("configured effectless injury removes module modifiers and recreates them from the template",async()=>{
+ const actor=setup(),status=masterStatuses.find(s=>s.name==='Broken Arm');
+ const template=new Item({name:status.name,type:'criticalInjury',effects:[{name:status.name,statuses:[status.id],changes:[{value:'-2'}],flags:{native:true}}]});
+ game.settings.get=(_module,key)=>key==='statusTemplates'?{[status.id]:{effectUuid:'Item.template.ActiveEffect.effect'}}:null;
+ globalThis.fromUuid=async()=>Array.from(template.effects)[0];
+ game.packs.get=()=>({getDocument:async()=>new Item({name:status.name,type:'criticalInjury',effects:[]})});
+ const [item]=await actor.createEmbeddedDocuments('Item',[{name:status.name,type:'criticalInjury',effects:[]}]);
+ await syncActorStatuses(actor,[status.id],false,true);
+ assert.equal(item.effects.size,1);const [effect]=item.effects;assert.equal(effect.changes[0].value,'-2');assert.equal(actor.effects.size,0);
+ effect.changes=[{value:'-4'}];await syncActorStatuses(actor,[status.id],false,false);assert.equal(item.effects.size,0);
+ await syncActorStatuses(actor,[status.id],false,true);const [fresh]=item.effects;assert.notEqual(fresh,effect);assert.equal(fresh.disabled,false);assert.equal(fresh.changes[0].value,'-2');assert.equal(item.effects.size,1);
+});
 test("status sync preserves effect origins so GM-only sheet controls do not change native player actions",async()=>{
  const actor=setup();
  const [item]=await actor.createEmbeddedDocuments("Item",[{name:"Synthcoke",type:"drug",effects:[{name:"Synthcoke Primary"}]}]);
@@ -46,7 +70,7 @@ test("status sync preserves effect origins so GM-only sheet controls do not chan
 });
 const marker=(actor,status,disabled=false)=>actor.createEmbeddedDocuments("ActiveEffect",[{name:status.name,statuses:[status.id],disabled,changes:[]}]);
 function setup(){
- globalThis.game={user:{id:"gm",isGM:true},users:{filter:fn=>[{id:"gm",isGM:true,active:true},{id:"owner",active:true}].filter(fn)},settings:{get:()=>null,storage:{get:()=>new Map()}},
+ globalThis.game={time:{worldTime:500},i18n:{localize:s=>s},user:{id:"gm",isGM:true},users:{filter:fn=>[{id:"gm",isGM:true,active:true},{id:"owner",active:true}].filter(fn)},settings:{get:()=>null,storage:{get:()=>new Map()}},
  packs:{get:pack=>({getDocument:async id=>{
    const status=masterStatuses.find(s=>s.binding?.pack===pack&&s.binding.itemId===id);
    return {type:status.binding.kind==="injury"?"criticalInjury":"drug",toObject:()=>({_id:id,name:status.binding.itemName,type:status.binding.kind==="injury"?"criticalInjury":"drug",system:{},effects:status.binding.kind==="effect"?[...new Set(masterStatuses.filter(s=>s.binding?.pack===pack&&s.binding.itemId===id).flatMap(s=>s.binding.effectNames??[]))].map(name=>({name,disabled:true,changes:[{key:"native",value:1}]})):[{name:"Native MOVE penalty",changes:[{key:"system.stats.move.value",value:-4}]}]})};
@@ -56,8 +80,8 @@ function setup(){
 }
 test("catalog includes six pharmacy additions and retains 22 native injury bindings",()=>{
  for(const name of ["Iron Grip","Asphyxiating"])assert.ok(!masterStatuses.some(status=>status.name===name));
- assert.equal(masterStatuses.length,74);assert.equal(masterStatuses.filter(s=>s.binding?.kind==="injury").length,22);
- assert.equal(new Set(masterStatuses.map(s=>s.id)).size,74);
+ assert.equal(masterStatuses.length,75);assert.equal(masterStatuses.filter(s=>s.binding?.kind==="injury").length,22);
+ assert.equal(new Set(masterStatuses.map(s=>s.id)).size,75);
  setup();assert.equal(configuredStatuses().filter(s=>s.name==="In Jail").length,1);
 });
 test("native injury carries its token status and toggles without deleting the item",async()=>{
@@ -197,4 +221,34 @@ test("Synthcoke sheet and token toggles use the same native primary and preserve
  await syncActorStatuses(actor,[id],false,false);assert.equal(primary.disabled,true);
  assert.deepEqual(primary.duration,duration);assert.deepEqual(primary.changes,changes);assert.equal(item.system.amount,3);
  assert.ok(regular.disabled && addiction.disabled);assert.equal(actor.effects.size,0);
+});
+
+test('turning a bound status off disables both actor copies and native penalties without deleting items',async()=>{
+ const actor=setup();
+ const [item]=await actor.createEmbeddedDocuments('Item',[{name:leg.binding.itemName,type:'criticalInjury',effects:[{name:'Native MOVE',statuses:[leg.id],changes:[{key:'MOVE',value:'-4'}]}]}]);
+ const [manual]=await marker(actor,leg);const [native]=item.effects;
+ await syncActorStatuses(actor,[leg.id],false,false);
+ assert.equal(manual.disabled,true);assert.equal(native.disabled,true);assert.equal(actor.items.size,1);
+ await syncActorStatuses(actor,[leg.id]);assert.equal(manual.disabled,false);assert.equal(native.disabled,true);
+ await syncActorStatuses(actor,[leg.id]);assert.equal(manual.disabled,true);assert.equal(native.disabled,true);
+ native.disabled=false;await syncActorStatuses(actor,[leg.id],false,true);
+ assert.equal(manual.disabled,true);assert.equal(native.disabled,false);
+ assert.deepEqual(native.changes,[{key:'MOVE',value:'-4'}]);
+});
+test('supplemental effects on native items receive fresh time and preserve source template data',async()=>{
+ const actor=setup(),status=masterStatuses.find(s=>s.name==='Broken Arm');
+ const combat={id:'current',started:true,active:true,scene:{id:'scene'},round:9,turn:1,turns:[{},{},{}],combatants:[{actor}]};
+ globalThis.canvas={scene:{id:'scene'}};game.combats=new Map([['current',combat]]);
+ const template=new Effect({name:status.name,changes:[{value:'-2'}],duration:{seconds:null,rounds:0,turns:1,startTime:1,startRound:0,startTurn:0,combat:'old'},flags:{native:true}},new Item({}));
+ game.settings.get=(_m,key)=>key==='statusTemplates'?{[status.id]:{effectUuid:'template'}}:null;
+ globalThis.fromUuid=async()=>template;
+ game.packs.get=()=>({getDocument:async()=>new Item({name:status.name,type:'criticalInjury',effects:[]})});
+ const [item]=await actor.createEmbeddedDocuments('Item',[{name:status.name,type:'criticalInjury',effects:[]}]);
+ await syncActorStatuses(actor,[status.id],false,true);
+ const [copy]=item.effects;assert.equal(copy.duration.combat,'current');assert.equal(copy.duration.startRound,9);assert.equal(copy.duration.startTurn,1);assert.equal(copy.duration.startTime,500);
+ const {durationExpired}=await import('../dist/scripts/effect-duration.js');assert.equal(durationExpired(copy.duration),false);
+ combat.turn=2;assert.equal(durationExpired(copy.duration),true);
+ assert.equal(template.duration.combat,'old');assert.equal(template.duration.startTime,1);
+ assert.equal(copy.flags.native,true);assert.equal(copy.flags['pneuma-combattools'].createdByCombatTools,true);
+ delete globalThis.canvas;
 });

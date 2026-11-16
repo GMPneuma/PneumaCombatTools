@@ -3,6 +3,7 @@
  * Mechanical bindings use native system items, never copied modifier formulas. */
 export interface StatusDefinition { id: string; name: string; img: string; group: "head" | "body" | "general" | "custom" | "pharma" | "drugs" | "addiction"; binding?: { kind: "injury" | "effect"; pack: string; itemId: string; itemName: string; effectNames?: string[] } }
 export const masterStatuses: StatusDefinition[] = [
+  {id:"pneuma-intoxicated",name:"Intoxicated",img:"modules/pneuma-combattools/styles/face-dizzy.svg",group:"general"},
   {id:"pneuma-needs-stabilization",name:"Needs Stabilization",img:"icons/svg/regen.svg",group:"general"},
 {
   "id": "pneuma-berserker-addiction",

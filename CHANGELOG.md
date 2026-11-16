@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.40 - 2026-11-16
+
+- Include the completed status-menu work omitted from v0.9.38 and v0.9.39: four status tabs, effect summaries and native-effect viewing, automation descriptions, custom effect editing, and section/per-status icon colors.
+- Include status activation fixes: serialized toggles, fresh effect durations, correct active HUD highlighting, and Combat Tools effect attribution/removal while retaining native effects.
+- Retain the AoE evasion changes and layout correction from the preceding releases.
+
+Validation: automated status and browser regressions; live Foundry verification remains pending.
+
 ## 0.9.39 - 2026-11-15
 
 - Fix Allow Cover Up overflowing its settings panel and overlapping expanded Rule details. Grid layout prevents native form-note flex sizing from stretching the panel contents.
