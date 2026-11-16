@@ -85,7 +85,7 @@ async function tokenActor(uuid: string): Promise<Actor> {
   if (!token?.actor) throw new Error("The combat token or actor no longer exists.");
   return token.actor;
 }
-export function offer(actor: Actor, ranged: boolean, combat?: Combat): EvasionOffer {
+export function offer(actor: Actor, ranged: boolean, combat?: Combat, mode = game.settings!.get(MODULE, "evasionEligibility")): EvasionOffer {
   const blocked=evasionBlocked(actor);
   if(blocked)return {allowed:false,penalty:0,cost:0,free:0,reason:blocked};
   if (!ranged) return { allowed: true, penalty: 0, cost: 0, free: 0, reason: "Free evasion" };
@@ -102,7 +102,6 @@ export function offer(actor: Actor, ranged: boolean, combat?: Combat): EvasionOf
       .some(ability => ["threat detection", game.i18n!.localize("CPR.global.role.solo.ability.threatDetection").toLowerCase()]
         .includes(ability.name.toLowerCase()) && Number(ability.rank) >= 2));
   const usage = combat ? flag<Usage>(combat, "evasionUsage." + defenderKey(actor)) : undefined;
-  const mode = game.settings!.get(MODULE, "evasionEligibility");
   if (ranged && mode === "custom" && usage?.round.startsWith(combat?.id + ":")
     && Number(usage.round.split(":")[1]) > Number(combat?.round)) {
     return { allowed: false, penalty: 0, cost: 0, free: 0,
@@ -316,10 +315,13 @@ export async function handleCombatRequest(request: Request): Promise<Claim | und
   await writeExchange(message, data);
   await finish(message, data, actor);
 }
-export function serialized(request: Request): Promise<Claim | undefined> {
-  const next = queue.then(() => handleCombatRequest(request));
+export function evasionWork<T>(run:()=>Promise<T>):Promise<T> {
+  const next = queue.then(run);
   queue = next.catch(() => undefined);
   return next;
+}
+export function serialized(request: Request): Promise<Claim | undefined> {
+  return evasionWork(()=>handleCombatRequest(request));
 }
 async function request(message: string, action: Request["action"], extra: Partial<Request> = {}): Promise<Claim | undefined> {
   requireCombatSocket();
@@ -441,6 +443,7 @@ export async function startCombatExchange(attacker: Token, target: Token, itemId
 export function resetCombatTracking(_combat: Combat, changes: Record<string, unknown>): void {
   if (changes.round === undefined || Number(changes.round) !== 0) return;
   changes["flags." + MODULE + ".-=evasionUsage"] = null;
+  changes["flags." + MODULE + ".-=areaEvasionUsage"] = null;
   changes["flags." + MODULE + ".-=quickhackConnections"] = null;
   changes["flags." + MODULE + ".evasionEpoch"] = foundry.utils.randomID();
 }

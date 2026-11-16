@@ -23,7 +23,7 @@ try {
   window.fromUuid=async uuid=>({actor:{...targetActor,testUserPermission:()=>uuid==="owned"}});
   const {areaContent,registerAreaAttacks}=await import("/scripts/aoe/workflow.js");
   window.data={scene:"s",kind:"explosive",phase:"responses",area:{shape:"square",origin:{x:50,y:50},direction:0,length:500,width:500},
-   settings:{coverUp:true,evade:"raw"},exchange:{title:"Grenade <unsafe>",html:'<div class="rollcard">ATTACK</div>',total:20},
+   settings:{coverUp:true,evade:"raw"},exchange:{combatId:null,title:"Grenade <unsafe>",html:'<div class="rollcard">ATTACK</div>',total:20},
    rows:[{uuid:"owned",actor:"actor",name:"Target & Ally",img:"",eligible:true,state:"waiting"},{uuid:"unowned",actor:"other",name:"NPC",img:"",eligible:false,state:"waiting"}]};
   window.message={id:"message",visible:true,isContentVisible:true,flags:{"pneuma-combattools":{aoe:data}}};
   document.querySelector("#card").innerHTML=areaContent(data);registerAreaAttacks();
@@ -300,7 +300,7 @@ try {
   assert.equal(await page.locator('[name="shellAngle"]').inputValue(),'75');
   assert.match(await page.locator('[data-area-summary="blast"]').textContent(),/square/);
 
-  assert.equal(await page.locator('[name="evade"] option').count(),3);
+  assert.equal(await page.locator('[name="evade"] option').count(),4);
   assert.deepEqual(await page.locator('[name="blastShape"] option').allTextContents(),["Square","Circle"]);
   assert.equal(await page.locator('[name="shellDV"], [name="evadeTies"]').count(),0);
   await page.locator('[name="shellShape"]').selectOption("cone");

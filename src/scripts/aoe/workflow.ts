@@ -1,3 +1,5 @@
+import {areaEvasionOffer, areaRound, recordAreaEvasion} from "./evasion.js";
+import type {EvasionOffer} from "../evasion-rules.js";
 import {consumeHazardAttack} from "../hazard-attacks.js";
 import {nativeItemMatches, findNativeItem} from "../native-lookup.js";
 import {attackTitle,attackHeading} from "../attack-title.js";
@@ -24,17 +26,18 @@ import {masterStatuses} from "../status-catalog.js";
 import {moveEvader,registerAreaMovement} from "./movement.js";
 import { MODULE, areaSettings, registerAreaSettings, type AreaSettings } from "./settings.js";
 import { isMolotov, areaKind, confirmAreaRoll, type AreaKind, type AreaWeapon } from "./weapon.js";
-import { polygon, evadeAllowed, winsAreaDefense, type Area, type Point } from "./geometry.js";
+import { polygon, winsAreaDefense, type Area, type Point } from "./geometry.js";
 import { placeArea, clippedPoints, templateData, areaCoverage, areaCells } from "./placement.js";
 import { requireCombatSocket } from "../socket-health.js";
 import {GMRequests} from "../gm-request.js";
-import { smokeAttackDialog, diceJSON, showSavedDice, messageDiceAudience, nativeCard, rollHidden, spendBonusLuck, type RollItem, type DiceAudience } from "../native-combat.js";
+import { evasionDialog, smokeAttackDialog, diceJSON, showSavedDice, messageDiceAudience, nativeCard, rollHidden, spendBonusLuck, type RollItem, type DiceAudience } from "../native-combat.js";
 import { thrownRollItem, improvisedSource } from "../thrown-weapons.js";
 import { getTable } from "../dv-hover.js";
 import { parseDV } from "../dv-data.js";
 import { bindCardAction, resolutionSection, rollOutcomeClass, canRenderCombatCard } from "../card-structure.js";
 import {renderDamageEditor} from "../damage-editor.js";
 import { canResetDamage, rollDamage, damageContent, handleDamage, damageEffectsLocked, applyFromCard, type DamageState, type DamageRequest } from "../damage-flow.js";
+import {evasionWork, defenderKey} from "../combat-resolution.js";
 import type { Exchange } from "../combat-resolution.js";
 import { grappleWeaponBlocked } from "../grapple/state.js";
 import { checkedLuck } from "../evasion-rules.js";
@@ -42,7 +45,7 @@ import { checkedLuck } from "../evasion-rules.js";
 interface TargetRow {
   instant?:InstantState; uuid:string; actor:string; name:string; img:string; eligible:boolean;
   state:"waiting"|"rolling"|"hit"|"miss"|"other"; total?:number; html?:string;
-  claim?:{nonce:string;user:string;expires:number}; coverProneId?:string; damage?:DamageState; moved?:boolean; coverUp?:boolean; moveCost?:number;
+  claim?:{nonce:string;user:string;expires:number;offer?:EvasionOffer;round?:string}; coverProneId?:string; damage?:DamageState; moved?:boolean; coverUp?:boolean; moveCost?:number;
   responseReceipt?:{nonce:string;user:string};
 }
 export interface AreaAttack {
@@ -51,7 +54,7 @@ export interface AreaAttack {
 }
 interface Request {
   aoeType:"request"; id:string; user:string; message:string; action:string; target?:string;
-  instantRequest?:InstantRequest; nonce?:string; total?:number; html?:string; area?:Area; damageRequest?:DamageRequest; hidden?:boolean; point?:Point;
+  instantRequest?:InstantRequest; nonce?:string; bonus?:number; total?:number; html?:string; area?:Area; damageRequest?:DamageRequest; hidden?:boolean; point?:Point;
 }
 interface Reply {aoeType:"reply";id:string;user:string;gm:string;error?:string}
 const flag=(message:ChatMessage)=>foundry.utils.getProperty(message,`flags.${MODULE}.aoe`) as AreaAttack|undefined;
@@ -86,7 +89,7 @@ export function makeArea(kind:AreaKind, source:Token, point:Point, s:AreaSetting
     angle:kind==="shell"?s.shellAngle:s.suppressionAngle};
 }
 function areaResponse(data:AreaAttack, actor:Actor):Pick<TargetRow,"eligible"|"state"> {
-  const eligible=!evasionBlocked(actor)&&evadeAllowed(Number(foundry.utils.getProperty(actor,"system.stats.ref.value")),data.settings.evade);
+  const eligible=data.kind==="suppression"||areaEvasionOffer(actor,data.settings,resolveEncounter(data.exchange)).allowed;
   if(data.kind==="shell" && data.exchange.total<=13)return {eligible,state:"miss"};
   const skip=data.kind!=="suppression" && !data.settings.coverUp && !eligible && game.settings?.get(MODULE,"skipIneligibleEvasion")===true;
   return {eligible,state:skip?"hit":"waiting"};
@@ -197,7 +200,7 @@ async function revealAttackDice(data:AreaAttack,message:ChatMessage):Promise<voi
   await message.update({[`flags.${MODULE}.rollsRevealed`]:true} as Parameters<typeof message.update>[0]);
 }
 const requests=new GMRequests();
-let queue:Promise<unknown>=Promise.resolve();
+
 export async function handleAreaRequest(req:Request) {
   if(game.user?.id!==gm()?.id)throw Error("An active GM is required.");
   const message=game.messages!.get(req.message) as ChatMessage|undefined, user=game.users!.get(req.user) as User|undefined;
@@ -282,7 +285,7 @@ export async function handleAreaRequest(req:Request) {
   if(!row||data.phase!=="responses"||!owns(await actorAt(row.uuid),user))throw Error("Only this target's owner or GM can respond.");
   if(data.kind!=="suppression"&&["claim","commit","move"].includes(req.action)){
     const blocked=evasionBlocked(await actorAt(row.uuid));if(blocked)throw Error(blocked);
-    row.eligible=evadeAllowed(Number(foundry.utils.getProperty(await actorAt(row.uuid),"system.stats.ref.value")),data.settings.evade);
+    row.eligible=areaEvasionOffer(await actorAt(row.uuid),data.settings,resolveEncounter(data.exchange)).allowed;
   }
   if(req.action==="move") {
     if(row.state!=="miss"||row.total===undefined||data.kind==="suppression")throw Error("Target did not evade.");
@@ -315,7 +318,10 @@ export async function handleAreaRequest(req:Request) {
   } else if(req.action==="claim") {
     if(row.state==="rolling"&&row.claim&&row.claim.expires<Date.now()){row.state="waiting";delete row.claim;}
     if(row.state!=="waiting"||!req.nonce||data.kind!=="suppression"&&!row.eligible)throw Error("This response is unavailable.");
-    row.state="rolling";row.claim={nonce:req.nonce,user:user.id!,expires:Date.now()+120000};
+    const combat=resolveEncounter(data.exchange);
+    const choice=data.kind==="suppression"?undefined:areaEvasionOffer(await actorAt(row.uuid),data.settings,combat);
+    if(choice&&!choice.allowed)throw Error(choice.reason);
+    row.state="rolling";row.claim={nonce:req.nonce,user:user.id!,expires:Date.now()+120000,offer:choice,round:areaRound(combat)};
   } else if(req.action==="release"||req.action==="commit") {
     if(req.action==="commit"&&row.responseReceipt?.nonce===req.nonce&&row.responseReceipt?.user===user.id){
       if(row.total!==req.total||row.html!==req.html)throw Error("Response reservation expired.");
@@ -325,6 +331,17 @@ export async function handleAreaRequest(req:Request) {
     if(req.action==="release"){row.state="waiting";delete row.claim;}
     else {
       if(!Number.isFinite(req.total)||typeof req.html!=="string")throw Error("Invalid defense roll.");
+      if(data.kind!=="suppression") {
+        const actor=await actorAt(row.uuid),combat=resolveEncounter(data.exchange);
+        const receipt=message.id+":"+row.uuid+":"+req.nonce;
+        const previous=foundry.utils.getProperty(combat??{},`flags.${MODULE}.areaEvasionUsage.${defenderKey(actor)}`) as {lastPayment?:string}|undefined;
+        if(previous?.lastPayment!==receipt&&foundry.utils.getProperty(actor,`flags.${MODULE}.areaEvasionPayment`)!==receipt) {
+          const current=areaEvasionOffer(actor,data.settings,combat),quoted=row.claim.offer;
+          if(row.claim.round!==areaRound(combat)||!current.allowed||!quoted||current.penalty!==quoted.penalty||current.cost!==quoted.cost)
+            throw Error("Evasion rules or round changed. Cancel this response and roll again.");
+        }
+        await recordAreaEvasion(actor,data.settings,combat,receipt,row.claim.round!,row.claim.offer?.cost??0,req.bonus??0);
+      }
       row.total=req.total;row.html=req.html;
       row.responseReceipt={nonce:req.nonce!,user:user.id!};
       row.state=winsAreaDefense(req.total!,data.exchange.total,data.kind==="suppression"?true:data.kind==="shell"?true:false)?"miss":"hit";
@@ -358,7 +375,7 @@ export async function handleAreaRequest(req:Request) {
 function send(message:string,action:string,extra:Partial<Request>={}) {
   requireCombatSocket();const authority=gm();if(!authority)throw Error("This function does not work without an active GM logged in.");
   const req:Request={...extra,aoeType:"request",id:foundry.utils.randomID(),user:game.user!.id,message,action};
-  if(authority.id===game.user!.id){const next=queue.catch(()=>{}).then(()=>handleAreaRequest(req));queue=next;return next;}
+  if(authority.id===game.user!.id){const next=evasionWork(()=>handleAreaRequest(req));return next;}
   return requests.request(req.id,()=>game.socket!.emit(`module.${MODULE}`,req),30000,"Area response was not confirmed by the GM. Check the card before retrying.");
 }
 const starting=new Set<string>();
@@ -459,7 +476,7 @@ function refreshResponseRetry(message:ChatMessage,row:TargetRow,key:string) {
     }
 }
 async function commitAreaResponse(message:ChatMessage,row:TargetRow,key:string,saved:SavedAreaResponse) {
-  await send(message.id!,"commit",{target:row.uuid,nonce:saved.nonce,total:saved.roll.resultTotal,html:await nativeCard(saved.roll)});
+  await send(message.id!,"commit",{target:row.uuid,nonce:saved.nonce,total:saved.roll.resultTotal,html:await nativeCard(saved.roll),bonus:saved.roll.luck});
   responseRetries.delete(key);
   refreshResponseRetry(message,row,key);
   try{await showSavedDice(diceJSON(saved.roll),saved.mode,saved.roller,saved.audience);}
@@ -482,12 +499,13 @@ async function respondArea(message:ChatMessage,data:AreaAttack,row:TargetRow,key
     const item=findNativeItem(actor.items,name) as RollItem|undefined;
     if(!item)throw Error(name+" skill is missing.");
     let roll=item.createRoll("skill",actor);
-    if(data.kind!=="suppression"&&data.settings.evadePenalty)roll.addMod([{value:data.settings.evadePenalty,source:"Area evasion homebrew"}]);
+    const choice=data.kind==="suppression"?undefined:flag(message)?.rows.find(r=>r.uuid===row.uuid)?.claim?.offer;
+    if(data.kind!=="suppression"&&!choice)throw Error("AoE evasion reservation is unavailable.");
     if(automatic){if(!automaticArea(actor,data))throw Error("Automatic area evasion requires RAW rules.");roll.luck=0;}
-    else if(!await roll.handleRollDialog({ctrlKey:skipDialog,metaKey:false,type:"pneuma-area"},actor,item))return;
-    checkedLuck(Number(foundry.utils.getProperty(actor,"system.stats.luck.value")),0,roll.luck);
+    else if(choice ? !await evasionDialog(roll,actor,item,choice.penalty,choice.cost,skipDialog) : !await roll.handleRollDialog({ctrlKey:skipDialog,metaKey:false,type:"pneuma-area"},actor,item))return;
+    checkedLuck(Number(foundry.utils.getProperty(actor,"system.stats.luck.value")),choice?.cost??0,roll.luck);
     if(data.kind!=="suppression"){const blocked=evasionBlocked(actor);if(blocked)throw Error(blocked);}
-    roll=await item.confirmRoll(roll);await spendBonusLuck(actor,roll.luck);await rollHidden(roll);
+    roll=await item.confirmRoll(roll);if(data.kind==="suppression")await spendBonusLuck(actor,roll.luck);await rollHidden(roll);
     roll.entityData={actor:actor.id!,token:row.uuid.split(".").at(-1)!,item:item.id!,tokens:[]};
     const saved={nonce,roll,mode:data.exchange.rollMode,roller:game.user!.id!,audience:messageDiceAudience(message)};
     responseRetries.set(key,saved);
@@ -528,7 +546,7 @@ async function syncTemplate(message:ChatMessage,data:AreaAttack) {
 
 function automaticArea(actor:Actor,data:AreaAttack) {
   const s=data.settings;
-  return automaticNPCEvasion(actor)&&data.kind!=="suppression"&&s.evade==="raw"&&!s.evadePenalty&&!s.evadeMove&&!s.evadeBorrow&&!s.coverUp;
+  return automaticNPCEvasion(actor)&&data.kind!=="suppression"&&s.evade==="raw"&&!s.evadePenalty&&!s.evadeMove&&!s.evadeBorrow&&!s.evadeOnce&&!s.coverUp;
 }
 function syncAreaVisibility(template: MeasuredTemplate): void {
   if (!foundry.utils.getProperty(template.document, `flags.${MODULE}.areaShape`)) return;
@@ -619,7 +637,7 @@ export function registerAreaAttacks() {
   });
   const finishMarkers=(combat:Combat)=>{
     // Run after any pending creation/update so cleanup cannot leave a late-created marker.
-    const next=queue.catch(()=>{}).then(()=>clearGrenadeMarkers(combat));queue=next;void next.catch(errors);
+    const next=evasionWork(()=>clearGrenadeMarkers(combat));void next.catch(errors);
   };
   Hooks.on("updateCombat",(combat:Combat,changes:{round?:number|null})=>{if(changes.round!==undefined&&!combat.started)finishMarkers(combat);});
   Hooks.on("deleteCombat",finishMarkers);
@@ -634,6 +652,8 @@ export function registerAreaAttacks() {
   Hooks.once("ready", () => pendingCards.seed(game.messages));
   for (const hook of ["createChatMessage", "updateChatMessage"]) Hooks.on(hook, (message: ChatMessage) => pendingCards.remember(message));
   Hooks.on("deleteChatMessage", (message: ChatMessage) => pendingCards.forget(message.id!));
+  Hooks.on("updateCombat", (combat:Combat) => pendingCards.refresh(undefined,combat.id!));
+  Hooks.on("updateActor", (actor:Actor) => pendingCards.refresh(actor.uuid));
   for(const hook of ["createItem","updateItem","deleteItem","createActiveEffect","updateActiveEffect","deleteActiveEffect"])Hooks.on(hook,(doc:Item|ActiveEffect)=>{
     const parent=doc.parent,actor=parent instanceof Actor?parent:parent?.parent instanceof Actor?parent.parent:undefined;
     if(actor)pendingCards.refresh(actor.uuid);
@@ -656,7 +676,7 @@ export function registerAreaAttacks() {
   });
   Hooks.on("createChatMessage",(message:ChatMessage)=>{
     const data=flag(message);if(!data||game.user?.id!==gm()?.id)return;
-    const next=queue.catch(()=>{}).then(async()=>{await syncTemplate(message,data);await save(message,data);});queue=next;void next.then(()=>automateArea(message)).catch(errors);
+    const next=evasionWork(async()=>{await syncTemplate(message,data);await save(message,data);});void next.then(()=>automateArea(message)).catch(errors);
   });
   Hooks.on("deleteChatMessage",(message:ChatMessage)=>{
     const data=flag(message);if(!data||game.user?.id!==gm()?.id)return;
@@ -670,7 +690,7 @@ export function registerAreaAttacks() {
       requests.reply(p,undefined);
     } else if(game.user!.id===gm()?.id) {
       const reply=(error?:string)=>game.socket!.emit(`module.${MODULE}`,{aoeType:"reply",id:p.id,user:p.user,gm:game.user!.id,error});
-      const next=queue.catch(()=>{}).then(()=>handleAreaRequest(p));queue=next;void next.then(()=>reply(),e=>reply((e as Error).message));
+      const next=evasionWork(()=>handleAreaRequest(p));void next.then(()=>reply(),e=>reply((e as Error).message));
     }
   }));
   Hooks.on("renderChatMessage",async(message:ChatMessage,html:JQuery)=>{
@@ -749,9 +769,10 @@ export function registerAreaAttacks() {
         button.disabled=true;button.title="Available on the rolling client's saved result after an interrupted response.";
       }
       if(action==="roll"&&data.kind!=="suppression"&&row){
-        const blocked=actor?evasionBlocked(actor):undefined;
-        const eligible=actor?evadeAllowed(Number(foundry.utils.getProperty(actor,"system.stats.ref.value")),data.settings.evade):row.eligible;
-        if(blocked||!eligible){button.disabled=true;button.title=blocked??"RAW evasion requires REF 8+.";}
+        try {
+          const choice=actor?areaEvasionOffer(actor,data.settings,resolveEncounter(data.exchange)):undefined;
+          if(choice){button.disabled=!choice.allowed;button.title=choice.allowed?`Evade${choice.penalty?" at "+choice.penalty:""}${choice.cost?" for "+choice.cost+" LUCK":""}`:choice.reason;}
+        } catch(error){button.disabled=true;button.title=(error as Error).message;}
       }
       if(action==="reset"&&row&&!canResetResponse(data,row)) {
         button.disabled=true;button.title="Cannot reset after movement, damage or effect application has started.";

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.38 - 2026-11-15
+
+- Group AoE evasion and movement controls with a wider eligibility dropdown.
+- Include installed, functional Reflex Co-Processors in RAW AoE evasion.
+- Add Follow Homebrew Evasion, sharing ranged qualifiers, free attempts, penalties and LUCK costs.
+- Add an optional one-AoE-evasion-per-round limit; completed successful and failed attempts count. Cover Up and suppressive fire remain separate.
+
+Validation: build, functional regression suite and focused browser form checks passed. Live Foundry verification remains pending; the broader AoE browser fixture retains its documented resistance-popup assertion failure.
+
 ## 0.9.37 - 2026-11-15
 
 - Ignore unrelated actor changes when refreshing the combat bar. Batch HP-strip updates without rebuilding portraits or measuring dock layout.

@@ -2,17 +2,21 @@
   <div class="pneuma-area-editor-body">
     <section class="pneuma-area-rules" aria-labelledby="pct-area-rules-title"><h3 id="pct-area-rules-title">Evasion &amp; Cover Up</h3>
       <div class="pneuma-area-rule-fields">
-        <div class="pneuma-area-rule-column">
-      <div class="form-group"><label for="pct-evade">Evasion eligibility</label><select id="pct-evade" name="evade">{{selectOptions evadeChoices selected=evade}}</select></div>
-      <div class="form-group"><label for="pct-evade-penalty">Evasion modifier</label><input id="pct-evade-penalty" type="number" name="evadePenalty" value="{{evadePenalty}}" min="-20" max="20"></div>
-      <div class="form-group"><label for="pct-cover-up" data-cover-up-label>Allow Cover Up Homebrew</label><input id="pct-cover-up" type="checkbox" name="coverUp" {{checked coverUp}}></div>
-        </div>
-        <div class="pneuma-area-rule-column">
-      <div class="form-group"><label for="pct-evade-move">Evasion requires MOVE</label><input id="pct-evade-move" type="checkbox" name="evadeMove" {{checked evadeMove}}></div>
-      <div class="form-group"><label for="pct-evade-borrow">Borrow from next turn</label><input id="pct-evade-borrow" type="checkbox" name="evadeBorrow" {{checked evadeBorrow}}></div>
-        </div>
+        <fieldset class="pneuma-area-rule-column"><legend>Evasion</legend>
+          <div class="form-group pneuma-area-eligibility"><label for="pct-evade">Eligibility</label><select id="pct-evade" name="evade">{{selectOptions evadeChoices selected=evade}}</select></div>
+          <p class="notes" data-evasion-help></p>
+          <div class="form-group"><label for="pct-evade-penalty">Additional modifier</label><input id="pct-evade-penalty" type="number" name="evadePenalty" value="{{evadePenalty}}" min="-20" max="20"></div>
+          <div class="form-group"><label for="pct-evade-once">Only 1 AoE Evasion per round</label><input id="pct-evade-once" type="checkbox" name="evadeOnce" {{checked evadeOnce}}></div>
+        </fieldset>
+        <fieldset class="pneuma-area-rule-column"><legend>Movement &amp; Cover Up</legend>
+          <div class="form-group"><label for="pct-evade-move">Evasion requires MOVE</label><input id="pct-evade-move" type="checkbox" name="evadeMove" {{checked evadeMove}}></div>
+          <div class="form-group"><label for="pct-evade-borrow">Borrow from next turn</label><input id="pct-evade-borrow" type="checkbox" name="evadeBorrow" {{checked evadeBorrow}}></div>
+          <p class="notes">Successful evaders must leave the area. MOVE costs are optional.</p>
+          <div class="form-group"><label for="pct-cover-up" data-cover-up-label>Allow Cover Up</label><input id="pct-cover-up" type="checkbox" name="coverUp" {{checked coverUp}}></div>
+        </fieldset>
       </div>
       <details class="pneuma-area-help"><summary>Rule details</summary>
+      <p class="notes">Follow Homebrew Evasion shares ranged-evasion qualifiers, free attempts, penalties and LUCK costs. The additional modifier applies on top. The one-per-round limit counts successful and failed AoE attempts, requires started combat, and excludes Cover Up and suppressive fire.</p>
       <p class="notes">Successful evaders must leave the area. RAW explosive evasion must exceed the attack; shell defense ties avoid the attack. MOVE costs and borrowing are optional homebrew.</p>
       <p class="notes">Adds Cover Up alongside Evasion; enabling it does not remove Evasion. Choose one response: roll Evasion if eligible, or Cover Up without a roll or evasion eligibility requirement. Cover Up keeps you in place, makes you Prone, and takes the hit with double armor SP. All worn armor (head and body) takes double ablation, even if no damage penetrates.</p>
       </details>

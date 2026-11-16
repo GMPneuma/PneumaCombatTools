@@ -122,7 +122,7 @@ test('AoE Evasion and suppression Concentration use originating card visibility,
   const f=setup('roll');f.item.name=kind==='shell'?'Evasion':'Concentration';
   const context=isolated('aoe/workflow',{MODULE:'pneuma-combattools',findNativeItem:()=>f.item,evasionBlocked:()=>undefined});
   context.send=async()=>{};
-  const message={id:'area-card',whisper:['gm','owner'],blind:true};
+  const message={id:'area-card',whisper:['gm','owner'],blind:true,flags:{'pneuma-combattools':{aoe:{rows:[{uuid:'Token.owner',claim:{offer:{allowed:true,penalty:0,cost:0}}}]}}}};
   await context.respond(message,{kind,settings:{},exchange:{rollMode:'blindroll'}},{uuid:'Token.owner'},false,true);
   assert.equal(f.evaluations(),1);
   assert.deepEqual(f.calls.map(call=>[call.total,call.whisper,call.blind]),[[10,['gm'],true],[4,['gm'],true]]);

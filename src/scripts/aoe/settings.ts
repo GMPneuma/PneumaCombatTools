@@ -4,11 +4,11 @@ export interface AreaSettings {
   shellShape:"square"|"cone"|"ray"; blastShape:"square"|"circle";
   shellRange:number; shellWidth:number; shellAngle:number; blastRadius:number; suppressionAngle:number; suppressionSize:number;
   shellSize: number; blastSize: number;  coverUp: boolean; corridorMax: number;
-  evade: "raw" | "everyone" | "none"; evadePenalty: number; evadeMove:boolean; evadeBorrow:boolean;
+  evade: "raw" | "homebrew" | "everyone" | "none"; evadePenalty: number; evadeMove:boolean; evadeBorrow:boolean; evadeOnce:boolean;
   suppressionShape: "corridor" | "raw" | "ray" | "cone" | "square"; suppressionWidth: number; suppressionRange: number;
 }
 export const defaults: AreaSettings = { shellShape:"square",blastShape:"square",shellRange:6,shellWidth:3,shellAngle:45,blastRadius:5,suppressionAngle:45,suppressionSize:6, shellSize: 6, blastSize: 10,  coverUp:false, corridorMax:0, evade: "raw", evadePenalty: 0,
-  evadeMove:false, evadeBorrow:false, suppressionShape: "ray", suppressionWidth: 3, suppressionRange: 25 };
+  evadeMove:false, evadeBorrow:false, evadeOnce:false, suppressionShape: "ray", suppressionWidth: 3, suppressionRange: 25 };
 declare global { interface SettingConfig { "pneuma-combattools.areaSettings": AreaSettings } }
 export function normalizeArea(input: Partial<AreaSettings>): AreaSettings {
   const n = (key: keyof AreaSettings, min: number, max: number) => {
@@ -19,8 +19,8 @@ export function normalizeArea(input: Partial<AreaSettings>): AreaSettings {
     shellRange:n("shellRange",1,500),shellWidth:n("shellWidth",1,25),shellAngle:n("shellAngle",1,179),
     blastRadius:n("blastRadius",1,100),
     suppressionAngle:n("suppressionAngle",1,179),suppressionSize:n("suppressionSize",1,100), coverUp:input.coverUp===true, corridorMax:n("corridorMax",0,1000), shellSize:n("shellSize",1,100), blastSize:n("blastSize",1,100), 
-    evade:["raw","everyone","none"].includes(input.evade ?? "") ? input.evade! : "raw",
-    evadePenalty:n("evadePenalty",-20,20), evadeMove:input.evadeMove===true,evadeBorrow:input.evadeBorrow===true,
+    evade:["raw","homebrew","everyone","none"].includes(input.evade ?? "") ? input.evade! : "raw",
+    evadeOnce:input.evadeOnce===true, evadePenalty:n("evadePenalty",-20,20), evadeMove:input.evadeMove===true,evadeBorrow:input.evadeBorrow===true,
     suppressionShape:input.suppressionShape === "raw" ? "raw" : input.suppressionShape === "cone" ? "cone" : input.suppressionShape === "square" ? "square" : "ray",
     suppressionWidth:n("suppressionWidth",1,25), suppressionRange:n("suppressionRange",1,500) };
 }
@@ -28,7 +28,7 @@ export const areaSettings = () => normalizeArea(game.settings!.get(MODULE,"areaS
 class AreaSettingsForm extends FormApplication {
   constructor(){super({});}
   static override get defaultOptions() { return foundry.utils.mergeObject(super.defaultOptions, {
-    title:"Area Attacks & Suppressive Fire", id:"pneuma-area-settings", width:720, height:560, resizable:true, scrollY:[".pneuma-area-editor-body"],
+    title:"Area Attacks & Suppressive Fire", id:"pneuma-area-settings", width:720, height:640, resizable:true, scrollY:[".pneuma-area-editor-body"],
     template:`modules/${MODULE}/templates/area-settings.hbs`, closeOnSubmit:true }); }
   override getData() {
     const settings=areaSettings();
@@ -40,7 +40,7 @@ class AreaSettingsForm extends FormApplication {
       range:settings[prefix+"Range" as keyof AreaSettings],width:settings[prefix+"Width" as keyof AreaSettings],angle:settings[prefix+"Angle" as keyof AreaSettings],
       blast:prefix==="blast",radius:settings.blastRadius,rangeLabel:prefix==="suppression"?"Cone range / RAW radius":"Range",suppression:prefix==="suppression",rayRange:settings.corridorMax,
     }));
-    return {...settings,profiles,evadeChoices:{raw:"RAW: REF 8+",everyone:"Homebrew: everyone",none:"Homebrew: no evasion"}};
+    return {...settings,profiles,evadeChoices:{raw:"RAW",homebrew:"Follow Homebrew Evasion",everyone:"Homebrew: Anyone",none:"Homebrew: No one"}};
   }
   override activateListeners(html:JQuery) {
     super.activateListeners(html);const root=html[0];if(!root)return;
@@ -51,6 +51,9 @@ class AreaSettingsForm extends FormApplication {
       root.querySelectorAll<HTMLElement>("[data-area-profile]").forEach(panel=>{panel.hidden=panel.dataset.areaProfile!==selected;});
     }));
     const update=()=>{
+      const mode=root.querySelector<HTMLSelectElement>('[name="evade"]')?.value;
+      const help=root.querySelector<HTMLElement>('[data-evasion-help]');
+      if(help)help.textContent=mode==="homebrew"?"Shares ranged homebrew qualifiers, free attempts, penalties and LUCK costs.":mode==="everyone"?"Anyone may evade, subject to injury restrictions.":mode==="none"?"AoE evasion is disabled. Cover Up can still be used.":"Requires REF 8+ or an installed, functional Reflex Co-Processor.";
       const borrowing=root.querySelector<HTMLInputElement>('[name="evadeBorrow"]');if(borrowing)borrowing.disabled=!root.querySelector<HTMLInputElement>('[name="evadeMove"]')?.checked;
       for(const prefix of ["shell","blast","suppression"]){
         const shape=root.querySelector<HTMLSelectElement>('[name="'+prefix+'Shape"]')?.value;

@@ -719,3 +719,7 @@ Normal-attack recipient rows now render the target label, damage action, and cri
 
 Normal-attack saved injury results now nest directly beneath the matching token damage card. Damage cards expose data-damage-target, derived from application IDs and selected-target UUIDs. One injury result attaches to the latest matching application. An injury without matching damage retains an explicitly named fallback below the outputs. This supersedes the separate combined injury-results block.
 - Grenade footprints (2026-11-11): implemented a GM-only Token Controls button for hiding visible grenade markers on the current scene. Individual chat cards retain their Show action. Live Foundry verification pending.
+
+## AoE evasion follow-up (v0.9.38)
+
+Implemented the requested grouped layout, RAW Co-Processor eligibility, Follow Homebrew Evasion, Anyone / No one modes, and independent one-AoE-evasion-per-round checkbox. Homebrew shares ranged allowances, penalties and LUCK costs. Completed attempts count regardless of success; Cover Up and Concentration remain separate. Automated functional and focused form checks passed. Live Foundry verification pending; the broader browser suite retains its previously documented resistance-popup assertion.

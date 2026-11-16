@@ -740,3 +740,11 @@ Close Combat Armor Rules carries the Pneuma Homebrew badge in settings and ident
 Retired the Show armor controls on normal damage cards setting. Rolled CombatTools attacks expose armor options through the pencil. Native damage cards with an Apply Damage action offer a collapsed Armor options disclosure.
 
 The ordinary and shared area damage editors include Halve Armor beside Always Ablate. It starts from the rolled half-SP value and can be changed before damage application. Full armor bypass is preserved.
+
+### AoE evasion settings (v0.9.38)
+
+- Grouped Evasion / Movement & Cover Up controls with a full-width eligibility selector and contextual help.
+- RAW includes an installed, functional Reflex Co-Processor; Follow Homebrew Evasion shares configured ranged qualifiers, free allowances, penalties, LUCK costs and round usage. Anyone / No one remain independent options.
+- Optional one AoE evasion per round counts completed rolls, successful or failed; cancelling a dialog, Cover Up and suppressive-fire Concentration do not count. Requires started combat when enabled. Round advance renews availability; resetting combat clears counters.
+- Additional AoE modifier stacks with the shared homebrew modifier. Mandatory and bonus LUCK are charged once on response commit. Pending cards refresh as usage changes.
+- Automated functional checks and browser form checks passed; live Foundry/theme verification pending.

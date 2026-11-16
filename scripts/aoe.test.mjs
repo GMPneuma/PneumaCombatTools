@@ -25,7 +25,7 @@ function fixture(kind="explosive",total=20){
  globalThis.foundry={utils:{getProperty:get,deepClone:structuredClone,randomID:()=>String(++serial)}};
  globalThis.ui={notifications:{info(){},warn(){},error(){}}};
  const users=collection([{id:"gm",isGM:true,active:true},{id:"att",isGM:false,active:true},{id:"def",isGM:false,active:true},{id:"stranger",isGM:false,active:true}]);
- globalThis.game={user:users[0],users,messages:collection(messages),modules:new Map([["pneuma-combattools",{}]]),settings:{get:(_m,k)=>k==="areaSettings"?defaults:k==="rollMode"?"roll":false},tables:{getName:()=>({getResultsForRoll:()=>[{text:"13"}]})}};
+ globalThis.game={i18n:{localize:key=>key},user:users[0],users,messages:collection(messages),modules:new Map([["pneuma-combattools",{}]]),settings:{get:(_m,k)=>k==="areaSettings"?defaults:k==="rollMode"?"roll":false},tables:{getName:()=>({getResultsForRoll:()=>[{text:"13"}]})}};
  const mkActor=(id,owner)=>({id,uuid:"Actor."+id,type:"character",items:collection([]),effects:[],async createEmbeddedDocuments(_type,rows){this.effects.push(...rows.map(r=>({...r,statuses:new Set(r.statuses)})));},system:{stats:{ref:{value:8},luck:{value:5}}},testUserPermission:u=>u.id===owner,update:async()=>{},_applyDamage:async()=>{calls.push("apply:"+id)}});
  const a=mkActor("a","att"),b=mkActor("b","def"),c=mkActor("c","def");for(const actor of [a,b,c])docs.set(actor.uuid,actor);
  const token=(id,actor,x)=>{const document={id,uuid:"Scene.s.Token."+id,actor,name:id,texture:{src:"icon.png"},parent:{id:"s"}};docs.set(document.uuid,document);const token={id,document,actor,name:id,x,y:0,w:100,h:100,center:{x:x+50,y:50},checkCollision:()=>false};document.object=token;document.update=async change=>{token.x=change.x;token.y=change.y;token.center={x:change.x+50,y:change.y+50};Object.assign(document,change);};return token;};
@@ -517,7 +517,7 @@ test('shell and incendiary areas include noncombat targets and preserve encounte
 });
 test('noncombat evader can relocate while optional turn-based MOVE accounting is enabled',async()=>{
  const f=fixture();game.settings.get=(_m,k)=>k==='areaSettings'?{...defaults,evadeMove:true,evadeBorrow:true,evadeMoveRatio:1}:k==='rollMode'?'roll':false;
- const combat={id:'c',scene:f.scene,active:true,started:true,flags:{},combatants:[{token:f.source.document,actor:f.a}],turns:[]};game.combats=collection([combat]);
+ const combat={id:'c',scene:f.scene,active:true,started:true,round:1,flags:{},update:async()=>{},combatants:[{token:f.source.document,actor:f.a}],turns:[]};game.combats=collection([combat]);
  await startAreaAttack(f.source,f.target,'w','attack');await f.request('claim',{nonce:'evade'});await f.request('commit',{nonce:'evade',total:30,html:'evaded'});
  await f.request('move',{point:{x:1000,y:500}});assert.equal(f.data().rows[0].moved,true);assert.equal(f.data().rows[0].moveCost,0);
 });
@@ -536,4 +536,67 @@ test('GM reset clears a shared damage reservation under nested flag merge semant
  await f.request('damage',{target:undefined,user:'att',damageRequest:{action:'damageClaim',nonce:'old'}});
  await f.request('damage',{target:undefined,user:'gm',damageRequest:{action:'damageReset'}});assert.equal(f.data().exchange.damage,undefined);
  await f.request('damage',{target:undefined,user:'att',damageRequest:{action:'damageClaim',nonce:'new'}});assert.equal(f.data().exchange.damage.nonce,'new');
+});
+
+const {areaEvasionOffer}=await import('../dist/scripts/aoe/evasion.js');
+const {offer:rangedOffer,resetCombatTracking}=await import('../dist/scripts/combat-resolution.js');
+const setPaths=(doc,changes)=>{for(const [path,value] of Object.entries(changes)){const parts=path.split('.');let target=doc;for(const key of parts.slice(0,-1))target=target[key]??={};target[parts.at(-1)]=value;}};
+function trackedArea(settings={},rule='cumulative') {
+ const f=encounterFixture();f.combat.round=1;f.combat.update=async changes=>setPaths(f.combat,changes);
+ f.b.update=async changes=>setPaths(f.b,changes);
+ const yes={qualifies:true,free:false,stacks:false},no={qualifies:false,free:false,stacks:false};
+ const rules={reflex:yes,coprocessor:yes,solo:no,anyone:no,rule,luckCost:2};
+ const old=game.settings.get;game.settings.get=(m,k)=>k==='areaSettings'?{...defaults,...settings}:k==='evasionHomebrew'?rules:k==='evasionEligibility'?'custom':old(m,k);
+ return {...f,rules};
+}
+test('RAW AoE recognizes installed functional Co-Processors; Anyone and No one remain independent',()=>{
+ const f=trackedArea();f.b.system.stats.ref.value=6;
+ assert.equal(areaEvasionOffer(f.b,defaults,f.combat).allowed,false);
+ const co={type:'cyberware',name:'Reflex Co-Processor',system:{isInstalledInActor:true}};f.b.items.push(co);
+ assert.equal(areaEvasionOffer(f.b,defaults,f.combat).allowed,true);
+ co.system.isInstalledInActor=false;assert.equal(areaEvasionOffer(f.b,defaults,f.combat).allowed,false);
+ assert.equal(areaEvasionOffer(f.b,{...defaults,evade:'everyone'},f.combat).allowed,true);
+ assert.equal(areaEvasionOffer(f.b,{...defaults,evade:'none'},f.combat).allowed,false);
+ assert.equal(normalizeArea({evade:'homebrew',evadeOnce:true}).evade,'homebrew');
+});
+test('AoE shares homebrew free attempts and cumulative penalties with ranged evasion',async()=>{
+ const f=trackedArea({evade:'homebrew',evadePenalty:-2});f.rules.reflex.free=true;
+ await startAreaAttack(f.source,f.target,'w','attack');
+ await f.request('claim',{nonce:'one'});assert.equal(f.data().rows[0].claim.offer.penalty,-2);
+ await f.request('commit',{nonce:'one',total:1,html:'failed'});
+ assert.equal(rangedOffer(f.b,true,f.combat).penalty,-1);
+ await f.request('reset',{user:'gm'});await f.request('claim',{nonce:'two'});
+ assert.equal(f.data().rows[0].claim.offer.penalty,-3);
+ await f.request('commit',{nonce:'two',total:30,html:'success'});
+ assert.equal(rangedOffer(f.b,true,f.combat).penalty,-2);
+ f.combat.round=2;assert.equal(rangedOffer(f.b,true,f.combat).free,1);
+});
+test('one AoE per round counts failed attempts, preserves Cover Up, and resets next round',async()=>{
+ const f=trackedArea({evadeOnce:true,coverUp:true});
+ await startAreaAttack(f.source,f.target,'w','attack');await f.request('claim',{nonce:'one'});
+ await f.request('commit',{nonce:'one',total:1,html:'failed'});
+ await f.request('commit',{nonce:'one',total:1,html:'failed'});
+ assert.equal(get(f.combat,'flags.'+M+'.areaEvasionUsage.Actor%2Eb.used'),1);
+ await f.request('reset',{user:'gm'});await assert.rejects(f.request('claim',{nonce:'two'}),/unavailable/);
+ await f.request('other');assert.equal(f.data().rows[0].coverUp,true);
+ f.combat.round=2;assert.equal(areaEvasionOffer(f.b,{...defaults,evadeOnce:true},f.combat).allowed,true);
+ assert.equal(areaEvasionOffer(f.b,{...defaults,evadeOnce:true}).allowed,false);
+ const changes={round:0};resetCombatTracking(f.combat,changes);assert.equal(changes['flags.'+M+'.-=areaEvasionUsage'],null);
+});
+test('homebrew AoE charges mandatory and bonus LUCK once, and retries a partial commit',async()=>{
+ const f=trackedArea({evade:'homebrew'},'luckAfterFree');
+ await startAreaAttack(f.source,f.target,'w','attack');await f.request('claim',{nonce:'paid'});
+ const update=f.combat.update;let fail=true;f.combat.update=async changes=>{if(fail){fail=false;throw Error('interrupted');}await update(changes);};
+ await assert.rejects(f.request('commit',{nonce:'paid',total:30,html:'roll',bonus:2}),/interrupted/);
+ assert.equal(f.b.system.stats.luck.value,1);
+ await f.request('commit',{nonce:'paid',total:30,html:'roll',bonus:2});
+ await f.request('commit',{nonce:'paid',total:30,html:'roll',bonus:2});
+ assert.equal(f.b.system.stats.luck.value,1);
+ assert.equal(get(f.combat,'flags.'+M+'.evasionUsage.Actor%2Eb.used'),1);
+});
+test('round changes invalidate an outstanding AoE quote without payment',async()=>{
+ const f=trackedArea({evade:'homebrew'},'luckAfterFree');
+ await startAreaAttack(f.source,f.target,'w','attack');await f.request('claim',{nonce:'old'});f.combat.round=2;
+ await assert.rejects(f.request('commit',{nonce:'old',total:30,html:'roll'}),/round changed/);
+ assert.equal(f.b.system.stats.luck.value,5);
 });
