@@ -126,6 +126,8 @@ export function groupModuleSettings(root: HTMLElement): void {
     const group = root.querySelector<HTMLElement>(`[data-combat-settings-group="${id}"]`);
     if (group) masterSettingControls(group, key!);
   }
+  // Foundry v12 search reads the category from each row's immediate parent.
+  for (const row of Array.from(wrapper.querySelectorAll<HTMLElement>(".form-group"))) row.parentElement!.dataset.category = MODULE;
 }
 
 export function registerSettingsLayout(): void {

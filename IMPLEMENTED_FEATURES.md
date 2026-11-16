@@ -811,3 +811,5 @@ Containing tabs and button sizing (2026-11-15, local/unreleased): restored adjoi
 AoE layout correction (v0.9.39): rule panels use grid layout so native form-note flex sizing cannot push Cover Up outside its panel. Browser regression covers expanded Rule details at three widths; live Foundry verification pending.
 
 Status-menu release completion (v0.9.40, 2026-11-16): the status-manager, custom-effect, icon-color, attribution/removal and HUD-state changes described above are included in this release. They were not included in v0.9.38 or v0.9.39. Earlier local/unreleased labels record their implementation history. Live Foundry validation remains pending.
+
+Settings search correction (v0.9.41, 2026-11-16): grouped native setting rows preserve their category on the immediate parent so Foundry v12 search keeps matching module categories visible. Labels, hints, menu buttons, nested groups, clear-search behavior and draft controls are covered by a browser regression using the native search method. Live Foundry validation remains pending.

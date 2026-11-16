@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.41 - 2026-11-16
+
+- Fix Foundry settings search hiding matching module settings after they are organized into groups. Preserve the native category identifier on each row's immediate container, including nested groups.
+- Add regression coverage using Foundry v12's native search method for labels, hints, clearing search and retaining draft controls. Original layouts reproduce the bug; corrected layouts pass. Live Foundry verification remains pending.
+
 ## 0.9.40 - 2026-11-16
 
 - Include the completed status-menu work omitted from v0.9.38 and v0.9.39: four status tabs, effect summaries and native-effect viewing, automation descriptions, custom effect editing, and section/per-status icon colors.

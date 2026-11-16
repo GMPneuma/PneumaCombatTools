@@ -784,3 +784,5 @@ Implemented the requested grouped layout, RAW Co-Processor eligibility, Follow H
 AoE layout follow-up (v0.9.39): reproduced Cover Up overlapping expanded Rule details with native form-note flex sizing. Changed rule-panel layout from vertical flex to grid and added panel-containment browser checks at 720, 900 and 1100px.
 
 Status-menu release completion (v0.9.40, 2026-11-16): the status-manager, custom-effect, icon-color, attribution/removal and HUD-state changes described above are included in this release. They were not included in v0.9.38 or v0.9.39. Earlier local/unreleased labels record their implementation history. Live Foundry validation remains pending.
+
+Settings search correction (v0.9.41, 2026-11-16): grouped native setting rows preserve their category on the immediate parent so Foundry v12 search keeps matching module categories visible. Labels, hints, menu buttons, nested groups, clear-search behavior and draft controls are covered by a browser regression using the native search method. Live Foundry validation remains pending.
