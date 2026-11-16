@@ -61,7 +61,7 @@ try {
  `});
  await page.waitForFunction(()=>typeof window.paintStatusIcon==='function');
  const pixels=await page.evaluate(async()=>{
-  const svg=fill=>'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><rect width="28" height="28" fill="'+fill+'"/></svg>');
+  const svg=fill=>'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><rect x="3" y="3" width="22" height="22" fill="'+fill+'"/></svg>');
   const img=document.createElement('img');img.src=svg('white');document.body.append(img);
   await window.paintStatusIcon(img,'#12ab34');await img.decode();
   const canvas=document.createElement('canvas');canvas.width=28;canvas.height=28;const ctx=canvas.getContext('2d');ctx.drawImage(img,0,0);

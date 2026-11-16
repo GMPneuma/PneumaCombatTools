@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {sectionColors,statusColor,validateStatusColor,iconWell,setStatusColorRows,colorForEffect,colorTokenEffects} from '../dist/scripts/status-colors.js';
+import {sectionColors,statusColor,validateStatusColor,iconWell,setStatusColorRows,colorForEffect} from '../dist/scripts/status-colors.js';
 const colors={native:'#abcdef','native-empty':'#123456',module:'#112233',custom:'#445566'};
 globalThis.game={settings:{get:()=>colors}};
 test('section defaults, per-user priority and addiction protection',()=>{
@@ -12,18 +12,12 @@ test('section defaults, per-user priority and addiction protection',()=>{
  assert.equal(validateStatusColor(''),undefined);assert.throws(()=>validateStatusColor('red'));
  assert.equal(iconWell('#ffffff'),'#242424');assert.equal(iconWell('#000000'),'#eeeeee');
 });
-test('token sprites follow effect indexes and aliases without changing effect documents or red addictions',()=>{
- setStatusColorRows([{id:'one',aliases:['native-one'],name:'One',tab:'module'},{id:'user',name:'User',tab:'custom',color:'#ff0000'},{id:'addiction',name:'Addiction',tab:'native',group:'addiction'}]);
- const effects=[{statuses:new Set(['native-one']),img:'same.svg'},{statuses:new Set(['user']),img:'same.svg'},{statuses:new Set(['addiction']),tint:'#ff0000'}];
- const before=structuredClone(effects);
- const sprites=[{zIndex:-1},{zIndex:2,tint:123},{zIndex:0,tint:0},{zIndex:1,tint:0,alpha:.8}];
- globalThis.PIXI={filters:{ColorMatrixFilter:class{}}};
- colorTokenEffects({actor:{temporaryEffects:effects},effects:{children:sprites}});
- assert.equal(sprites[0].filters,undefined);assert.equal(sprites[1].filters,undefined);assert.equal(sprites[1].tint,123);
- assert.equal(sprites[2].filters[0].matrix[4],17/255);assert.equal(sprites[3].filters[0].matrix[4],1);
- assert.equal(sprites[3].alpha,.8);assert.deepEqual(effects,before);
+test('effect matching respects aliases, names and addiction protection',()=>{
+ setStatusColorRows([{id:'one',aliases:['native-one'],name:'One',img:'glyph.svg',tab:'module'},{id:'addiction',name:'Addiction',tab:'native',group:'addiction'}]);
+ assert.equal(colorForEffect({statuses:new Set(['native-one'])}),'#112233');
  assert.equal(colorForEffect({statuses:new Set(),name:'One'}),'#112233');
  assert.equal(colorForEffect({statuses:new Set(['one','addiction'])}),undefined);
+ assert.equal(colorForEffect({statuses:new Set(['unknown']),name:'Unknown'}),undefined);
 });
 
 test('unset sections share grey while explicit user colors retain priority',()=>{

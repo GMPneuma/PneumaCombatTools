@@ -25,22 +25,21 @@ export function iconWell(color?:string):string {
   const rgb=[1,3,5].map(i=>parseInt(color.slice(i,i+2),16));
   return .2126*rgb[0]!+.7152*rgb[1]!+.0722*rgb[2]!>128?"#242424":"#eeeeee";
 }
-const icons=new Map<string,Promise<string>>();
-/** Recolor glyph pixels only. Keep native HUD nodes, IDs, borders and handlers intact. */
-export async function paintStatusIcon(img:HTMLImageElement,color?:string):Promise<void> {
-  const source=img.dataset.statusOriginalSrc??img.getAttribute("src")??"";
-  img.dataset.statusOriginalSrc=source;
-  const key=source+":"+(color??"");img.dataset.statusPaint=key;
-  img.style.setProperty("--pneuma-icon-well",iconWell(color));
-  img.classList.add("pneuma-status-colored-icon");
-  if(!color){img.src=source;return;}
+const icons=new Map<string,Promise<string|undefined>>();
+/** Opaque artwork is not a silhouette: preserve it instead of filling its background. */
+export function coloredStatusIcon(source:string,color:string):Promise<string|undefined> {
+  const key=source+":"+color;
   let promise=icons.get(key);
   if(!promise){
-    promise=new Promise<string>((resolve,reject)=>{
+    promise=new Promise<string|undefined>((resolve,reject)=>{
       const original=new Image();original.crossOrigin="anonymous";
       original.onload=()=>{try{
         const canvas=document.createElement("canvas");canvas.width=128;canvas.height=128;
-        const ctx=canvas.getContext("2d")!;ctx.drawImage(original,0,0,128,128);ctx.globalCompositeOperation="source-in";ctx.fillStyle=color;ctx.fillRect(0,0,128,128);
+        const ctx=canvas.getContext("2d")!;ctx.drawImage(original,0,0,128,128);
+        const pixels=ctx.getImageData(0,0,128,128).data;
+        // Require transparent corners; boxed native Item art must not be flattened.
+        if([0,127,127*128,128*128-1].some(pixel=>pixels[pixel*4+3]!>0)){resolve(undefined);return;}
+        ctx.globalCompositeOperation="source-in";ctx.fillStyle=color;ctx.fillRect(0,0,128,128);
         resolve(canvas.toDataURL("image/png"));
       }catch(error){reject(error);}};
       original.onerror=()=>reject(Error("Icon unavailable"));original.src=source;
@@ -48,32 +47,49 @@ export async function paintStatusIcon(img:HTMLImageElement,color?:string):Promis
     if(icons.size>=256)icons.clear();icons.set(key,promise);
     void promise.catch(()=>icons.delete(key));
   }
-  try{const painted=await promise;if(img.dataset.statusPaint===key)img.src=painted;}catch{/* Preserve the original icon when an external source disallows canvas access. */}
+  return promise;
+}
+/** Keep native HUD nodes, IDs, borders and handlers intact. */
+export async function paintStatusIcon(img:HTMLImageElement,color?:string):Promise<void> {
+  const source=img.dataset.statusOriginalSrc??img.getAttribute("src")??"";
+  img.dataset.statusOriginalSrc=source;
+  const key=source+":"+(color??"");img.dataset.statusPaint=key;
+  img.style.setProperty("--pneuma-icon-well",iconWell(color));
+  img.classList.add("pneuma-status-colored-icon");
+  if(!color){img.src=source;return;}
+  try{const painted=await coloredStatusIcon(source,color);if(img.dataset.statusPaint===key)img.src=painted??source;}
+  catch{if(img.dataset.statusPaint===key)img.src=source;}
 }
 let rows:ColorStatus[]=[];
 const byId=new Map<string,ColorStatus>();
 export function setStatusColorRows(next:ColorStatus[]):void {
   rows=next;byId.clear();for(const row of rows)for(const id of [row.id,...row.aliases??[]])byId.set(id,row);
 }
-export function colorForEffect(effect:{statuses:Set<string>;name?:string|null}):string|undefined {
+function rowForEffect(effect:{statuses:Set<string>;name?:string|null}):ColorStatus|undefined {
   const matches=Array.from(effect.statuses).map(id=>byId.get(id)).filter((row):row is ColorStatus=>!!row);
   if(matches.some(row=>row.group==="addiction"))return undefined;
-  const row=matches[0]??rows.find(row=>row.name===effect.name);
-  return row?statusColor(row):undefined;
+  return matches[0]??rows.find(row=>row.name===effect.name);
 }
-/** Foundry v12 assigns each rendered icon the source temporaryEffect's index as zIndex. */
-export function colorTokenEffects(token:Token):void {
+export function colorForEffect(effect:{statuses:Set<string>;name?:string|null}):string|undefined {
+  const row=rowForEffect(effect);return row?statusColor(row):undefined;
+}
+/** Use catalog status glyphs, not native Item artwork, without changing effect documents. */
+export async function colorTokenEffects(token:Token):Promise<void> {
   const effects=token.actor?.temporaryEffects??[];
-  for(const child of (token as Token & {effects?:PIXI.Container}).effects?.children??[]) {
-    if(child.zIndex<0)continue;
-    const effect=effects[child.zIndex];if(!effect)continue;
-    const color=colorForEffect(effect);if(!color)continue;
+  await Promise.all(Array.from((token as Token & {effects?:PIXI.Container}).effects?.children??[]).map(async child=>{
+    if(child.zIndex<0)return;
+    const effect=effects[child.zIndex];if(!effect)return;
+    const row=rowForEffect(effect),color=row?statusColor(row):undefined;
+    if(!row?.img||!color)return;
     const sprite=child as PIXI.Sprite;
-    const filter=new PIXI.filters.ColorMatrixFilter();
-    const [r,g,b]=[1,3,5].map(i=>parseInt(color.slice(i,i+2),16)/255);
-    filter.matrix=[0,0,0,0,r!,0,0,0,0,g!,0,0,0,0,b!,0,0,0,1,0];
-    sprite.tint=0xffffff;sprite.filters=[...(sprite.filters??[]),filter];
-  }
+    try{
+      const painted=await coloredStatusIcon(row.img,color);if(!painted)return;
+      const texture=await loadTexture(painted);if(!(texture instanceof PIXI.Texture)||sprite.destroyed)return;
+      const width=sprite.width,height=sprite.height;
+      sprite.texture=texture;sprite.tint=0xffffff;
+      sprite.width=width;sprite.height=height;
+    }catch{/* Keep the native artwork when a glyph cannot be loaded or read. */}
+  }));
 }
 export function paintStatusMenu(root:HTMLElement):void {
   for(const img of Array.from(root.querySelectorAll<HTMLImageElement>(".status-effects img.effect-control[data-status-id]"))) {
@@ -96,7 +112,7 @@ export function registerStatusColors(provider:()=>Promise<ColorStatus[]>):void {
   game.settings!.register(MODULE,"statusSectionColors",{scope:"world",config:false,type:Object,
     default:Object.fromEntries(STATUS_COLOR_TABS.map(tab=>[tab,DEFAULT_STATUS_COLOR])) as SectionColors,onChange:update});
   registerNativeWrapper(CONFIG.Token.objectClass.prototype,"_drawEffects",async function(wrapped,...args){
-    const result=await wrapped(...args);colorTokenEffects(this);return result;
+    const result=await wrapped(...args);await colorTokenEffects(this);return result;
   },"WRAPPER");
   game.settings!.register(MODULE,"greyStatusDefaults",{scope:"world",config:false,type:Boolean,default:false});
   Hooks.once("ready",async()=>{

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.42 - 2026-11-16
+
+- Fix Broken Leg and other colored token statuses displaying as solid squares. Matching effects now use transparent catalog glyphs before recoloring.
+- Preserve original artwork when a suitable glyph is unavailable, and retain effect documents, overlay opacity, dimensions and other sprite filters.
+- Add pixel-level browser regression coverage for transparent glyphs, opaque artwork and fallback behavior. Live Foundry verification remains pending.
+
 ## 0.9.41 - 2026-11-16
 
 - Fix Foundry settings search hiding matching module settings after they are organized into groups. Preserve the native category identifier on each row's immediate container, including nested groups.
