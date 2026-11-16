@@ -748,3 +748,5 @@ The ordinary and shared area damage editors include Halve Armor beside Always Ab
 - Optional one AoE evasion per round counts completed rolls, successful or failed; cancelling a dialog, Cover Up and suppressive-fire Concentration do not count. Requires started combat when enabled. Round advance renews availability; resetting combat clears counters.
 - Additional AoE modifier stacks with the shared homebrew modifier. Mandatory and bonus LUCK are charged once on response commit. Pending cards refresh as usage changes.
 - Automated functional checks and browser form checks passed; live Foundry/theme verification pending.
+
+AoE layout correction (v0.9.39): rule panels use grid layout so native form-note flex sizing cannot push Cover Up outside its panel. Browser regression covers expanded Rule details at three widths; live Foundry verification pending.

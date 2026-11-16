@@ -723,3 +723,5 @@ Normal-attack saved injury results now nest directly beneath the matching token 
 ## AoE evasion follow-up (v0.9.38)
 
 Implemented the requested grouped layout, RAW Co-Processor eligibility, Follow Homebrew Evasion, Anyone / No one modes, and independent one-AoE-evasion-per-round checkbox. Homebrew shares ranged allowances, penalties and LUCK costs. Completed attempts count regardless of success; Cover Up and Concentration remain separate. Automated functional and focused form checks passed. Live Foundry verification pending; the broader browser suite retains its previously documented resistance-popup assertion.
+
+AoE layout follow-up (v0.9.39): reproduced Cover Up overlapping expanded Rule details with native form-note flex sizing. Changed rule-panel layout from vertical flex to grid and added panel-containment browser checks at 720, 900 and 1100px.

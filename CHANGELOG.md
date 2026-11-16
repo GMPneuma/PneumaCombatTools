@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.39 - 2026-11-15
+
+- Fix Allow Cover Up overflowing its settings panel and overlapping expanded Rule details. Grid layout prevents native form-note flex sizing from stretching the panel contents.
+- Add browser regression checks for panel containment at 720, 900 and 1100px.
+
+Validation: reproduced the overlap before the fix; focused browser checks and build pass after the fix. Live Foundry verification remains pending.
+
 ## 0.9.38 - 2026-11-15
 
 - Group AoE evasion and movement controls with a wider eligibility dropdown.
