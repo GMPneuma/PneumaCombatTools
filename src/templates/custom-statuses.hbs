@@ -9,6 +9,7 @@
       <p class="notes">{{description}}</p>
       <div class="status-section-colors"><label>Default icon color <input type="color" class="status-section-color" data-section="{{id}}" aria-label="{{label}} default icon color" value="{{color}}"></label><button type="button" data-reset-section-color aria-label="Reset section icon color" title="Reset to grey">Reset</button><span>Applies to the token menu and token icons. Red addiction icons stay unchanged.</span></div>
       {{#if isCustom}}
+      <label><input type="checkbox" name="separateCustomStatuses" {{#if ../separateCustomStatuses}}checked{{/if}}> Show custom statuses in their own group below General on the token status effect menu</label>
       <div class="pneuma-custom-status-rows">
         {{#each rows}}<div class="pneuma-custom-status-row" data-status-id="{{id}}" data-effect-uuid="{{effectUuid}}">
           <div class="status-user-icon"><img src="{{img}}" data-status-preview alt="Status icon" width="48" height="48"><input type="hidden" class="status-img" value="{{img}}"><button type="button" class="status-edit-icon" data-pick-icon aria-label="Edit icon">Edit icon</button></div>

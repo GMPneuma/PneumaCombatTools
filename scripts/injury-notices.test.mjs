@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {test} from "node:test";
-import {applyInjuryMoveFloor,scheduleInjuryReminder,deliverInjuryReminders} from "../dist/scripts/injury-notices.js";
+import {registerInjuryNotices,applyInjuryMoveFloor,scheduleInjuryReminder,deliverInjuryReminders} from "../dist/scripts/injury-notices.js";
 import {listHUDMessages,dismissHUDMessage} from "../dist/scripts/hud-messages.js";
 import {crackedSkullDamage} from "../dist/scripts/damage-application.js";
 const get=(o,p)=>p.split(".").reduce((v,k)=>v?.[k],o);
@@ -36,4 +36,19 @@ test("next-turn injury reminders are advisory, wait for target's turn and are de
  assert.equal(actor.system.stats.move.value,-2);assert.equal(actor.effects.length,0);
  await deliverInjuryReminders(combat);
  for(const n of listHUDMessages())dismissHUDMessage(n.source,n.id);
+});
+
+test('startup prepares each injured world or synthetic actor once',()=>{
+ const injured=setup(['Broken Leg']),synthetic=setup(['Collapsed Lung']),healthy=setup([]);
+ synthetic.uuid='Scene.off.Token.n.Actor.synthetic';healthy.uuid='Actor.healthy';
+ const prepared=[];
+ for(const actor of [injured,synthetic,healthy])actor.prepareData=()=>prepared.push(actor.uuid);
+ game.actors=[injured,healthy];game.scenes=[{tokens:[{actor:injured},{actor:injured},{actor:synthetic}]}];
+ game.settings={register(){}};globalThis.CONFIG={Actor:{documentClass:class{applyActiveEffects(){}}}};
+ globalThis.libWrapper={register(){}};
+ const ready=[];globalThis.Hooks={on(){},once(name,fn){if(name==='ready')ready.push(fn);}};
+ registerInjuryNotices();
+ // The first ready listener initializes injuries. A separate listener imports Foundry's roll class.
+ ready[0]();
+ assert.deepEqual(prepared,[injured.uuid,synthetic.uuid]);
 });

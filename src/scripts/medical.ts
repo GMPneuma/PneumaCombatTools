@@ -1,3 +1,4 @@
+import {registerExpiryIndex} from "./expiry-index.js";
 import {sceneEncounter} from "./encounter.js";
 import {withActorMutation} from "./actor-mutation.js";
 import {allActors,escapeHTML,primaryGM} from "./shared.js";
@@ -219,12 +220,12 @@ async function finishMedical(key:string,saved:SavedMedical,source:Token,target:T
   savedRolls.delete(key);
 }
 let queuedQuickFixExpiry:Promise<void>|undefined;
-export function expireQuickFixes(combat?:Combat):Promise<void> {
+export function expireQuickFixes(combat?:Combat,candidates:()=>Actor[]=allActors):Promise<void> {
   if(!combat&&queuedQuickFixExpiry)return queuedQuickFixExpiry;
   const next=medicalWork(async()=>{
     if(!combat)queuedQuickFixExpiry=undefined;
     const failures:string[]=[];
-    for(const actor of allActors())if(statusAuthority(actor))for(const item of actor.items) {
+    for(const actor of candidates())if(statusAuthority(actor))for(const item of actor.items) {
       if(!get(item,`flags.${M}.quickFix`))continue;
       try{await withActorMutation(actor,async()=>{
         const saved=get(item,`flags.${M}.quickFix`) as {combat?:string|null;expires:number;effects:string[];deathSave:boolean}|undefined;
@@ -257,9 +258,10 @@ export function registerMedical() {
     if(before!==undefined&&statusAuthority(actor))void markMedicalDamage(actor,Number(before)).catch(error=>ui.notifications!.error(String(error)));
     const hud=canvas.tokens?.hud;if(hud?.object?.actor?.uuid===actor.uuid)hud.render(true);
   });
-  const expire=()=>void expireQuickFixes().catch(error=>ui.notifications!.error(String(error)));
+  const candidates=registerExpiryIndex(actor=>actor.items.some(item=>!!get(item,`flags.${M}.quickFix`)));
+  const expire=()=>void expireQuickFixes(undefined,candidates).catch(error=>ui.notifications!.error(String(error)));
   Hooks.on("updateWorldTime",expire);
-  Hooks.on("pneumaCombatCleanupFinished",(combat:Combat)=>{void expireQuickFixes(combat).catch(error=>ui.notifications!.error(String(error)));});
+  Hooks.on("pneumaCombatCleanupFinished",(combat:Combat)=>{void expireQuickFixes(combat,candidates).catch(error=>ui.notifications!.error(String(error)));});
   Hooks.once("ready",()=>{
     for(const actor of allActors())remember(actor);
     expire();game.socket!.on("module."+M,(wire:Request|Reply)=>{

@@ -43,7 +43,7 @@ try {
  const createCustomEffectTemplate=async status=>({uuid:'Item.template.ActiveEffect.'+status.id,sheet:{render:()=>window.edited=status.id},update:async()=>{}});
  const fromUuid=async()=>null;
  const ActiveEffect=class{};const Item=class{};
- const game={i18n:{localize:s=>s},user:{isGM:true},settings:{get:()=>window.colors,set:async(_m,key,rows)=>{if(key==='statusSectionColors'){window.colors=rows;return;}custom=structuredClone(rows);window.custom=custom;}}};
+ const game={i18n:{localize:s=>s},user:{isGM:true},settings:{get:(_m,key)=>key==='separateCustomStatuses'?(window.separate??false):window.colors,set:async(_m,key,rows)=>{if(key==='separateCustomStatuses'){window.separate=rows;return;}if(key==='statusSectionColors'){window.colors=rows;return;}custom=structuredClone(rows);window.custom=custom;}}};
  const foundry={utils:{randomID:()=> 'new-user'}};
  const ui={notifications:{error:message=>window.error=message}};
  const FilePicker=class{constructor(options){this.options=options}render(){this.options.callback('chosen.svg')}};
@@ -110,6 +110,9 @@ try {
  await page.locator('[data-status-id=module] [data-reset-status]').click();await page.waitForFunction(()=>window.saved.module===undefined);
  await page.getByRole('button',{name:'Edit',exact:true}).click();await page.waitForFunction(()=>window.edited==='module');
  await page.getByText('Custom User Statuses',{exact:false}).first().click();await page.getByRole('button',{name:'Add user effect',exact:true}).click();
+ const grouping=page.locator('.tab[data-tab=custom] input[name=separateCustomStatuses]');
+ assert.equal(await grouping.isChecked(),false);
+ await grouping.check();
  const added=page.locator('[data-status-id="pneuma-custom-new-user"]');
  assert.deepEqual(await added.evaluate(row=>Array.from(row.children).map(el=>el.className||el.tagName)),['status-user-icon','status-user-color','LABEL','status-user-effect','BUTTON','BUTTON']);await added.getByRole('textbox',{name:'Status name',exact:true}).fill('Radiation exposure');
  await added.getByRole('button',{name:'Edit icon',exact:true}).click();assert.equal(await added.locator('.status-img').inputValue(),'chosen.svg');
@@ -119,6 +122,8 @@ try {
  assert.equal(await page.evaluate(()=>window.custom.find(s=>s.name==='Radiation exposure').effectUuid),'Item.template.ActiveEffect.pneuma-custom-new-user');
  assert.equal(await page.evaluate(()=>window.custom.find(s=>s.name==='Radiation exposure').color),'#12ab34');
  assert.equal(await page.evaluate(()=>window.colors.custom),'#abc123');
+ assert.equal(await page.evaluate(()=>window.separate),true);
+ await grouping.uncheck();
  await added.getByRole('button',{name:'Reset status icon color',exact:true}).click();
  assert.equal(await added.locator('.status-inherit-color').isChecked(),true);
  assert.equal(await added.locator('.status-color').inputValue(),'#abc123');
@@ -126,6 +131,7 @@ try {
  assert.equal(await page.locator('.status-section-color[data-section=custom]').inputValue(),'#888888');
  await page.getByRole('button',{name:'Save settings',exact:true}).click();
  await page.waitForFunction(()=>window.colors.custom==='#888888' && window.custom.find(s=>s.name==='Radiation exposure').color===undefined);
+ await page.waitForFunction(()=>window.separate===false);
  assert.equal(await page.evaluate(()=>window.error),undefined);
  for(const width of [850,700]){
   await page.locator('#pneuma-custom-statuses').evaluate((el,width)=>el.style.width=width+'px',width);

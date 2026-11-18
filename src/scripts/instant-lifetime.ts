@@ -1,3 +1,4 @@
+import {registerExpiryIndex} from "./expiry-index.js";
 import {captureCombatSummary,waitCombatSummary} from "./combat-summary.js";
 import { allActors as actors } from "./shared.js";
 import {withActorMutation} from "./actor-mutation.js";
@@ -195,12 +196,17 @@ export function registerInstantLifetimes() {
   Hooks.on("createActor",rememberHP);Hooks.on("createToken",(t:TokenDocument)=>{if(t.actor)rememberHP(t.actor);});
   Hooks.on("deleteActor",(a:Actor)=>hpValues.delete(a.uuid));
   Hooks.on("updateWorldTime",()=>enqueue(async()=>{
+    const candidates=timeCandidates();
+    if(!candidates.length)return;
     const inCombat=new Set(Array.from(game.combats??[]).filter(c=>c.started).flatMap(c=>Array.from(c.combatants).map(row=>row.actor?.uuid)));
-    for(const a of actors())if(!inCombat.has(a.uuid))await expireInstantActor(a);
+    for(const a of candidates)if(!inCombat.has(a.uuid))await expireInstantActor(a);
   }));
   // preUpdate is local to the initiating client. Cached values also cover remote writes received by the elected GM.
   Hooks.on("preUpdateActor",rememberHP);
   Hooks.on("updateActor",(a:Actor)=>{const before=hpValues.get(a.uuid),after=Number(foundry.utils.getProperty(a,"system.derivedStats.hp.value"));hpValues.set(a.uuid,after);if(before!==undefined&&after<before)enqueue(()=>clearInstantCondition(a,"sleep"));});
+  const timed=(e:ActiveEffect)=>hasDuration(e.duration)||life(e)?.expires!==undefined;
+  const timeCandidates=registerExpiryIndex(actor=>actor.effects.some(timed)||actor.items.some(item=>
+    !!life(item)?.duration||life(item)?.expires!==undefined||item.effects.some(timed)));
   Hooks.on("createCombat",rememberCombat);Hooks.on("preUpdateCombat",rememberCombat);
   const finish=(c:Combat,lastRound=c.round??0)=>{
     const summary=captureCombatSummary(c,lastRound);

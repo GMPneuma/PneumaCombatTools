@@ -19,7 +19,7 @@ export function correctStatusChoices<T extends Record<string, {isActive:boolean;
   return choices;
 }
 /** Move native nodes rather than replace them: Foundry keeps its click/right-click handlers. */
-export function groupStatusHUD(root: HTMLElement, statuses: StatusDefinition[]): void {
+export function groupStatusHUD(root: HTMLElement, statuses: StatusDefinition[], separateCustomStatuses = false): void {
   const tray = root.querySelector<HTMLElement>(".status-effects:not(.pneuma-combat-menu)");
   if (!tray || tray.dataset.pneumaGrouped) return;
   const icons = Array.from(tray.querySelectorAll<HTMLElement>(".effect-control"));
@@ -27,11 +27,13 @@ export function groupStatusHUD(root: HTMLElement, statuses: StatusDefinition[]):
   tray.dataset.pneumaGrouped = "true";
   tray.classList.add("pneuma-status-tray");
   const general = document.createElement("div"); general.className = "pneuma-status-grid";
-  const groups = new Map<string, HTMLElement>([["general", general], ["custom", general]]);
+  const groups = new Map<string, HTMLElement>([["general", general]]);
   const generalSection = document.createElement("details"); generalSection.className = "pneuma-status-group"; generalSection.open = true;
   const generalTitle = document.createElement("summary"); generalTitle.textContent = "General";
   generalSection.append(generalTitle, general); tray.append(generalSection);
-  for (const [group, title] of [["head", "Crit Head"], ["body", "Crit Body"], ["pharma", "Pharmaceuticals"], ["drugs", "Drugs"], ["addiction", "Addiction"]]) {
+  const sections = [["head", "Crit Head"], ["body", "Crit Body"], ["pharma", "Pharmaceuticals"], ["drugs", "Drugs"], ["addiction", "Addiction"]];
+  if (separateCustomStatuses && statuses.some(status => status.group === "custom")) sections.unshift(["custom", "Custom User Statuses"]);
+  for (const [group, title] of sections) {
     const details = document.createElement("details"); details.className = "pneuma-status-group";
     const summary = document.createElement("summary"); summary.textContent = title!;
     const grid = document.createElement("div"); grid.className = "pneuma-status-grid";

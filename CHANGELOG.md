@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.0 - 2026-11-18
+
+- Add a world setting on the Custom User Statuses tab to place custom statuses directly below General in the token status effect menu. It defaults to off.
+- Track actors eligible for timed effects and Quick Fix expiry, including off-scene token actors. At startup, check linked actors once and re-prepare actors with movement-floor injuries.
+
 ## 0.9.42 - 2026-11-16
 
 - Fix Broken Leg and other colored token statuses displaying as solid squares. Matching effects now use transparent catalog glyphs before recoloring.

@@ -15,13 +15,14 @@ try {
  const result=await page.evaluate(()=>{
    const root=document.querySelector("#token-hud"),tray=root.querySelector(".status-effects");
    let clicks=0,contexts=0;
-   for(const s of masterStatuses){
+   const statuses=[...masterStatuses,{id:"pneuma-in-jail",name:"In Jail",group:"custom"}];
+   for(const s of statuses){
      const icon=document.createElement("img");icon.className="effect-control";icon.dataset.statusId=s.id;icon.title=s.name;
      icon.addEventListener("click",()=>clicks++);icon.addEventListener("contextmenu",e=>{e.preventDefault();contexts++;});
      tray.append(icon);
    }
    const before=[...tray.querySelectorAll(".effect-control")];
-   groupStatusHUD(root,masterStatuses);groupStatusHUD(root,masterStatuses);
+   groupStatusHUD(root,statuses);groupStatusHUD(root,statuses);
    const groups=[...tray.querySelectorAll("details")];
    const closed=groups.slice(1).every(g=>!g.open);
    const generalOpen=groups[0].open;
@@ -57,5 +58,15 @@ try {
    return {before, during, after: visible()};
  });
  assert.deepEqual(visibility, {before:true, during:false, after:true});
+ const layouts=await page.evaluate(()=>[false,true,false].map(separate=>{
+   const root=document.createElement("div");
+   root.innerHTML='<div class="status-effects"><img class="effect-control" data-status-id="user"></div>';
+   const icon=root.querySelector("img");
+   groupStatusHUD(root,[...masterStatuses,{id:"user",name:"In Jail",group:"custom"}],separate);
+   const sections=[...root.querySelectorAll("summary")].map(title=>title.textContent);
+   return {sections:sections.slice(0,3),group:icon.closest("details").querySelector("summary").textContent};
+ }));
+ const general={sections:["General","Crit Head","Crit Body"],group:"General"};
+ assert.deepEqual(layouts,[general,{sections:["General","Custom User Statuses","Crit Head"],group:"Custom User Statuses"},general]);
  console.log("Status HUD browser checks passed: collapsed groups, complete catalog, retained native click/right-click handlers.");
 }finally{await browser.close();}

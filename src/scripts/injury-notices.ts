@@ -1,4 +1,4 @@
-import { primaryGM as electedGM } from "./shared.js";
+import { allActors, primaryGM as electedGM } from "./shared.js";
 import {hasInjury} from "./injury-rules.js";
 import {postHUDMessage} from "./hud-messages.js";
 import {registerNativeWrapper} from "./native-wrappers.js";
@@ -44,8 +44,9 @@ export async function deliverInjuryReminders(combat:Combat){
  if(active.some(r=>r.injury==="Spinal Injury"))alert(actor,"SPINAL INJURY — No Action this turn. You may still take a Move Action.");
  if(active.some(r=>r.injury!=="Spinal Injury"))alert(actor,"EAR INJURY — No Move Action this turn after moving over 4 m/yd last turn.");
 }
+const needsMoveFloor=(actor:Actor)=>["Collapsed Lung","Broken Leg","Dismembered Leg"].some(n=>hasInjury(actor,n));
 export function applyInjuryMoveFloor(actor:Actor){
- if(!["Collapsed Lung","Broken Leg","Dismembered Leg"].some(n=>hasInjury(actor,n)))return;
+ if(!needsMoveFloor(actor))return;
  // Preserve explicit immobilization/override effects, including disabled frames.
  const effects=typeof actor.allApplicableEffects==="function"?Array.from(actor.allApplicableEffects()):Array.from(actor.effects);
  if(effects.some(e=>!e.disabled&&!e.isSuppressed&&!foundry.utils.getProperty(e,"system.isSuppressed")&&e.changes.some(c=>c.key==="system.stats.move.value"&&c.mode===5&&Number(c.value)<=0)))return;
@@ -66,10 +67,11 @@ export function registerInjuryNotices(){
   }
  };
  Hooks.once("ready",()=>{
-  for(const actor of game.actors??[])known.set(actor.uuid,snapshot(actor));
-  for(const scene of game.scenes??[])for(const token of scene.tokens)if(token.actor)known.set(token.actor.uuid,snapshot(token.actor));
   registerNativeWrapper(CONFIG.Actor.documentClass.prototype,"applyActiveEffects",function(wrapped,...args){const result=wrapped(...args);applyInjuryMoveFloor(this as Actor);return result;},"WRAPPER");
-  for(const actor of game.actors??[])actor.prepareData();
+  for(const actor of allActors()){
+   known.set(actor.uuid,snapshot(actor));
+   if(needsMoveFloor(actor))actor.prepareData();
+  }
  });
  for(const hook of ["createItem","updateItem","deleteItem","createActiveEffect","updateActiveEffect","deleteActiveEffect"])Hooks.on(hook,(doc:Item|ActiveEffect)=>{
   const actor=doc.parent instanceof Actor?doc.parent:doc.parent instanceof Item?doc.parent.parent:null;

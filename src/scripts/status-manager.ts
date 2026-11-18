@@ -99,7 +99,7 @@ export class StatusManager extends FormApplication {
   override async getData(){
     const rows=(await statusManagerRows()).sort((a,b)=>a.name.localeCompare(b.name));
     const colors=sectionColors();
-    return {tabs:[
+    return {separateCustomStatuses:game.settings!.get(MODULE,"separateCustomStatuses"),tabs:[
       {id:"native",label:"System effects",description:"Existing system effects are view-only. View their details. Combat Tools does not replace these effects."},
       {id:"native-empty",label:"System statuses",description:"System statuses or Items without a matching effect. Add modifiers using the system editor."},
       {id:"module",label:"Combat Tools Statuses",description:"Statuses supplied by Combat Tools. Add or edit a modifier effect; existing Combat Tools automation still applies."},
@@ -194,8 +194,10 @@ export class StatusManager extends FormApplication {
     }));
     const valid=validateCustomStatuses(rows);
     const colors=Object.fromEntries(STATUS_COLOR_TABS.map(tab=>[tab,validateStatusColor(this.element[0]!.querySelector<HTMLInputElement>('.status-section-color[data-section="'+tab+'"]')?.value)??DEFAULT_STATUS_COLOR])) as SectionColors;
+    const separate=this.element[0]!.querySelector<HTMLInputElement>('[name="separateCustomStatuses"]')!.checked;
     await game.settings!.set(MODULE,"statusSectionColors",colors);
     await game.settings!.set(MODULE,"customStatuses",valid);
+    if(separate!==game.settings!.get(MODULE,"separateCustomStatuses"))await game.settings!.set(MODULE,"separateCustomStatuses",separate);
   }
   protected override async _updateObject(){try{await this.saveCustomRows();this.render(false);}catch(error){ui.notifications!.error((error as Error).message);throw error;}}
 }

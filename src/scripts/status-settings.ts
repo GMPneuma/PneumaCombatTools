@@ -43,7 +43,10 @@ export function labelCombatEffects(actor:Actor,root:HTMLElement,manageEffect?:(e
   }
 }
 export interface CustomStatus extends EffectStatus {}
-declare global { interface SettingConfig { "pneuma-combattools.customStatuses": CustomStatus[] | null } }
+declare global { interface SettingConfig {
+  "pneuma-combattools.customStatuses": CustomStatus[] | null;
+  "pneuma-combattools.separateCustomStatuses": boolean;
+} }
 const jail: CustomStatus = { id: "pneuma-in-jail", name: "In Jail", img: "modules/pneuma-combattools/styles/in-jail.svg" };
 export function validateCustomStatuses(rows: CustomStatus[]): CustomStatus[] {
   const ids = new Set(masterStatuses.map(status => status.id));
@@ -144,6 +147,10 @@ export function registerCyberpunkStatuses(): void {
     if (statuses.size!==effect.statuses.size) effect.updateSource({statuses:[...statuses]});
   });
   game.settings!.register(MODULE, "customStatuses", { scope: "world", config: false, type: Array, default: null, onChange: installStatusList });
+  game.settings!.register(MODULE, "separateCustomStatuses", {
+    scope: "world", config: false, type: Boolean, default: false,
+    onChange: () => { canvas.tokens?.hud?.render(); }
+  });
   game.settings!.register(MODULE,"statusTemplates",{scope:"world",config:false,type:Object,default:{}});
   game.settings!.registerMenu(MODULE, "customStatusesMenu", {
     name: "Status effects", label: "Configure status effects", hint: "System effects, system statuses, Combat Tools effects, and user effects.",
@@ -157,6 +164,11 @@ export function registerCyberpunkStatuses(): void {
     if (game.user?.isGM && game.modules.get("condition-lab-triggler")?.active)
       ui.notifications!.warn("Combat Tools now supplies Cyberpunk statuses. Disable Condition Lab & Triggler to avoid competing status-list changes. Custom entries are preserved.");
   });
-  Hooks.on("renderTokenHUD", (_hud: TokenHUD, html: JQuery) => { if (html[0]) {groupStatusHUD(html[0], configuredStatuses().map(s=>({...s,id:nativeIds.get(s.id)??s.id})));paintStatusMenu(html[0]);} });
+  Hooks.on("renderTokenHUD", (_hud: TokenHUD, html: JQuery) => {
+    if (!html[0]) return;
+    const statuses = configuredStatuses().map(s=>({...s,id:nativeIds.get(s.id)??s.id}));
+    groupStatusHUD(html[0], statuses, game.settings!.get(MODULE, "separateCustomStatuses"));
+    paintStatusMenu(html[0]);
+  });
   registerStatusSync();
 }
