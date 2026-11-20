@@ -20,7 +20,8 @@ try {
   window.foundry={data:{fields:{ObjectField:class{}}},utils:{getProperty:(o,p)=>p.split(".").reduce((v,k)=>v?.[k],o)}};
   window.game={user:{id:"def",isGM:false},users:[],modules:new Map(),settings:{get:()=>({coverUp:false}),register(){},registerMenu(_m,_k,config){window.SettingsForm=config.type}},i18n:{localize:k=>k}};
   window.targetActor={items:[],effects:[],system:{stats:{ref:{value:8}}}};
-  window.fromUuid=async uuid=>({actor:{...targetActor,testUserPermission:()=>uuid==="owned"}});
+  window.fromUuidSync=uuid=>({actor:{...targetActor,testUserPermission:()=>uuid==="owned"}});
+  window.fromUuid=async uuid=>fromUuidSync(uuid);
   const {areaContent,registerAreaAttacks}=await import("/scripts/aoe/workflow.js");
   window.data={scene:"s",kind:"explosive",phase:"responses",area:{shape:"square",origin:{x:50,y:50},direction:0,length:500,width:500},
    settings:{coverUp:true,evade:"raw"},exchange:{combatId:null,title:"Grenade <unsafe>",html:'<div class="rollcard">ATTACK</div>',total:20},
@@ -40,6 +41,23 @@ try {
  assert.equal(await page.locator('[data-aoe-action="show"]').count(),0);
  const evade=page.locator('[data-aoe-row="owned"] button[data-aoe-action="roll"]');
  assert.equal(await evade.isEnabled(),true);
+ const refreshCounts=await page.evaluate(async()=>{
+  // This fixture starts after ready, so seed the live pending-card index from a message update.
+  const updates=[];
+  window.ui={...window.ui,chat:{element:{find:()=>({length:1})},updateMessage:m=>updates.push(m.id)}};
+  for(const hook of hooks.updateChatMessage)await hook(message);
+  const changed=async()=>{
+    for(const hook of hooks.updateActor??[])hook({uuid:'actor'});
+    await new Promise(requestAnimationFrame);
+    return updates.splice(0).length;
+  };
+  const unchanged=await changed();
+  targetActor.system.stats.ref.value=7;
+  const eligibility=await changed();
+  targetActor.system.stats.ref.value=8;
+  return [unchanged,eligibility];
+ });
+ assert.deepEqual(refreshCounts,[0,1],'area card renders only when its response changes');
 
  await page.evaluate(async()=>{
   const {areaContent}=await import("/scripts/aoe/workflow.js");data.rows.forEach(row=>row.state="rolling");

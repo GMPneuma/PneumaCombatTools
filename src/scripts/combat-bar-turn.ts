@@ -8,6 +8,7 @@ let queue: Promise<unknown> = Promise.resolve();
 
 /** Recheck the exact turn inside the GM queue so two requests cannot skip a participant. */
 export async function advanceBarTurn(request: TurnRequest): Promise<void> {
+  globalThis.pneumaPerformance?.handlerStart('barTurn',request.id,request.user);
   const combat = game.combats?.get(request.combat), user = game.users?.get(request.user) as User | undefined;
   if (!game.user?.isGM || !combat?.active || !combat.started || !user?.active) throw Error("Combat or requesting player is no longer active.");
   if (combat.round !== request.round || combat.turn !== request.turn || combat.combatant?.id !== request.combatant) throw Error("The turn has already changed.");

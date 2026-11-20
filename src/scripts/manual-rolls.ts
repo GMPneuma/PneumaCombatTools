@@ -98,7 +98,8 @@ async function applyInjuryResult(data: ManualCard, actor: Actor): Promise<string
   return actor.name + " — " + injury.name;
 }
 /** Serialized by the elected GM, including local requests. */
-export async function handleManualRequest(wire: Pick<Wire,"message" | "user" | "request">): Promise<void> {
+export async function handleManualRequest(wire: Pick<Wire,"message" | "user" | "request"> & {id?:string}): Promise<void> {
+  globalThis.pneumaPerformance?.handlerStart('manualType',wire.id,wire.user);
   const message = game.messages!.get(wire.message) as ChatMessage | undefined;
   const user = game.users!.get(wire.user) as User | undefined;
   const original = message && state(message);

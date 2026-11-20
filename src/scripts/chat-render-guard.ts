@@ -22,6 +22,7 @@ export function installChatRenderGuard(prototype: object): void {
   },'MIXED');
   registerNativeWrapper(prototype,'updateMessage',function(wrapped,message: ChatMessage,...args) {
     if (!message.id) return wrapped(message,...args);
+    globalThis.pneumaPerformance?.chatRequest(message);
     const current = state(this), previous = current.updates.get(message.id);
     return track(current.updates,message.id,async()=>{
       await previous?.catch(()=>{});

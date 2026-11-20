@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.1 - 2026-11-20
+
+- Adds a client-local Performance Recorder for players and GMs under Combat Tools settings. Mark a hitch with Alt+Shift+L to freeze the last minute of detailed events alongside session-wide trends. Export a readable summary or full JSON.
+- Captures browser and canvas frame times, chat redraws, document activity, measured module work, and player requests handled by the GM. Install Visual Tools 1.0.1 for its detailed timings.
+- Each recording offers an unchecked option to send the full report to Pneuma's report inbox when stopped or marked. Uploads include Foundry display names and IDs. The recorder shows a receipt or a retry option.
+- Pending attack, area-response, injury and Sleep cards skip redraws when the controls shown to the viewer are unchanged.
+
 ## 1.0.0 - 2026-11-18
 
 - Add a world setting on the Custom User Statuses tab to place custom statuses directly below General in the token status effect menu. It defaults to off.

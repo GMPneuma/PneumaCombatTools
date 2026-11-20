@@ -51,7 +51,7 @@ interface Claim { user: string; message: string; nonce: string; offer: EvasionOf
 const claims = new Map<string, Claim>();
 const pending = new Map<string, { resolve(value: Claim | undefined): void; reject(error: Error): void }>();
 const retry = new Map<string, { nonce: string; defense: Defense }>();
-const pendingCards = new PendingCardRefresh(message => ui.chat?.updateMessage(message));
+const pendingCards = new PendingCardRefresh(message => ui.chat?.updateMessage(message), undefined, defenseControls);
 let queue: Promise<unknown> = Promise.resolve();
 let trackingReady = true;
 const flag = <T>(doc: object, name: string): T | undefined =>
@@ -115,6 +115,14 @@ function exchangeOffer(actor: Actor, data: Exchange, combat?: Combat): EvasionOf
   const choice = offer(actor, data.ranged, combat);
   return data.evasionOverride && !choice.allowed
     ? { allowed: true, penalty: 0, cost: 0, free: 0, reason: "GM override" } : choice;
+}
+function defenseControls(message: ChatMessage): string {
+  const data = flag<Exchange>(message, "exchange")!;
+  const actor = (fromUuidSync(data.defender as TokenDocument["uuid"]) as TokenDocument | null)?.actor;
+  if (!actor?.isOwner) return "hidden";
+  if (data.state === "applying") return "finish payment";
+  try { return JSON.stringify(exchangeOffer(actor, data, currentCombat(data))); }
+  catch (error) { return String(error); }
 }
 export function skipUnavailableEvasion(data: Exchange, actor: Actor, combat?: Combat): void {
   if (data.unaware || game.settings?.get(MODULE,"skipIneligibleEvasion")===false) return;
@@ -190,6 +198,7 @@ async function writeExchange(message: ChatMessage, data: Exchange): Promise<void
   const changes: Record<string, unknown> = { ["flags." + MODULE + ".exchange"]: foundry.utils.deepClone(data), content: exchangeContent(data) };
   if (!data.damage && flag<Exchange>(message, "exchange")?.damage)
     changes["flags." + MODULE + ".exchange.-=damage"] = null;
+  globalThis.pneumaPerformance?.write(data,message,'exchange');
   await message.update(changes);
 }
 async function revealDice(data: Exchange, message?: ChatMessage): Promise<void> {
@@ -232,6 +241,7 @@ async function finish(message: ChatMessage, data: Exchange, actor: Actor): Promi
   void revealDice(data,message).catch(error => console.warn(MODULE, "Dice display failed", error));
 }
 export async function handleCombatRequest(request: Request): Promise<Claim | undefined> {
+  globalThis.pneumaPerformance?.handlerStart('kind',request.id,request.user);
   if (!trackingReady) throw new Error("Evasion tracking migration is not finished. Wait and retry; reload if migration reported an error.");
   const message = game.messages?.get(request.message) as ChatMessage | undefined;
   const stored = message && flag<Exchange>(message, "exchange");
@@ -242,6 +252,7 @@ export async function handleCombatRequest(request: Request): Promise<Claim | und
     if (!user.isGM && (message.blind || (message.whisper.length && !message.whisper.includes(user.id) && message.author?.id !== user.id)))
       throw new Error("This is a private exchange.");
     const data = foundry.utils.deepClone(stored);
+    globalThis.pneumaPerformance?.bindWrite(data,request.id);
     await handleDamage(request as DamageRequest, user, data, () => writeExchange(message, data), message);
     return;
   }
@@ -250,6 +261,7 @@ export async function handleCombatRequest(request: Request): Promise<Claim | und
   if (!user.isGM && message.whisper.length && !message.whisper.includes(user.id) && message.author?.id !== user.id)
     throw new Error("This is a private exchange.");
   const data = foundry.utils.deepClone(stored);
+  globalThis.pneumaPerformance?.bindWrite(data,request.id);
   const claim = claims.get(claimKey(data, actor));
   if (request.action === "release") {
     if (claim && claim.nonce === request.nonce && claim.user === user.id) claims.delete(claimKey(data, actor));
@@ -541,6 +553,7 @@ export function registerCombatResolution(): void {
   Hooks.on("renderChatMessage", (message: ChatMessage, html: JQuery) => {
     const data = flag<Exchange>(message, "exchange");
     if (!data || !message.visible || (message.blind && !game.user!.isGM)) return;
+    pendingCards.recordDisplay(message);
     if (html[0]) decorateCombatMessage(html[0], data);
     if (data.state === "cancelled") return;
     html.find(".message-sender").text(data.attackerName + " → " + data.defenderName);
@@ -594,7 +607,7 @@ export function registerCombatResolution(): void {
           button.setAttribute("aria-description", choice.reason);
         }
         button.addEventListener("click", async event => {
-          const buttons = panel.querySelectorAll("button"); buttons.forEach(b => b.disabled = true);
+          const buttons = panel.querySelectorAll<HTMLButtonElement>("button:enabled"); buttons.forEach(b => b.disabled = true);
           try { await respond(message, evade, false, event.shiftKey); }
           catch (error) { ui.notifications!.error((error as Error).message); }
           finally { buttons.forEach(b => b.disabled = false); }

@@ -131,6 +131,7 @@ const retries = new Map<string, AvoidanceRequest>();
 /** Authority validates ownership and a per-row claim; other targets may respond concurrently. */
 export function resolveSceneAvoidance(request: AvoidanceRequest): Promise<void> {
   return serial(async () => {
+    globalThis.pneumaPerformance?.handlerStart('sceneEffectType',request.id,request.user);
     gm();
     const message = game.messages?.get(request.message) as ChatMessage | undefined;
     const saved = message && dataOf(message);

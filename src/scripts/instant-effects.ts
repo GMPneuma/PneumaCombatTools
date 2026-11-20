@@ -162,6 +162,7 @@ export async function createInstantCard(actor:Actor,id:InstantId|"status",source
 interface Wire {instantType:"request"|"reply";id:string;message:string;user:string;request:InstantRequest;scope?:string;gm?:string;error?:string}
 const pending=new Map<string,{resolve:()=>void;reject:(e:Error)=>void;timer:ReturnType<typeof setTimeout>}>();let queue:Promise<unknown>=Promise.resolve();
 export async function handleInstantRequest(w:Wire) {
+  globalThis.pneumaPerformance?.handlerStart('instantType',w.id,w.user);
   const message=game.messages!.get(w.message) as ChatMessage|undefined,user=game.users!.get(w.user) as User|undefined;
   const saved=message&&foundry.utils.getProperty(message,"flags."+M+(w.scope?".attachedEffects."+w.scope:".instant")) as EffectCard|undefined;
   if(w.scope&&!/^[a-zA-Z0-9]+$/.test(w.scope))throw Error("Invalid effect reference.");
@@ -200,7 +201,10 @@ export function registerInstantEffects() {
     // Only sleep retains a condition-dependent Wake action. Completed fire rows are receipts.
     const relevant=states.filter(s=>s.state==="applied"&&s.id==="sleep");
     return relevant.length?{actors:relevant.map(s=>s.actor),combat:relevant[0]?.encounter?.combatId}:undefined;
-  });
+  }, (_message,scope)=>JSON.stringify(scope.actors.map(uuid=>{
+    const actor=fromUuidSync(uuid as Actor["uuid"]) as Actor|null;
+    return !!actor&&(game.user!.isGM||actor.isOwner)&&hasInstantCondition(actor,"sleep");
+  })));
   for(const hook of ["createChatMessage","updateChatMessage"])Hooks.on(hook,(message:ChatMessage)=>{void dispatchMicrowaver(message);});
   registerEffectEvents();
   registerInstantLifetimes();

@@ -15,9 +15,18 @@ export class PendingCardRefresh {
   private requests = new Map<string, [string | undefined, string | undefined]>();
   private queued = new Set<string>();
   private rendering = new Set<string>();
+  // Compare against the last actual render; document updates alone don't change the displayed controls.
+  private displayed = new WeakMap<ChatMessage, string>();
   private scheduled = false;
   constructor(private update: (message: ChatMessage) => unknown,
-    private scope: (message: ChatMessage) => PendingScope | undefined = exchangeScope) {}
+    private scope: (message: ChatMessage) => PendingScope | undefined = exchangeScope,
+    private controls?: (message: ChatMessage, scope: PendingScope) => string) {}
+  recordDisplay(message: ChatMessage): void {
+    if (!this.controls || !message.visible || message.isContentVisible === false || (message.blind && !game.user?.isGM)) return;
+    const scope = this.scope(message);
+    if (scope) this.displayed.set(message, this.controls(message, scope));
+    else this.displayed.delete(message);
+  }
   seed(messages: Iterable<ChatMessage> | undefined): void {
     if (this.source === messages) return;
     this.source = messages;
@@ -72,7 +81,9 @@ export class PendingCardRefresh {
     this.scheduled = true;
     requestAnimationFrame(() => {
       this.scheduled = false;
+      const finish = globalThis.pneumaPerformance?.work("pneuma-combattools","chat.pendingChecks");
       for (const [actor, combat] of this.requests.values()) {
+        globalThis.pneumaPerformance?.metric(["chat.invalidation",actor ?? null,combat ?? null]);
         const ids = actor !== undefined ? this.actors.get(actor) : combat !== undefined ? this.combats.get(combat) : this.cards.keys();
         for (const id of ids ?? []) {
           const card = this.cards.get(id);
@@ -84,9 +95,12 @@ export class PendingCardRefresh {
       for (const id of ids) {
         if (this.rendering.has(id)) { this.queued.add(id); continue; }
         const card = this.cards.get(id);
+        if (!card?.message.visible || card.message.isContentVisible === false || (card.message.blind && !game.user?.isGM)) continue;
+        const displayed = this.displayed.get(card.message);
+        if (this.controls && displayed !== undefined && displayed === this.controls(card.message, card)) continue;
         // Native updateMessage inserts missing messages. Invalidation must only refresh mounted cards.
-        if (card?.message.visible && (!card.message.blind || game.user?.isGM)
-          && ui.chat?.element?.find(`[data-message-id="${id}"]`).length) {
+        if (ui.chat?.element?.find(`[data-message-id="${id}"]`).length) {
+          globalThis.pneumaPerformance?.metric(["chat.pendingRedraw",id]);
           const result = this.update(card.message);
           if (result && typeof (result as PromiseLike<unknown>).then === "function") {
             this.rendering.add(id);
@@ -97,15 +111,18 @@ export class PendingCardRefresh {
           }
         }
       }
+      finish?.();
     });
   }
 }
 
 /** Shared actor/combat invalidation for condition-dependent card controls. */
-export function registerConditionCardRefresh(scope:(message:ChatMessage)=>PendingScope|undefined):void {
-  const index=new PendingCardRefresh(message=>ui.chat?.updateMessage(message,false),scope);
+export function registerConditionCardRefresh(scope:(message:ChatMessage)=>PendingScope|undefined,
+  controls:(message:ChatMessage,scope:PendingScope)=>string):void {
+  const index=new PendingCardRefresh(message=>ui.chat?.updateMessage(message,false),scope,controls);
   Hooks.once("ready",()=>index.seed(game.messages));
-  for(const hook of ["createChatMessage","updateChatMessage","renderChatMessage"])Hooks.on(hook,(message:ChatMessage)=>index.remember(message));
+  for(const hook of ["createChatMessage","updateChatMessage"])Hooks.on(hook,(message:ChatMessage)=>index.remember(message));
+  Hooks.on("renderChatMessage",(message:ChatMessage)=>{index.remember(message);index.recordDisplay(message);});
   Hooks.on("deleteChatMessage",(message:ChatMessage)=>index.forget(message.id!));
   Hooks.on("updateActor",(actor:Actor)=>index.refresh(actor.uuid));
   for(const hook of ["createItem","updateItem","deleteItem","createActiveEffect","updateActiveEffect","deleteActiveEffect"])Hooks.on(hook,(doc:Item|ActiveEffect)=>{

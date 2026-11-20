@@ -90,6 +90,7 @@ export function registerEmp() {
     game.socket!.on(`module.${MODULE}`,(wire:Wire)=>{
       if(wire?.empType==="select"&&empGM()?.id===game.user?.id){
         void empWork(async()=>{
+          globalThis.pneumaPerformance?.handlerStart('empType',wire.id,wire.user);
           const combat=game.combats!.get(wire.combat) as Combat|undefined,user=game.users!.get(wire.user) as User|undefined;
           if(!combat||!user||!Array.isArray(wire.selected))throw Error("Invalid EMP selection.");
           await applyEmpSelection(combat,wire.request,wire.selected,user);

@@ -393,7 +393,10 @@ export function registerGrapple() {
   Hooks.once("ready",() => {
     game.socket!.on(CHANNEL,(wire: GrappleRequest | Reply) => {
       if (wire?.grappleType === "request" && gm()?.id === game.user?.id) {
-        void serialized(() => handleGrappleRequest(wire)).then(claim => reply(wire,undefined,claim),error => reply(wire,String((error as Error).message ?? error)));
+        void serialized(() => {
+          globalThis.pneumaPerformance?.handlerStart('grappleType',wire.request,wire.user);
+          return handleGrappleRequest(wire);
+        }).then(claim => reply(wire,undefined,claim),error => reply(wire,String((error as Error).message ?? error)));
       } else if (wire?.grappleType === "reply") requests.reply({...wire,id:wire.request},wire.claim);
     });
   });

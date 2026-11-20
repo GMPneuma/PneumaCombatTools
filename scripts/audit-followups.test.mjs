@@ -37,8 +37,26 @@ test('a failed LUCK write releases the actor queue for a later retry',async()=>{
  await assert.rejects(spendBonusLuck(actor,1),/write failed/);await spendBonusLuck(actor,1);assert.equal(actor.system.stats.luck.value,1);
 });
 test('completed fire cards do not subscribe to condition refresh; sleep keeps its Wake refresh',()=>{
- let scope;const ctx=fixture('instant-effects',{registerConditionCardRefresh:fn=>scope=fn,registerEffectEvents(){},registerFlashbangEvents(){},getFlashbangState(){},getTearGasState(){},game:{modules:new Map([["pneuma-combattools",{}]])},registerInstantLifetimes(){},Hooks:{on(){},once(){}},foundry:{utils:{getProperty:get}}});
+ let scope,controls;const actor={isOwner:true,asleep:true};
+ const ctx=fixture('instant-effects',{registerConditionCardRefresh:(fn,key)=>{scope=fn;controls=key;},
+   fromUuidSync:()=>actor,hasInstantCondition:a=>a.asleep,registerEffectEvents(){},registerFlashbangEvents(){},getFlashbangState(){},getTearGasState(){},game:{user:{isGM:false},modules:new Map([["pneuma-combattools",{}]])},registerInstantLifetimes(){},Hooks:{on(){},once(){}},foundry:{utils:{getProperty:get}}});
  ctx.registerInstantEffects();const fire={id:'incendiary',state:'applied',actor:'Actor.a'},sleep={...fire,id:'sleep'};
  for(const data of [{instant:{effect:fire}},{attachedEffects:{a:{effect:fire}}},{aoe:{rows:[{instant:fire}]}}])assert.equal(scope({flags:{'pneuma-combattools':data}}),undefined);
  const tracked=scope({flags:{'pneuma-combattools':{attachedEffects:{a:{effect:fire},b:{effect:sleep}}}}});assert.deepEqual([...tracked.actors],['Actor.a']);
+ const before=controls(null,tracked);
+ actor.name='Renamed';assert.equal(controls(null,tracked),before);
+ actor.asleep=false;assert.notEqual(controls(null,tracked),before);
+});
+
+test('movement injury controls follow the injury, encounter and ownership',()=>{
+ let controls;const actor={isOwner:true,injured:true},combat={started:true};
+ const ctx=fixture('injury-mechanics',{registerConditionCardRefresh:(_scope,key)=>{controls=key;},
+   Hooks:{on(){},once(){}},fromUuidSync:()=>actor,hasInjury:a=>a.injured,game:{user:{isGM:false},combats:new Map([['c',combat]])},foundry:{utils:{getProperty:get}}});
+ ctx.registerInjuryMechanics();
+ const card={flags:{'pneuma-combattools':{brokenRibs:{actor:'Actor.a',combat:'c',epoch:'',distance:5}}}};
+ const before=controls(card);
+ actor.name='Renamed';assert.equal(controls(card),before);
+ actor.injured=false;assert.notEqual(controls(card),before);
+ actor.injured=true;combat.started=false;assert.notEqual(controls(card),before);
+ combat.started=true;actor.isOwner=false;assert.notEqual(controls(card),before);
 });

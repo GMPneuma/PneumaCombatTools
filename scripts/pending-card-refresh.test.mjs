@@ -50,6 +50,38 @@ hooks.updateChatMessage.forEach(fn=>fn(cards[0]));flush();
 hooks.updateActor.forEach(fn=>fn({uuid:"Actor.one"}));flush();assert.deepEqual(changed,[]);
 console.log("Pending-card hooks: one startup scan only, relevant actor/item/combat refresh, resolved-card cleanup passed.");
 
+// Twelve mounted attack cards on the same defender, using the real render and document hooks.
+{
+ const actor={uuid:'Actor.defender',isOwner:true,items:[],effects:[],system:{stats:{ref:{value:8},luck:{value:4}}}};
+ const combat={id:'encounter',started:true,round:1};
+ game.combats=new Map([[combat.id,combat]]);
+ game.i18n={localize:key=>key};
+ game.settings.get=(_module,key)=>key==='evasionEligibility'?'raw':undefined;
+ globalThis.fromUuidSync=()=>({actor});globalThis.fromUuid=async uuid=>fromUuidSync(uuid);
+ const mounted=Array.from({length:12},(_,i)=>card('mounted-'+i,actor.uuid,combat.id));
+ const fire=(name,...args)=>hooks[name].forEach(fn=>fn(...args));
+ const display=message=>fire('renderChatMessage',message,{find:()=>({length:1,text(){}})});
+ for(const message of mounted){
+   Object.assign(message.flags['pneuma-combattools'].exchange,{defender:'Scene.s.Token.d',ranged:true});
+   fire('updateChatMessage',message);display(message);
+ }
+ actor.items.push({type:'gear',name:'Rope'});
+ fire('updateItem',{parent:actor},{name:'Rope'});
+ fire('updateCombat',combat,{'flags.pneuma-combattools.combatSummary':{}});
+ flush();assert.deepEqual(changed.splice(0),[],'unrelated inventory and summary edits leave all twelve cards alone');
+ actor.system.stats.ref.value=7;
+ fire('updateActor',actor,{'system.stats.ref.value':7});flush();
+ assert.deepEqual(changed.splice(0),mounted.map(m=>m.id),'crossing the REF threshold redraws the affected controls');
+ mounted.forEach(display);
+ actor.system.stats.ref.value=6;
+ fire('updateActor',actor,{'system.stats.ref.value':6});flush();
+ assert.deepEqual(changed.splice(0),[],'a stat change with the same offer leaves all controls intact');
+ actor.items.push({type:'cyberware',name:'Reflex Co-Processor',system:{isInstalledInActor:true}});
+ fire('createItem',{parent:actor});flush();
+ assert.deepEqual(changed.splice(0),mounted.map(m=>m.id),'qualifying cyberware restores evasion');
+ assert.equal(scans,1);
+}
+
 // Multiple defenders share one AoE card; removing a completed row stops its refreshes.
 const areaChanges=[];
 const areas=new PendingCardRefresh(message=>areaChanges.push(message.id),message=>{

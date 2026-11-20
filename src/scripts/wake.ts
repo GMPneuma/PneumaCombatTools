@@ -34,6 +34,7 @@ export function registerWake():void {
     if(packet?.wake==="reply"&&packet.user===game.user!.id){const job=pending.get(packet.id);if(!job)return;clearTimeout(job.timer);pending.delete(packet.id);if(packet.error)job.reject(Error(packet.error));else job.resolve();return;}
     if(packet?.wake!=="request"||game.user!.id!==primaryGM()?.id)return;
     const user=game.users?.get(packet.user) as User|undefined;if(!user||!packet.source||!packet.target)return;
+    globalThis.pneumaPerformance?.handlerStart('wake',packet.id,packet.user);
     let error:string|undefined;try{await resolveWake(packet.source,packet.target,user,packet.action);}catch(e){error=e instanceof Error?e.message:String(e);}
     game.socket!.emit(channel,{wake:"reply",id:packet.id,user:packet.user,error});
   }));

@@ -1,0 +1,22 @@
+<form>
+  {{#if recording}}
+  <p role="status"><strong>Recording this client.</strong> You can close this window. Press the Mark lag keybinding (default Alt+Shift+L) during play to freeze the last minute.</p>
+  {{#if shareThisCapture}}<p>The full report will be sent to Pneuma when recording stops.</p>{{/if}}
+  <button type="button" data-mark>Mark lag and stop</button>
+  <button type="button" data-stop>Stop recording</button>
+  {{else}}
+  {{#if saved}}<p role="status">Capture ready. Export it before starting another recording or refreshing Foundry.</p>
+  {{#if uploadMessage}}<p role="status">{{uploadMessage}}</p>{{/if}}
+  {{#if canRetry}}<button type="button" data-retry>Retry sending report</button>{{/if}}
+  <ul style="max-height: 42vh; overflow: auto">{{#each summary}}<li>{{this}}</li>{{/each}}</ul>
+  <button type="button" data-export="full">Export full report with summary (.json)</button>
+  <button type="button" data-export="summary">Export readable summary (.txt)</button>{{else}}
+  <p>Record this client during play. The report keeps trends for the whole session and detailed events for the last minute.</p>
+  {{/if}}
+  {{#unless uploading}}
+  <label><input type="checkbox" data-share-report> Send this recording to Pneuma when I stop recording or mark lag.</label>
+  <p>The full report goes to Pneuma’s report inbox for automated analysis. It includes connected Foundry users’ names and IDs, timed actions, document IDs, and browser and module details. Chat text and roll contents are excluded.</p>
+  <button type="button" data-start>Start recording</button>
+  {{/unless}}
+  {{/if}}
+</form>

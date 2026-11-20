@@ -191,6 +191,7 @@ async function save(message:ChatMessage,data:AreaAttack) {
   const resolved=complete(data);
   if(resolved&&!data.resolutionComplete){data.areaHidden=true;await syncTemplate(message,data);}
   data.resolutionComplete=resolved;
+  globalThis.pneumaPerformance?.write(data,message,'aoe');
   await message.update({content:areaContent(data),[`flags.${MODULE}.aoe`]:data,...(!data.exchange.damage&&flag(message)?.exchange.damage?{[`flags.${MODULE}.aoe.exchange.-=damage`]:null}:{})} as Parameters<ChatMessage["update"]>[0]);
   // Persist first: later saves and chat rerenders must never repeat the animation.
   if(reveal)void revealAttackDice(data,message).catch(error=>console.warn(MODULE,"Area attack dice display failed",error));
@@ -202,11 +203,13 @@ async function revealAttackDice(data:AreaAttack,message:ChatMessage):Promise<voi
 const requests=new GMRequests();
 
 export async function handleAreaRequest(req:Request) {
+  globalThis.pneumaPerformance?.handlerStart('aoeType',req.id,req.user);
   if(game.user?.id!==gm()?.id)throw Error("An active GM is required.");
   const message=game.messages!.get(req.message) as ChatMessage|undefined, user=game.users!.get(req.user) as User|undefined;
   const saved=message&&flag(message);
   if(!message||!saved||!user)throw Error("Area attack is unavailable.");
   const data=foundry.utils.deepClone(saved);
+  globalThis.pneumaPerformance?.bindWrite(data,req.id);
   resolveEncounter(data.exchange);
 
   const row=data.rows.find(r=>r.uuid===req.target);
@@ -648,6 +651,17 @@ export function registerAreaAttacks() {
     if (data?.phase !== "responses") return;
     const actors = data.rows.filter(row => ["waiting", "rolling"].includes(row.state)).map(row => row.actor);
     return actors.length ? { actors, combat: data.exchange.combatId } : undefined;
+  }, message => {
+    const data = flag(message)!;
+    return JSON.stringify(data.rows.map(row => {
+      const actor = (fromUuidSync(row.uuid as TokenDocument["uuid"]) as TokenDocument | null)?.actor;
+      if (!actor || !owns(actor)) return "hidden";
+      if (row.state !== "waiting" || data.kind === "suppression") return "owned";
+      try {
+        const offer = areaEvasionOffer(actor, data.settings, resolveEncounter(data.exchange));
+        return offer.allowed ? [offer.penalty, offer.cost] : offer.reason;
+      } catch (error) { return String(error); }
+    }));
   });
   Hooks.once("ready", () => pendingCards.seed(game.messages));
   for (const hook of ["createChatMessage", "updateChatMessage"]) Hooks.on(hook, (message: ChatMessage) => pendingCards.remember(message));
@@ -695,6 +709,7 @@ export function registerAreaAttacks() {
   }));
   Hooks.on("renderChatMessage",async(message:ChatMessage,html:JQuery)=>{
     const data=flag(message);if(!data||!canRenderCombatCard(message))return;
+    pendingCards.recordDisplay(message);
     if(data.phase==="scatter"){
       const placement=html[0]?.querySelector('.pneuma-resolution-result-body');
       if(placement?.querySelector('[data-aoe-action="scatter"]') && !placement.querySelector('[data-aoe-action="scatterAny"]'))placement.innerHTML=scatterControls();

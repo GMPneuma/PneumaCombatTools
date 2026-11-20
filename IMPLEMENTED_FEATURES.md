@@ -1,5 +1,8 @@
 # Combat Tools feature inventory
 
+- Performance Recorder (1.0.1). Players and GMs can record session-wide minute totals, freeze the last minute of detailed events at a hitch, review a summary, and download JSON or plain text from Combat Tools settings. It covers local frame intervals, chat and document activity, measured Combat and Visual Tools handlers, and player requests observed by the GM.
+- Each recording has an optional, initially unchecked upload to Pneuma's report inbox for analysis. Opted-in captures send the full JSON when stopped or marked, including via the lag hotkey. The recorder displays the receipt or offers a manual retry. Uploads retain Foundry display names and IDs.
+
 Status icon colors (2026-11-15, local/unreleased): In Jail is a prepopulated, editable/removable example in User effects. Each of the four tabs has a saved default icon color; user entries can override it or use the section default. Red addiction icons retain their original artwork. Configuration previews use contrasting wells for light/dark visibility; token-menu icons retain native backgrounds. Saved colors redraw token effects and overlays without modifying effect documents or modifiers. Automated verification is separate from live Foundry validation.
 
 - Status configuration displays each status name once, without the redundant source-name subtitle. Effect-presence labels and modifier counts remain visible.
@@ -16,7 +19,7 @@ Status icon colors (2026-11-15, local/unreleased): In Jail is a prepopulated, ed
 
 - Damage-recipient labels and action buttons occupy explicit grid cells, preserving readable names on narrow cards with either current label-first markup or older action-first markup. Browser checks cover both orders at 260/300/400px; live Foundry verification pending.
 
-- Local performance fixes: pending-card refreshes use actor/combat indexes, batch invalidations before selecting cards, and prevent overlapping asynchronous renders. Unfinished defense-payment lookup and turn-end injury reminders reuse indexes instead of repeatedly traversing chat history. Initial index hydration still reads existing messages once per index. Live Foundry verification pending.
+- Pending attack, area-response, injury and Sleep cards compare their displayed controls with current eligibility and ownership before redrawing. Unrelated inventory or encounter edits leave mounted cards in place. Actor/combat indexes batch refresh requests, prevent overlapping renders and support unfinished defense-payment and injury-reminder lookups. Initial index hydration reads existing messages once per index.
 
 - Damage receipts reuse a bounded HTML cache; collapsed damage editors build armor and bonus controls when opened. Injury duplicate rerolls reuse loaded documents and yield during long retries while retaining native table draws and saved application receipts. Passive status synchronization and injury checks coalesce document-event bursts; injury matching skips unrelated item effects. Quickhack menus share one catalog snapshot and inventory lookup per opening.
 

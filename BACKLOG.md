@@ -1,5 +1,8 @@
 # Combat Tools backlog
 
+- Performance Recorder (1.0.1). Capture player and GM activity around reported lag, including chat redraws, document events, frame time and measured Visual Tools work. A shareable JSON file includes the summary and detailed timeline. A separate text export contains the summary. Live multiplayer verification pending.
+- Diagnostic submissions (implemented locally). Players and GMs can opt in per recording to send the full report, with original names and IDs, directly to Pneuma when recording stops. The recorder shows a receipt or offers a retry and local export.
+
 - Status icon colors (2026-11-15, local/unreleased): In Jail is a prepopulated, editable/removable example in User effects. Each of the four tabs has a saved default icon color; user entries can override it or use the section default. Red addiction icons retain their original artwork. Configuration previews and token-menu icons use contrasting wells for light/dark visibility. Saved colors redraw token effects and overlays without modifying effect documents or modifiers. Automated verification is separate from live Foundry validation.
 
 - System effect editing superseded (2026-11-15): user requested View effect instead of Customize for existing system effects. Implemented display-only details and removed native Item replacement; legacy Item overrides are ignored. Added supplemental/user effects remain editable. This supersedes the native customization portion of the four-tab entry below; previously created world Items and Actor effects are not deleted or rewritten.

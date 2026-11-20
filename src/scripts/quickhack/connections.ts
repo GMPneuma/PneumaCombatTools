@@ -53,6 +53,7 @@ function serialized<T>(combat: Combat, operation: () => Promise<T>): Promise<T> 
   return next;
 }
 async function connect(request: ConnectRequest) {
+  globalThis.pneumaPerformance?.handlerStart('quickhackType',request.id,request.requesterId);
   if (!primaryGM()) throw new Error("This function does not work without an active GM logged in.");
   if (!enabled()) throw new Error("QuickHack is disabled.");
   const message = await waitForResult(request.messageId);
@@ -123,6 +124,7 @@ export async function ejectConnection(source: Actor, targetUuid: string, connect
   });
 }
 async function disconnect(request: DisconnectRequest) {
+  globalThis.pneumaPerformance?.handlerStart('quickhackType',request.id,request.requesterId);
   if (!primaryGM()) throw new Error("This function does not work without an active GM logged in.");
   if (!enabled()) throw new Error("QuickHack is disabled.");
   const combat = resolveEncounter(request.encounter);

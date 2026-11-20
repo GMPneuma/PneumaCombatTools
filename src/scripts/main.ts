@@ -1,3 +1,4 @@
+import {registerPerformanceRecorder} from "./performance-settings.js";
 import {medicalMenuGroups} from "./medical-menu.js";
 import {registerSelfChatKey} from "./self-chat-key.js";
 import {registerSceneEffects} from "./scene-effects.js";
@@ -85,6 +86,7 @@ const selectedAttacker = () => {
 
 Hooks.once("init", () => {
   if (game.system!.id !== "cyberpunk-red-core") return;
+  registerPerformanceRecorder();
   registerSocketHealth();
   registerSelfChatKey();
   registerChatResultDelay();

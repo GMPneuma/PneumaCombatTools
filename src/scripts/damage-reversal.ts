@@ -19,7 +19,8 @@ let queue:Promise<unknown>=Promise.resolve();
 export function reverseDamageOnce(request:Request):Promise<void> {
   const next=queue.catch(()=>{}).then(()=>reverse(request));queue=next;return next;
 }
-async function reverse({message:messageId,instance,user:userId}:Request):Promise<void> {
+async function reverse({message:messageId,instance,user:userId,id}:Request & {id?:string}):Promise<void> {
+  globalThis.pneumaPerformance?.handlerStart('reversalType',id,userId);
   if(game.user?.id!==primaryGM()?.id)throw Error("An active GM must reverse damage.");
   if(!/^[a-zA-Z0-9_-]+$/.test(instance))throw Error("Invalid damage instance.");
   const message=game.messages?.get(messageId) as ChatMessage|undefined,user=game.users?.get(userId) as User|undefined;

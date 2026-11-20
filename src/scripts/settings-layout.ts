@@ -10,6 +10,7 @@ const groups = [
   { id: "quickhack", title: "QuickHack", keys: ["quickhackEnabled", "quickhackMode", "quickhackMessages", "customQuickhackMenu"] },
   { id: "combat-bar", title: "Combat Bar", keys: [...COMBAT_BAR_SETTING_KEYS,"combatBarSettings"] },
   { id: "token-hud", title: "Token HUD & Targeting", keys: ["tokenHUDSettings", "hoverDV", "hoverAutofire", "hoverDVEncounterOnly", "ekgVisibilitySettings"] },
+  { id: "diagnostics", title: "Diagnostics", keys: ["performanceRecorder"] },
   { id: "status-hud", title: "Biomonitor", keys: ["eyeHUD", "biomonitorSettings", "eyeHUDDock", "crewHUDIntegration", "biomonitorShowHP", "forcePlayerHUDAnimations", "eyeHUDAnimateMessages", "biomonitorFlashSeconds"] },
 ] as const;
 

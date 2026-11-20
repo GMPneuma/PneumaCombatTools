@@ -52,6 +52,7 @@ export function styleChatButtons(root:HTMLElement, moduleCard=false):void {
   if(observed.has(root))return;observed.add(root);
   // Inspect changed controls/subtrees only; native dice expansion needs no full-card pass.
   const observer=new MutationObserver(records=>{
+    const finish=globalThis.pneumaPerformance?.work("pneuma-combattools","chat.buttonChanges",root.dataset.messageId);
     observer.disconnect();
     const changed=new Set<HTMLElement>();
     const collect=(node:Node)=>{
@@ -65,6 +66,7 @@ export function styleChatButtons(root:HTMLElement, moduleCard=false):void {
     }
     for(const node of changed)if(root.contains(node))decorate(node);
     watch();
+    finish?.();
   });
   const watch=()=>observer.observe(root,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:["disabled","aria-disabled","aria-pressed","title","data-gm-only","data-chat-state","data-chat-action"]});
   root.addEventListener("click",event=>{
@@ -75,6 +77,8 @@ export function styleChatButtons(root:HTMLElement, moduleCard=false):void {
 }
 export function registerChatButtons():void {
   Hooks.on("renderChatMessage",(message:ChatMessage,html:JQuery)=>{
-    if(html[0])styleChatButtons(html[0],!!foundry.utils.getProperty(message,'flags.pneuma-combattools'));
+    const finish=globalThis.pneumaPerformance?.work("pneuma-combattools","chat.buttons",message.id ?? undefined);
+    try { if(html[0])styleChatButtons(html[0],!!foundry.utils.getProperty(message,'flags.pneuma-combattools')); }
+    finally { finish?.(); }
   });
 }

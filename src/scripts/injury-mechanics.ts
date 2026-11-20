@@ -13,6 +13,10 @@ let queue:Promise<unknown>=Promise.resolve();
 function work<T>(fn:()=>Promise<T>):Promise<T>{const next=queue.catch(()=>{}).then(fn);queue=next;return next;}
 const movementInjuries=["Broken Ribs","Foreign Object (Body)","Foreign Object (Head)"] as const;
 interface RibsCard {injury?:string;actor:string;token:string;name:string;combat:string;turn:string;epoch:string;distance:number;applied?:boolean}
+function injuryCardEligible(data:RibsCard,actor:Actor|null):boolean {
+  const combat=game.combats?.get(data.combat);
+  return !!actor&&hasInjury(actor,data.injury??"Broken Ribs")&&data.distance>4&&!!combat?.started&&(get<string>(combat,"flags."+MODULE+".evasionEpoch")??"")===data.epoch;
+}
 let indexedMessages: typeof game.messages;
 const injuryCards = new Map<string,Map<string,ChatMessage>>();
 const injuryKeys = new Map<string,string>();
@@ -58,8 +62,9 @@ export async function warnBrokenRibs(doc:TokenDocument,record:MoveRecord):Promis
     }
   });
 }
-export async function applyRibsDamage(id:string,user:User):Promise<void> {
+export async function applyRibsDamage(id:string,user:User,requestId?:string):Promise<void> {
   return work(async()=>{
+    globalThis.pneumaPerformance?.handlerStart('ribsType',requestId,user.id ?? undefined);
     if(game.user?.id!==gm()?.id)throw Error("An active GM must apply the injury damage.");
     const message=game.messages?.get(id) as ChatMessage|undefined,saved=message&&get<RibsCard>(message),data=saved&&foundry.utils.deepClone(saved);
     if(!message||!data)throw Error("Injury warning is unavailable.");
@@ -111,12 +116,15 @@ export function registerInjuryMechanics():void {
     const record=get<MoveRecord>(changes,`flags.${MODULE}.movement`)??changes[`flags.${MODULE}.movement`] as MoveRecord|undefined;
     if(record)void warnBrokenRibs(doc,foundry.utils.deepClone({...get<MoveRecord>(doc,`flags.${MODULE}.movement`),...record})).catch(e=>ui.notifications!.error(String(e)));
   });
-  registerConditionCardRefresh(message=>{const data=get<RibsCard>(message);return data&&!data.applied?{actors:[data.actor],combat:data.combat}:undefined;});
+  registerConditionCardRefresh(message=>{const data=get<RibsCard>(message);return data&&!data.applied?{actors:[data.actor],combat:data.combat}:undefined;}, message=>{
+    const data=get<RibsCard>(message)!;
+    const actor=fromUuidSync(data.actor as Actor["uuid"]) as Actor|null;
+    return JSON.stringify([!!actor&&(game.user!.isGM||actor.isOwner),injuryCardEligible(data,actor)]);
+  });
   Hooks.on("renderChatMessage",async(message:ChatMessage,html:JQuery)=>{
     const data=get<RibsCard>(message);if(!data)return;
     const actor=await fromUuid(data.actor) as Actor|null;
-    const combat=game.combats?.get(data.combat);
-    const eligible=!!actor&&hasInjury(actor,data.injury??"Broken Ribs")&&data.distance>4&&!!combat?.started&&(get<string>(combat,"flags."+MODULE+".evasionEpoch")??"")===data.epoch;
+    const eligible=injuryCardEligible(data,actor);
     const root=html[0]?.querySelector<HTMLElement>(".pneuma-injury-card");if(root)root.dataset.injury=injuryId(data);
     if(!data.applied&&!eligible){
       if(root){root.dataset.state="withdrawn";const summary=root.querySelector(".pneuma-injury-summary")??root.querySelector(".rollcard-bottom p");if(summary)summary.textContent="This injury warning is no longer applicable.";}
@@ -135,7 +143,7 @@ export function registerInjuryMechanics():void {
         clearTimeout(wait.timer);pending.delete(p.id);if(p.error)wait.reject(Error(p.error));else wait.resolve();
       }else if(game.user?.id===gm()?.id){const user=game.users?.get(p.user) as User|undefined;if(!user||!p.message)return;
         const reply=(error?:string)=>game.socket!.emit(channel,{ribsType:"result",id:p.id,user:p.user,gm:game.user!.id,error});
-        void applyRibsDamage(p.message,user).then(()=>reply(),e=>reply(String(e)));
+        void applyRibsDamage(p.message,user,p.id).then(()=>reply(),e=>reply(String(e)));
       }
     });
     try{const path="/systems/cyberpunk-red-core/modules/rolls/cpr-rolls.js";const rolls=await import(path);installInjuryRollGuards(CONFIG.Item.documentClass.prototype,rolls.CPRRoll.prototype);}

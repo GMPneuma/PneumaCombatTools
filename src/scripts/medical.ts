@@ -86,6 +86,7 @@ function medicalWork<T>(run:()=>Promise<T>):Promise<T> {const next=work.catch(()
 const completed=new Set<string>();
 export function resolveMedical(request:Request):Promise<void> {
   return medicalWork(async()=>{
+    globalThis.pneumaPerformance?.handlerStart('medicalType',request.id,request.user);
     if(game.user?.id!==primaryGM()?.id)throw Error("An active GM is required.");
     const key=request.user+":"+request.id;
     if(completed.has(key))return;
