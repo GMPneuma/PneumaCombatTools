@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.2 - 2026-11-22
+
+- Update empty settings groups inside the settings window when search results change. This removes a CSS rule that added browser work while panning the canvas.
+- Register the docked Biomonitor shortcut once and update its labels only when they change. The minimized Biomonitor measures the Crew HUD only when it needs to position a notification.
+
 ## 1.0.1 - 2026-11-20
 
 - Adds a client-local Performance Recorder for players and GMs under Combat Tools settings. Mark a hitch with Alt+Shift+L to freeze the last minute of detailed events alongside session-wide trends. Export a readable summary or full JSON.

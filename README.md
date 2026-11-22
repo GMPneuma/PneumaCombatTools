@@ -1,6 +1,6 @@
 # Pneuma's Combat Tools
 
-Combat workflows for **Foundry VTT v12** and **Cyberpunk RED Core**. Current release: **1.0.1**. Requires **libWrapper** and an active GM for coordinated workflows.
+Combat workflows for **Foundry VTT v12** and **Cyberpunk RED Core**. Current release: **1.0.2**. Requires **libWrapper** and an active GM for coordinated workflows.
 
 ## Features
 

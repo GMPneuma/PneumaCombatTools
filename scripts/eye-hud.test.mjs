@@ -38,7 +38,11 @@ try{
  await page.addScriptTag({type:"module",content:ts.transpile(shortcutSource,{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}) + "\nObject.assign(window,{hudShortcuts,refreshHudShortcuts});"});
  await page.waitForFunction(()=>window.hudShortcuts);
  await page.evaluate(()=>{
-   window.crewEntry={active:true,api:{hudShortcuts}};
+   window.shortcutRegistrations=0;
+   window.crewEntry={active:true,api:{hudShortcuts:{...hudShortcuts,register(id,button){
+     window.shortcutRegistrations++;
+     hudShortcuts.register(id,button);
+   }}}};
    game.modules.get=id=>id==='pneuma-crewtools'?crewEntry:moduleEntry;
  });
  }
@@ -360,6 +364,27 @@ try{
  assert.equal(await page.locator('#pneuma-biomon-shortcut').evaluate(b=>getComputedStyle(b).color),'rgb(255, 98, 98)');
  await page.getByRole('button',{name:'Minimize Biomonitor',exact:true}).click();
  await page.waitForSelector('#pneuma-eye-hud.is-integrated-mini',{state:'attached'});
+ const miniWork=await page.evaluate(async()=>{
+   const host=document.getElementById('pneuma-crewtools-calendar');
+   const controls=document.getElementById('controls');
+   let toolbarScans=0,hostReads=0;
+   const registrations=shortcutRegistrations;
+   const query=controls.querySelectorAll, bounds=host.getBoundingClientRect;
+   controls.querySelectorAll=function(selector){toolbarScans++;return query.call(this,selector);};
+   host.getBoundingClientRect=function(){hostReads++;return bounds.call(this);};
+   try {
+     for(let i=0;i<3;i++){
+       Hooks.callAll('updateCombat',{},{});
+       await new Promise(requestAnimationFrame);
+     }
+     return {toolbarScans,hostReads,registrations:shortcutRegistrations-registrations,
+       highlightCount:host.querySelectorAll('.pneuma-eye-trace path').length};
+   } finally {
+     delete controls.querySelectorAll;
+     delete host.getBoundingClientRect;
+   }
+ });
+ assert.deepEqual(miniWork,{toolbarScans:0,hostReads:0,registrations:0,highlightCount:3});
  await page.evaluate(()=>moduleEntry.api.hud.send({source:'integration',id:'alert',text:'Incoming hack'}));
  await page.waitForFunction(()=>document.querySelector('#pneuma-biomon-shortcut').classList.contains('has-alert'));
  assert.equal(await page.locator('#pneuma-biomon-shortcut').evaluate(b=>getComputedStyle(b).color),'rgb(255, 180, 95)');

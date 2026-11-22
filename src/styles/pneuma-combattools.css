@@ -2,7 +2,6 @@
 /* Native settings controls retain their theme; fieldsets only organize the module's rows. */
 .pneuma-combat-settings > fieldset { margin: 0 0 12px; padding: 8px 12px; min-width: 0; }
 .pneuma-combat-settings > fieldset > legend { font-weight: bold; padding: 0 6px; }
-.pneuma-combat-settings > fieldset:not(:has(> .form-group:not([hidden]):not(.hidden):not([style*="display: none"]))) { display: none; }
 
 #token-hud .combat-weapons[hidden] { display: none; }
 

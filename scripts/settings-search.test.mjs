@@ -27,8 +27,21 @@ test('grouped settings retain native v12 search categories, hints and reset',{sk
    }
    await page.evaluate(()=>nativeFilter(null,'no-such-setting',/no-such-setting/,document.body));
    assert.equal(await page.locator('.category:not(.hidden)').count(),0);
+   const combat = page.locator('[data-combat-settings-group="combat"]');
+   assert.equal(await combat.evaluate(section => section.hidden), true);
+   await page.evaluate(()=>nativeFilter(null,'searchlabel0',/searchlabel0/i,document.body));
+   assert.equal(await combat.isVisible(), true);
+   assert.equal(await page.locator('[data-combat-settings-group="evasion"]').isVisible(), false);
    await page.evaluate(()=>nativeFilter(null,'',/(?:)/,document.body));
    assert.equal(await page.locator('.category.hidden,.form-group.hidden').count(),0);
+   assert.equal(await page.locator('[data-combat-settings-group="evasion"]').isVisible(), true);
+   const attackRow = combat.locator(':scope > .form-group');
+   await attackRow.evaluate(row => { row.style.display = 'none'; });
+   assert.equal(await combat.isVisible(), false);
+   await attackRow.evaluate(row => { row.hidden = true; row.style.removeProperty('display'); });
+   assert.equal(await combat.isVisible(), false);
+   await attackRow.evaluate(row => { row.hidden = false; });
+   assert.equal(await combat.isVisible(), true);
    assert.equal(await page.evaluate(()=>original.isConnected&&original.checked===draft),true);
    await page.close();
   }

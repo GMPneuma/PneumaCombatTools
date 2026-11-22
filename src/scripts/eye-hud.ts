@@ -152,7 +152,11 @@ function integratedHUD(): boolean {
 }
 let crewButton: HTMLButtonElement | undefined;
 function updateCrewButton(actor: Actor | undefined, alert: boolean, title: string, shared = false): void {
-  if (!integratedHUD()) { crewShortcuts?.unregister(MODULE); crewButton = undefined; return; }
+  if (!integratedHUD()) {
+    if (crewButton) crewShortcuts?.unregister(MODULE);
+    crewButton = undefined;
+    return;
+  }
   if (!crewButton) {
     crewButton = control("", async () => {
       const open = game.settings!.get(MODULE, "eyeHUD") && !game.settings!.get(MODULE, "eyeHUDMinimized");
@@ -161,14 +165,14 @@ function updateCrewButton(actor: Actor | undefined, alert: boolean, title: strin
     });
     crewButton.id = "pneuma-biomon-shortcut";
     crewButton.setAttribute("aria-controls", "pneuma-eye-hud");
+    crewShortcuts!.register(MODULE, crewButton);
   }
   const open = game.settings!.get(MODULE, "eyeHUD") && !game.settings!.get(MODULE, "eyeHUDMinimized");
-  crewButton.title = title;
-  crewButton.setAttribute("aria-label", open ? "Minimize Biomonitor" : "Open Biomonitor");
-  if (open && crewButton.getAttribute("aria-expanded") !== "true") {
-    document.dispatchEvent(new Event("pneumaCrewBiomonitorOpened"));
+  if (crewButton.getAttribute("aria-expanded") !== String(!!open)) {
+    if (open) document.dispatchEvent(new Event("pneumaCrewBiomonitorOpened"));
+    crewButton.setAttribute("aria-expanded", String(!!open));
+    crewButton.setAttribute("aria-label", open ? "Minimize Biomonitor" : "Open Biomonitor");
   }
-  crewButton.setAttribute("aria-expanded", String(!!open));
   const { state } = readHUDVitals(actor);
   if (crewButton.dataset.state !== state) {
     const trace = createEKGTrace(state);
@@ -180,14 +184,14 @@ function updateCrewButton(actor: Actor | undefined, alert: boolean, title: strin
   const token = hoveredHUDToken?.actor === actor ? hoveredHUDToken : canvas.tokens?.controlled.find(t => t.actor === actor);
   const name = token?.name || actor?.token?.name || actor?.name || "";
   const identity = crewButton.lastElementChild!;
-  identity.textContent = name;
-  crewButton.title = [name, shared ? "BIOMONITOR LINK" : "", title].filter(Boolean).join(" · ");
+  if (identity.textContent !== name) identity.textContent = name;
+  const tooltip = [name, shared ? "BIOMONITOR LINK" : "", title].filter(Boolean).join(" · ");
+  if (crewButton.title !== tooltip) crewButton.title = tooltip;
   crewButton.classList.toggle("has-alert", alert);
-  crewShortcuts!.register(MODULE, crewButton);
 }
-function positionAttachments() {
-  if (!root || !attachments) return;
-  const bounds = (root.classList.contains("is-integrated-mini") && crewShortcuts?.getBounds?.()) || root.getBoundingClientRect();
+function positionAttachments(anchor = root) {
+  if (!anchor || !attachments) return;
+  const bounds = anchor.getBoundingClientRect();
   const leftDock = leftAlignedMessages();
   const width = Math.min(600, Math.max(0, leftDock ? window.innerWidth - bounds.left - 8 : bounds.right - 8));
   attachments.style.width = width + "px";
@@ -260,6 +264,10 @@ function dockHUD(panel: HTMLElement) {
     if (host) dockResizeObserver.observe(host);
   }
   if (host) {
+    if (panel.classList.contains("is-integrated-mini")) {
+      if (attachments?.querySelector(".pneuma-eye-notification")) positionAttachments(host);
+      return;
+    }
     const anchor = host.getBoundingClientRect();
     const top = anchor.bottom + 8;
     const controls = document.getElementById("controls");

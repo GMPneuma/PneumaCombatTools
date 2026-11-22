@@ -127,6 +127,20 @@ export function groupModuleSettings(root: HTMLElement): void {
     const group = root.querySelector<HTMLElement>(`[data-combat-settings-group="${id}"]`);
     if (group) masterSettingControls(group, key!);
   }
+  for (const section of Array.from(wrapper.querySelectorAll<HTMLFieldSetElement>(":scope > fieldset"))) {
+    const syncVisibility = () => {
+      const rows = section.querySelectorAll<HTMLElement>(":scope > .form-group");
+      section.hidden = !Array.from(rows).some(row => !row.hidden && !row.classList.contains("hidden") && row.style.display !== "none");
+    };
+    syncVisibility();
+    // Foundry filters existing rows in place. Keep the observer with the section when settings are rebuilt.
+    const observer = new MutationObserver(changes => {
+      if (changes.some(change => change.type === "childList" ? change.target === section : change.target.parentElement === section)) {
+        syncVisibility();
+      }
+    });
+    observer.observe(section, { subtree: true, childList: true, attributeFilter: ["class", "hidden", "style"] });
+  }
   // Foundry v12 search reads the category from each row's immediate parent.
   for (const row of Array.from(wrapper.querySelectorAll<HTMLElement>(".form-group"))) row.parentElement!.dataset.category = MODULE;
 }
