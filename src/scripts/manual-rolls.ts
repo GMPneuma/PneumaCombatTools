@@ -188,7 +188,7 @@ export function bindManualCard(message: ChatMessage, html: HTMLElement) {
   const root=html.querySelector<HTMLElement>(".pneuma-manual-card");if(!root||root.dataset.bound)return;root.dataset.bound="true";
   if(data.kind==="group") {
     // Upgrade already-saved cards to the current row presentation as well.
-    if(root.querySelector(".pneuma-group-rows details") || !root.querySelector(".pneuma-group-heading"))root.innerHTML=groupContent(data);
+    if(root.querySelector(".pneuma-group-rows details, .pneuma-group-rows > li:not(:has(> .pneuma-group-actor))") || !root.querySelector(".pneuma-group-heading"))root.innerHTML=groupContent(data);
     for(const total of Array.from(root.querySelectorAll<HTMLElement>(".pneuma-group-total"))) {
       const details=total.closest("li")!.querySelector<HTMLElement>(".pneuma-group-details")!;
       // Set the initial state on the rendered DOM, not just serialized chat HTML.
@@ -440,7 +440,7 @@ async function groupPrompt() {
       const current = await fromUuid(actor.uuid) as Actor | null;
       if (!current?.testUserPermission(user, "OWNER") || !findGroupSkill(current, skill))
         throw Error(user.name+" needs ownership of a character with "+skill+".");
-      return {id:user.id + ":" + current.uuid,user:user.id!,actor:current.uuid,name:user.name+" - "+current.name,state:"waiting" as const};
+      return {id:user.id + ":" + current.uuid,user:user.id!,actor:current.uuid,actorName:current.name ?? "",state:"waiting" as const};
     }));
     const dv = value(form,"dv");
     await create({kind:"group",creator:game.user!.id!,title:skill,rollMode:"roll",skill,

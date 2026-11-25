@@ -78,7 +78,7 @@ try {
   for(const n of [1,3,11,12])check(Math.round(n*(1-armorIgnorePercent(0,true)/100))===Math.ceil(n/2),'round upward');
   check(armorIgnorePercent(50,true)===50&&armorIgnorePercent(100,true)===100,'no double halving or restoring bypassed armor');
   let invalid=false;try{manualNumber('2.5','Dice',1,100)}catch{invalid=true}check(invalid,'invalid dice');
-  const data={kind:'group',creator:'gm',title:'Perception',skill:'Perception',rollMode:'roll',dv:13,hideDV:true,rows:[{user:'p1',actor:'Actor.1',name:'Pex',state:'waiting'},{user:'p2',actor:'Actor.2',name:'NPC <unsafe>',state:'waiting'}]};
+  const data={kind:'group',creator:'gm',title:'Perception',skill:'Perception',rollMode:'roll',dv:13,hideDV:true,rows:[{user:'p1',actor:'Actor.1',name:'Player 1 - Pex - Scout',state:'waiting'},{user:'p2',actor:'Actor.2',name:'NPC <unsafe>',state:'waiting'}]};
   const message={id:'group',visible:true,whisper:[],flags:{'pneuma-combattools':{manualRoll:data}},async update(changes){this.flags['pneuma-combattools'].manualRoll=changes['flags.pneuma-combattools.manualRoll'];this.content=changes.content;}};
   game.messages.set('group',message);
   const send=(user,request)=>handleManualRequest({message:'group',user,request});
@@ -93,8 +93,12 @@ try {
   check(saved.rows[0].total===14&&saved.rows[1].state==='waiting','preserve rows and idempotent commit');
   check(message.content.includes('rollcard-top')&&message.content.includes('rollcard-bottom')&&message.content.includes('cpr-block pneuma-group-heading'),'native card sections');
   check(!message.content.includes('DV 13')&&message.content.includes('&lt;unsafe&gt;'),'hidden DV and escape');
-  game.user=game.users.get('p1');cards.innerHTML=message.content;cards.querySelector('.pneuma-group-details').removeAttribute('hidden');cards.querySelector('.pneuma-group-details').style.display='block';bindManualCard(message,cards);check(!cards.textContent.includes('DV 13')&&cards.querySelectorAll('button').length===0,'player controls');
+  game.user=game.users.get('p1');cards.innerHTML=message.content;
+  const oldName=cards.querySelector('.pneuma-group-actor');oldName.classList.remove('pneuma-group-actor');oldName.textContent='Player 1 - Pex - Scout';
+  cards.querySelector('.pneuma-group-details').removeAttribute('hidden');cards.querySelector('.pneuma-group-details').style.display='block';bindManualCard(message,cards);check(!cards.textContent.includes('DV 13')&&cards.querySelectorAll('button').length===0,'player controls');
   const total=cards.querySelector('.pneuma-group-total'),details=cards.querySelector('.pneuma-group-details');
+  check(cards.querySelector('.pneuma-group-actor').textContent==='Pex - Scout' && !cards.textContent.includes('Player 1'),'already-saved group card shows only the actor');
+  check(total.getAttribute('aria-label')==='Show roll details for Pex - Scout','accessible detail label uses only the actor');
   check(!cards.querySelector('summary')&&details.hidden&&getComputedStyle(details).display==='none','details label removed and initially hidden');
   details.innerHTML='<div class="d10-data-details hide" style="display:none">INT + 8; Accounting + 1; Mods: -2</div>';
   total.click();check(!details.hidden&&total.getAttribute('aria-expanded')==='true'&&!details.firstElementChild.classList.contains('hide')&&getComputedStyle(details.firstElementChild).display==='block'&&getComputedStyle(details).display==='block','total opens expanded modifiers');
@@ -362,6 +366,7 @@ try {
    await promptData.callback([holder]);
    const chosenCard = created.flags['pneuma-combattools'].manualRoll;
    check(chosenCard.rows[1].user===unassigned.id && chosenCard.rows[1].actor===synthetic.uuid,'the selected owner receives the shared actor roll');
+   check(chosenCard.rows[1].actorName===synthetic.name && !created.content.includes(unassigned.name),'new card shows only the actor name');
    await criticalPrompt();window.criticalFormPreview=promptData.content;
   } finally {
    game.users=beforeUsers;game.user=beforeUser;game.actors=beforeActors;canvas.scene=beforeScene;window.fromUuid=beforeResolve;

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.5 - 2026-11-25
+
+- Show actor names in Group Roll result rows and roll-detail labels, including on existing cards when chat reloads.
+
 ## 1.0.4 - 2026-11-25
 
 - Add Online, Skill, and Base columns to Group Skill Check. Skill and Base update when the selected skill changes.

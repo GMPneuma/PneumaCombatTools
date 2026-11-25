@@ -1,6 +1,6 @@
 # Combat Tools feature inventory
 
-- Group Skill Check shows player connection state, skill level, and base for the selected skill. The online, default-actor, and current-scene filters start enabled. Clear the default-actor filter to include other owned characters and mooks. Clear the current-scene filter to use world actors. The roster shows each skill-capable actor once, skips Scene Tools vehicles, and offers a player picker when multiple eligible owners share an actor. The picker initially prefers the assigned player. The dialog offers four Favorites slots and keeps scrolling within the actor list.
+- Group Skill Check shows player connection state, skill level, and base for the selected skill. The online, default-actor, and current-scene filters start enabled. Clear the default-actor filter to include other owned characters and mooks. Clear the current-scene filter to use world actors. The roster shows each skill-capable actor once, skips Scene Tools vehicles, and offers a player picker when multiple eligible owners share an actor. The picker initially prefers the assigned player. The dialog offers four Favorites slots and keeps scrolling within the actor list. Group roll result rows show actor names.
 
 - Save and Apply actions in Combat Tools forms and prompts are aligned at the bottom right.
 
