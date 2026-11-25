@@ -58,6 +58,7 @@ export async function chooseDamageStatuses(selected: string[], slot = selected.l
     }).join("") + '</form>';
   return Dialog.prompt({
     title: current ? "Change status effect" : "Add effects", content, label: "Save", rejectClose: false,
+    options: {classes: ["dialog", "pneuma-combat-save-dialog"]},
     callback: html => {
       const id = html[0]!.querySelector<HTMLInputElement>('input:checked')?.value ?? "";
       if(id&&!choices.some(effect=>effect.id===id))throw Error("The selected effect is unavailable for this workflow.");

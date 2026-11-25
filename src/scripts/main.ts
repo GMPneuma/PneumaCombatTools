@@ -396,6 +396,7 @@ Hooks.on("renderTokenHUD", async (hud: TokenHUD, html: JQuery, data: { standalon
     const connection = connectionFor(attacker.actor, token.actor.uuid);
     const ice = selfIce(token.actor, connection?.breachCleared ?? 0);
     const cleared = await Dialog.prompt({title: "Self-ICE: cleared Passwalls", content: `<label>Cleared <input name="cleared" type="number" min="0" max="${ice.walls}" step="1" value="${ice.cleared}"></label>`, label: "Apply", rejectClose: false,
+      options: {classes: ["dialog", "pneuma-combat-save-dialog"]},
       callback: html => Number(html.find<HTMLInputElement>('[name="cleared"]').val())});
     if (cleared === null || cleared === undefined) return;
     try {

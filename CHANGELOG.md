@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.3 - 2026-11-25
+
+- Align Save and Apply at the bottom right in Combat Tools settings and prompts, including Status Effects, Quickhacks, EMP, and Self-ICE.
+- Move group skill shortcuts to the lower right of the Request Group Check form.
+
 ## 1.0.2 - 2026-11-22
 
 - Update empty settings groups inside the settings window when search results change. This removes a CSS rule that added browser work while panning the canvas.

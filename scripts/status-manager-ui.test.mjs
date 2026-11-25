@@ -83,8 +83,10 @@ try {
  const checkLayout=async()=>{
   const layout=await page.locator('#pneuma-custom-statuses').evaluate(root=>{
    const rect=el=>el.getBoundingClientRect();const frame=rect(root),tabs=rect(root.querySelector('.status-tabs')),panel=root.querySelector('.status-panels'),footer=rect(root.querySelector('footer'));
-   return {tabOffset:tabs.top-frame.top,panelHeight:panel.clientHeight,panelScroll:panel.scrollHeight,footerBottom:footer.bottom,frameBottom:frame.bottom,overflow:root.scrollHeight-root.clientHeight};
+   const save=rect(root.querySelector('footer button[type=submit]'));
+   return {saveWidth:save.width,footerWidth:footer.width,saveRightGap:footer.right-save.right,tabOffset:tabs.top-frame.top,panelHeight:panel.clientHeight,panelScroll:panel.scrollHeight,footerBottom:footer.bottom,frameBottom:frame.bottom,overflow:root.scrollHeight-root.clientHeight};
   });
+  assert.ok(layout.saveWidth<layout.footerWidth&&Math.abs(layout.saveRightGap)<2,JSON.stringify(layout));
   assert.ok(layout.tabOffset<150,JSON.stringify(layout));assert.ok(layout.panelHeight>200,JSON.stringify(layout));assert.ok(layout.footerBottom<=layout.frameBottom,JSON.stringify(layout));assert.ok(layout.overflow<=1,JSON.stringify(layout));
   return layout;
  };

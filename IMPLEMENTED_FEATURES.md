@@ -1,5 +1,7 @@
 # Combat Tools feature inventory
 
+- Save and Apply actions in Combat Tools forms and prompts are aligned at the bottom right.
+
 - Performance Recorder (1.0.1). Players and GMs can record session-wide minute totals, freeze the last minute of detailed events at a hitch, review a summary, and download JSON or plain text from Combat Tools settings. It covers local frame intervals, chat and document activity, measured Combat and Visual Tools handlers, and player requests observed by the GM.
 - Each recording has an optional, initially unchecked upload to Pneuma's report inbox for analysis. Opted-in captures send the full JSON when stopped or marked, including via the lag hotkey. The recorder displays the receipt or offers a manual retry. Uploads retain Foundry display names and IDs.
 

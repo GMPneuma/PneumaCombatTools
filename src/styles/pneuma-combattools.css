@@ -1135,7 +1135,7 @@ i.pneuma-neural-plug::before { content: ""; display: inline-block; width: 1em; h
 
 .pneuma-roll-flyout [data-roll-choice^="favorite-"] > i { color:var(--pneuma-dv-yellow, #ffdc70); }
 
-.pneuma-group-shortcuts { display:flex; flex-direction:column; gap:4px; margin:0 0 12px; padding:6px; border:1px solid #7774; border-radius:5px; background:#00000006; }
+.pneuma-group-shortcuts { display:flex; flex-direction:column; gap:4px; width:fit-content; max-width:100%; margin:8px 0 0 auto; padding:6px; border:1px solid #7774; border-radius:5px; background:#00000006; }
 .pneuma-group-shortcut-row { display:flex; align-items:center; gap:4px; }
 .pneuma-roll-dialog .pneuma-group-shortcut { display:flex; align-items:center; gap:8px; flex:1; min-width:0; margin:0; padding:3px 8px; border:1px solid transparent; border-radius:3px; background:transparent; text-align:left; font-size:12px; line-height:22px; box-shadow:none; }
 .pneuma-group-shortcut > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -1570,3 +1570,18 @@ body.pneuma-dock-full-width #sidebar {
 
 #pneuma-custom-statuses .status-tabs .item + .item { margin-left:-1px; }
 
+
+.pneuma-combat-save-footer,
+.pneuma-combat-save-dialog .dialog-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.pneuma-combat-save-footer > button,
+.pneuma-combat-save-dialog .dialog-buttons > button {
+  flex: 0 0 auto;
+  width: auto;
+  margin: 0;
+  padding-inline: 12px;
+}
