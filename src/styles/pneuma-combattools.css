@@ -1370,7 +1370,7 @@ i.pneuma-neural-plug::before { content: ""; display: inline-block; width: 1em; h
 .pneuma-roll-dialog :is(input,select,button):focus-visible { outline: 2px solid var(--pct-dialog-accent); outline-offset: 1px; box-shadow: none; }
 .pneuma-roll-dialog :is(input[type="checkbox"],input[type="radio"]) { accent-color: var(--pct-dialog-accent); }
 .pneuma-roll-dialog .form-group > label { font-size: 12px; letter-spacing: .02em; line-height: 1.4; }
-.pneuma-roll-dialog :is(.pneuma-roll-checks,.pneuma-roll-modes,fieldset,.pneuma-skill-stat-roll,.pneuma-treatment-patient-picker,.pneuma-treatment-section) {
+.pneuma-roll-dialog :is(.pneuma-roll-checks,.pneuma-roll-modes,fieldset,.pneuma-group-actors,.pneuma-skill-stat-roll,.pneuma-treatment-patient-picker,.pneuma-treatment-section) {
   padding: 9px 10px; border: 1px solid var(--pct-dialog-border); border-radius: 5px; background: var(--pct-dialog-panel);
 }
 .pneuma-roll-dialog :is(.pneuma-roll-character,.pneuma-treatment-section h3) {
@@ -1585,3 +1585,60 @@ body.pneuma-dock-full-width #sidebar {
   margin: 0;
   padding-inline: 12px;
 }
+
+.pneuma-group-check-dialog {
+  --pneuma-group-row-height: 32px;
+  --pneuma-group-header-height: 28px;
+  max-height: calc(100vh - 16px);
+}
+.pneuma-group-check-dialog > .window-content,
+.pneuma-group-check-dialog .dialog-content,
+.pneuma-group-check-dialog .pneuma-group-actors {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.pneuma-group-check-dialog > .window-content { flex: 1 1 auto; }
+.pneuma-group-check-dialog .pneuma-manual-form { min-height: 0; }
+.pneuma-group-check-dialog .dialog-buttons,
+.pneuma-group-check-dialog .pneuma-manual-form > :not(.pneuma-group-actors) { flex: 0 0 auto; }
+.pneuma-group-check-dialog .pneuma-group-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+}
+.pneuma-group-check-dialog .pneuma-group-favorites { min-width: 0; max-height: none; overflow: visible; }
+.pneuma-group-check-dialog .pneuma-group-shortcuts { width: auto; margin: 0; padding: 0; border: 0; background: none; }
+.pneuma-group-check-dialog .pneuma-group-dv-options { display: flex; flex-direction: column; gap: 8px; }
+.pneuma-group-check-dialog .pneuma-group-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.pneuma-group-check-dialog .pneuma-group-filters label { font-size: 12px; white-space: nowrap; }
+.pneuma-group-check-dialog .pneuma-group-actors { min-width: 0; gap: 0; }
+.pneuma-group-check-dialog .pneuma-group-list {
+  flex: 0 1 auto;
+  min-height: 0;
+  height: calc(var(--pneuma-group-header-height) + 10 * var(--pneuma-group-row-height));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.pneuma-group-check-dialog .pneuma-group-roster { table-layout: fixed; border-collapse: separate; border-spacing: 0; border: 0; }
+.pneuma-group-check-dialog .pneuma-group-roster th { height: var(--pneuma-group-header-height); padding-block: 0; }
+.pneuma-group-check-dialog .pneuma-group-roster td { padding-block: 0; }
+.pneuma-group-check-dialog .pneuma-group-player { box-sizing: border-box; min-height: var(--pneuma-group-row-height); padding-block: 0; }
+.pneuma-group-check-dialog .pneuma-group-player > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pneuma-group-check-dialog .pneuma-group-participant { display: flex; align-items: center; gap: 4px; }
+.pneuma-group-check-dialog .pneuma-group-participant > label { flex: 1 1 auto; min-width: 0; }
+.pneuma-group-check-dialog [data-group-recipient] { width: 45%; min-width: 0; font-size: 12px; }
+.pneuma-group-check-dialog [data-group-recipient][hidden] { display: none; }
+.pneuma-roll-dialog .pneuma-group-roster { width: 100%; margin: 0; }
+.pneuma-roll-dialog .pneuma-group-roster th:first-child { text-align: left; }
+.pneuma-roll-dialog .pneuma-group-player > span { min-width: 0; overflow-wrap: anywhere; }
+.pneuma-roll-dialog .pneuma-group-roster :is(th, td):not(:first-child) {
+  width: 4.5em;
+  text-align: center;
+  white-space: nowrap;
+}
+.pneuma-roll-dialog .pneuma-group-roster[hidden],
+.pneuma-roll-dialog .pneuma-group-roster tr[hidden] { display: none; }

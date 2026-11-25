@@ -1,5 +1,7 @@
 # Combat Tools feature inventory
 
+- Group Skill Check shows player connection state, skill level, and base for the selected skill. The online, default-actor, and current-scene filters start enabled. Clear the default-actor filter to include other owned characters and mooks. Clear the current-scene filter to use world actors. The roster shows each skill-capable actor once, skips Scene Tools vehicles, and offers a player picker when multiple eligible owners share an actor. The picker initially prefers the assigned player. The dialog offers four Favorites slots and keeps scrolling within the actor list.
+
 - Save and Apply actions in Combat Tools forms and prompts are aligned at the bottom right.
 
 - Performance Recorder (1.0.1). Players and GMs can record session-wide minute totals, freeze the last minute of detailed events at a hitch, review a summary, and download JSON or plain text from Combat Tools settings. It covers local frame intervals, chat and document activity, measured Combat and Visual Tools handlers, and player requests observed by the GM.

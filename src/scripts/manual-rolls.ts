@@ -108,7 +108,7 @@ export async function handleManualRequest(wire: Pick<Wire,"message" | "user" | "
   const data = foundry.utils.deepClone(original);
   const req = wire.request;
   if (data.kind === "group") {
-    const row = data.rows?.find(row=>row.user===req.row);
+    const row = data.rows?.find(row=>(row.id ?? row.user)===req.row);
     if (!row || (!user.isGM && row.user !== user.id)) throw Error("This roll belongs to another player.");
     const actor = await fromUuid(row.actor) as Actor | null;
     if (!actor || !actor.testUserPermission(user,"OWNER")) throw Error("You do not own the requested character.");
@@ -163,10 +163,10 @@ function send(message: string, request: Request): Promise<void> {
 async function rollGroup(message: ChatMessage, data: ManualCard, rowId: string, skipDialog = false) {
   const key=message.id+":"+rowId,previous=retry.get(key);
   if(previous){await send(message.id!,previous.request);retry.delete(key);await showSavedDice(previous.dice,previous.mode,previous.roller,previous.audience);return;}
-  const row=data.rows!.find(row=>row.user===rowId)!;
+  const row=data.rows!.find(row=>(row.id ?? row.user)===rowId)!;
   const actor=await fromUuid(row.actor) as Actor | null;
   if(!actor?.isOwner)throw Error("You do not own this character.");
-  const item=actor.items.find(item=>String(item.type)==="skill" && item.name?.toLowerCase()===data.skill?.toLowerCase()) as RollItem | undefined;
+  const item=findGroupSkill(actor, data.skill ?? "") as RollItem | undefined;
   if(!item?.createRoll)throw Error("This character does not have the requested skill.");
   const nonce=foundry.utils.randomID();await send(message.id!,{action:"claim",row:rowId,nonce});
   let rolled=false;
@@ -205,9 +205,12 @@ export function bindManualCard(message: ChatMessage, html: HTMLElement) {
     if(game.user!.isGM && data.hideDV && data.dv!==undefined)root.querySelector(".pneuma-group-dv")!.textContent="DV "+data.dv+" (hidden from players)";
     for(const row of data.rows??[]) {
       if(!game.user!.isGM && row.user!==game.user!.id)continue;
-      const slot=root.querySelector<HTMLElement>('[data-group-user="'+CSS.escape(row.user)+'"] .pneuma-group-action')!;
-      if(row.state==="waiting" || retry.has(message.id+":"+row.user)){const button=addButton(slot,retry.has(message.id+":"+row.user)?"Finish roll":"Roll",event=>rollGroup(message,data,row.user,event.shiftKey));button.dataset.chatAction=retry.has(message.id+":"+row.user)?"retry":"roll";button.dataset.gmOnly=String(game.user!.isGM && row.user!==game.user!.id); }
-      else if(row.state==="rolling" && game.user!.isGM){const button=addButton(slot,"Release",()=>send(message.id!,{action:"reset",row:row.user}));button.dataset.gmOnly="true";button.dataset.chatAction="release";}
+      const rowId = row.id ?? row.user;
+      const attribute = row.id ? "data-group-id" : "data-group-user";
+      const slot = root.querySelector<HTMLElement>(`[${attribute}="${CSS.escape(rowId)}"] .pneuma-group-action`)!;
+      const hasRetry = retry.has(message.id + ":" + rowId);
+      if(row.state==="waiting" || hasRetry){const button=addButton(slot,hasRetry?"Finish roll":"Roll",event=>rollGroup(message,data,rowId,event.shiftKey));button.dataset.chatAction=hasRetry?"retry":"roll";button.dataset.gmOnly=String(game.user!.isGM && row.user!==game.user!.id); }
+      else if(row.state==="rolling" && game.user!.isGM){const button=addButton(slot,"Release",()=>send(message.id!,{action:"reset",row:rowId}));button.dataset.gmOnly="true";button.dataset.chatAction="release";}
     }return;
   }
   const controls=root.querySelector<HTMLElement>(".pneuma-manual-controls")!;
@@ -225,8 +228,8 @@ function field(label:string, control:string) {const name=/name="([^"]+)"/.exec(c
 const pair=(content:string)=>'<div class="pneuma-roll-pair">'+content+'</div>';
 const check=(name:string,label:string,checked=false)=>'<label class="pneuma-roll-check"><input type="checkbox" name="'+name+'"'+(checked?' checked':'')+'>'+label+'</label>';
 function numeric(name:string,value:number,min=-100,max=100) {return '<input name="'+name+'" type="number" value="'+value+'" min="'+min+'" max="'+max+'" step="1" required>';}
-async function prompt(title:string,content:string,label:string,run:(form:HTMLFormElement)=>Promise<void>, render?:(form:HTMLFormElement)=>void) {
-  await Dialog.prompt({title,content:'<form class="pneuma-manual-form">'+content+'</form>',label,options:{width:380,classes:['dialog','pneuma-roll-dialog']},rejectClose:false,render:html=>{const form=html[0]!.querySelector<HTMLFormElement>('form');if(form)render?.(form);},callback:async html=>{const form=html[0]!.querySelector<HTMLFormElement>("form")!;if(!form.reportValidity())throw Error("Complete the required fields.");await run(form);}});
+async function prompt(title:string,content:string,label:string,run:(form:HTMLFormElement)=>Promise<void>, render?:(form:HTMLFormElement)=>void, width=380, windowClass?:string) {
+  await Dialog.prompt({title,content:'<form class="pneuma-manual-form">'+content+'</form>',label,options:{width,classes:['dialog','pneuma-roll-dialog',...(windowClass ? [windowClass] : [])]},rejectClose:false,render:html=>{const form=html[0]!.querySelector<HTMLFormElement>('form');if(form)render?.(form);},callback:async html=>{const form=html[0]!.querySelector<HTMLFormElement>("form")!;if(!form.reportValidity())throw Error("Complete the required fields.");await run(form);}});
 }
 const value=(form:HTMLFormElement,name:string)=>new FormData(form).get(name)?.toString()??"";
 async function damagePrompt() {
@@ -318,11 +321,12 @@ function bindGroupShortcuts(form:HTMLFormElement):void {
   const root=form.querySelector<HTMLElement>(".pneuma-group-shortcuts")!;
   const select=form.querySelector<HTMLSelectElement>('[name="skill"]')!;
   const path="flags."+M+".groupSkillShortcuts";
+  const slotsCount=4;
   let busy=false;
   const draw=()=>{
     const saved=foundry.utils.getProperty(game.user!,path) as (string|null)[]|undefined;
     root.replaceChildren();
-    for(let index=0;index<3;index++){
+    for(let index=0;index<slotsCount;index++){
       const name=Array.isArray(saved)?saved[index]:undefined;
       const row=document.createElement("div");row.className="pneuma-group-shortcut-row";
       const button=document.createElement("button");button.type="button";
@@ -332,7 +336,7 @@ function bindGroupShortcuts(form:HTMLFormElement):void {
       button.dataset.empty=String(!name);button.setAttribute("aria-pressed",String(!!name&&select.value===name));
       button.title=name?"Select "+name:"Save the selected skill in slot "+(index+1);
       button.setAttribute("aria-label",button.title);
-      button.disabled=!!name&&!Array.from(select.options).some(option=>option.value===name);
+      button.disabled=name ? !Array.from(select.options).some(option=>option.value===name) : !select.value;
       button.addEventListener("click",()=>{
         if(name){select.value=name;select.dispatchEvent(new Event("change",{bubbles:true}));return;}
         void save(index,select.value);
@@ -348,7 +352,7 @@ function bindGroupShortcuts(form:HTMLFormElement):void {
     if(busy||!game.user!.isGM)return;busy=true;
     try{
       const stored=foundry.utils.getProperty(game.user!,path) as (string|null)[]|undefined;
-      const slots=Array.from({length:3},(_,i)=>Array.isArray(stored)?stored[i]??null:null);
+      const slots=Array.from({length:slotsCount},(_,i)=>Array.isArray(stored)?stored[i]??null:null);
       if(name&&slots.includes(name))throw Error("That skill already has a shortcut.");
       slots[index]=name;await game.user!.update({[path]:slots});draw();
     }catch(error){report(error);}finally{busy=false;}
@@ -356,20 +360,144 @@ function bindGroupShortcuts(form:HTMLFormElement):void {
   select.addEventListener("change",draw);
   draw();
 }
+function findGroupSkill(actor: Actor, name: string): Item | undefined {
+  return actor.items.find(item => String(item.type) === "skill" && item.name?.toLowerCase() === name.toLowerCase());
+}
+function skillRollNumbers(actor: Actor, name: string, level: number, stat?: string) {
+  const mod = Number(Handlebars.helpers.cprGetSkillModInfo!(name, actor, "modTotal", {hash:{}}));
+  const base = level + mod + Number(foundry.utils.getProperty(actor, `system.stats.${stat}.value`));
+  return {mod, base};
+}
 async function groupPrompt() {
-  if(!game.user!.isGM)throw Error("Only the GM can request a group check.");
-  const users=game.users!.filter(user=>!user.isGM && !!user.character);
-  const skills=[...new Set(users.flatMap(user=>user.character!.items.filter(item=>String(item.type)==="skill").map(item=>item.name!)))].sort();
-  if(!users.length||!skills.length)throw Error("Assign player characters with skills before requesting a group check.");
-  await prompt("Request group check",field("Skill",'<select name="skill">'+skills.map(skill=>'<option>'+esc(skill)+'</option>').join('')+'</select>')+pair(field("Optional DV",'<input name="dv" type="number" min="0" max="100" step="1" placeholder="No DV">')+check("hideDV","Hide DV from players"))+'<fieldset><legend>Players</legend>'+users.map(user=>'<label class="pneuma-group-player"><input name="players" type="checkbox" value="'+esc(user.id)+'"'+(user.active?' checked':'')+'>'+esc(user.name)+' — '+esc(user.character!.name)+(user.active?'':' (offline)')+'</label>').join('')+'</fieldset><div class="pneuma-group-shortcuts" role="group" aria-label="Common group skills"></div>',"Request rolls",async form=>{
-    if(!game.user!.isGM)throw Error("GM only.");
-    const ids=new FormData(form).getAll("players").map(String),chosen=users.filter(user=>ids.includes(user.id!));
-    if(!chosen.length)throw Error("Select at least one player.");
-    const skill=value(form,"skill");
-    for(const user of chosen)if(!user.character!.testUserPermission(user,"OWNER") || !user.character!.items.some(item=>String(item.type)==="skill" && item.name===skill))throw Error(user.name+" needs ownership of a character with "+skill+".");
-    const dv=value(form,"dv");
-    await create({kind:"group",creator:game.user!.id!,title:skill,rollMode:"roll",skill,...(dv!==""?{dv:manualNumber(dv,"DV",0,100)}:{}),hideDV:new FormData(form).has("hideDV"),rows:chosen.map(user=>({user:user.id!,actor:user.character!.uuid,name:user.name+" — "+user.character!.name,state:"waiting"}))});
-  },bindGroupShortcuts);
+  if (!game.user!.isGM) throw Error("Only the GM can request a group check.");
+  const users = game.users!.filter(user => !user.isGM);
+  const isCharacter = (actor: Actor) => ["character", "mook"].includes(String(actor.type));
+  const actors = game.actors?.filter(isCharacter) ?? [];
+  const scene = canvas.scene;
+  const sceneActors = new Map<string, {actor: Actor; sourceId: string | null}>();
+  for (const token of scene?.tokens ?? []) {
+    if (token.actor && !foundry.utils.getProperty(token, "flags.pneuma-scenetools.CreatedByVehicleTools"))
+      sceneActors.set(token.actor.uuid, {actor: token.actor, sourceId: token.actorId});
+  }
+  const playerActors = users.flatMap(user => {
+    const assigned = user.character;
+    const world = assigned ? [assigned, ...actors] : actors;
+    const candidates = new Map(world.map(actor => [actor.uuid, {actor, inWorld: true, isDefault: actor === assigned}]));
+    for (const [uuid, {actor, sourceId}] of sceneActors) {
+      if (candidates.has(uuid)) continue;
+      const isDefault = !!assigned && sourceId === assigned.id;
+      if (isDefault || isCharacter(actor)) candidates.set(uuid, {actor, inWorld: false, isDefault});
+    }
+    return [...candidates.values()]
+      .filter(({actor}) => actor.testUserPermission(user, "OWNER"))
+      .sort((a, b) => Number(b.isDefault) - Number(a.isDefault))
+      .map(entry => ({...entry, user, onScene: sceneActors.has(entry.actor.uuid)}));
+  });
+  const byActor = new Map<string, typeof playerActors>();
+  const skillNames = new Map<string, string>();
+  for (const entry of playerActors) {
+    const {actor} = entry;
+    const grouped = byActor.get(actor.uuid);
+    if (grouped) { grouped.push(entry); continue; }
+    if (foundry.utils.getProperty(actor, "flags.pneuma-scenetools.promotedVehicle")
+        || foundry.utils.getProperty(actor, "flags.pneuma-scenetools.defaultVehicleTemplate")) continue;
+    const skills = actor.items.filter(item => String(item.type) === "skill" && !!item.name);
+    if (!skills.length) continue;
+    byActor.set(actor.uuid, [entry]);
+    for (const skill of skills) skillNames.set(skill.name!.toLowerCase(), skill.name!);
+  }
+  const roster = [...byActor.values()].map(owners => ({actor: owners[0]!.actor, owners}));
+  const recipients = new Map<string, User>();
+  const preferredPlayers = new Map<string, string>();
+  const skills = [...skillNames.values()].sort((a,b) => a.localeCompare(b));
+  const content = '<div class="pneuma-group-options"><div class="pneuma-group-dv-options">'+field("Skill", '<select name="skill">'+
+      (skills.map(skill => '<option>'+esc(skill)+'</option>').join("") || '<option value="">No skills available</option>')+'</select>')
+    + field("DV", '<input name="dv" type="number" min="0" max="100" step="1" placeholder="No DV">')
+    + check("hideDV", "Hide DV from players")+'</div>'
+    + '<fieldset class="pneuma-group-favorites"><legend>Favorites</legend><div class="pneuma-group-shortcuts" role="group" aria-label="Common group skills"></div></fieldset></div>'
+    + '<div class="pneuma-group-filters">'+check("defaultActors", "Only Default Actor", true)+check("onlinePlayers", "Online Only", true)+check("currentScene", "Only current scene", true)+'</div>'
+    + '<section class="pneuma-group-actors" aria-label="Actors"><div class="pneuma-group-list"><table class="pneuma-group-roster"><thead><tr><th scope="col">Player / Actor</th><th scope="col">Online</th><th scope="col">Skill</th><th scope="col">Base</th></tr></thead><tbody>'
+    + roster.map(({actor, owners}) => '<tr><td><div class="pneuma-group-participant"><label class="pneuma-group-player"><input name="players" type="checkbox" value="'+esc(actor.uuid)+'"'
+      +(owners.some(({user, isDefault}) => user.active && isDefault) ? ' checked' : '')+'><span data-player-actor></span></label>'
+      +(owners.length > 1 ? '<select data-group-recipient hidden aria-label="Choose player for '+esc(actor.name)+'"></select>' : '')
+      +'</div></td><td data-player-state></td><td data-skill-level></td><td data-skill-base></td></tr>').join("")
+    + '</tbody></table><p data-group-empty>No player actors match these filters.</p></div></section>';
+  await prompt("Request group check", content, "Request rolls", async form => {
+    if (!game.user!.isGM) throw Error("GM only.");
+    const ids = new Set(new FormData(form).getAll("players").map(String));
+    const chosen = roster.flatMap(({actor}) => {
+      const user = recipients.get(actor.uuid);
+      return user && ids.has(actor.uuid) ? [{actor, user}] : [];
+    });
+    if (!chosen.length) throw Error("Select at least one player actor with the requested skill.");
+    if (new FormData(form).has("currentScene")) {
+      const placed = new Set(Array.from(canvas.scene?.tokens ?? [], token => token.actor?.uuid));
+      if (!scene || scene.id !== canvas.scene?.id || chosen.some(({actor}) => !placed.has(actor.uuid)))
+        throw Error("The scene roster changed. Reopen Group Skill Check and select the actors again.");
+    }
+    const skill = value(form,"skill");
+    const rows = await Promise.all(chosen.map(async ({user, actor}) => {
+      const current = await fromUuid(actor.uuid) as Actor | null;
+      if (!current?.testUserPermission(user, "OWNER") || !findGroupSkill(current, skill))
+        throw Error(user.name+" needs ownership of a character with "+skill+".");
+      return {id:user.id + ":" + current.uuid,user:user.id!,actor:current.uuid,name:user.name+" - "+current.name,state:"waiting" as const};
+    }));
+    const dv = value(form,"dv");
+    await create({kind:"group",creator:game.user!.id!,title:skill,rollMode:"roll",skill,
+      ...(dv!=="" ? {dv:manualNumber(dv,"DV",0,100)} : {}),hideDV:new FormData(form).has("hideDV"),rows});
+  }, form => {
+    const skill = form.querySelector<HTMLSelectElement>('[name="skill"]')!;
+    const defaults = form.querySelector<HTMLInputElement>('[name="defaultActors"]')!;
+    const online = form.querySelector<HTMLInputElement>('[name="onlinePlayers"]')!;
+    const currentScene = form.querySelector<HTMLInputElement>('[name="currentScene"]')!;
+    const table = form.querySelector<HTMLTableElement>(".pneuma-group-roster")!;
+    const rows = Array.from(table.tBodies[0]!.rows);
+    const refresh = () => {
+      recipients.clear();
+      rows.forEach((row,index) => {
+        const {actor, owners} = roster[index]!;
+        const eligible = owners.filter(({user, isDefault, inWorld, onScene}) =>
+          (!defaults.checked || isDefault) && (!online.checked || user.active) && (currentScene.checked ? onScene : inWorld));
+        const chosen = preferredPlayers.get(actor.uuid);
+        const owner = eligible.find(entry => entry.user.id === chosen)
+          ?? eligible.find(entry => entry.isDefault && entry.user.active) ?? eligible.find(entry => entry.isDefault)
+          ?? eligible.find(entry => entry.user.active) ?? eligible[0];
+        const user = owner?.user;
+        row.hidden = !user;
+        if (user) recipients.set(actor.uuid, user);
+        const item = user ? findGroupSkill(actor, skill.value) : undefined;
+        row.querySelector<HTMLInputElement>('input')!.disabled = !item;
+        const picker = row.querySelector<HTMLSelectElement>("[data-group-recipient]");
+        const shared = eligible.length > 1;
+        if (picker) {
+          picker.hidden = !shared;
+          if (shared) {
+            picker.replaceChildren(...eligible.map(({user: player}) => new Option(player.name ?? "", player.id!)));
+            picker.value = user!.id!;
+          }
+        }
+        row.querySelector('[data-player-actor]')!.textContent = shared ? actor.name ?? "" : user ? user.name + " - " + actor.name : "";
+        row.querySelector('[data-player-state]')!.textContent = user?.active ? "Online" : "Offline";
+        const data = item?.system as {level?: number; stat?: string} | undefined;
+        const level = data?.level;
+        const base = level === undefined ? undefined : skillRollNumbers(actor, item!.name!, level, data?.stat).base;
+        row.querySelector('[data-skill-level]')!.textContent = level === undefined ? "—" : String(level);
+        row.querySelector('[data-skill-base]')!.textContent = base !== undefined && Number.isFinite(base) ? String(base) : "—";
+      });
+      table.hidden = rows.every(row => row.hidden);
+      form.querySelector<HTMLElement>('[data-group-empty]')!.hidden = !table.hidden;
+    };
+    for (const control of [skill, defaults, online, currentScene]) control.addEventListener("change", refresh);
+    rows.forEach((row,index) => {
+      const picker = row.querySelector<HTMLSelectElement>("[data-group-recipient]");
+      picker?.addEventListener("change", () => {
+        preferredPlayers.set(roster[index]!.actor.uuid, picker.value);
+        refresh();
+      });
+    });
+    bindGroupShortcuts(form);
+    refresh();
+  }, 520, "pneuma-group-check-dialog");
 }
 export async function manualEvasion(skipDialog = false): Promise<void> {
   const selected = canvas.tokens?.controlled ?? [];
@@ -405,8 +533,7 @@ async function characterRollPrompt(kind: "skill" | "roleAbility") {
     const stats=kind==="skill"?'<div class="pneuma-skill-stat-roll"><label>STAT <select data-stat-choice>'+["int","ref","dex","tech","cool","will","move","body","luck","emp"].filter(stat=>foundry.utils.getProperty(actor,"system.stats."+stat+".value")!==undefined).map(stat=>'<option value="'+stat+'"'+(selectedStat===stat?' selected':'')+'>'+stat.toUpperCase()+' ('+(actor as Actor&{getStat(stat:string):number}).getStat(stat)+')</option>').join('')+'</select></label><button type="button" data-stat-roll>Roll STAT</button><small>Roll under; ties fail.</small></div><label class="pneuma-skill-filter">Filter skills <input type="search" data-skill-filter value="'+esc(filter)+'" placeholder="Type a skill name"></label>':'';
     return stats+'<div class="pneuma-character-roll-list"><table><thead><tr><th class="text-normal text-bold">Favorite</th><th class="text-normal text-bold">'+(kind==="skill"?'Skill':'Role Ability')+'</th><th class="text-normal text-bold">'+(kind==="skill"?'Level':'Rank')+'</th><th class="text-normal text-bold">Mod</th>'+(kind==="skill"?'<th class="text-normal text-bold">Base</th>':'')+'<th class="text-normal text-bold" colspan="2">Actions</th></tr></thead><tbody>'+choices.map((choice,index)=>{
       // Same modifier helper and base formula as CPR's character sheet.
-      const mod=Number(Handlebars.helpers.cprGetSkillModInfo!(choice.name,actor,"modTotal",{hash:{}}));
-      const base=choice.rank+mod+Number(foundry.utils.getProperty(actor,`system.stats.${choice.stat}.value`));
+      const {mod,base} = skillRollNumbers(actor, choice.name, choice.rank, choice.stat);
       const starred = rollFavorites().some(f => sameFavorite(f, favorite(choice)));
       const star = choice.hasRoll ? '<button type="button" class="pneuma-roll-favorite" data-choice="'+index+'" data-action="favorite" aria-label="'+(starred?'Remove favorite ':'Favorite ')+esc(choice.name)+'" aria-pressed="'+starred+'" title="'+(starred?'Remove favorite':'Favorite (maximum 3 across skills and role abilities)')+'"><i class="'+(starred?'fas':'far')+' fa-star" aria-hidden="true"></i></button>' : '';
       return '<tr data-skill-name="'+esc(choice.name.toLowerCase())+'"'+(kind==="skill"&&!choice.name.toLowerCase().includes(filter.toLowerCase().trim())?' hidden':'')+'><td>'+star+'</td><td>'+esc(choice.name)+(kind==="roleAbility"?'<small>'+esc(choice.item.name!)+'</small>':'')+'</td><td>'+choice.rank+'</td><td>'+mod+'</td>'+(kind==="skill"?'<td>'+base+'</td>':'')+'<td><button type="button" data-choice="'+index+'" data-action="view" aria-label="View '+esc(choice.name)+'">View</button></td><td><button type="button" data-choice="'+index+'" data-action="roll" aria-label="Roll '+esc(choice.name)+'"'+(choice.hasRoll?'':' disabled title="This ability has no native roll"')+'>Roll</button></td></tr>';

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.4 - 2026-11-25
+
+- Add Online, Skill, and Base columns to Group Skill Check. Skill and Base update when the selected skill changes.
+- Start with Only Default Actor, Online Only, and Only current scene enabled. Clear the filters to expand the roster.
+- List each eligible actor once, skip Scene Tools vehicles, and let the GM choose which eligible player receives a shared actor's roll request.
+- Stack Skill, DV, and Hide DV from players on the left and four Favorites on the right. Keep scrolling inside the actor list, with room for ten actors at normal height.
+
 ## 1.0.3 - 2026-11-25
 
 - Align Save and Apply at the bottom right in Combat Tools settings and prompts, including Status Effects, Quickhacks, EMP, and Self-ICE.

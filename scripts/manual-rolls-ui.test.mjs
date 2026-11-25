@@ -261,17 +261,117 @@ try {
 
  // Inspect every module-owned Roll-menu dialog in native-style light/dark windows.
  await page.evaluate(async()=>{
-  const beforeUsers=game.users,beforeUser=game.user;
-  game.user={isGM:true,flags:{}};game.users=[{id:'preview-player',name:'Player',active:true,isGM:false,character:{name:'Solo',items:[{type:'skill',name:'Perception'}]}}];
-  await groupPrompt();window.groupFormPreview=promptData.content;
-  await criticalPrompt();window.criticalFormPreview=promptData.content;
-  game.users=beforeUsers;game.user=beforeUser;
+  const {users: beforeUsers, user: beforeUser, actors: beforeActors} = game;
+  const beforeResolve = window.fromUuid;
+  const beforeScene = canvas.scene;
+  const oldFavorites = ['Accounting','Brawling','Stealth'];
+  const groupFlags = {groupSkillShortcuts:[...oldFavorites]};
+  const gm = {id:'gm', isGM:true, flags:{'pneuma-combattools':groupFlags}, async update(changes){
+   groupFlags.groupSkillShortcuts=changes['flags.pneuma-combattools.groupSkillShortcuts'];
+  }};
+  const online = {id:'online', name:'Player Online', active:true, isGM:false};
+  const offline = {id:'offline', name:'Player Offline', active:false, isGM:false};
+  const unassigned = {id:'unassigned', name:'Player Without Default', active:true, isGM:false};
+  const makeActor = (name, owner, levels) => ({
+    id:name, uuid: 'Actor.'+name, name, type:'character', system:{stats:{int:{value:6}}},
+    items:Object.entries(levels).map(([name,level])=>({name,type:'skill',system:{level,stat:'int'}})),
+    testUserPermission:user=>user.id===owner.id || user.isGM,
+  });
+  online.character = makeActor('Solo',online,{Accounting:1,Perception:4,Brawling:2,Stealth:3});
+  online.character.testUserPermission=user=>user.id===online.id || user.id===unassigned.id || user.isGM;
+  offline.character = makeActor('Fixer',offline,{Perception:3});
+  const alternate = makeActor('Tech',online,{Perception:2});
+  const ownedOnly = makeActor('Netrunner',unassigned,{Perception:5});
+  const offScene = makeActor('World Character',unassigned,{Perception:7});
+  const synthetic = makeActor('Tech',online,{Perception:5,Tracking:2});
+  synthetic.testUserPermission=user=>user.id===online.id || user.id===unassigned.id || user.isGM;
+  const vehicle = makeActor('Vehicle Template',online,{Driving:1});
+  vehicle.testUserPermission=()=>true;
+  synthetic.uuid = 'Scene.GroupCheck.Token.Unlinked.Actor.Tech';
+  game.user = gm;
+  game.users = [gm,online,offline,unassigned];
+  game.users.get = id => game.users.find(user=>user.id===id);
+  game.actors = [online.character,offline.character,alternate,ownedOnly,offScene];
+  canvas.scene = {id:'GroupCheck', tokens:[
+    {actor:online.character,actorId:online.character.id},
+    {actor:online.character,actorId:online.character.id},
+    {actor:offline.character,actorId:offline.character.id},
+    {actor:synthetic,actorId:alternate.id},
+    {actor:ownedOnly,actorId:ownedOnly.id},
+    {actor:vehicle,actorId:vehicle.id,flags:{'pneuma-scenetools':{CreatedByVehicleTools:true}}},
+  ]};
+  window.fromUuid = async uuid => [...game.actors,synthetic].find(actor=>actor.uuid===uuid);
+  const check = (result,message) => {if(!result) throw Error(message);};
+  try {
+   await groupPrompt();
+   const holder = document.createElement('div');
+   holder.innerHTML=promptData.content;
+   promptData.render([holder]);
+   const find = selector => holder.querySelector(selector);
+   const change = (control,value) => {control.value=value;control.dispatchEvent(new Event('change'));};
+   const toggle = (control,state) => {control.checked=state;control.dispatchEvent(new Event('change'));};
+   const visible = () => [...holder.querySelectorAll('.pneuma-group-roster tbody tr:not([hidden])')];
+   const cells = row => [...row.cells].slice(1).map(cell=>cell.textContent).join(',');
+   check([...holder.querySelectorAll('.pneuma-group-roster th')].map(header=>header.textContent).join(',')==='Player / Actor,Online,Skill,Base','roster column headings');
+   const defaultActors = find('[name=defaultActors]');
+   const onlyOnline = find('[name=onlinePlayers]');
+   const sceneOnly = find('[name=currentScene]');
+   check([defaultActors,onlyOnline,sceneOnly].map(input=>input.parentElement.textContent.trim()).join(',')==='Only Default Actor,Online Only,Only current scene','compact filter labels');
+   check(promptData.options.width===520 && promptData.options.classes.includes('pneuma-group-check-dialog') && defaultActors.checked && onlyOnline.checked && sceneOnly.checked,'wider dialog and all filters enabled');
+   check(visible().length===1 && cells(visible()[0])==='Online,1,9','assigned online actor displays level and CPR base');
+   change(find('[name=skill]'),'Perception');
+   check(cells(visible()[0])==='Online,4,12','skill selection refreshes the roster');
+   const favorites = () => [...holder.querySelectorAll('.pneuma-group-shortcut')];
+   check(favorites().length===4 && favorites().slice(0,3).map(button=>button.textContent).join(',')===oldFavorites.join(','),'four slots preserve the three saved favorites');
+   favorites()[3].click();
+   await Promise.resolve();
+   check(groupFlags.groupSkillShortcuts[3]==='Perception','fourth favorite saves');
+   change(find('[name=skill]'),'Tracking');
+   favorites()[3].click();
+   check(find('[name=skill]').value==='Perception','fourth favorite still selects the skill');
+   window.groupFormPreview=holder.innerHTML;
+   toggle(defaultActors,false);
+   check(visible().length===3 && cells(visible()[1])==='Online,5,13' && cells(visible()[2])==='Online,5,13','scene roster deduplicates linked tokens and shared actors, skips the vehicle, and uses live unlinked values');
+   const firstPicker = visible()[0].querySelector('[data-group-recipient]');
+   check(!firstPicker.hidden && firstPicker.value===online.id && firstPicker.options.length===2,'shared actor shows a picker with its assigned player selected');
+   const alternatePicker = visible()[1].querySelector('[data-group-recipient]');
+   check(!alternatePicker.hidden && alternatePicker.options.length===2,'shared unlinked actor still has one row and two choices');
+   toggle(sceneOnly,false);
+   check(visible().length===4 && cells(visible()[1])==='Online,2,10' && visible()[3].textContent.includes('World Character'),'clearing the scene filter uses the world roster and world actor values');
+   toggle(sceneOnly,true);
+   toggle(onlyOnline,false);
+   check(visible().length===4 && cells(visible()[2])==='Offline,3,11','offline actor appears when the filter is cleared');
+   change(find('[name=skill]'),'Accounting');
+   check(visible()[1].querySelector('input').disabled && cells(visible()[1])==='Online,—,—','missing skill disables selection');
+   change(find('[name=skill]'),'Perception');
+   visible()[1].querySelector('input').checked=true;
+   await promptData.callback([holder]);
+   const card = created.flags['pneuma-combattools'].manualRoll;
+   check(card.rows[1].actor===synthetic.uuid,'request retains the unlinked token actor');
+   check(card.rows.length===2 && card.rows.every(row=>row.user===online.id) && card.rows[0].id!==card.rows[1].id,'two actors owned by one user get distinct requests');
+   const message={id:'group-roster',whisper:[],flags:created.flags,async update(changes){this.flags['pneuma-combattools'].manualRoll=changes['flags.pneuma-combattools.manualRoll'];}};
+   game.messages.set(message.id,message);
+   await handleManualRequest({message:message.id,user:online.id,request:{action:'claim',row:card.rows[1].id,nonce:'alternate'}});
+   const rows=message.flags['pneuma-combattools'].manualRoll.rows;
+   check(rows[0].state==='waiting' && rows[1].state==='rolling','claim updates only the chosen actor');
+   game.messages.delete(message.id);
+   change(alternatePicker,unassigned.id);
+   change(find('[name=skill]'),'Tracking');
+   change(find('[name=skill]'),'Perception');
+   check(alternatePicker.value===unassigned.id,'the selected player survives skill changes');
+   await promptData.callback([holder]);
+   const chosenCard = created.flags['pneuma-combattools'].manualRoll;
+   check(chosenCard.rows[1].user===unassigned.id && chosenCard.rows[1].actor===synthetic.uuid,'the selected owner receives the shared actor roll');
+   await criticalPrompt();window.criticalFormPreview=promptData.content;
+  } finally {
+   game.users=beforeUsers;game.user=beforeUser;game.actors=beforeActors;canvas.scene=beforeScene;window.fromUuid=beforeResolve;
+  }
  });
  for(const theme of ['light','dark']) {
   const result=await page.evaluate(theme=>{
    const ink=theme==='dark'?'#eee':'#222',surface=theme==='dark'?'#24282d':'#dedede';
    document.body.innerHTML='';document.body.style.background=theme==='dark'?'#14171a':'#eee';document.body.style.color=ink;
-   const samples=[['General Roll',customFormPreview,380],['Damage',damageFormPreview,380],['Critical Injury',criticalFormPreview,380],['Group Check',groupFormPreview,380],['Skill / STAT',skillListPreview,630],['Role Ability',roleListPreview,590]];
+   const samples=[['General Roll',customFormPreview,380],['Damage',damageFormPreview,380],['Critical Injury',criticalFormPreview,380],['Group Check',groupFormPreview,520],['Skill / STAT',skillListPreview,630],['Role Ability',roleListPreview,590]];
    return samples.map(([title,content,width])=>{
     const app=document.createElement('section');app.className='window-app pneuma-roll-dialog';app.style.cssText='width:'+width+'px;max-width:calc(100vw - 24px);box-sizing:border-box;margin:12px 0;background:'+surface+';--cpr-text-normal:'+ink+';--cpr-background-window:'+surface+';--color-border-highlight:#a84048';
     app.innerHTML='<header class="window-header" style="padding:6px 10px"><strong>'+title+'</strong></header><div class="window-content"><div class="dialog-content">'+content+'</div><div class="dialog-buttons"><button class="default">Roll</button></div></div>';document.body.append(app);
@@ -283,5 +383,43 @@ try {
   await page.screenshot({path:process.env.TEMP+'/pct-roll-dialogs-'+theme+'.png',fullPage:true});
  }
  console.log('Roll dialog polish checked: six forms in light/dark native-style windows, viewport fit and consistent buttons.');
+
+ for (const height of [900, 480]) {
+  await page.setViewportSize({width:620,height});
+  const layout = await page.evaluate(() => {
+   document.body.innerHTML = '';
+   const app = document.createElement('section');
+   app.className = 'window-app pneuma-roll-dialog pneuma-group-check-dialog';
+   app.style.cssText = 'width:520px;display:flex;flex-direction:column;--cpr-text-normal:#222;--cpr-background-window:#eee';
+   app.innerHTML = '<header class="window-header">Request group check</header><div class="window-content"><div class="dialog-content">'
+    +groupFormPreview+'</div><div class="dialog-buttons"><button>Request rolls</button></div></div>';
+   document.body.append(app);
+   const form = app.querySelector('form');
+   const list = form.querySelector('.pneuma-group-list');
+   const body = list.querySelector('tbody');
+   const sample = body.querySelector('tr:not([hidden])');
+   body.replaceChildren(...Array.from({length:15}, () => sample.cloneNode(true)));
+   const bounds = element => element.getBoundingClientRect();
+   const [options, filters, actors] = form.children;
+   const skill = options.querySelector('[name=skill]');
+   const favorites = options.querySelector('.pneuma-group-favorites');
+   const dv = options.querySelector('[name=dv]');
+   const hide = options.querySelector('[name=hideDV]');
+   const visibleBottom = bounds(list).top + list.clientHeight;
+   const fullRows = [...body.rows].filter(row=>bounds(row).bottom<=visibleBottom+1).length;
+   const fits = [app, app.querySelector('.window-content'), app.querySelector('.dialog-content')].every(node=>node.scrollHeight<=node.clientHeight+1);
+   const sameFilterLine = new Set([...filters.querySelectorAll('input')].map(input=>bounds(input).top)).size===1;
+   const footer = bounds(app.querySelector('.dialog-buttons button'));
+   const ordered = bounds(options).bottom <= bounds(filters).top && bounds(filters).bottom <= bounds(actors).top
+    && bounds(skill).right < bounds(favorites).left && bounds(skill).bottom <= bounds(dv).top
+    && bounds(dv).bottom <= bounds(hide).top && hide.parentElement.textContent.trim()==='Hide DV from players';
+   list.scrollTop = list.scrollHeight;
+   return {fullRows, fits, ordered, sameFilterLine, listScroll:list.scrollTop, footerVisible:footer.bottom<=window.innerHeight};
+  });
+  assert.ok(layout.fits && layout.ordered && layout.sameFilterLine && layout.footerVisible && layout.listScroll>0, JSON.stringify({height,...layout}));
+  if (height===900) assert.equal(layout.fullRows,10,JSON.stringify(layout));
+  else assert.ok(layout.fullRows>0 && layout.fullRows<10,JSON.stringify(layout));
+ }
+ console.log('Group check layout: Skill, DV and Hide DV left, four Favorites right, and only the ten-row roster scrolls.');
 
 } finally {await browser.close()}
